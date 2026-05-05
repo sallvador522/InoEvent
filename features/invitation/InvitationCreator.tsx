@@ -1,12 +1,16 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { motion } from 'framer-motion';
 import { Button } from '../../components/ui/Button';
 import { QRCodeSVG } from 'qrcode.react'; 
-import { Save, QrCode } from 'lucide-react';
-import { useNavigate } from 'react-router-dom';
+import { Save, QrCode, ArrowLeft } from 'lucide-react';
+import { useNavigate, useParams, Link } from 'react-router-dom';
+import { useFirebase, db, handleFirestoreError, OperationType } from '../../components/FirebaseProvider';
+import { doc, setDoc, getDoc, updateDoc } from 'firebase/firestore';
 
 export const InvitationCreator: React.FC = () => {
     const navigate = useNavigate();
+    const { id } = useParams();
+    const { user } = useFirebase();
     const [formData, setFormData] = useState({
         groomName: '',
         brideName: '',
@@ -20,24 +24,95 @@ export const InvitationCreator: React.FC = () => {
         contactPhone: ''
     });
     
-    const handleSubmit = () => {
-        if (!formData.groomName || !formData.brideName || !formData.date || !formData.time || !formData.location || !formData.iban || !formData.accountName || !formData.bankName) {
+    const [isSaving, setIsSaving] = useState(false);
+    const [isLoading, setIsLoading] = useState(!!id);
+    
+    useEffect(() => {
+        const loadEvent = async () => {
+            if (!id) return;
+            try {
+                const docRef = doc(db, 'events', id);
+                const docSnap = await getDoc(docRef);
+                if (docSnap.exists()) {
+                    const data = docSnap.data();
+                    setFormData({
+                        groomName: data.groomName || '',
+                        brideName: data.brideName || '',
+                        date: data.date || '',
+                        time: data.time || '',
+                        location: data.location || '',
+                        description: data.description || '',
+                        iban: data.iban || '',
+                        accountName: data.accountName || '',
+                        bankName: data.bankName || '',
+                        contactPhone: data.contactPhone || ''
+                    });
+                }
+            } catch (error) {
+                handleFirestoreError(error, OperationType.GET, `events/${id}`);
+                alert("Erro ao carregar os dados do evento.");
+            } finally {
+                setIsLoading(false);
+            }
+        };
+        loadEvent();
+    }, [id]);
+    
+    const handleSubmit = async () => {
+        if (!formData.groomName || !formData.brideName || !formData.date || !formData.location) {
             alert('Por favor, preencha todos os campos obrigatórios!');
             return;
         }
 
-        const finalData = { 
-            ...formData, 
-            title: `${formData.groomName} & ${formData.brideName}` 
-        };
-        sessionStorage.setItem('createdEventData', JSON.stringify(finalData));
-        navigate('/invite/created');
+        if (!user) {
+            alert('Você precisa estar logado para salvar um evento.');
+            return;
+        }
+
+        setIsSaving(true);
+        try {
+            const finalData = { 
+                ...formData, 
+                title: `${formData.groomName} & ${formData.brideName}`,
+                ownerId: user.uid,
+                layoutMode: 'MODERN'
+            };
+            
+            if (id) {
+                const docRef = doc(db, 'events', id);
+                await updateDoc(docRef, finalData);
+                navigate(`/invite/${id}`);
+            } else {
+                const newEventId = "evt_" + Math.random().toString(36).substr(2, 9);
+                const docRef = doc(db, 'events', newEventId);
+                await setDoc(docRef, finalData);
+                navigate(`/invite/${newEventId}`);
+            }
+        } catch (error) {
+            handleFirestoreError(error, OperationType.WRITE, 'events');
+            alert('Erro ao salvar o evento.');
+        } finally {
+            setIsSaving(false);
+        }
     }
     
+    if (isLoading) {
+        return (
+            <div className="min-h-screen bg-slate-50 flex items-center justify-center font-display">
+                <div className="w-8 h-8 border-2 border-brand-blue border-t-transparent rounded-full animate-spin"></div>
+            </div>
+        );
+    }
+
     return (
         <div className="min-h-screen bg-slate-50 p-6 font-display">
             <div className="max-w-2xl mx-auto bg-white rounded-3xl p-8 shadow-sm border border-slate-100">
-                <h1 className="text-2xl font-bold text-brand-blue mb-6">Criar Convite - Plano Essencial</h1>
+                <div className="flex items-center mb-6">
+                    <Link to="/" className="w-10 h-10 flex items-center justify-center rounded-full hover:bg-slate-100 text-slate-500 transition-colors mr-4">
+                        <ArrowLeft size={20} />
+                    </Link>
+                    <h1 className="text-2xl font-bold text-brand-blue">{id ? "Editar Convite" : "Criar Convite - Plano Essencial"}</h1>
+                </div>
                 
                 <div className="space-y-4">
                     <div className="grid grid-cols-2 gap-4">
@@ -68,8 +143,8 @@ export const InvitationCreator: React.FC = () => {
                     
                     <textarea placeholder="Descrição do Convite" value={formData.description} onChange={e => setFormData({...formData, description: e.target.value})} className="w-full p-4 rounded-xl border border-slate-200 text-slate-900" rows={3}></textarea>
                     
-                    <Button onClick={handleSubmit} variant="navy" fullWidth>
-                        <Save size={20} className="mr-2" /> Salvar e Visualizar
+                    <Button onClick={handleSubmit} variant="navy" fullWidth disabled={isSaving}>
+                        <Save size={20} className="mr-2" /> {isSaving ? "Salvando..." : "Salvar e Visualizar"}
                     </Button>
                 </div>
             </div>

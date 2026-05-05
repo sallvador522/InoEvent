@@ -26,6 +26,11 @@ const App: React.FC = () => {
                 <InvitationCreator />
             </ProtectedRoute>
         } />
+        <Route path="/edit-invitation/:id" element={
+            <ProtectedRoute>
+                <InvitationCreator />
+            </ProtectedRoute>
+        } />
       </Routes>
     </Router>
   );

@@ -1,6 +1,6 @@
 
 import React, { useState, useEffect } from 'react';
-import { useParams } from 'react-router-dom';
+import { useParams, Link } from 'react-router-dom';
 import { motion } from 'framer-motion';
 import { getEventById } from '../../mockData';
 import { EventDetails } from '../../types';
@@ -8,7 +8,9 @@ import { TocaPlayer } from '../../components/music/TocaPlayer';
 import { BottomSheet } from '../../components/ui/BottomSheet';
 import { Button } from '../../components/ui/Button';
 import { QRCodeSVG } from 'qrcode.react';
-import { Users, CalendarClock, Mail, PartyPopper, Shirt, Camera, Music4, Smile } from 'lucide-react';
+import { Users, CalendarClock, Mail, PartyPopper, Shirt, Camera, Music4, Smile, ArrowLeft } from 'lucide-react';
+import { useFirebase, db, handleFirestoreError, OperationType } from '../../components/FirebaseProvider';
+import { doc, getDoc, setDoc, getCountFromServer, collection, query, where } from 'firebase/firestore';
 
 // ============================================================================
 // COMPONENT: INVITATION CONTROLLER
@@ -16,43 +18,99 @@ import { Users, CalendarClock, Mail, PartyPopper, Shirt, Camera, Music4, Smile }
 // ============================================================================
 const InvitationView: React.FC = () => {
   const { id } = useParams();
+  const { user } = useFirebase();
+  const [event, setEvent] = useState<any>(null);
+  const [loading, setLoading] = useState(true);
   
-  // Handle dynamically created event
-  const isCreatedEvent = id === 'created';
-  const createdEventData = isCreatedEvent ? JSON.parse(sessionStorage.getItem('createdEventData') || '{}') : null;
-  
-  const event = isCreatedEvent ? {
-    id: 'created',
-    type: 'WEDDING',
-    layoutMode: 'MODERN', // Using Camila & Tiago template
-    title: createdEventData.title || 'Novos Noivos',
-    hosts: 'Convidam',
-    date: createdEventData.date || 'Data a definir',
-    isoDate: createdEventData.date || new Date().toISOString(),
-    time: createdEventData.time || '19:00',
-    locationName: createdEventData.location || 'Local a definir',
-    address: 'Luanda, Angola', 
-    heroImage: 'https://images.unsplash.com/photo-1511285560982-1356c11d4606?q=80&w=2670&auto=format&fit=crop',
-    description: createdEventData.description || 'Estamos ansiosos para celebrar nosso amor com você!',
-    musicTrack: 'Turning Page - Sleeping At Last',
-    timeline: [
-        { time: createdEventData.time || '19:00', title: 'Cerimônia', description: createdEventData.location || "Local do Evento" }
-    ],
-    gifts: [ { type: 'IBAN', title: 'Presente', description: 'Dados bancários para contribuição', value: createdEventData.iban || '', accountName: createdEventData.accountName || '', bankName: createdEventData.bankName || '' } ],
-    mapLink: createdEventData.location || '#',
-    phone: createdEventData.contactPhone
-  } : getEventById(id || '');
   const [isRSVPOpen, setRSVPOpen] = useState(false);
 
-  // Scroll to top on mount to ensure the user sees the Hero section first
   useEffect(() => {
     window.scrollTo(0, 0);
-  }, []);
+    
+    // First check mock data
+    const mockEvent = getEventById(id || '');
+    if (mockEvent) {
+      setEvent(mockEvent);
+      setLoading(false);
+      return;
+    }
 
-  if (!event) return <div className="p-10 text-center">Evento não encontrado.</div>;
+    // Check 'created' flow
+    const isCreatedEvent = id === 'created';
+    if (isCreatedEvent) {
+      const createdEventData = JSON.parse(sessionStorage.getItem('createdEventData') || '{}');
+      setEvent({
+        id: 'created',
+        type: 'WEDDING',
+        layoutMode: 'MODERN',
+        title: createdEventData.title || 'Novos Noivos',
+        hosts: 'Convidam',
+        date: createdEventData.date || 'Data a definir',
+        isoDate: createdEventData.date || new Date().toISOString(),
+        time: createdEventData.time || '19:00',
+        locationName: createdEventData.location || 'Local a definir',
+        address: 'Luanda, Angola', 
+        heroImage: 'https://images.unsplash.com/photo-1511285560982-1356c11d4606?q=80&w=2670&auto=format&fit=crop',
+        description: createdEventData.description || 'Estamos ansiosos para celebrar nosso amor com você!',
+        musicTrack: 'Turning Page - Sleeping At Last',
+        timeline: [
+            { time: createdEventData.time || '19:00', title: 'Cerimônia', description: createdEventData.location || "Local do Evento" }
+        ],
+        gifts: [ { type: 'IBAN', title: 'Presente', description: 'Dados bancários para contribuição', value: createdEventData.iban || '', accountName: createdEventData.accountName || '', bankName: createdEventData.bankName || '' } ],
+        mapLink: createdEventData.location || '#',
+        phone: createdEventData.contactPhone,
+        ownerId: user?.uid
+      });
+      setLoading(false);
+      return;
+    }
+
+    // Fetch from firestore
+    const fetchEvent = async () => {
+      try {
+        if (!id) return;
+        const docRef = doc(db, 'events', id);
+        const docSnap = await getDoc(docRef);
+        
+        if (docSnap.exists()) {
+          const data = docSnap.data();
+          setEvent({
+            ...data,
+            id: docSnap.id,
+            type: data.type || 'WEDDING',
+            layoutMode: data.layoutMode || 'MODERN',
+            heroImage: data.heroImage || 'https://images.unsplash.com/photo-1511285560982-1356c11d4606?q=80&w=2670&auto=format&fit=crop',
+            musicTrack: data.musicTrack || 'Turning Page - Sleeping At Last',
+            isoDate: data.date || new Date().toISOString(),
+            timeline: data.timeline || [{ time: data.time || '19:00', title: 'Cerimônia', description: data.location || "Local" }],
+            gifts: data.iban ? [ { type: 'IBAN', title: 'Presente', description: 'Dados bancários para contribuição', value: data.iban || '', accountName: data.accountName || '', bankName: data.bankName || '' } ] : data.gifts,
+            address: data.address || 'Luanda, Angola',
+            locationName: data.location || 'Local do Evento',
+            phone: data.contactPhone || ''
+          });
+        }
+      } catch (error: any) {
+         if(!error.message?.includes("Missing or insufficient permissions")) {
+            handleFirestoreError(error, OperationType.GET, `events/${id}`);
+         } else {
+            console.warn("Guest attempted to access private event or missing rules");
+         }
+      } finally {
+        setLoading(false);
+      }
+    };
+    
+    fetchEvent();
+  }, [id, user]);
+
+  if (loading) return <div className="p-10 text-center font-display text-brand-blue">Carregando convite...</div>;
+  if (!event) return <div className="p-10 text-center font-display text-brand-blue">Evento não encontrado ou fechado.</div>;
 
   // Simulate Guest Name (In a real app, this comes from URL token/param)
   const guestName = "Família Silva";
+
+  // Check if owner is viewing
+  const isOwner = user && event.ownerId === user.uid;
 
   // Common Props passed to all layouts
   const props = { event, onRSVP: () => setRSVPOpen(true), guestName };
@@ -61,6 +119,19 @@ const InvitationView: React.FC = () => {
     <>
       <TocaPlayer trackName={event.musicTrack} isDark={event.layoutMode === 'LUXURY' || event.layoutMode === 'INDUSTRIAL'} />
       
+      {isOwner && (
+        <div className="fixed top-4 left-4 z-50 flex gap-2">
+           <Link to="/" className="flex items-center gap-2 bg-white/90 backdrop-blur-sm text-slate-800 px-4 py-2 rounded-full shadow-xl hover:bg-white transition-all font-display text-sm font-bold border border-slate-200">
+              <ArrowLeft size={16} /> Voltar para Início
+           </Link>
+           {event.id !== 'created' && (
+             <Link to={`/dashboard/${event.id}`} className="flex items-center gap-2 bg-brand-blue text-white px-4 py-2 rounded-full shadow-xl hover:bg-brand-blue/90 transition-all font-display text-sm font-bold">
+                Gerenciar RSVP
+             </Link>
+           )}
+        </div>
+      )}
+
       {/* Dynamic Layout Rendering */}
       {event.layoutMode === 'CLASSIC' && <ClassicLayout {...props} />}
       {event.layoutMode === 'ESSENTIAL' && <EssentialLayout {...props} />}
@@ -1094,28 +1165,116 @@ const LuxuryLayout: React.FC<{ event: EventDetails; onRSVP: () => void; guestNam
 // ============================================================================
 // SHARED: RSVP FORM
 // ============================================================================
-const RSVPForm: React.FC<{ event: EventDetails; onClose: () => void }> = ({ event, onClose }) => {
+const RSVPForm: React.FC<{ event: EventDetails | any; onClose: () => void }> = ({ event, onClose }) => {
    const isLuxury = event.layoutMode === 'LUXURY' || event.layoutMode === 'INDUSTRIAL';
    const [status, setStatus] = useState<'yes' | 'no'>('yes');
    const [isConfirmed, setIsConfirmed] = useState(false);
+   const [isSubmitting, setIsSubmitting] = useState(false);
+   const [guestId, setGuestId] = useState('');
+   const [isFull, setIsFull] = useState(false);
+   const [checkingCapacity, setCheckingCapacity] = useState(true);
+   const [formData, setFormData] = useState({
+      name: '',
+      companions: '0',
+      message: ''
+   });
    
+   useEffect(() => {
+       const checkCapacity = async () => {
+           try {
+               const q = query(collection(db, 'events', event.id, 'guests'), where('status', '==', 'CONFIRMED'));
+               const snap = await getCountFromServer(q);
+               if (snap.data().count >= 50) {
+                  setIsFull(true);
+               }
+           } catch(e) {
+               console.error(e);
+           } finally {
+               setCheckingCapacity(false);
+           }
+       };
+       checkCapacity();
+   }, [event.id]);
+
+   const handleSubmit = async (e: React.FormEvent) => {
+       e.preventDefault();
+       setIsSubmitting(true);
+       try {
+           const newGuestId = "gst_" + Math.random().toString(36).substr(2, 9);
+           const guestRef = doc(db, 'events', event.id, 'guests', newGuestId);
+           await setDoc(guestRef, {
+               name: formData.name,
+               email: '',
+               status: status === 'yes' ? 'CONFIRMED' : 'DECLINED',
+               adults: status === 'yes' ? (1 + Number(formData.companions)) : 0,
+               children: 0,
+               message: formData.message,
+               createdAt: new Date().toISOString()
+           });
+           setGuestId(newGuestId);
+           setIsConfirmed(true);
+       } catch (err: any) {
+           console.error("RSVP Error:", err);
+           if (!err.message?.includes("Missing or insufficient permissions")) {
+               handleFirestoreError(err, OperationType.WRITE, `events/${event.id}/guests`);
+           }
+           alert("Houve um erro ao enviar seu RSVP. Tente novamente.");
+       } finally {
+           setIsSubmitting(false);
+       }
+   };
+
+   if (checkingCapacity) {
+     return (
+       <div className="text-center p-6 space-y-6 flex flex-col items-center justify-center min-h-[300px]">
+           <div className="w-8 h-8 border-2 border-brand-blue border-t-transparent rounded-full animate-spin"></div>
+           <p className="text-sm opacity-70">A verificar disponibilidade...</p>
+       </div>
+     );
+   }
+
+   if (isFull) {
+       return (
+         <div className="text-center p-6 space-y-6 flex flex-col items-center justify-center min-h-[250px]">
+             <div className="w-16 h-16 bg-red-50 rounded-full flex items-center justify-center text-red-500 mx-auto">
+                <Users size={32} />
+             </div>
+             <h3 className="font-bold text-lg text-red-600">Lista Cheia!</h3>
+             <p className="text-sm opacity-80">A lista de convidados para este evento atingiu a capacidade máxima (50 convidados).</p>
+             <Button onClick={onClose} fullWidth variant={isLuxury ? 'outline' : 'primary'}>Fechar</Button>
+         </div>
+       );
+   }
+
    if (isConfirmed) {
      return (
        <div className="text-center p-6 space-y-6">
-          <div className="w-32 h-32 mx-auto bg-white p-2 border border-slate-200">
-             <QRCodeSVG value={`https://inoevents.com/checkin/${event.id}`} size={128} />
-          </div>
-          <h3 className="font-bold text-lg">Confirmação Recebida!</h3>
-          <p className="text-sm opacity-70">Apresente este código na recepção do evento.</p>
+          {status === 'yes' ? (
+              <>
+                <div className="w-32 h-32 mx-auto bg-white p-2 border border-slate-200 flex items-center justify-center">
+                    <QRCodeSVG value={`https://inoevents.com/checkin/${event.id}?guest=${guestId}`} size={112} />
+                </div>
+                <h3 className="font-bold text-lg">Confirmação Recebida!</h3>
+                <p className="text-sm opacity-70">Apresente o QRCode acima na recepção do evento.</p>
+              </>
+          ) : (
+              <>
+                  <div className="w-16 h-16 mx-auto bg-slate-100 rounded-full flex items-center justify-center text-slate-400">
+                      <Smile size={32} />
+                  </div>
+                  <h3 className="font-bold text-lg">Obrigado por nos avisar!</h3>
+                  <p className="text-sm opacity-70">Sentiremos sua falta.</p>
+              </>
+          )}
           <Button onClick={onClose} fullWidth variant={isLuxury ? 'outline' : 'primary'}>Fechar</Button>
        </div>
      );
    }
 
    return (
-    <form className="space-y-6" onSubmit={(e) => { e.preventDefault(); setIsConfirmed(true); }}>
+    <form className="space-y-6" onSubmit={handleSubmit}>
       <p className={`text-sm ${isLuxury ? 'text-gray-400' : 'opacity-70'}`}>
-        Por favor, confirme sua presença para o evento de <strong>{event.title}</strong>.
+        Por favor, confirme sua presence para o evento de <strong>{event.title}</strong>.
       </p>
       
       <div className="flex gap-4">
@@ -1142,13 +1301,13 @@ const RSVPForm: React.FC<{ event: EventDetails; onClose: () => void }> = ({ even
       <div className="space-y-4">
         <div>
           <label className={`text-xs font-bold uppercase tracking-wider mb-1 block ${isLuxury ? 'text-[#BF9B30]' : 'opacity-50'}`}>Nome Completo</label>
-          <input type="text" className={`w-full bg-transparent border-b py-2 focus:outline-none ${isLuxury ? 'border-gray-600 text-white focus:border-[#BF9B30]' : 'border-gray-300 text-black focus:border-black'}`} placeholder="Seu nome" required />
+          <input required value={formData.name} onChange={e => setFormData({...formData, name: e.target.value})} type="text" className={`w-full bg-transparent border-b py-2 focus:outline-none ${isLuxury ? 'border-gray-600 text-white focus:border-[#BF9B30]' : 'border-gray-300 text-black focus:border-black'}`} placeholder="Seu nome" />
         </div>
         
         {status === 'yes' && (
           <div>
             <label className={`text-xs font-bold uppercase tracking-wider mb-1 block ${isLuxury ? 'text-[#BF9B30]' : 'opacity-50'}`}>Acompanhantes</label>
-            <select className={`w-full bg-transparent border-b py-2 focus:outline-none ${isLuxury ? 'border-gray-600 text-white focus:border-[#BF9B30] [&>option]:text-black' : 'border-gray-300 text-black focus:border-black'}`}>
+            <select value={formData.companions} onChange={e => setFormData({...formData, companions: e.target.value})} className={`w-full bg-transparent border-b py-2 focus:outline-none ${isLuxury ? 'border-gray-600 text-white focus:border-[#BF9B30] [&>option]:text-black' : 'border-gray-300 text-black focus:border-black'}`}>
               <option value="0">Apenas eu</option>
               <option value="1">+1 Acompanhante</option>
               <option value="2">+2 Acompanhantes</option>
@@ -1160,14 +1319,16 @@ const RSVPForm: React.FC<{ event: EventDetails; onClose: () => void }> = ({ even
            <label className={`text-xs font-bold uppercase tracking-wider mb-1 block ${isLuxury ? 'text-[#BF9B30]' : 'opacity-50'}`}>Mensagem aos Noivos (Opcional)</label>
            <textarea 
              rows={3}
+             value={formData.message} 
+             onChange={e => setFormData({...formData, message: e.target.value})}
              className={`w-full bg-transparent border rounded-lg p-3 focus:outline-none text-sm ${isLuxury ? 'border-gray-600 text-white focus:border-[#BF9B30]' : 'border-gray-200 text-black focus:border-black'}`}
              placeholder={status === 'yes' ? "Mal posso esperar..." : "Desejo muitas felicidades..."} 
            />
         </div>
       </div>
 
-      <Button type="submit" fullWidth variant={isLuxury ? 'outline' : 'primary'} className={isLuxury ? 'border-[#BF9B30] text-[#BF9B30] hover:bg-[#BF9B30] hover:text-black font-bold uppercase tracking-widest' : ''}>
-         {status === 'yes' ? 'ENVIAR RESPOSTA' : 'ENVIAR JUSTIFICATIVA'}
+      <Button disabled={isSubmitting} type="submit" fullWidth variant={isLuxury ? 'outline' : 'primary'} className={isLuxury ? 'border-[#BF9B30] text-[#BF9B30] hover:bg-[#BF9B30] hover:text-black font-bold uppercase tracking-widest mt-4' : 'mt-4'}>
+         {isSubmitting ? 'Enviando...' : (status === 'yes' ? 'ENVIAR RESPOSTA' : 'ENVIAR JUSTIFICATIVA')}
       </Button>
     </form>
    );

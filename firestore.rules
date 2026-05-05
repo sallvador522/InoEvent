@@ -37,8 +37,11 @@ service cloud.firestore {
     }
 
     match /events/{eventId} {
+      // --- List ---
+      allow list: if isSignedIn() && resource.data.ownerId == request.auth.uid;
+      
       // --- Get ---
-      allow get: if isSignedIn() && isValidId(eventId) && (resource == null || resource.data.ownerId == request.auth.uid);
+      allow get: if isValidId(eventId);
       
       // --- Create ---
       allow create: if isSignedIn() && isValidId(eventId) && isValidEvent(incoming()) && incoming().ownerId == request.auth.uid;
@@ -48,6 +51,15 @@ service cloud.firestore {
       
       // --- Delete ---
       allow delete: if isSignedIn() && isValidId(eventId) && resource != null && resource.data.ownerId == request.auth.uid;
+      
+      // --- Guests Subcollection ---
+      match /guests/{guestId} {
+        // Public can read guests to allow getCountFromServer
+        allow read: if true;
+        // Public can create guest (RSVP form)
+        allow create: if isValidId(guestId) && incoming().name is string;
+        allow update, delete: if isSignedIn() && get(/databases/$(database)/documents/events/$(eventId)).data.ownerId == request.auth.uid;
+      }
     }
   }
 }

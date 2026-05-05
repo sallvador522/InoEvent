@@ -1,0 +1,44 @@
+{
+  "entities": {
+    "User": {
+      "title": "User",
+      "description": "App user",
+      "type": "object",
+      "properties": {
+        "uid": { "type": "string" },
+        "email": { "type": "string", "format": "email" },
+        "plan": { "type": "string" }
+      },
+      "required": ["uid", "email"]
+    },
+    "Event": {
+      "title": "Event",
+      "description": "Event details",
+      "type": "object",
+      "properties": {
+        "id": { "type": "string" },
+        "ownerId": { "type": "string" },
+        "title": { "type": "string" },
+        "date": { "type": "string" },
+        "time": { "type": "string" },
+        "location": { "type": "string" },
+        "description": { "type": "string" },
+        "iban": { "type": "string" },
+        "accountName": { "type": "string" },
+        "bankName": { "type": "string" },
+        "contactPhone": { "type": "string" }
+      },
+      "required": ["id", "ownerId", "title"]
+    }
+  },
+  "firestore": {
+    "/users/{uid}": {
+      "schema": { "$ref": "User" },
+      "description": "User profiles"
+    },
+    "/events/{eventId}": {
+      "schema": { "$ref": "Event" },
+      "description": "Events created by users"
+    }
+  }
+}

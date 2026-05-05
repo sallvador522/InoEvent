@@ -64,6 +64,7 @@ export interface EventDetails {
   gifts?: GiftItem[];
   tips?: TipItem[];
   dressCode?: DressCode;
+  phone?: string; // Add phone
 }
 
 export interface ThemeConfig {

@@ -7,6 +7,8 @@ import { EventDetails } from '../../types';
 import { TocaPlayer } from '../../components/music/TocaPlayer';
 import { BottomSheet } from '../../components/ui/BottomSheet';
 import { Button } from '../../components/ui/Button';
+import { QRCodeSVG } from 'qrcode.react';
+import { Users, CalendarClock, Mail, PartyPopper, Shirt, Camera, Music4, Smile } from 'lucide-react';
 
 // ============================================================================
 // COMPONENT: INVITATION CONTROLLER
@@ -14,7 +16,32 @@ import { Button } from '../../components/ui/Button';
 // ============================================================================
 const InvitationView: React.FC = () => {
   const { id } = useParams();
-  const event = getEventById(id || '');
+  
+  // Handle dynamically created event
+  const isCreatedEvent = id === 'created';
+  const createdEventData = isCreatedEvent ? JSON.parse(sessionStorage.getItem('createdEventData') || '{}') : null;
+  
+  const event = isCreatedEvent ? {
+    id: 'created',
+    type: 'WEDDING',
+    layoutMode: 'MODERN', // Using Camila & Tiago template
+    title: createdEventData.title || 'Novos Noivos',
+    hosts: 'Convidam',
+    date: createdEventData.date || 'Data a definir',
+    isoDate: createdEventData.date || new Date().toISOString(),
+    time: createdEventData.time || '19:00',
+    locationName: createdEventData.location || 'Local a definir',
+    address: 'Luanda, Angola', 
+    heroImage: 'https://images.unsplash.com/photo-1511285560982-1356c11d4606?q=80&w=2670&auto=format&fit=crop',
+    description: createdEventData.description || 'Estamos ansiosos para celebrar nosso amor com você!',
+    musicTrack: 'Turning Page - Sleeping At Last',
+    timeline: [
+        { time: createdEventData.time || '19:00', title: 'Cerimônia', description: createdEventData.location || "Local do Evento" }
+    ],
+    gifts: [ { type: 'IBAN', title: 'Presente', description: 'Dados bancários para contribuição', value: createdEventData.iban || '', accountName: createdEventData.accountName || '', bankName: createdEventData.bankName || '' } ],
+    mapLink: createdEventData.location || '#',
+    phone: createdEventData.contactPhone
+  } : getEventById(id || '');
   const [isRSVPOpen, setRSVPOpen] = useState(false);
 
   // Scroll to top on mount to ensure the user sees the Hero section first
@@ -36,6 +63,7 @@ const InvitationView: React.FC = () => {
       
       {/* Dynamic Layout Rendering */}
       {event.layoutMode === 'CLASSIC' && <ClassicLayout {...props} />}
+      {event.layoutMode === 'ESSENTIAL' && <EssentialLayout {...props} />}
       {event.layoutMode === 'MODERN' && <ModernLayout {...props} />}
       {event.layoutMode === 'LUXURY' && <LuxuryLayout {...props} />}
       {event.layoutMode === 'GARDEN' && <GardenLayout {...props} />}
@@ -124,6 +152,40 @@ const CountdownTimer: React.FC<{ targetDate: string; colorClass?: string }> = ({
 
 
 // ============================================================================
+// LAYOUT ESSENTIAL: CLEAN & FAST
+// ============================================================================
+const EssentialLayout: React.FC<{ event: EventDetails; onRSVP: () => void; guestName: string }> = ({ event, onRSVP }) => {
+  return (
+    <div className="min-h-screen bg-slate-50 font-display pb-28">
+      {/* Hero Image */}
+      <div className="h-[40vh] w-full overflow-hidden">
+        <img src={event.heroImage} className="w-full h-full object-cover" />
+      </div>
+
+      <div className="max-w-xl mx-auto px-6 -mt-16 relative z-10 space-y-6">
+        <div className="bg-white rounded-3xl p-8 shadow-sm border border-slate-100 text-center">
+          <h1 className="text-3xl font-bold text-brand-blue mb-2">{event.title}</h1>
+          <p className="text-sm text-slate-500 mb-6">{event.date} às {event.time}</p>
+        </div>
+        
+        <div className="bg-white rounded-3xl p-8 shadow-sm border border-slate-100 space-y-4">
+            <h2 className="font-bold text-brand-blue">Informações</h2>
+            <p className="text-sm text-slate-600">{event.description}</p>
+            <Button onClick={() => window.open(event.mapLink || '#', '_blank')} variant="navy" fullWidth>Localização (Maps)</Button>
+            {event.phone && (
+              <Button onClick={() => window.open(`https://wa.me/${event.phone.replace(/\D/g, '')}?text=Olá!`, '_blank')} variant="outline" fullWidth className="border-green-500 text-green-700 hover:bg-green-50">Falar no WhatsApp</Button>
+            )}
+        </div>
+      </div>
+
+      <div className="fixed bottom-6 left-1/2 -translate-x-1/2 z-50 w-full max-w-sm px-4">
+          <Button onClick={onRSVP} variant="navy" fullWidth>Confirmar Presença</Button>
+      </div>
+    </div>
+  );
+};
+
+// ============================================================================
 // LAYOUT 1: CLASSIC ROMANTIC (Refined)
 // ============================================================================
 const ClassicLayout: React.FC<{ event: EventDetails; onRSVP: () => void; guestName: string }> = ({ event, onRSVP }) => {
@@ -205,6 +267,36 @@ const ClassicLayout: React.FC<{ event: EventDetails; onRSVP: () => void; guestNa
   );
 };
 
+
+// ============================================================================
+// HELPER: MANUAL DO CONVIDADO
+// ============================================================================
+const GuestManual = () => {
+    const points = [
+        { icon: Users, text: "Contamos com a sua presença!" },
+        { icon: CalendarClock, text: "Seja pontual!" },
+        { icon: Mail, text: "Convidado não convida!" },
+        { icon: PartyPopper, text: "Comemore a nossa união!" },
+        { icon: Shirt, text: "Branco é a cor da noiva!" },
+        { icon: Camera, text: "Faça muitas fotos e stories!" },
+        { icon: Music4, text: "É obrigatório dançar muito!" },
+        { icon: Smile, text: "Sorria e seja muito feliz!" },
+    ];
+    return (
+        <FadeInSection className="py-24 px-6 bg-white border-t border-gray-100 mt-12 text-center">
+            <h3 className="text-3xl font-serif text-[#C2B280] mb-12">Manual do Convidado</h3>
+            <div className="grid grid-cols-2 gap-8 max-w-2xl mx-auto">
+                {points.map((p, i) => (
+                    <div key={i} className="flex flex-col items-center">
+                        <p.icon className="w-8 h-8 text-[#C2B280] mb-4" strokeWidth={1} />
+                        <p className="text-sm text-gray-600">{p.text}</p>
+                    </div>
+                ))}
+            </div>
+            <p className="mt-12 text-sm text-gray-500 italic">Agradecemos o carinho e a compreensão!</p>
+        </FadeInSection>
+    )
+}
 
 // ============================================================================
 // LAYOUT 2: MINIMALIST ETHEREAL (Redesigned Modern)
@@ -327,34 +419,42 @@ const ModernLayout: React.FC<{ event: EventDetails; onRSVP: () => void; guestNam
       </FadeInSection>
 
       {/* 6. DRESS CODE & TIPS */}
-      <div className="grid md:grid-cols-2 max-w-6xl mx-auto w-full">
-         <FadeInSection className="bg-white p-16 md:p-24 flex flex-col items-center justify-center text-center border-b md:border-b-0 md:border-r border-gray-100">
-             <span className="material-symbols-outlined text-4xl text-[#C2B280] mb-6">checkroom</span>
-             <h3 className="text-2xl font-serif mb-4">Dress Code</h3>
-             <p className="text-gray-500 leading-relaxed max-w-sm mb-6">{event.dressCode?.description || 'Traje Passeio Completo'}</p>
-             {event.dressCode?.image && (
-                <div className="w-24 h-24 rounded-full overflow-hidden mb-4 grayscale opacity-80">
-                   <img src={event.dressCode.image} className="w-full h-full object-cover" />
-                </div>
-             )}
+
+      {/* 7. GIFTS / IBAN Section */}
+      {event.gifts && event.gifts[0].value && (
+         <FadeInSection className="py-12 border-t border-gray-100 mt-12 text-center px-6">
+            <span className="font-display text-[10px] uppercase tracking-[0.3em] text-gray-400 mb-4 block">Presente</span>
+            <h4 className="text-xl font-serif mb-6">Querido(a) convidado(a)!</h4>
+            <p className="text-gray-500 mb-8 max-w-sm mx-auto leading-relaxed">
+              {event.gifts[0].description} Caso queira nos presentear, agradecemos desde já o seu lindo gesto e gostaríamos que o fizesse por transferência bancária para o IBAN indicado abaixo:
+            </p>
+            
+            <div className="bg-[#F4F4F4] p-6 rounded-2xl border border-gray-200 mb-8 max-w-sm mx-auto shadow-inner">
+               <p className="text-xl md:text-2xl font-mono text-gray-900 tracking-widest mb-4">{event.gifts[0].value}</p>
+               <div className="space-y-1">
+                 <p className="text-xs text-gray-500 uppercase tracking-widest">Titular</p>
+                 <p className="text-sm text-gray-800 font-bold mb-2">{event.gifts[0].accountName}</p>
+                 <p className="text-xs text-gray-500 uppercase tracking-widest">Banco</p>
+                 <p className="text-sm text-gray-800 font-bold">{event.gifts[0].bankName}</p>
+               </div>
+            </div>
+
+            <p className="text-gray-500 mb-8 text-sm leading-relaxed">
+               Os comprovativos podem ser enviados via WhatsApp para o número {event.phone}. <br/>
+               Muito obrigado(a)! <br/>
+               Deus lhe abençoe sempre!
+            </p>
+            
+            <button 
+               onClick={() => {navigator.clipboard.writeText(event.gifts![0].value); alert('IBAN Copiado!')}}
+               className="px-8 py-3 border border-[#C2B280] text-[#C2B280] text-xs font-bold uppercase tracking-widest hover:bg-[#C2B280] hover:text-white transition-colors"
+            >
+               Copiar IBAN
+            </button>
          </FadeInSection>
-         
-         <FadeInSection className="bg-white p-16 md:p-24 flex flex-col items-center justify-center text-center">
-             <span className="material-symbols-outlined text-4xl text-[#C2B280] mb-6">featured_seasonal_and_gifts</span>
-             <h3 className="text-2xl font-serif mb-4">Lista de Presentes</h3>
-             <p className="text-gray-500 leading-relaxed max-w-sm mb-8">
-               {event.gifts?.[0].description || 'Sua presença é nosso maior presente.'}
-             </p>
-             {event.gifts && (
-               <button 
-                  onClick={() => {navigator.clipboard.writeText(event.gifts![0].value); alert('IBAN Copiado!')}}
-                  className="px-8 py-3 bg-[#2C2C2C] text-white text-xs font-bold uppercase tracking-widest hover:bg-[#C2B280] transition-colors"
-               >
-                  Copiar IBAN
-               </button>
-             )}
-         </FadeInSection>
-      </div>
+      )}
+
+
 
       {/* 7. GALLERY (Masonry-ish) */}
       {event.gallery && (
@@ -369,6 +469,9 @@ const ModernLayout: React.FC<{ event: EventDetails; onRSVP: () => void; guestNam
             </div>
          </FadeInSection>
       )}
+
+      {/* 8. MANUAL DO CONVIDADO */}
+      <GuestManual />
 
       {/* FOOTER ACTION */}
       <div className="fixed bottom-8 left-1/2 -translate-x-1/2 z-50">
@@ -994,9 +1097,23 @@ const LuxuryLayout: React.FC<{ event: EventDetails; onRSVP: () => void; guestNam
 const RSVPForm: React.FC<{ event: EventDetails; onClose: () => void }> = ({ event, onClose }) => {
    const isLuxury = event.layoutMode === 'LUXURY' || event.layoutMode === 'INDUSTRIAL';
    const [status, setStatus] = useState<'yes' | 'no'>('yes');
+   const [isConfirmed, setIsConfirmed] = useState(false);
    
+   if (isConfirmed) {
+     return (
+       <div className="text-center p-6 space-y-6">
+          <div className="w-32 h-32 mx-auto bg-white p-2 border border-slate-200">
+             <QRCodeSVG value={`https://inoevents.com/checkin/${event.id}`} size={128} />
+          </div>
+          <h3 className="font-bold text-lg">Confirmação Recebida!</h3>
+          <p className="text-sm opacity-70">Apresente este código na recepção do evento.</p>
+          <Button onClick={onClose} fullWidth variant={isLuxury ? 'outline' : 'primary'}>Fechar</Button>
+       </div>
+     );
+   }
+
    return (
-    <form className="space-y-6" onSubmit={(e) => { e.preventDefault(); onClose(); }}>
+    <form className="space-y-6" onSubmit={(e) => { e.preventDefault(); setIsConfirmed(true); }}>
       <p className={`text-sm ${isLuxury ? 'text-gray-400' : 'opacity-70'}`}>
         Por favor, confirme sua presença para o evento de <strong>{event.title}</strong>.
       </p>

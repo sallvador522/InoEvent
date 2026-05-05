@@ -3,6 +3,7 @@ import { Link } from 'react-router-dom';
 import { motion } from 'framer-motion';
 import { EVENTS } from '../../mockData';
 import { ThemeType } from '../../types';
+import { useFirebase, signOut, auth } from '../../components/FirebaseProvider';
 
 // Create a motion component from the React Router Link
 const MotionLink = motion(Link);
@@ -20,6 +21,9 @@ const CATEGORIES = [
 
 export const LandingPage: React.FC = () => {
   const [selectedCategory, setSelectedCategory] = useState('all');
+  const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
+  const [dashboardOpen, setDashboardOpen] = useState(false);
+  const { user, userProfile } = useFirebase();
   
   const getBadgeConfig = (type: ThemeType) => {
     switch (type) {
@@ -62,25 +66,74 @@ export const LandingPage: React.FC = () => {
         <div className="hidden md:flex items-center gap-8 text-sm font-medium text-blue-100">
            <a href="#" className="hover:text-white transition-colors">Início</a>
            <a href="#" className="hover:text-white transition-colors">Casamentos</a>
-           <a href="#" className="hover:text-white transition-colors">Preços</a>
+           <Link to="/plans" className="hover:text-white transition-colors">Preços</Link>
            <a href="#" className="hover:text-white transition-colors">Contactos</a>
            <a href="#" className="hover:text-white transition-colors">Perguntas</a>
            <a href="#" className="hover:text-white transition-colors">Sobre Nós</a>
            
            <div className="flex items-center gap-6 pl-2">
              <span className="text-white/20 text-lg font-light select-none">|</span>
-             <button className="hover:text-primary transition-colors font-semibold text-white">Entrar</button>
+             {user ? (
+               <div className="flex items-center gap-4">
+                  <span className="px-3 py-1 bg-white/20 rounded-full text-xs font-semibold text-white shadow-sm border border-white/10">{userProfile?.plan || 'Essencial'}</span>
+                  <button onClick={() => signOut(auth)} className="hover:text-red-400 transition-colors font-semibold text-white">Sair</button>
+               </div>
+             ) : (
+               <Link to="/auth" className="hover:text-primary transition-colors font-semibold text-white">Entrar</Link>
+             )}
            </div>
         </div>
 
         {/* Mobile Actions */}
         <div className="flex items-center gap-4 md:hidden">
-          <button className="text-sm font-semibold text-blue-100 hover:text-white transition-colors">Entrar</button>
-          <button className="bg-white/10 hover:bg-white/20 text-white p-2 rounded-full flex items-center justify-center transition-colors">
-            <span className="material-symbols-outlined text-[20px]">menu</span>
+          {!user && (
+            <Link to="/auth" className="text-sm font-semibold text-blue-100 hover:text-white transition-colors">Entrar</Link>
+          )}
+          <button 
+           onClick={() => setMobileMenuOpen(!mobileMenuOpen)}
+           className="bg-white/10 hover:bg-white/20 text-white p-2 rounded-full flex items-center justify-center transition-colors">
+            <span className="material-symbols-outlined text-[20px]">
+              {mobileMenuOpen ? 'close' : 'menu'}
+            </span>
           </button>
         </div>
       </nav>
+
+      {/* Mobile Drawer */}
+      {mobileMenuOpen && (
+        <motion.div 
+          initial={{ opacity: 0, y: -20 }}
+          animate={{ opacity: 1, y: 0 }}
+          className="fixed top-20 left-0 right-0 bg-white z-40 p-6 shadow-xl border-b border-slate-100 md:hidden flex flex-col gap-4 font-bold text-brand-blue"
+        >
+          <Link to="/" onClick={() => setMobileMenuOpen(false)}>Início</Link>
+          <Link to="/plans" onClick={() => setMobileMenuOpen(false)}>Preços</Link>
+          <a href="#" onClick={() => setMobileMenuOpen(false)}>Casamentos</a>
+          <a href="#" onClick={() => setMobileMenuOpen(false)}>Contactos</a>
+          
+          {user ? (
+              <div className="border-t pt-4 flex flex-col gap-4">
+                  <span className="px-3 py-1 bg-brand-blue/10 rounded-full text-xs font-semibold text-brand-blue self-start">{userProfile?.plan || 'Essencial'}</span>
+                  <button onClick={() => { signOut(auth); setMobileMenuOpen(false); }} className="text-left text-red-600">Sair</button>
+              </div>
+          ) : (
+              <Link to="/auth" onClick={() => setMobileMenuOpen(false)}>Entrar</Link>
+          )}
+          
+          <div className="border-t pt-4">
+              <a href="#" className="font-bold text-slate-800" onClick={() => setDashboardOpen(!dashboardOpen)}>Meus Eventos</a>
+              {dashboardOpen && (
+                  <div className="flex flex-col gap-2 ml-4 mt-2 font-normal text-sm">
+                      {EVENTS.map(event => (
+                          <Link to={`/dashboard/${event.id}`} key={event.id} onClick={() => setMobileMenuOpen(false)}>
+                              {event.title}
+                          </Link>
+                      ))}
+                  </div>
+              )}
+          </div>
+        </motion.div>
+      )}
 
       <main className="relative z-10 flex flex-col gap-0 pb-24">
         
@@ -268,7 +321,7 @@ export const LandingPage: React.FC = () => {
                 <span className="font-bold text-slate-200">InoEvents</span>
              </div>
              <div className="flex gap-8">
-                <a className="hover:text-white transition-colors" href="#">Preços</a>
+                <Link className="hover:text-white transition-colors" to="/plans">Preços</Link>
                 <a className="hover:text-white transition-colors" href="#">Suporte</a>
                 <a className="hover:text-white transition-colors" href="#">Termos</a>
              </div>

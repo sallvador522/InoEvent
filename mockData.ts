@@ -16,16 +16,38 @@ export const EVENTS: EventDetails[] = [
     address: 'Cidade Alta, Luanda, Angola',
     receptionName: 'Salão Nobre',
     receptionAddress: 'Clube Naval de Luanda',
-    heroImage: 'https://images.unsplash.com/photo-1519225448526-0645155bead2?q=80&w=2574&auto=format&fit=crop',
+    heroImage: 'https://images.unsplash.com/photo-1519741497674-611481863552?q=80&w=2574&auto=format&fit=crop',
     description: 'Com a bênção de Deus e de nossos pais, convidamos você para o nosso casamento. Um dia de amor, tradição e alegria.',
     musicTrack: 'Canon in D - Piano',
     themeColor: '#1B365D', // Navy Blue Classic
-    mapImage: 'https://images.unsplash.com/photo-1519167758481-83f550bb49b3?q=80&w=2698&auto=format&fit=crop',
+    mapImage: 'https://images.unsplash.com/photo-1465495976277-4387d4b0b4c6?q=80&w=2698&auto=format&fit=crop',
     timeline: [
       { time: '15:30', title: 'Cerimônia Religiosa', description: "Catedral da Sé" },
       { time: '17:30', title: 'Cumprimentos', description: 'Jardins da Catedral' },
       { time: '19:00', title: 'Recepção', description: 'Clube Naval' },
       { time: '21:00', title: 'Jantar', description: 'Buffet Completo' }
+    ]
+  },
+
+  // NOVO: Essencial
+  {
+    id: 'wedding-essential',
+    type: ThemeType.WEDDING,
+    layoutMode: 'ESSENTIAL',
+    title: 'Ana & João',
+    hosts: 'Com muita alegria',
+    date: '10 . DEZ . 2024',
+    isoDate: '2024-12-10T18:00:00',
+    time: '18:00',
+    locationName: 'Espaço Elegance',
+    address: 'Talatona, Luanda',
+    heroImage: 'https://images.unsplash.com/photo-1520854221256-17451cc331bf?q=80&w=2670&auto=format&fit=crop',
+    description: 'Um dia inesquecível de celebração do nosso amor. Junte-se a nós para brindarmos à vida e à felicidade (Modelo Essencial).',
+    musicTrack: 'A Thousand Years - Christina Perri',
+    themeColor: '#4A4A4A',
+    timeline: [
+      { time: '18:00', title: 'Cerimônia', description: "Jardim" },
+      { time: '20:00', title: 'Recepção', description: 'Salão Principal' }
     ]
   },
 
@@ -41,15 +63,15 @@ export const EVENTS: EventDetails[] = [
     time: '16:00',
     locationName: 'Solar dos Hibiscos',
     address: 'Mussulo, Luanda, Angola',
-    heroImage: 'https://images.unsplash.com/photo-1511285560982-1356c11d4606?q=80&w=2670&auto=format&fit=crop',
+    heroImage: 'https://images.unsplash.com/photo-1520854221256-17451cc331bf?q=80&w=2670&auto=format&fit=crop',
     description: '"O amor é paciente, o amor é bondoso. Não inveja, não se vangloria, não se orgulha." (1 Coríntios 13:4). Sua presença é essencial neste novo capítulo de nossas vidas.',
     musicTrack: 'Turning Page - Sleeping At Last',
     themeColor: '#C2B280', // Taupe/Sand
-    mapImage: 'https://images.unsplash.com/photo-1515934751635-c81c6bc9a2d8?q=80&w=2670&auto=format&fit=crop',
+    mapImage: 'https://images.unsplash.com/photo-1532712938310-34cb3982ef74?q=80&w=2670&auto=format&fit=crop',
     gallery: [
-      'https://images.unsplash.com/photo-1519741497674-611481863552?q=80&w=2574&auto=format&fit=crop',
-      'https://images.unsplash.com/photo-1523438885200-e635ba2c371e?q=80&w=2574&auto=format&fit=crop',
-      'https://images.unsplash.com/photo-1606800052052-a08af7148866?q=80&w=2670&auto=format&fit=crop'
+      'https://images.unsplash.com/photo-1515934751635-c81c6bc9a2d8?q=80&w=2574&auto=format&fit=crop',
+      'https://images.unsplash.com/photo-1583939003579-730e3918a45a?q=80&w=2574&auto=format&fit=crop',
+      'https://images.unsplash.com/photo-1511795409834-ef04bbd61622?q=80&w=2670&auto=format&fit=crop'
     ],
     timeline: [
       { time: '16:00', title: 'Cerimônia ao Ar Livre', description: 'Gramado Principal' },
@@ -241,4 +263,8 @@ export const EVENTS: EventDetails[] = [
 
 export const getEventById = (id: string): EventDetails | undefined => {
   return EVENTS.find(e => e.id === id);
+};
+
+export const getEventByLayoutMode = (layoutMode: string): EventDetails | undefined => {
+  return EVENTS.find(e => e.layoutMode === layoutMode);
 };

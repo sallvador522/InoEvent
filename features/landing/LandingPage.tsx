@@ -77,13 +77,7 @@ export const LandingPage: React.FC = () => {
         navigate('/auth');
         return;
     }
-    const plan = userProfile?.plan || 'Essencial';
-    if (plan === 'Essencial') {
-       navigate('/create-invitation');
-    } else {
-       // Placeholder for template selection
-       alert('Redirecionando para seleção de templates...');
-    }
+    navigate('/create-invitation');
   }
 
   const filteredEvents = selectedCategory === 'all' 
@@ -150,7 +144,7 @@ export const LandingPage: React.FC = () => {
                   </div>
                
                   <span className="px-3 py-1 bg-white/20 rounded-full text-xs font-semibold text-white shadow-sm border border-white/10 ml-2">{userProfile?.plan || 'Essencial'}</span>
-                  <button onClick={() => signOut(auth)} className="hover:text-red-400 transition-colors font-semibold text-white ml-2">Sair</button>
+                  <button onClick={() => signOut(auth)} className="hover:text-red-400 transition-colors font-semibold text-white ml-4">Sair</button>
                </div>
              ) : (
                <Link to="/auth" className="hover:text-primary transition-colors font-semibold text-white">Entrar</Link>
@@ -160,6 +154,7 @@ export const LandingPage: React.FC = () => {
 
         {/* Mobile Actions */}
         <div className="flex items-center gap-4 md:hidden">
+          <Link to="/plans" className="text-sm font-semibold text-blue-100 hover:text-white transition-colors">Preços</Link>
           {!user && (
             <Link to="/auth" className="text-sm font-semibold text-blue-100 hover:text-white transition-colors">Entrar</Link>
           )}
@@ -258,10 +253,14 @@ export const LandingPage: React.FC = () => {
                 </div>
               )}
               
-              <Link to="/plans" onClick={() => setMobileMenuOpen(false)} className="hover:text-primary transition-colors flex items-center justify-between">
-                <span className="flex items-center gap-3"><span className="material-symbols-outlined text-slate-400">workspace_premium</span> Preços</span>
-                <span className="material-symbols-outlined text-slate-300">chevron_right</span>
-              </Link>
+              {(userProfile?.plan === 'Premium' || userProfile?.plan === 'Corporate') && (
+                  <Link to="/business/create" onClick={() => setMobileMenuOpen(false)} className="hover:text-primary transition-colors flex items-center justify-between">
+                    <span className="flex items-center gap-3"><span className="material-symbols-outlined text-slate-400">storefront</span> Criar Negócio</span>
+                    <span className="material-symbols-outlined text-slate-300">chevron_right</span>
+                  </Link>
+              )}
+              
+              {/* Preços link removed */}
               <a href="#" onClick={() => setMobileMenuOpen(false)} className="hover:text-primary transition-colors flex items-center justify-between">
                 <span className="flex items-center gap-3"><span className="material-symbols-outlined text-slate-400">favorite</span> Casamentos</span>
                 <span className="material-symbols-outlined text-slate-300">chevron_right</span>
@@ -355,14 +354,34 @@ export const LandingPage: React.FC = () => {
                  <div className="h-px w-8 md:w-16 bg-white/80"></div>
               </div>
 
-              <motion.button 
-                 whileHover={{ scale: 1.05 }}
-                 whileTap={{ scale: 0.95 }}
-                 onClick={handleCreateEvent}
-                 className="px-8 py-3 bg-white/10 backdrop-blur-md border border-white/40 text-white font-bold rounded-full hover:bg-white hover:text-brand-blue transition-all duration-300 shadow-2xl"
-              >
-                 {user ? 'CRIAR EVENTOS' : 'COMEÇAR AGORA'}
-              </motion.button>
+              <div className="flex flex-col sm:flex-row items-center gap-5 mt-4">
+                <motion.button 
+                   whileHover={{ scale: 1.05 }}
+                   whileTap={{ scale: 0.95 }}
+                   onClick={handleCreateEvent}
+                   className="px-8 py-4 bg-white/10 backdrop-blur-md border border-white/40 text-white font-bold rounded-full hover:bg-white hover:text-brand-blue transition-all duration-300 shadow-2xl"
+                >
+                   {user ? 'CRIAR EVENTOS' : 'COMEÇAR AGORA'}
+                </motion.button>
+                
+                <motion.div 
+                   whileHover={{ scale: 1.05, y: -2 }}
+                   whileTap={{ scale: 0.95 }}
+                   className="relative group"
+                >
+                   <span className="absolute -top-2 -right-2 flex h-5 w-5 z-10">
+                     <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-emerald-400 opacity-75"></span>
+                     <span className="relative inline-flex rounded-full h-5 w-5 bg-emerald-500 border border-white"></span>
+                   </span>
+                   <Link 
+                     to="/plans"
+                     className="px-8 py-4 bg-brand-blue/80 backdrop-blur-md border border-brand-blue/50 text-white font-bold rounded-full hover:bg-brand-blue transition-all duration-300 shadow-[0_0_20px_rgba(0,0,0,0.3)] group-hover:shadow-[0_0_25px_rgba(255,255,255,0.2)] flex items-center gap-2"
+                   >
+                     <span>VER PREÇOS</span>
+                     <span className="ml-2 pl-2 border-l border-white/20 text-xs text-blue-100 font-medium">A partir de 7.500 Kz</span>
+                   </Link>
+                </motion.div>
+              </div>
            </motion.div>
         </section>
 
@@ -409,17 +428,13 @@ export const LandingPage: React.FC = () => {
         <section className="flex flex-col gap-6 bg-transparent py-12">
           <div className="px-6 flex items-center justify-between max-w-5xl mx-auto w-full">
             <div>
-              <h3 className="text-brand-blue text-2xl font-serif font-bold">Modelos em Destaque</h3>
+              <h3 className="text-brand-blue text-2xl font-serif font-bold">Todos os Modelos</h3>
               <p className="text-slate-500 text-sm mt-1">Design de classe mundial para {CATEGORIES.find(c => c.id === selectedCategory)?.label}</p>
             </div>
-            <button className="text-brand-blue text-sm font-bold flex items-center hover:underline gap-1 bg-white px-4 py-2 rounded-lg shadow-sm border border-slate-100">
-               Ver Galeria
-               <span className="material-symbols-outlined text-sm">arrow_forward</span>
-            </button>
           </div>
           
           {/* Horizontal Scroll Container */}
-          <div className="flex overflow-x-auto no-scrollbar snap-x snap-mandatory px-6 pb-8 gap-6 md:justify-center">
+          <div className="flex overflow-x-auto no-scrollbar snap-x snap-mandatory px-6 pb-8 gap-6 md:justify-center max-w-7xl mx-auto w-full">
             {filteredEvents.length > 0 ? (
               filteredEvents.map((event, index) => {
                 const badge = getBadgeConfig(event.type);
@@ -442,11 +457,11 @@ export const LandingPage: React.FC = () => {
                       <div className="absolute inset-0 bg-gradient-to-t from-black/60 to-transparent opacity-60"></div>
                       <div className="absolute top-3 right-3 z-20">
                         <span className={`inline-block px-3 py-1 backdrop-blur-md rounded-full text-[10px] font-bold shadow-sm ${badge.className}`}>
-                          {badge.label}
+                          {event.layoutMode}
                         </span>
                       </div>
                     </div>
-                    <div className="px-1">
+                    <div className="px-1 text-center">
                       <h4 className="text-slate-900 font-serif font-bold text-xl group-hover:text-brand-blue transition-colors">{event.title}</h4>
                       <p className="text-slate-500 text-sm mt-1 line-clamp-2">{event.description}</p>
                     </div>

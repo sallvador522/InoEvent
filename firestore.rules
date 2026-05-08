@@ -30,10 +30,9 @@ service cloud.firestore {
       allow get: if isOwner(userId);
       allow create: if isOwner(userId) && isValidUser(incoming()) && incoming().uid == request.auth.uid;
       allow update: if isOwner(userId) && 
-                       request.resource.data.diff(resource.data).affectedKeys().hasOnly(['plan']) &&
+                       request.resource.data.diff(resource.data).affectedKeys().hasOnly(['plan', 'whiteLabelName', 'whiteLabelLogo', 'updatedAt', 'credits']) &&
                        request.resource.data.uid == resource.data.uid &&
-                       request.resource.data.email == resource.data.email &&
-                       (request.resource.data.plan is string || request.resource.data.plan == null);
+                       request.resource.data.email == resource.data.email;
     }
 
     match /events/{eventId} {

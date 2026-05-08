@@ -1,6 +1,6 @@
 {
   "name": "InoEvents",
   "description": "InoEvents - A plataforma de convites digitais premium mobile-first com temas dinâmicos e experiência de app.",
-  "requestFramePermissions": [],
+  "requestFramePermissions": ["camera"],
   "majorCapabilities": []
 }

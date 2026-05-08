@@ -4,7 +4,7 @@ import { Users, CheckCircle2, QrCode, Share2, Download, Clock, Search, MessageSq
 import { motion, AnimatePresence } from 'framer-motion';
 import { doc, collection, onSnapshot, deleteDoc, updateDoc } from 'firebase/firestore';
 import { db, handleFirestoreError, OperationType } from '../../components/FirebaseProvider';
-import { Scanner } from '@yudiel/react-qr-scanner';
+import { QRScanner } from '../../components/QRScanner';
 
 export const Dashboard = () => {
     const { id } = useParams<{ id: string }>();
@@ -17,6 +17,11 @@ export const Dashboard = () => {
     const [settingsOpen, setSettingsOpen] = useState(false);
     const [isDeleting, setIsDeleting] = useState(false);
     const [showDeleteConfirm, setShowDeleteConfirm] = useState(false);
+    const [selectedGuest, setSelectedGuest] = useState<any>(null);
+    const [showGuestMenu, setShowGuestMenu] = useState(false);
+    const [showScanner, setShowScanner] = useState(false);
+    const [scanState, setScanState] = useState<{status: 'idle' | 'processing' | 'success' | 'error' | 'already_scanned', message: string, guestName?: string}>({status: 'idle', message: ''});
+    const [activeFilter, setActiveFilter] = useState<'all' | 'checkedIn' | 'confirmed' | 'pending' | 'declined'>('all');
 
     useEffect(() => {
 
@@ -71,13 +76,11 @@ export const Dashboard = () => {
 
     const confirmDelete = () => setShowDeleteConfirm(true);
 
-    const [showScanner, setShowScanner] = useState(false);
-    const [scanResult, setScanResult] = useState<string | null>(null);
-
     const handleExportCSV = () => {
-        const headers = ['Nome', 'Status', 'Confirmados', 'Mensagem', 'Data'];
+        const headers = ['Nome', 'Telefone', 'Status', 'Confirmados', 'Mensagem', 'Data'];
         const rows = guests.map(g => [
             `"${g.name || ''}"`,
+            `"${g.phone || ''}"`,
             `"${g.status === 'CONFIRMED' ? 'Confirmado' : 'Recusado'}"`,
             g.adults || 0,
             `"${(g.message || '').replace(/"/g, '""')}"`,
@@ -95,34 +98,41 @@ export const Dashboard = () => {
     };
 
     const handleScanResult = async (result: string) => {
-        if(scanResult === result) return;
-        setScanResult(result);
+        if(scanState.status !== 'idle') return;
+        setScanState({ status: 'processing', message: 'Processando QR Code...' });
         try {
-            const url = new URL(result);
-            const guestUrlId = url.searchParams.get('guest');
+            // Extracts guest parameter whether it's in search params or hash (e.g. /#/checkin/.../?guest=123)
+            let guestUrlId: string | null = null;
+            if (result.includes('guest=')) {
+                guestUrlId = result.split('guest=')[1].split('&')[0];
+            } else {
+                const url = new URL(result);
+                guestUrlId = url.searchParams.get('guest');
+            }
+            
             if(guestUrlId) {
                 const g = guests.find(guest => guest.id === guestUrlId);
                 if (g) {
                     if (g.checkedIn) {
-                        alert(`Aviso: O convidado ${g.name} JÁ realizou o check-in!`);
+                        setScanState({ status: 'already_scanned', message: 'Já realizou o check-in!', guestName: g.name });
                     } else {
                         const guestRef = doc(db, 'events', id!, 'guests', guestUrlId);
                         await updateDoc(guestRef, {
                             checkedIn: true,
                             checkedInAt: new Date().toISOString()
                         });
-                        alert(`Sucesso! Check-in de ${g.name} confirmado.`);
+                        setScanState({ status: 'success', message: 'Check-in confirmado!', guestName: g.name });
                    }
                 } else {
-                    alert('Convidado não encontrado nesta lista.');
+                    setScanState({ status: 'error', message: 'Convidado não encontrado nesta lista.' });
                 }
             } else {
-                alert('Formato de QR Code inválido.');
+                setScanState({ status: 'error', message: 'Formato de QR Code inválido.' });
             }
         } catch (e) {
-            alert('QR Code Inválido ou não pertence a este sistema.');
+            setScanState({ status: 'error', message: 'QR Code Inválido ou não pertence a este sistema.' });
         }
-        setTimeout(() => setScanResult(null), 3500); // clear after delay
+        setTimeout(() => setScanState({ status: 'idle', message: '' }), 3500); // clear after delay
     };
 
     const handleDeleteEvent = async () => {
@@ -137,6 +147,21 @@ export const Dashboard = () => {
             alert('Falha ao remover o evento.');
             setIsDeleting(false);
             setShowDeleteConfirm(false);
+        }
+    };
+
+    const handleDeleteGuest = async (guestId: string) => {
+        setIsDeleting(true);
+        try {
+            const guestRef = doc(db, 'events', id!, 'guests', guestId);
+            await deleteDoc(guestRef);
+            setShowGuestMenu(false);
+            setSelectedGuest(null);
+            setIsDeleting(false);
+        } catch (error) {
+            handleFirestoreError(error, OperationType.DELETE, `events/${id}/guests/${guestId}`);
+            alert('Falha ao remover o convidado.');
+            setIsDeleting(false);
         }
     };
 
@@ -160,12 +185,23 @@ export const Dashboard = () => {
     const confirmedCount = guests.filter(g => g.status === 'CONFIRMED').length;
     const pendingCount = guests.filter(g => g.status === 'PENDING').length;
     const declinedCount = guests.filter(g => g.status === 'DECLINED').length;
+    const checkedInCount = guests.filter(g => g.checkedIn).length;
     const totalCount = guests.length;
 
-    const filteredGuests = guests.filter(g => 
-        g.name?.toLowerCase().includes(searchQuery.toLowerCase()) ||
-        g.email?.toLowerCase().includes(searchQuery.toLowerCase())
-    );
+    const filteredGuests = guests.filter(g => {
+        const matchesSearch = g.name?.toLowerCase().includes(searchQuery.toLowerCase()) || 
+                              g.phone?.toLowerCase().includes(searchQuery.toLowerCase());
+                              
+        if (!matchesSearch) return false;
+        
+        switch (activeFilter) {
+            case 'checkedIn': return g.checkedIn === true;
+            case 'confirmed': return g.status === 'CONFIRMED';
+            case 'pending': return g.status === 'PENDING';
+            case 'declined': return g.status === 'DECLINED';
+            default: return true;
+        }
+    });
 
     return (
         <div className="min-h-screen bg-[#FDFDFD] pb-20 font-display text-slate-800">
@@ -279,8 +315,9 @@ export const Dashboard = () => {
                 </div>
 
                 {/* Spatial UI Stats Cards */}
-                <div className="grid grid-cols-1 md:grid-cols-4 gap-4 mb-12">
-                    <StatCard title="Total Convidados" value={totalCount} icon={Users} color="bg-blue-50 text-blue-600" />
+                <div className="grid grid-cols-2 md:grid-cols-5 gap-4 mb-12">
+                    <StatCard title="Total" value={totalCount} icon={Users} color="bg-blue-50 text-blue-600" />
+                    <StatCard title="Entraram" value={checkedInCount} icon={CheckCircle2} color="bg-emerald-50 text-emerald-600" />
                     <StatCard title="Confirmados" value={confirmedCount} icon={CheckCircle2} color="bg-green-50 text-green-600" />
                     <StatCard title="Pendentes" value={pendingCount} icon={Clock} color="bg-orange-50 text-orange-600" />
                     <StatCard title="Recusados" value={declinedCount} icon={Users} color="bg-red-50 text-red-600" />
@@ -298,16 +335,24 @@ export const Dashboard = () => {
                             </button>
                         </div>
 
-                        {/* Glassmorphic Search Bar */}
-                        <div className="relative group">
-                            <Search className="absolute left-4 top-1/2 -translate-y-1/2 text-slate-400 group-focus-within:text-brand-blue transition-colors w-5 h-5" />
-                            <input 
-                                type="text" 
-                                placeholder="Busque por nome ou email..." 
-                                value={searchQuery}
-                                onChange={e => setSearchQuery(e.target.value)}
-                                className="w-full pl-12 pr-4 py-4 bg-white border border-slate-200 rounded-2xl shadow-sm focus:outline-none focus:ring-2 focus:ring-brand-blue/20 focus:border-brand-blue transition-all"
-                            />
+                        {/* Glassmorphic Search Bar & Filters */}
+                        <div className="flex flex-col xl:flex-row gap-4">
+                            <div className="relative group flex-1">
+                                <Search className="absolute left-4 top-1/2 -translate-y-1/2 text-slate-400 group-focus-within:text-brand-blue transition-colors w-5 h-5" />
+                                <input 
+                                    type="text" 
+                                    placeholder="Busque por nome ou telefone..." 
+                                    value={searchQuery}
+                                    onChange={e => setSearchQuery(e.target.value)}
+                                    className="w-full pl-12 pr-4 py-3 bg-white border border-slate-200 rounded-2xl shadow-sm focus:outline-none focus:ring-2 focus:ring-brand-blue/20 focus:border-brand-blue transition-all"
+                                />
+                            </div>
+                            <div className="flex gap-2 bg-slate-100 p-1.5 rounded-2xl overflow-x-auto">
+                                <FilterButton label="Todos" active={activeFilter === 'all'} onClick={() => setActiveFilter('all')} />
+                                <FilterButton label="Entraram" active={activeFilter === 'checkedIn'} onClick={() => setActiveFilter('checkedIn')} />
+                                <FilterButton label="Confirmados" active={activeFilter === 'confirmed'} onClick={() => setActiveFilter('confirmed')} />
+                                <FilterButton label="Pendentes" active={activeFilter === 'pending'} onClick={() => setActiveFilter('pending')} />
+                            </div>
                         </div>
 
                         {/* List container */}
@@ -342,6 +387,8 @@ export const Dashboard = () => {
                                                     <div>
                                                         <p className="font-bold text-slate-800">{guest.name}</p>
                                                         <p className="text-sm text-slate-500 flex items-center gap-1">
+                                                            <span>{guest.phone}</span>
+                                                            <span className="opacity-50 mx-1">•</span>
                                                             {guest.adults || 1} Adulto(s) {guest.children ? `• ${guest.children} Criança(s)` : ''}
                                                         </p>
                                                     </div>
@@ -353,8 +400,15 @@ export const Dashboard = () => {
                                                         </div>
                                                     )}
                                                     <StatusBadge status={guest.status} />
-                                                    <button className="text-slate-400 hover:text-brand-blue p-2 rounded-full hover:bg-brand-blue/5 transition-colors">
-                                                        <MoreHorizontal size={20} />
+                                                    <button 
+                                                        onClick={(e) => {
+                                                            e.stopPropagation();
+                                                            setSelectedGuest(guest);
+                                                            setShowGuestMenu(true);
+                                                        }}
+                                                        className="text-slate-400 hover:text-brand-blue p-3 rounded-full hover:bg-brand-blue/5 transition-colors z-10"
+                                                    >
+                                                        <MoreHorizontal size={24} />
                                                     </button>
                                                 </div>
                                             </motion.div>
@@ -367,6 +421,7 @@ export const Dashboard = () => {
 
                     {/* Sidebar Actions */}
                     <div className="flex flex-col gap-6">
+                        {(event?.plan === 'Premium' || event?.plan === 'Corporate') ? (
                          <div className="bg-brand-blue text-white rounded-3xl p-8 relative overflow-hidden shadow-xl shadow-brand-blue/20">
                             <div className="absolute top-0 right-0 w-64 h-64 bg-white/5 rounded-full blur-3xl -mr-10 -mt-10 pointer-events-none"></div>
                             <h3 className="text-xl font-bold mb-2">Check-in Digital</h3>
@@ -375,6 +430,15 @@ export const Dashboard = () => {
                                 <QrCode size={18} /> Validar QRCode
                             </button>
                          </div>
+                        ) : (
+                         <div className="bg-gradient-to-br from-slate-800 to-slate-900 text-white rounded-3xl p-8 relative overflow-hidden shadow-xl shadow-slate-900/20 text-center">
+                            <h3 className="text-xl font-bold mb-2 text-[#BF9B30]">Upgrade para Premium</h3>
+                            <p className="text-slate-300 text-sm mb-6">Desbloqueie o Check-in Digital na portaria e a validação rápida de QR Codes.</p>
+                            <Link to="/plans" className="w-full bg-[#BF9B30] text-slate-900 py-3 rounded-xl font-bold flex items-center justify-center gap-2 hover:brightness-110 transition-colors shadow-lg">
+                                Mudar Plano
+                            </Link>
+                         </div>
+                        )}
 
                          <div className="bg-white border border-slate-100 rounded-3xl p-6 shadow-sm">
                             <h3 className="font-bold text-slate-800 mb-4">Informações</h3>
@@ -393,6 +457,27 @@ export const Dashboard = () => {
                                 </div>
                             </div>
                          </div>
+
+                         <div className="bg-white border border-slate-100 rounded-3xl p-6 shadow-sm">
+                            <h3 className="font-bold text-slate-800 mb-4">Suporte</h3>
+                            <div className="flex flex-col gap-4 text-sm font-medium">
+                                {(!event?.plan || event?.plan === 'Essencial') && (
+                                   <div className="flex items-center gap-3 text-slate-600">
+                                      <MessageSquare size={18} /> Via E-mail
+                                   </div>
+                                )}
+                                {event?.plan === 'Premium' && (
+                                   <div className="flex items-center gap-3 text-[#BF9B30]">
+                                      <MessageSquare size={18} /> WhatsApp Prioritário
+                                   </div>
+                                )}
+                                {event?.plan === 'Corporate' && (
+                                   <div className="flex items-center gap-3 text-brand-blue">
+                                      <Users size={18} /> Gestor de Conta Dedicado
+                                   </div>
+                                )}
+                            </div>
+                         </div>
                     </div>
                 </div>
             </main>
@@ -409,23 +494,33 @@ export const Dashboard = () => {
                         <div className="w-full max-w-sm flex flex-col gap-4">
                             <div className="flex items-center justify-between text-white mb-2">
                                 <h3 className="font-bold text-lg flex items-center gap-2"><QrCode size={20}/> Check-in</h3>
-                                <button onClick={() => {setShowScanner(false); setScanResult(null);}} className="p-2 hover:bg-white/10 rounded-full transition-colors">
+                                <button onClick={() => {setShowScanner(false); setScanState({ status: 'idle', message: '' });}} className="p-2 hover:bg-white/10 rounded-full transition-colors">
                                     X
                                 </button>
                             </div>
                             <div className="rounded-3xl overflow-hidden shadow-2xl relative bg-black aspect-square">
-                                <Scanner 
-                                    onScan={(results) => {
-                                        if (results && results.length > 0 && results[0].rawValue) {
-                                            handleScanResult(results[0].rawValue);
+                                <QRScanner 
+                                    onScan={(result) => {
+                                        if (result) {
+                                            handleScanResult(result);
                                         }
                                     }}
                                     onError={(err) => console.log(err)}
-                                    components={{ audio: false }}
                                 />
-                                {scanResult && (
-                                    <div className="absolute inset-0 bg-brand-blue/80 flex items-center justify-center text-white p-6 text-center backdrop-blur-sm z-10 font-bold text-xl">
-                                        Processando...
+                                {scanState.status !== 'idle' && (
+                                    <div className={`absolute inset-0 flex flex-col items-center justify-center text-white p-6 text-center backdrop-blur-sm z-10 font-bold text-xl ${
+                                        scanState.status === 'success' ? 'bg-green-500/90' :
+                                        scanState.status === 'already_scanned' ? 'bg-yellow-500/90' :
+                                        scanState.status === 'error' ? 'bg-red-500/90' :
+                                        'bg-brand-blue/90'
+                                    }`}>
+                                        <div className="mb-2">
+                                            {scanState.status === 'success' && <CheckCircle2 size={48} className="mx-auto" />}
+                                            {scanState.status === 'already_scanned' && <Clock size={48} className="mx-auto" />}
+                                            {scanState.status === 'processing' && <div className="w-12 h-12 border-4 border-white border-t-transparent rounded-full animate-spin mx-auto" />}
+                                        </div>
+                                        <p>{scanState.message}</p>
+                                        {scanState.guestName && <p className="text-sm font-normal mt-2 opacity-90">{scanState.guestName}</p>}
                                     </div>
                                 )}
                             </div>
@@ -434,9 +529,63 @@ export const Dashboard = () => {
                     </motion.div>
                 )}
             </AnimatePresence>
+
+            {/* Guest Actions Modal */}
+            <AnimatePresence>
+                {showGuestMenu && selectedGuest && (
+                    <motion.div 
+                        initial={{ opacity: 0 }}
+                        animate={{ opacity: 1 }}
+                        exit={{ opacity: 0 }}
+                        className="fixed inset-0 z-[110] flex items-center justify-center p-4 bg-slate-900/40 backdrop-blur-sm"
+                    >
+                        <motion.div 
+                            initial={{ scale: 0.95, y: 20 }}
+                            animate={{ scale: 1, y: 0 }}
+                            exit={{ scale: 0.95, y: 20 }}
+                            className="bg-white rounded-3xl p-6 max-w-sm w-full shadow-2xl border border-slate-100"
+                        >
+                            <h3 className="text-lg font-bold text-slate-800">{selectedGuest.name}</h3>
+                            <p className="text-sm font-bold text-slate-500 mb-4">{selectedGuest.phone || 'Sem contato'}</p>
+                            <div className="bg-slate-50 p-4 rounded-xl mb-6 text-sm text-slate-600">
+                                <p className="font-bold text-xs uppercase text-slate-400 mb-1">Mensagem enviada:</p>
+                                {selectedGuest.message || 'Nenhuma mensagem enviada.'}
+                            </div>
+                            <div className="flex flex-col gap-2">
+                                <button 
+                                    onClick={() => handleDeleteGuest(selectedGuest.id)}
+                                    className="w-full py-3 rounded-xl font-bold bg-red-50 text-red-600 hover:bg-red-100 transition-colors"
+                                >
+                                    Apagar Convidado
+                                </button>
+                                <button 
+                                    onClick={() => setShowGuestMenu(false)}
+                                    className="w-full py-3 rounded-xl font-bold bg-slate-100 text-slate-600 hover:bg-slate-200 transition-colors"
+                                >
+                                    Fechar
+                                </button>
+                            </div>
+                        </motion.div>
+                    </motion.div>
+                )}
+            </AnimatePresence>
+
         </div>
     );
 };
+
+const FilterButton = ({ label, active, onClick }: { label: string, active: boolean, onClick: () => void }) => (
+    <button 
+        onClick={onClick}
+        className={`px-4 py-2 rounded-xl text-sm font-bold whitespace-nowrap transition-all ${
+            active 
+                ? 'bg-white text-slate-800 shadow-sm' 
+                : 'text-slate-500 hover:text-slate-700 hover:bg-slate-200/50'
+        }`}
+    >
+        {label}
+    </button>
+);
 
 const StatCard = ({ title, value, icon: Icon, color }: any) => (
     <div className="bg-white p-6 rounded-3xl border border-slate-100 shadow-[0_2px_10px_rgb(0,0,0,0.02)] flex flex-col justify-between group hover:shadow-lg transition-all duration-300">

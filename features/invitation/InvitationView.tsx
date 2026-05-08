@@ -9,6 +9,7 @@ import { BottomSheet } from '../../components/ui/BottomSheet';
 import { Button } from '../../components/ui/Button';
 import { QRCodeSVG } from 'qrcode.react';
 import { Users, CalendarClock, Mail, PartyPopper, Shirt, Camera, Music4, Smile, ArrowLeft } from 'lucide-react';
+import { toPng } from 'html-to-image';
 import { useFirebase, db, handleFirestoreError, OperationType } from '../../components/FirebaseProvider';
 import { doc, getDoc, setDoc, getCountFromServer, collection, query, where } from 'firebase/firestore';
 
@@ -109,8 +110,10 @@ const InvitationView: React.FC = () => {
   // Simulate Guest Name (In a real app, this comes from URL token/param)
   const guestName = "Família Silva";
 
+  const isTemplate = !!getEventById(event.id);
+
   // Check if owner is viewing
-  const isOwner = user && event.ownerId === user.uid;
+  const isOwner = user && event.ownerId === user.uid && !isTemplate;
 
   // Common Props passed to all layouts
   const props = { event, onRSVP: () => setRSVPOpen(true), guestName };
@@ -119,6 +122,21 @@ const InvitationView: React.FC = () => {
     <>
       <TocaPlayer trackName={event.musicTrack} isDark={event.layoutMode === 'LUXURY' || event.layoutMode === 'INDUSTRIAL'} />
       
+      {isTemplate && (
+        <div className="fixed top-4 left-1/2 -translate-x-1/2 z-[100] w-[90%] max-w-lg bg-white/95 backdrop-blur-xl border border-brand-blue/20 rounded-2xl p-4 shadow-[0_10px_40px_-10px_rgba(0,40,100,0.2)] flex items-center justify-between">
+           <div className="flex flex-col mr-4">
+              <span className="text-[10px] uppercase font-bold text-slate-400 tracking-widest leading-none mb-1 text-left">Pré-visualização</span>
+              <span className="text-sm font-serif font-bold text-brand-blue leading-none text-left">Modelo {event.layoutMode}</span>
+           </div>
+           <Link 
+              to={`/create-invitation?template=${event.layoutMode}`}
+              className="bg-brand-blue text-white px-5 py-2.5 rounded-xl text-xs font-bold shadow-lg shadow-brand-blue/30 hover:bg-brand-blue/90 hover:scale-105 transition-all text-center flex-shrink-0"
+           >
+              Usar Modelo
+           </Link>
+        </div>
+      )}
+
       {isOwner && (
         <div className="fixed top-4 left-4 z-50 flex gap-2">
            <Link to="/" className="flex items-center gap-2 bg-white/90 backdrop-blur-sm text-slate-800 px-4 py-2 rounded-full shadow-xl hover:bg-white transition-all font-display text-sm font-bold border border-slate-200">
@@ -140,6 +158,16 @@ const InvitationView: React.FC = () => {
       {event.layoutMode === 'GARDEN' && <GardenLayout {...props} />}
       {event.layoutMode === 'RUSTIC' && <RusticLayout {...props} />}
       {event.layoutMode === 'INDUSTRIAL' && <IndustrialLayout {...props} />}
+
+      <div className="w-full flex flex-col items-center justify-center py-10 pb-32 text-xs font-bold tracking-widest uppercase text-slate-500 gap-3 z-10 relative">
+        {event.whiteLabelName && (
+           <span className="opacity-70">Powered by</span>
+        )}
+        {event.whiteLabelLogo && (
+            <img src={event.whiteLabelLogo} alt={event.whiteLabelName} className="h-10 object-contain" />
+        )}
+        <span>{event.whiteLabelName ? event.whiteLabelName : 'Criado com InoEvents'}</span>
+      </div>
 
       {/* Shared RSVP Modal */}
       <BottomSheet 
@@ -240,6 +268,11 @@ const EssentialLayout: React.FC<{ event: EventDetails; onRSVP: () => void; guest
         </div>
         
         <div className="bg-white rounded-3xl p-8 shadow-sm border border-slate-100 space-y-4">
+            <h2 className="font-bold text-brand-blue uppercase tracking-widest text-xs text-center border-b border-slate-100 pb-2">Contagem Regressiva</h2>
+            <CountdownTimer targetDate={event.isoDate} colorClass="text-brand-blue" />
+        </div>
+        
+        <div className="bg-white rounded-3xl p-8 shadow-sm border border-slate-100 space-y-4">
             <h2 className="font-bold text-brand-blue">Informações</h2>
             <p className="text-sm text-slate-600">{event.description}</p>
             <Button onClick={() => window.open(event.mapLink || '#', '_blank')} variant="navy" fullWidth>Localização (Maps)</Button>
@@ -248,6 +281,8 @@ const EssentialLayout: React.FC<{ event: EventDetails; onRSVP: () => void; guest
             )}
         </div>
       </div>
+      
+      <GuestManual />
 
       <div className="fixed bottom-6 left-1/2 -translate-x-1/2 z-50 w-full max-w-sm px-4">
           <Button onClick={onRSVP} variant="navy" fullWidth>Confirmar Presença</Button>
@@ -306,6 +341,11 @@ const ClassicLayout: React.FC<{ event: EventDetails; onRSVP: () => void; guestNa
          </FadeInSection>
 
          <FadeInSection>
+            <h3 className="text-xs font-bold uppercase tracking-[0.2em] text-slate-400 mb-6">Contagem Regressiva</h3>
+            <CountdownTimer targetDate={event.isoDate} colorClass="text-slate-800" />
+         </FadeInSection>
+
+         <FadeInSection>
            <h3 className="text-xs font-bold uppercase tracking-[0.2em] text-slate-400 mb-6">Programação</h3>
            <div className="space-y-8 relative before:absolute before:inset-y-0 before:left-1/2 before:w-px before:bg-slate-200">
               {event.timeline.map((item, idx) => (
@@ -327,7 +367,22 @@ const ClassicLayout: React.FC<{ event: EventDetails; onRSVP: () => void; guestNa
                </Button>
             </div>
          </FadeInSection>
+
+         {event.gallery && (
+            <FadeInSection>
+               <h3 className="text-xs font-bold uppercase tracking-[0.2em] text-slate-400 mb-6">Nossa Galeria</h3>
+               <div className="grid grid-cols-2 gap-4">
+                  {event.gallery.map((img, i) => (
+                     <div key={i} className={`rounded-xl overflow-hidden shadow-sm ${i === 0 ? 'col-span-2' : ''}`}>
+                        <img src={img} className="w-full h-full object-cover hover:scale-105 transition-transform duration-500" />
+                     </div>
+                  ))}
+               </div>
+            </FadeInSection>
+         )}
       </div>
+
+      <GuestManual />
 
       <div className="fixed bottom-6 left-1/2 -translate-x-1/2 z-50">
         <button onClick={onRSVP} className="bg-brand-blue text-white px-10 py-4 rounded-full font-sans font-bold shadow-2xl shadow-brand-blue/40 uppercase tracking-widest text-xs hover:scale-105 transition-transform">
@@ -342,7 +397,7 @@ const ClassicLayout: React.FC<{ event: EventDetails; onRSVP: () => void; guestNa
 // ============================================================================
 // HELPER: MANUAL DO CONVIDADO
 // ============================================================================
-const GuestManual = () => {
+const GuestManual: React.FC<{ isDark?: boolean }> = ({ isDark }) => {
     const points = [
         { icon: Users, text: "Contamos com a sua presença!" },
         { icon: CalendarClock, text: "Seja pontual!" },
@@ -353,18 +408,24 @@ const GuestManual = () => {
         { icon: Music4, text: "É obrigatório dançar muito!" },
         { icon: Smile, text: "Sorria e seja muito feliz!" },
     ];
+    
+    const textColor = isDark ? "text-gray-300" : "text-gray-600";
+    const iconColor = isDark ? "text-white/70" : "text-[#C2B280]";
+    const headingColor = isDark ? "text-white" : "text-[#C2B280]";
+    const bgColor = isDark ? "bg-black/20 border-white/10" : "bg-white border-gray-100";
+    
     return (
-        <FadeInSection className="py-24 px-6 bg-white border-t border-gray-100 mt-12 text-center">
-            <h3 className="text-3xl font-serif text-[#C2B280] mb-12">Manual do Convidado</h3>
-            <div className="grid grid-cols-2 gap-8 max-w-2xl mx-auto">
+        <FadeInSection className={`py-16 md:py-24 px-6 ${bgColor} border-t mt-12 text-center`}>
+            <h3 className={`text-3xl font-serif ${headingColor} mb-12`}>Manual do Convidado</h3>
+            <div className="grid grid-cols-2 md:grid-cols-4 gap-8 max-w-4xl mx-auto">
                 {points.map((p, i) => (
                     <div key={i} className="flex flex-col items-center">
-                        <p.icon className="w-8 h-8 text-[#C2B280] mb-4" strokeWidth={1} />
-                        <p className="text-sm text-gray-600">{p.text}</p>
+                        <p.icon className={`w-8 h-8 ${iconColor} mb-4`} strokeWidth={1} />
+                        <p className={`text-sm ${textColor}`}>{p.text}</p>
                     </div>
                 ))}
             </div>
-            <p className="mt-12 text-sm text-gray-500 italic">Agradecemos o carinho e a compreensão!</p>
+            <p className={`mt-12 text-sm ${isDark ? 'text-gray-400' : 'text-gray-500'} italic`}>Agradecemos o carinho e a compreensão!</p>
         </FadeInSection>
     )
 }
@@ -698,6 +759,9 @@ const GardenLayout: React.FC<{ event: EventDetails; onRSVP: () => void; guestNam
         </FadeInSection>
       )}
 
+      {/* MANUAL DO CONVIDADO */}
+      <GuestManual />
+
       {/* 7. GIFTS & DRESS CODE */}
       <div className="grid md:grid-cols-2 gap-8 max-w-4xl mx-auto px-6 mb-24">
          {event.dressCode && (
@@ -772,7 +836,10 @@ const RusticLayout: React.FC<{ event: EventDetails; onRSVP: () => void; guestNam
           <p className="text-xl md:text-2xl font-script leading-relaxed text-[#5D4037] mb-6">"{event.description}"</p>
           <div className="w-24 h-px bg-[#D7CCC8] mx-auto my-6"></div>
           <p className="uppercase tracking-widest text-xs text-[#8D6E63]">Convidado Especial</p>
-          <p className="text-xl font-bold mt-2">{guestName}</p>
+          <p className="text-xl font-bold mt-2 mb-10">{guestName}</p>
+          
+          <p className="text-[10px] uppercase tracking-[0.3em] text-[#8D6E63] mb-6 border-t border-[#D7CCC8] pt-6 inline-block">Contagem Regressiva</p>
+          <CountdownTimer targetDate={event.isoDate} colorClass="text-[#4E342E]" />
        </FadeInSection>
  
        {/* LOCATIONS - Side by Side Cards */}
@@ -823,6 +890,22 @@ const RusticLayout: React.FC<{ event: EventDetails; onRSVP: () => void; guestNam
              </button>
           </FadeInSection>
        </div>
+
+       {/* GALLERY */}
+       {event.gallery && (
+          <FadeInSection className="max-w-5xl mx-auto px-6 mb-24">
+             <h3 className="text-center font-serif text-3xl text-[#4E342E] mb-8">Nossa Galeria</h3>
+             <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
+                {event.gallery.map((img, i) => (
+                   <div key={i} className="aspect-square rounded-2xl overflow-hidden shadow-sm">
+                      <img src={img} className="w-full h-full object-cover hover:scale-110 transition-transform duration-700" />
+                   </div>
+                ))}
+             </div>
+          </FadeInSection>
+       )}
+       
+       <GuestManual />
  
        {/* FIXED ACTION */}
        <div className="fixed bottom-6 left-1/2 -translate-x-1/2 z-50 w-full max-w-sm px-4">
@@ -875,9 +958,11 @@ const IndustrialLayout: React.FC<{ event: EventDetails; onRSVP: () => void; gues
           <div className="p-8 md:p-16 border-b md:border-b-0 md:border-r border-white/20 flex flex-col justify-center">
              <FadeInSection>
                <span className="text-xs text-gray-400 uppercase tracking-widest mb-4 block">O Conceito</span>
-               <p className="text-xl md:text-2xl font-light leading-relaxed">
+               <p className="text-xl md:text-2xl font-light leading-relaxed mb-10">
                   {event.description}
                </p>
+               <span className="text-xs text-gray-400 uppercase tracking-widest mb-4 block">Contagem Regressiva</span>
+               <CountdownTimer targetDate={event.isoDate} colorClass="text-white" />
              </FadeInSection>
           </div>
           <div className="p-8 md:p-16 flex flex-col justify-center bg-white text-black">
@@ -927,6 +1012,22 @@ const IndustrialLayout: React.FC<{ event: EventDetails; onRSVP: () => void; gues
              </div>
           </div>
        </div>
+       
+       {/* GALLERY */}
+       {event.gallery && (
+          <div className="p-8 md:p-16 border-b border-white/20">
+             <h3 className="text-2xl font-bold uppercase mb-8 border-l-4 border-white pl-4">Galeria</h3>
+             <div className="grid grid-cols-2 md:grid-cols-3 gap-1">
+                {event.gallery.map((img, i) => (
+                   <div key={i} className="aspect-square overflow-hidden bg-white/5">
+                      <img src={img} className="w-full h-full object-cover grayscale hover:grayscale-0 transition-all duration-500" />
+                   </div>
+                ))}
+             </div>
+          </div>
+       )}
+
+       <GuestManual isDark />
 
        {/* RSVP BUTTON */}
        <div className="fixed bottom-8 right-8 z-50">
@@ -1137,7 +1238,7 @@ const LuxuryLayout: React.FC<{ event: EventDetails; onRSVP: () => void; guestNam
 
         {/* 10. GALLERY (Horizontal Scroll) */}
         {event.gallery && (
-          <FadeInSection className="w-full mb-24 pl-6">
+          <FadeInSection className="w-full mb-12 pl-6">
             <h3 className="text-[#BF9B30] font-bold uppercase tracking-widest text-xs mb-4 text-left">Nossa Galeria</h3>
             <div className="flex overflow-x-auto gap-4 pb-4 no-scrollbar">
                {event.gallery.map((img, i) => (
@@ -1146,6 +1247,10 @@ const LuxuryLayout: React.FC<{ event: EventDetails; onRSVP: () => void; guestNam
             </div>
           </FadeInSection>
         )}
+
+        <div className="w-full border-t border-[#BF9B30]/30 mt-8">
+           <GuestManual isDark />
+        </div>
 
         {/* Gold Action Button (Fixed Bottom Bar) */}
         <div className="fixed bottom-0 left-0 w-full bg-[#0F1419]/95 backdrop-blur-md border-t border-[#BF9B30]/20 p-4 z-50 flex items-center justify-center">
@@ -1175,17 +1280,31 @@ const RSVPForm: React.FC<{ event: EventDetails | any; onClose: () => void }> = (
    const [checkingCapacity, setCheckingCapacity] = useState(true);
    const [formData, setFormData] = useState({
       name: '',
+      phone: '',
       companions: '0',
       message: ''
    });
    
    useEffect(() => {
+       const savedRSVP = localStorage.getItem(`rsvp_${event.id}`);
+       if (savedRSVP) {
+           const parsed = JSON.parse(savedRSVP);
+           setStatus(parsed.status);
+           setGuestId(parsed.guestId);
+           setFormData(prev => ({ ...prev, name: parsed.name, phone: parsed.phone || '' }));
+           setIsConfirmed(true);
+           setCheckingCapacity(false);
+           return;
+       }
+
        const checkCapacity = async () => {
            try {
-               const q = query(collection(db, 'events', event.id, 'guests'), where('status', '==', 'CONFIRMED'));
-               const snap = await getCountFromServer(q);
-               if (snap.data().count >= 50) {
-                  setIsFull(true);
+               if (event.plan === 'Essencial' || !event.plan) {
+                   const q = query(collection(db, 'events', event.id, 'guests'), where('status', '==', 'CONFIRMED'));
+                   const snap = await getCountFromServer(q);
+                   if (snap.data().count >= 50) {
+                      setIsFull(true);
+                   }
                }
            } catch(e) {
                console.error(e);
@@ -1200,19 +1319,60 @@ const RSVPForm: React.FC<{ event: EventDetails | any; onClose: () => void }> = (
        e.preventDefault();
        setIsSubmitting(true);
        try {
-           const newGuestId = "gst_" + Math.random().toString(36).substr(2, 9);
-           const guestRef = doc(db, 'events', event.id, 'guests', newGuestId);
-           await setDoc(guestRef, {
-               name: formData.name,
-               email: '',
-               status: status === 'yes' ? 'CONFIRMED' : 'DECLINED',
-               adults: status === 'yes' ? (1 + Number(formData.companions)) : 0,
-               children: 0,
-               message: formData.message,
-               createdAt: new Date().toISOString()
-           });
-           setGuestId(newGuestId);
+           const normalizedPhone = formData.phone.trim().replace(/\D/g, ''); // Extract only digits
+           
+           // Check if guest already exists by phone
+           const guestsRef = collection(db, 'events', event.id, 'guests');
+           const q = query(guestsRef, where('phone', '==', normalizedPhone));
+           
+           // We need to import getDocs if not imported already. Let's assume we can get it from firebase/firestore which is already imported.
+           // Actually, let's just make sure getDocs is imported at the top of the file. I'll add it in a subsequent edit if needed.
+           // Wait, I can just use getDocs from firebase/firestore.
+           
+           // Actually wait, let me just add getDocs to the imports if needed. Let me edit the imports too.
+           const { getDocs } = await import('firebase/firestore');
+           const snap = await getDocs(q);
+           
+           let finalGuestId = '';
+           
+           if (!snap.empty) {
+               // Update existing guest
+               const existingDoc = snap.docs[0];
+               finalGuestId = existingDoc.id;
+               const guestRef = doc(db, 'events', event.id, 'guests', finalGuestId);
+               await setDoc(guestRef, {
+                   name: formData.name,
+                   phone: normalizedPhone,
+                   status: status === 'yes' ? 'CONFIRMED' : 'DECLINED',
+                   adults: status === 'yes' ? (1 + Number(formData.companions)) : 0,
+                   children: 0,
+                   message: formData.message,
+                   updatedAt: new Date().toISOString()
+               }, { merge: true });
+           } else {
+               // Create new guest
+               finalGuestId = "gst_" + Math.random().toString(36).substr(2, 9);
+               const guestRef = doc(db, 'events', event.id, 'guests', finalGuestId);
+               await setDoc(guestRef, {
+                   name: formData.name,
+                   phone: normalizedPhone,
+                   status: status === 'yes' ? 'CONFIRMED' : 'DECLINED',
+                   adults: status === 'yes' ? (1 + Number(formData.companions)) : 0,
+                   children: 0,
+                   message: formData.message,
+                   createdAt: new Date().toISOString()
+               });
+           }
+           
+           setGuestId(finalGuestId);
            setIsConfirmed(true);
+           
+           localStorage.setItem(`rsvp_${event.id}`, JSON.stringify({
+               status: status === 'yes' ? 'yes' : 'no',
+               guestId: finalGuestId,
+               name: formData.name,
+               phone: normalizedPhone
+           }));
        } catch (err: any) {
            console.error("RSVP Error:", err);
            if (!err.message?.includes("Missing or insufficient permissions")) {
@@ -1221,6 +1381,22 @@ const RSVPForm: React.FC<{ event: EventDetails | any; onClose: () => void }> = (
            alert("Houve um erro ao enviar seu RSVP. Tente novamente.");
        } finally {
            setIsSubmitting(false);
+       }
+   };
+
+   const handleDownloadTicket = async () => {
+       const node = document.getElementById('qr-ticket');
+       if (node) {
+           try {
+               const dataUrl = await toPng(node, { quality: 1, backgroundColor: '#ffffff' });
+               const link = document.createElement('a');
+               link.download = `convite-${event.title.replace(/\s+/g, '-').toLowerCase()}.png`;
+               link.href = dataUrl;
+               link.click();
+           } catch (err) {
+               console.error('Oops, something went wrong!', err);
+               alert("Falha ao transferir o convite. Tente novamente.");
+           }
        }
    };
 
@@ -1250,13 +1426,26 @@ const RSVPForm: React.FC<{ event: EventDetails | any; onClose: () => void }> = (
      return (
        <div className="text-center p-6 space-y-6">
           {status === 'yes' ? (
-              <>
-                <div className="w-32 h-32 mx-auto bg-white p-2 border border-slate-200 flex items-center justify-center">
-                    <QRCodeSVG value={`https://inoevents.com/checkin/${event.id}?guest=${guestId}`} size={112} />
+              <div className="flex flex-col items-center gap-4">
+                <div id="qr-ticket" className="w-64 mx-auto bg-white p-6 border border-slate-200 rounded-xl flex flex-col items-center justify-center gap-4 text-slate-800 shadow-sm relative overflow-hidden">
+                    <div className="absolute top-0 left-0 w-full h-2 bg-brand-blue" />
+                    <h4 className="font-bold text-center text-lg leading-tight mt-2">{event.title}</h4>
+                    <p className="text-[10px] uppercase tracking-widest text-slate-400">{event.date} • {event.time}</p>
+                    {(!event.plan || event.plan === 'Essencial') ? (
+                        <QRCodeSVG value={`${window.location.origin}/#/invite/${event.id}`} size={160} />
+                    ) : (
+                        <QRCodeSVG value={`${window.location.origin}/#/checkin/${event.id}?guest=${guestId}`} size={160} />
+                    )}
+                    <p className="text-xs font-bold bg-slate-100 px-4 py-1.5 rounded-full uppercase tracking-wider">{formData.name}</p>
                 </div>
-                <h3 className="font-bold text-lg">Confirmação Recebida!</h3>
-                <p className="text-sm opacity-70">Apresente o QRCode acima na recepção do evento.</p>
-              </>
+                <div>
+                   <h3 className="font-bold text-lg">Confirmação Recebida!</h3>
+                   <p className="text-sm opacity-70 mb-2">Apresente este QRCode na recepção do evento.</p>
+                </div>
+                <Button onClick={handleDownloadTicket} className="bg-slate-800 text-white hover:bg-black font-bold uppercase tracking-widest text-xs h-12 w-full rouded-xl">
+                   Baixar Convite
+                </Button>
+              </div>
           ) : (
               <>
                   <div className="w-16 h-16 mx-auto bg-slate-100 rounded-full flex items-center justify-center text-slate-400">
@@ -1266,7 +1455,7 @@ const RSVPForm: React.FC<{ event: EventDetails | any; onClose: () => void }> = (
                   <p className="text-sm opacity-70">Sentiremos sua falta.</p>
               </>
           )}
-          <Button onClick={onClose} fullWidth variant={isLuxury ? 'outline' : 'primary'}>Fechar</Button>
+          <Button onClick={onClose} fullWidth variant={isLuxury ? 'outline' : 'secondary'}>Fechar Janela</Button>
        </div>
      );
    }
@@ -1302,6 +1491,12 @@ const RSVPForm: React.FC<{ event: EventDetails | any; onClose: () => void }> = (
         <div>
           <label className={`text-xs font-bold uppercase tracking-wider mb-1 block ${isLuxury ? 'text-[#BF9B30]' : 'opacity-50'}`}>Nome Completo</label>
           <input required value={formData.name} onChange={e => setFormData({...formData, name: e.target.value})} type="text" className={`w-full bg-transparent border-b py-2 focus:outline-none ${isLuxury ? 'border-gray-600 text-white focus:border-[#BF9B30]' : 'border-gray-300 text-black focus:border-black'}`} placeholder="Seu nome" />
+        </div>
+
+        <div>
+          <label className={`text-xs font-bold uppercase tracking-wider mb-1 block ${isLuxury ? 'text-[#BF9B30]' : 'opacity-50'}`}>WhatsApp (Apenas números)</label>
+          <input required type="tel" value={formData.phone} onChange={e => setFormData({...formData, phone: e.target.value})} className={`w-full bg-transparent border-b py-2 focus:outline-none ${isLuxury ? 'border-gray-600 text-white focus:border-[#BF9B30]' : 'border-gray-300 text-black focus:border-black'}`} placeholder="Ex: 11999999999" pattern="[0-9]*" />
+          <p className="text-[10px] opacity-50 mt-1">Seu número garante que não perdes seu convite.</p>
         </div>
         
         {status === 'yes' && (

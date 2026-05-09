@@ -20,14 +20,31 @@ const CATEGORIES = [
   { id: 'adult', label: 'Adulto', icon: 'nightlife' },
 ];
 
+const TESTIMONIALS = [
+  { text: "A melhor plataforma de convites que já usei. Simplesmente elegante.", author: "Maria Silva", role: "Noiva", rating: 5 },
+  { text: "Meus convidados ficaram maravilhados com a facilidade do RSVP.", author: "João Pereira", role: "Aniversariante", rating: 5 },
+  { text: "Design impecável! O QR code individual facilitou muito a recepção.", author: "Ana Costa", role: "Assessora de Eventos", rating: 5 },
+  { text: "Suporte VIP incrível via WhatsApp. Resolveram tudo em minutos.", author: "Carlos Santos", role: "Produtor B2B", rating: 5 },
+  { text: "Os templates são maravilhosos. O meu casamento ganhou outro nível.", author: "Juliana Mendes", role: "Noiva", rating: 5 },
+  { text: "Painel de controle excelente para gerir milhares de convidados.", author: "Sérgio Almeida", role: "Organizador Corporate", rating: 5 },
+];
+
 export const LandingPage: React.FC = () => {
   const [selectedCategory, setSelectedCategory] = useState('all');
   const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
   const [dashboardOpen, setDashboardOpen] = useState(false);
   const { user, userProfile } = useFirebase();
   const [userEvents, setUserEvents] = useState<any[]>([]);
+  const [currentTestimonialIndex, setCurrentTestimonialIndex] = useState(0);
   
   const navigate = useNavigate();
+
+  useEffect(() => {
+    const timer = setInterval(() => {
+      setCurrentTestimonialIndex((prev) => (prev + 1) % TESTIMONIALS.length);
+    }, 5000);
+    return () => clearInterval(timer);
+  }, []);
 
   useEffect(() => {
     if (!user) {
@@ -106,12 +123,11 @@ export const LandingPage: React.FC = () => {
 
         {/* Desktop Navigation */}
         <div className="hidden md:flex items-center gap-8 text-sm font-medium text-blue-100">
-           <a href="#" className="hover:text-white transition-colors">Início</a>
-           <a href="#" className="hover:text-white transition-colors">Casamentos</a>
+           <a href="#features" className="hover:text-white transition-colors">Funcionalidades</a>
            <Link to="/plans" className="hover:text-white transition-colors">Preços</Link>
-           <a href="#" className="hover:text-white transition-colors">Contactos</a>
-           <a href="#" className="hover:text-white transition-colors">Perguntas</a>
-           <a href="#" className="hover:text-white transition-colors">Sobre Nós</a>
+           <a href="mailto:suporte@inoevents.com" className="hover:text-white transition-colors">Contactos</a>
+           <a href="#faq" className="hover:text-white transition-colors">Perguntas</a>
+           <Link to="/about" className="hover:text-white transition-colors">Sobre Nós</Link>
            
            <div className="flex items-center gap-6 pl-2">
              <span className="text-white/20 text-lg font-light select-none">|</span>
@@ -140,6 +156,11 @@ export const LandingPage: React.FC = () => {
                         </>
                      ) : (
                         <div className="px-4 py-4 text-slate-400 text-sm text-center">Nenhum evento criado.</div>
+                     )}
+                     {(userProfile?.plan === 'Business' || userProfile?.plan === 'Corporate') && (
+                        <Link to="/b2b" className="px-4 py-3 text-brand-blue border-t border-slate-100 text-center font-bold text-xs hover:bg-slate-50 transition-colors uppercase tracking-wider bg-blue-50/50 block">
+                           Meu Negócio
+                        </Link>
                      )}
                   </div>
                
@@ -253,19 +274,22 @@ export const LandingPage: React.FC = () => {
                 </div>
               )}
               
-              {(userProfile?.plan === 'Premium' || userProfile?.plan === 'Corporate') && (
-                  <Link to="/business/create" onClick={() => setMobileMenuOpen(false)} className="hover:text-primary transition-colors flex items-center justify-between">
-                    <span className="flex items-center gap-3"><span className="material-symbols-outlined text-slate-400">storefront</span> Criar Negócio</span>
+              {(userProfile?.plan === 'Business' || userProfile?.plan === 'Corporate') && (
+                  <Link to="/b2b" onClick={() => setMobileMenuOpen(false)} className="hover:text-primary transition-colors flex items-center justify-between">
+                    <span className="flex items-center gap-3"><span className="material-symbols-outlined text-brand-blue">business_center</span> <span className="font-bold text-brand-blue">Meu Negócio</span></span>
                     <span className="material-symbols-outlined text-slate-300">chevron_right</span>
                   </Link>
               )}
               
-              {/* Preços link removed */}
-              <a href="#" onClick={() => setMobileMenuOpen(false)} className="hover:text-primary transition-colors flex items-center justify-between">
-                <span className="flex items-center gap-3"><span className="material-symbols-outlined text-slate-400">favorite</span> Casamentos</span>
+              <a href="#features" onClick={() => setMobileMenuOpen(false)} className="hover:text-primary transition-colors flex items-center justify-between">
+                <span className="flex items-center gap-3"><span className="material-symbols-outlined text-slate-400">favorite</span> Funcionalidades</span>
                 <span className="material-symbols-outlined text-slate-300">chevron_right</span>
               </a>
-              <a href="#" onClick={() => setMobileMenuOpen(false)} className="hover:text-primary transition-colors flex items-center justify-between">
+              <Link to="/about" onClick={() => setMobileMenuOpen(false)} className="hover:text-primary transition-colors flex items-center justify-between">
+                <span className="flex items-center gap-3"><span className="material-symbols-outlined text-slate-400">info</span> Sobre Nós</span>
+                <span className="material-symbols-outlined text-slate-300">chevron_right</span>
+              </Link>
+              <a href="mailto:suporte@inoevents.com" onClick={() => setMobileMenuOpen(false)} className="hover:text-primary transition-colors flex items-center justify-between">
                 <span className="flex items-center gap-3"><span className="material-symbols-outlined text-slate-400">call</span> Contactos</span>
                 <span className="material-symbols-outlined text-slate-300">chevron_right</span>
               </a>
@@ -459,6 +483,11 @@ export const LandingPage: React.FC = () => {
                         <span className={`inline-block px-3 py-1 backdrop-blur-md rounded-full text-[10px] font-bold shadow-sm ${badge.className}`}>
                           {event.layoutMode}
                         </span>
+                        {event.layoutMode !== "MODERN" && (
+                          <span className="inline-block px-3 py-1 ml-2 bg-gradient-to-r from-amber-200 to-amber-400 text-amber-900 rounded-full text-[10px] font-bold shadow-sm">
+                              PRO
+                          </span>
+                        )}
                       </div>
                     </div>
                     <div className="px-1 text-center">
@@ -486,46 +515,154 @@ export const LandingPage: React.FC = () => {
           
           <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
             <FeatureCard 
-              icon="check_circle" 
-              title="RSVP Inteligente"
-              desc="Confirmação de presença em tempo real integrada ao WhatsApp."
+              icon="qr_code_scanner" 
+              title="RSVP & QR Code"
+              desc="Confirmação de presença online com emissão automática de convite com QR Code."
             />
             <FeatureCard 
-              icon="photo_library" 
-              title="Álbum Digital"
-              desc="Seus convidados compartilham fotos em um feed exclusivo do evento."
+              icon="dashboard" 
+              title="Gestão de Convidados"
+              desc="Acompanhe quem confirmou presença e controle as entradas diretamente pelo App."
             />
             <FeatureCard 
-              icon="location_on" 
-              title="Navegação Fácil"
-              desc="Mapas interativos integrados com Uber e Waze para seus convidados."
+              icon="redeem" 
+              title="Lista de Presentes"
+              desc="Adicione IBAN de forma segura para receber presentes em dinheiro diretamente na sua conta."
             />
           </div>
         </section>
 
-        {/* Social Proof */}
-        <section className="px-4 py-12 text-center bg-brand-blue text-white">
-          <div className="max-w-4xl mx-auto">
-             <span className="material-symbols-outlined text-4xl mb-4 text-primary">verified</span>
-             <h2 className="text-4xl font-serif font-bold mb-2">10.000+</h2>
-             <p className="text-blue-200 text-sm uppercase tracking-widest font-medium mb-8">Eventos Realizados</p>
-             <p className="text-xl font-light italic opacity-90">"A melhor plataforma de convites que já usei. Simplesmente elegante."</p>
+        {/* Social Proof Gallery */}
+        <section className="py-24 overflow-hidden bg-brand-blue relative">
+          <div className="absolute inset-0 bg-[url('https://www.transparenttextures.com/patterns/cubes.png')] opacity-10"></div>
+          
+          <div className="relative z-10 max-w-7xl mx-auto px-6 mb-16 text-center">
+             <span className="inline-flex items-center gap-2 px-3 py-1 rounded-full bg-blue-500/20 text-blue-200 text-sm font-medium mb-6">
+                 <span className="relative flex h-2 w-2">
+                    <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-blue-400 opacity-75"></span>
+                    <span className="relative inline-flex rounded-full h-2 w-2 bg-blue-500"></span>
+                 </span>
+                 Mais de 10.000 Eventos Realizados
+             </span>
+             <h2 className="text-4xl md:text-6xl font-script text-white mb-4">O que dizem os nossos clientes</h2>
+             <p className="text-blue-100 max-w-2xl mx-auto text-lg backdrop-blur-sm">Experiências inesquecíveis partilhadas por quem confia no InoEvents.</p>
+          </div>
+
+          <div className="relative z-10 font-sans w-full max-w-[100vw] overflow-x-hidden">
+             <motion.div 
+               className="flex gap-6 w-max px-4"
+               animate={{ x: ["0%", "-50%"] }}
+               transition={{ repeat: Infinity, ease: "linear", duration: 40 }}
+               whileHover={{ animationPlayState: 'paused' } as any}
+             >
+                 {[...TESTIMONIALS, ...TESTIMONIALS].map((testimonial, idx) => (
+                     <div key={idx} className="w-[350px] md:w-[450px] flex-shrink-0 bg-white/5 backdrop-blur-md border border-white/10 p-8 rounded-3xl cursor-grab active:cursor-grabbing hover:bg-white/10 transition-colors">
+                         <div className="flex gap-1 mb-6 text-[#BF9B30]">
+                             {[...Array(testimonial.rating)].map((_, i) => (
+                                 <svg key={i} className="w-5 h-5 fill-current" viewBox="0 0 24 24"><path d="M12 17.27L18.18 21L16.54 13.97L22 9.24L14.81 8.63L12 2L9.19 8.63L2 9.24L7.46 13.97L5.82 21L12 17.27Z"/></svg>
+                             ))}
+                         </div>
+                         <p className="text-white text-lg font-light leading-relaxed mb-8 font-serif">"{testimonial.text}"</p>
+                         <div className="flex items-center gap-4 mt-auto">
+                             <div className="w-12 h-12 bg-gradient-to-br from-[#BF9B30] to-yellow-600 rounded-full flex items-center justify-center text-white font-bold text-lg shadow-lg">
+                                 {testimonial.author.charAt(0)}
+                             </div>
+                             <div>
+                                 <h4 className="text-white font-bold tracking-wide">{testimonial.author}</h4>
+                                 <p className="text-blue-200 text-sm">{testimonial.role}</p>
+                             </div>
+                         </div>
+                     </div>
+                 ))}
+             </motion.div>
+          </div>
+        </section>
+
+        {/* FAQ Section */}
+        <section className="py-24 px-6 max-w-4xl mx-auto" id="faq">
+          <div className="text-center mb-16">
+            <h2 className="text-3xl md:text-5xl font-extrabold tracking-tight text-slate-900 mb-6">Perguntas Frequentes</h2>
+            <p className="text-slate-500 text-lg">Tudo que você precisa saber sobre o InoEvents.</p>
+          </div>
+          <div className="space-y-4">
+            {[
+              {
+                q: "Como funciona o check-in por QR Code?",
+                a: "Cada convite gerado possui um QR Code único. No dia do evento, basta utilizar o InoEvents para escanear o código na tela do celular do convidado para confirmar a presença de forma rápida e segura."
+              },
+              {
+                q: "A plataforma funciona offline?",
+                a: "O aplicativo precisa de internet para sincronizar a lista em tempo real. No entanto, se o sinal cair durante o evento, o check-in continuará funcionando e sincronizará assim que a conexão for reestabelecida."
+              },
+              {
+                q: "Posso personalizar a aparência do convite?",
+                a: "Sim! Oferecemos templates como Classic, Modern, Luxury e mais. Nos planos pagos, você também pode adicionar banners e remover a marca d'água do InoEvents."
+              },
+              {
+                q: "Os meus convidados precisam de aplicativo?",
+                a: "Não. Os convidados recebem um link via WhatsApp, E-mail ou SMS e acessam a página do convite diretamente no navegador do seu smartphone."
+              },
+              {
+                q: "Existe um limite de convidados?",
+                a: "O plano Essencial tem limite de até 100 convidados. Dependendo da dimensão do seu evento, você pode migrar para os planos Premium (até 500), Business (até 5.000) ou Corporate (ilimitado)."
+              }
+            ].map((faq, idx) => (
+              <details key={idx} className="group bg-white border border-slate-200 rounded-2xl cursor-pointer [&_summary::-webkit-details-marker]:hidden">
+                <summary className="flex items-center justify-between p-6 font-bold text-slate-800 text-lg outline-none select-none">
+                  {faq.q}
+                  <span className="ml-4 flex-shrink-0 transition-transform duration-300 group-open:rotate-180">
+                    <span className="material-symbols-outlined text-brand-blue">expand_more</span>
+                  </span>
+                </summary>
+                <div className="p-6 pt-0 text-slate-600 leading-relaxed">
+                  {faq.a}
+                </div>
+              </details>
+            ))}
           </div>
         </section>
 
         {/* Footer */}
-        <footer className="px-6 py-10 bg-slate-900 text-slate-400 text-sm border-t border-slate-800">
-          <div className="max-w-5xl mx-auto flex flex-col md:flex-row justify-between items-center gap-6">
-             <div className="flex items-center gap-2">
-                <span className="material-symbols-outlined text-slate-500">auto_awesome</span>
-                <span className="font-bold text-slate-200">InoEvents</span>
+        <footer className="px-6 py-16 bg-slate-900 text-slate-400 text-sm border-t border-slate-800">
+          <div className="max-w-7xl mx-auto grid grid-cols-1 md:grid-cols-4 gap-12 mb-12">
+             <div className="col-span-1 md:col-span-2">
+                <div className="flex items-center gap-2 mb-6">
+                   <span className="material-symbols-outlined text-brand-blue text-2xl">auto_awesome</span>
+                   <span className="font-extrabold text-white text-xl tracking-tight">InoEvents</span>
+                </div>
+                <p className="text-slate-400 leading-relaxed max-w-sm mb-6">
+                   Transformando a forma como você convida e gere eventos. Tecnologias de elite para memoráveis recepções.
+                </p>
+                <div className="flex gap-4">
+                   <a href="#" className="w-10 h-10 rounded-full bg-slate-800 flex items-center justify-center hover:bg-brand-blue hover:text-white transition-colors">
+                      <span className="material-symbols-outlined text-[20px]">public</span>
+                   </a>
+                </div>
              </div>
-             <div className="flex gap-8">
-                <Link className="hover:text-white transition-colors" to="/plans">Preços</Link>
-                <a className="hover:text-white transition-colors" href="#">Suporte</a>
-                <a className="hover:text-white transition-colors" href="#">Termos</a>
+             
+             <div>
+                 <h4 className="text-white font-bold mb-6 tracking-wide">Produto</h4>
+                 <ul className="space-y-4">
+                     <li><Link to="/plans" className="hover:text-white transition-colors">Planos & Preços</Link></li>
+                     <li><a href="#features" className="hover:text-white transition-colors">Funcionalidades</a></li>
+                     <li><Link to="/b2b" className="hover:text-white transition-colors">Soluções Corporativas</Link></li>
+                     <li><Link to="/about" className="hover:text-white transition-colors">Sobre Nós</Link></li>
+                 </ul>
              </div>
-             <p>© 2024 InoEvents.</p>
+
+             <div>
+                 <h4 className="text-white font-bold mb-6 tracking-wide">Legal</h4>
+                 <ul className="space-y-4">
+                     <li><Link to="/terms" className="hover:text-white transition-colors">Termos de Serviço</Link></li>
+                     <li><Link to="/privacy" className="hover:text-white transition-colors">Políticas de Privacidade</Link></li>
+                     <li><a href="mailto:suporte@inoevents.com" className="hover:text-white transition-colors">Suporte</a></li>
+                 </ul>
+             </div>
+          </div>
+          
+          <div className="max-w-7xl mx-auto pt-8 border-t border-slate-800 flex flex-col md:flex-row justify-between items-center gap-4">
+             <p>© {new Date().getFullYear()} InoEvents. Todos os direitos reservados.</p>
+             <p className="text-xs">Feito com foco no design e na experiência do usuário.</p>
           </div>
         </footer>
 

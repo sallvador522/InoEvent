@@ -21,13 +21,28 @@ service cloud.firestore {
              (data.location is string || data.location == null);
     }
 
+    function isValidTransaction(data) {
+      return data.keys().hasAll(['ownerId', 'amount', 'type', 'description', 'date']) &&
+             data.ownerId is string &&
+             data.amount is number &&
+             data.type in ['CREDIT', 'DEBIT'] &&
+             data.description is string &&
+             data.date is string &&
+             (data.get('eventId', null) is string || data.get('eventId', null) == null);
+    }
+
     // --- Rules ---
     match /{document=**} {
       allow read, write: if false; // Default deny
     }
 
+    match /transactions/{transactionId} {
+      allow read: if isSignedIn() && resource.data.ownerId == request.auth.uid;
+      allow create: if isSignedIn() && isValidId(transactionId) && isValidTransaction(incoming()) && incoming().ownerId == request.auth.uid;
+    }
+
     match /users/{userId} {
-      allow get: if isOwner(userId);
+      allow get: if true;
       allow create: if isOwner(userId) && isValidUser(incoming()) && incoming().uid == request.auth.uid;
       allow update: if isOwner(userId) && 
                        request.resource.data.diff(resource.data).affectedKeys().hasOnly(['plan', 'whiteLabelName', 'whiteLabelLogo', 'updatedAt', 'credits']) &&
@@ -51,13 +66,13 @@ service cloud.firestore {
       // --- Delete ---
       allow delete: if isSignedIn() && isValidId(eventId) && resource != null && resource.data.ownerId == request.auth.uid;
       
-      // --- Guests Subcollection ---
+        // --- Guests Subcollection ---
       match /guests/{guestId} {
         // Public can read guests to allow getCountFromServer
         allow read: if true;
-        // Public can create guest (RSVP form)
-        allow create: if isValidId(guestId) && incoming().name is string;
-        allow update, delete: if isSignedIn() && get(/databases/$(database)/documents/events/$(eventId)).data.ownerId == request.auth.uid;
+        // Public can create and update guest (RSVP form)
+        allow create, update: if isValidId(guestId) && incoming().name is string;
+        allow delete: if isSignedIn() && get(/databases/$(database)/documents/events/$(eventId)).data.ownerId == request.auth.uid;
       }
     }
   }

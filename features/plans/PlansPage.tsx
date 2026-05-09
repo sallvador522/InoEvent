@@ -1,21 +1,27 @@
 import React, { useState } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
 import { Check, ArrowLeft, Gem, Sparkles, Building2, X } from 'lucide-react';
-import { Link } from 'react-router-dom';
+import { Link, useNavigate } from 'react-router-dom';
 import { doc, updateDoc, getDoc, setDoc } from 'firebase/firestore';
 import { useFirebase, db, handleFirestoreError, OperationType } from '../../components/FirebaseProvider';
 import { Button } from '../../components/ui/Button';
+import toast from 'react-hot-toast';
 
 const plans = [
   {
     name: 'Essencial',
     subtitle: 'Para comemorações íntimas',
-    price: '7.500 Kz',
+    prices: {
+      monthly: '7.500 Kz',
+      annual: '75.000 Kz'
+    },
+    savings: 'Economize 15.000 Kz ao ano',
     description: 'O início perfeito para um evento inesquecível com o essencial que você precisa.',
     icon: <Sparkles className="w-8 h-8 text-blue-400" />,
     features: [
+      'Até 5 convites por mês',
       '1 Modelo premium',
-      'RSVP Até 50 convidados',
+      'RSVP Até 100 convidados',
       'Código QR Único',
       'Localização no Maps',
       'Suporte via E-mail',
@@ -24,23 +30,32 @@ const plans = [
   {
     name: 'Premium',
     subtitle: 'Casamentos & Festas',
-    price: '20.000 Kz',
+    prices: {
+      monthly: '20.000 Kz',
+      annual: '190.000 Kz'
+    },
+    savings: 'Economize 50.000 Kz ao ano',
     popular: true,
     description: 'A experiência luxuosa completa para o seu grande dia.',
     icon: <Gem className="w-8 h-8 text-purple-400" />,
     features: [
+      'Eventos Ilimitados',
       'Modelos Exclusivos Ilimitados',
-      'Gestão RSVP Ilimitada',
+      'RSVP Até 500 convidados',
       'Código QR Individual por convidado',
       'Maps + Galeria de Fotos Interativa',
       'Suporte VIP via WhatsApp 24/7',
     ],
   },
   {
-    name: 'Corporate',
-    displayName: 'Corporate (B2B)',
+    name: 'Business',
+    displayName: 'Business (B2B)',
     subtitle: 'Agências e Produtores',
-    price: 'Sob Consulta',
+    prices: {
+      monthly: 'Sob Consulta',
+      annual: 'Sob Consulta'
+    },
+    savings: '',
     description: 'Solução robusta para quem organiza múltiplos eventos. Escale com o InoEvents.',
     icon: <Building2 className="w-8 h-8 text-amber-400" />,
     features: [
@@ -77,14 +92,28 @@ const itemVariants = {
 };
 
 export const PlansPage: React.FC = () => {
+  const navigate = useNavigate();
   const { user, userProfile } = useFirebase();
   const [loadingPlan, setLoadingPlan] = useState<string | null>(null);
   const [isSimulateModalOpen, setIsSimulateModalOpen] = useState(false);
   const [selectedPlanToBuy, setSelectedPlanToBuy] = useState<any>(null);
+  const [billingCycle, setBillingCycle] = useState<'monthly' | 'annual'>('monthly');
 
   const confirmPlanSelection = (plan: any) => {
     if (!user) {
-      alert("Por favor, entre na sua conta para escolher um plano.");
+      toast.custom((t) => (
+        <div className={`${t.visible ? 'animate-enter' : 'animate-leave'} max-w-sm w-full bg-white shadow-[0_8px_30px_rgb(0,0,0,0.12)] rounded-xl flex flex-col border border-slate-100 overflow-hidden`}>
+            <div className="p-4">
+                <h3 className="font-bold text-slate-900 mb-1">Acesso Necessário</h3>
+                <p className="text-sm text-slate-500">Você precisa entrar na sua conta para escolher um plano.</p>
+            </div>
+            <div className="flex border-t border-slate-100">
+                <button onClick={() => toast.dismiss(t.id)} className="flex-1 px-4 py-3 text-sm font-bold text-slate-500 hover:bg-slate-50 transition-colors">Cancelar</button>
+                <div className="w-px bg-slate-100" />
+                <button onClick={() => { toast.dismiss(t.id); navigate('/auth'); }} className="flex-1 px-4 py-3 text-sm font-bold text-brand-blue hover:bg-slate-50 transition-colors">Fazer Login</button>
+            </div>
+        </div>
+      ), { duration: 5000 });
       return;
     }
     setSelectedPlanToBuy(plan);
@@ -104,10 +133,10 @@ export const PlansPage: React.FC = () => {
       }
       setIsSimulateModalOpen(false);
       setSelectedPlanToBuy(null);
-      alert("Plano modificado com sucesso!");
+      toast.success("Plano modificado com sucesso!");
     } catch (error) {
       console.error(error);
-      alert("Erro ao alterar o plano. Tente novamente.");
+      toast.error("Erro ao alterar o plano. Tente novamente.");
       handleFirestoreError(error, OperationType.WRITE, `users/${user.uid}`);
     } finally {
       setLoadingPlan(null);
@@ -142,13 +171,38 @@ export const PlansPage: React.FC = () => {
           initial={{ opacity: 0, y: 20 }}
           animate={{ opacity: 1, y: 0 }}
           transition={{ duration: 0.8, ease: "easeOut" }}
-          className="text-center mb-16 md:mb-20"
+          className="text-center mb-10 md:mb-12"
         >
           <span className="text-brand-blue font-bold tracking-widest text-xs uppercase mb-3 block">Transparência & Elegância</span>
           <h1 className="text-4xl md:text-6xl font-script text-slate-900 mb-6">Investimento no seu momento</h1>
           <p className="text-slate-500 text-lg md:text-xl font-light max-w-2xl mx-auto">
             Design impecável e tecnologia premium, estruturados para tornar o seu evento inesquecível.
           </p>
+        </motion.div>
+
+        <motion.div 
+          initial={{ opacity: 0, y: 20 }}
+          animate={{ opacity: 1, y: 0 }}
+          transition={{ duration: 0.8, ease: "easeOut", delay: 0.1 }}
+          className="flex justify-center mb-12"
+        >
+          <div className="bg-slate-200/50 p-1 rounded-full flex items-center shadow-inner">
+            <button
+              onClick={() => setBillingCycle('monthly')}
+              className={`px-6 py-2.5 rounded-full text-sm font-bold tracking-wide transition-all ${billingCycle === 'monthly' ? 'bg-white text-slate-900 shadow-sm' : 'text-slate-500 hover:text-slate-700'}`}
+            >
+              Mensal
+            </button>
+            <button
+              onClick={() => setBillingCycle('annual')}
+              className={`px-6 py-2.5 rounded-full text-sm font-bold tracking-wide transition-all flex items-center gap-2 ${billingCycle === 'annual' ? 'bg-brand-blue text-white shadow-sm' : 'text-slate-500 hover:text-slate-700'}`}
+            >
+              Anual
+              <span className={`px-2 py-0.5 rounded-full text-[10px] uppercase font-black tracking-widest ${billingCycle === 'annual' ? 'bg-white/20 text-white' : 'bg-brand-blue/10 text-brand-blue'}`}>
+                -20%
+              </span>
+            </button>
+          </div>
         </motion.div>
 
         <motion.div 
@@ -200,10 +254,28 @@ export const PlansPage: React.FC = () => {
                     {plan.description}
                   </p>
 
-                  <div className="mb-8">
-                    <span className="text-4xl md:text-5xl font-bold text-slate-900 tracking-tight">{plan.price}</span>
-                    <span className="text-sm text-slate-400 ml-2">/ evento</span>
+                  <div className="mb-4">
+                    <span className="text-4xl md:text-5xl font-bold text-slate-900 tracking-tight">
+                      {billingCycle === 'monthly' ? plan.prices.monthly : plan.prices.annual}
+                    </span>
+                    {plan.prices.monthly !== 'Sob Consulta' && (
+                      <span className="text-sm text-slate-400 ml-2">/ {billingCycle === 'monthly' ? 'mês' : 'ano'}</span>
+                    )}
                   </div>
+                  
+                  {billingCycle === 'annual' && plan.savings && (
+                    <div className="mb-4 text-emerald-600 text-sm font-bold bg-emerald-50 px-3 py-1.5 rounded-lg inline-block self-start">
+                      {plan.savings}
+                    </div>
+                  )}
+                  {billingCycle === 'monthly' && plan.savings && (
+                    <div className="mb-4 text-emerald-600 text-sm font-bold px-3 py-1.5 rounded-lg inline-block self-start invisible">
+                      Placeholder
+                    </div>
+                  )}
+                  {(!plan.savings) && (
+                    <div className="mb-4 h-[32px]"></div>
+                  )}
                   
                   <div className="h-px w-full bg-slate-100 mb-8" />
                   

@@ -33,7 +33,7 @@ export const EVENTS: EventDetails[] = [
   {
     id: 'wedding-essential',
     type: ThemeType.WEDDING,
-    layoutMode: 'ESSENTIAL',
+    layoutMode: 'CLASSIC',
     title: 'Ana & João',
     hosts: 'Com muita alegria',
     date: '10 . DEZ . 2024',

@@ -29,12 +29,30 @@
         "contactPhone": { "type": "string" }
       },
       "required": ["id", "ownerId", "title"]
+    },
+    "Transaction": {
+      "title": "Transaction",
+      "description": "Credit transactions",
+      "type": "object",
+      "properties": {
+        "ownerId": { "type": "string" },
+        "amount": { "type": "number" },
+        "type": { "type": "string" },
+        "description": { "type": "string" },
+        "date": { "type": "string" },
+        "eventId": { "type": "string" }
+      },
+      "required": ["ownerId", "amount", "type", "description", "date"]
     }
   },
   "firestore": {
     "/users/{uid}": {
       "schema": { "$ref": "User" },
       "description": "User profiles"
+    },
+    "/transactions/{transactionId}": {
+      "schema": { "$ref": "Transaction" },
+      "description": "User transactions"
     },
     "/events/{eventId}": {
       "schema": { "$ref": "Event" },

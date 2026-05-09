@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { motion } from 'framer-motion';
 import { useNavigate } from 'react-router-dom';
 import { useFirebase } from '../../components/FirebaseProvider';
@@ -6,6 +6,7 @@ import { doc, updateDoc } from 'firebase/firestore';
 import { db } from '../../components/FirebaseProvider';
 import { Button } from '../../components/ui/Button';
 import { Building2, UploadCloud, ArrowRight } from 'lucide-react';
+import toast from 'react-hot-toast';
 
 export const CreateBusiness: React.FC = () => {
     const { user, userProfile } = useFirebase();
@@ -15,11 +16,18 @@ export const CreateBusiness: React.FC = () => {
     const [businessLogo, setBusinessLogo] = useState(userProfile?.whiteLabelLogo || ''); // Handled as base64 data url for preview purposes
     const [isSaving, setIsSaving] = useState(false);
 
+    useEffect(() => {
+        if (!userProfile) return;
+        if (userProfile.plan !== 'Business' && userProfile.plan !== 'Corporate') {
+            navigate('/dashboard');
+        }
+    }, [userProfile, navigate]);
+
     const handleImageUpload = (e: React.ChangeEvent<HTMLInputElement>) => {
         const file = e.target.files?.[0];
         if (file) {
             if (file.size > 500 * 1024) {
-                alert('A imagem deve ter no máximo 500KB');
+                toast.error('A imagem deve ter no máximo 500KB');
                 return;
             }
             const reader = new FileReader();
@@ -36,15 +44,28 @@ export const CreateBusiness: React.FC = () => {
         
         setIsSaving(true);
         try {
+            const { getDoc, setDoc } = await import('firebase/firestore');
             const userRef = doc(db, 'users', user.uid);
-            await updateDoc(userRef, { 
-                whiteLabelName: businessName,
-                whiteLabelLogo: businessLogo 
-            });
+            const userSnap = await getDoc(userRef);
+            if (!userSnap.exists()) {
+                await setDoc(userRef, {
+                    uid: user.uid,
+                    email: user.email || 'no-email@example.com',
+                    plan: userProfile?.plan || 'Essencial',
+                    whiteLabelName: businessName,
+                    whiteLabelLogo: businessLogo
+                });
+            } else {
+                await updateDoc(userRef, { 
+                    whiteLabelName: businessName,
+                    whiteLabelLogo: businessLogo 
+                });
+            }
+            toast.success("Negócio criado com sucesso!");
             navigate('/dashboard'); // Go to UserDashboard
         } catch (error) {
             console.error(error);
-            alert("Erro ao criar negócio.");
+            toast.error("Erro ao criar negócio.");
         } finally {
             setIsSaving(false);
         }
@@ -61,9 +82,15 @@ export const CreateBusiness: React.FC = () => {
                     <Building2 size={32} />
                 </div>
                 
-                <h1 className="text-3xl font-bold text-slate-800 mb-2">Criar Seu Negócio</h1>
+                <button onClick={() => navigate('/dashboard')} className="text-sm text-slate-500 hover:text-slate-800 font-medium flex items-center gap-2 mb-4 transition-colors">
+                    <ArrowRight size={16} className="rotate-180" /> Voltar ao Painel
+                </button>
+
+                <h1 className="text-3xl font-bold text-slate-800 mb-2">
+                    {userProfile?.whiteLabelName ? 'Gerenciar Sua Empresa' : 'Criar Seu Negócio'}
+                </h1>
                 <p className="text-slate-500 mb-8">
-                    Configure sua empresa de eventos (B2B). Com isso, seus convites gerados exibirão a sua marca.
+                    {userProfile?.whiteLabelName ? 'Atualize as configurações da sua empresa (B2B).' : 'Configure sua empresa de eventos (B2B). Com isso, seus convites gerados exibirão a sua marca.'}
                 </p>
 
                 <form onSubmit={handleSave} className="space-y-6">
@@ -104,7 +131,7 @@ export const CreateBusiness: React.FC = () => {
 
                     <div className="pt-6 border-t border-slate-100">
                         <Button fullWidth disabled={isSaving} type="submit" className="h-12 flex items-center justify-center gap-2">
-                           {isSaving ? "Salvando..." : <>Criar Meu Negócio <ArrowRight size={18} /></>}
+                           {isSaving ? "Salvando..." : <>{userProfile?.whiteLabelName ? 'Salvar Configurações' : 'Criar Meu Negócio'} <ArrowRight size={18} /></>}
                         </Button>
                     </div>
                 </form>

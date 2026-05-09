@@ -1,6 +1,6 @@
 
 import React, { useState, useEffect } from 'react';
-import { useParams, Link } from 'react-router-dom';
+import { useParams, Link, useNavigate } from 'react-router-dom';
 import { motion } from 'framer-motion';
 import { getEventById } from '../../mockData';
 import { EventDetails } from '../../types';
@@ -12,6 +12,7 @@ import { Users, CalendarClock, Mail, PartyPopper, Shirt, Camera, Music4, Smile, 
 import { toPng } from 'html-to-image';
 import { useFirebase, db, handleFirestoreError, OperationType } from '../../components/FirebaseProvider';
 import { doc, getDoc, setDoc, getCountFromServer, collection, query, where } from 'firebase/firestore';
+import toast from 'react-hot-toast';
 
 // ============================================================================
 // COMPONENT: INVITATION CONTROLLER
@@ -19,10 +20,29 @@ import { doc, getDoc, setDoc, getCountFromServer, collection, query, where } fro
 // ============================================================================
 const InvitationView: React.FC = () => {
   const { id } = useParams();
-  const { user } = useFirebase();
+  const navigate = useNavigate();
+  const { user, userProfile } = useFirebase();
   const [event, setEvent] = useState<any>(null);
   const [loading, setLoading] = useState(true);
   
+  const handleUseTemplate = (e: React.MouseEvent) => {
+      if (userProfile && userProfile.plan === 'Essencial' && event.layoutMode !== 'MODERN') {
+          e.preventDefault();
+          toast.custom((t) => (
+              <div className={`${t.visible ? 'animate-enter' : 'animate-leave'} max-w-sm w-full bg-white shadow-[0_8px_30px_rgb(0,0,0,0.12)] rounded-xl flex flex-col border border-slate-100 overflow-hidden`}>
+                  <div className="p-4">
+                      <h3 className="font-bold text-slate-900 mb-1">Modelo Exclusivo</h3>
+                      <p className="text-sm text-slate-500">O modelo {event.layoutMode} é exclusivo para planos Premium e Business.</p>
+                  </div>
+                  <div className="flex border-t border-slate-100">
+                      <button onClick={() => toast.dismiss(t.id)} className="flex-1 px-4 py-3 text-sm font-bold text-slate-500 hover:bg-slate-50 transition-colors">Cancelar</button>
+                      <div className="w-px bg-slate-100" />
+                      <button onClick={() => { toast.dismiss(t.id); navigate('/plans'); }} className="flex-1 px-4 py-3 text-sm font-bold text-brand-blue hover:bg-slate-50 transition-colors">Ver Planos</button>
+                  </div>
+              </div>
+          ), { duration: 5000 });
+      }
+  };
   const [isRSVPOpen, setRSVPOpen] = useState(false);
 
   useEffect(() => {
@@ -49,14 +69,15 @@ const InvitationView: React.FC = () => {
         date: createdEventData.date || 'Data a definir',
         isoDate: createdEventData.date || new Date().toISOString(),
         time: createdEventData.time || '19:00',
-        locationName: createdEventData.location || 'Local a definir',
-        address: 'Luanda, Angola', 
+        locationName: createdEventData.locationName || createdEventData.location || 'Local a definir',
+        address: createdEventData.address || 'Luanda, Angola', 
         heroImage: 'https://images.unsplash.com/photo-1511285560982-1356c11d4606?q=80&w=2670&auto=format&fit=crop',
         description: createdEventData.description || 'Estamos ansiosos para celebrar nosso amor com você!',
         musicTrack: 'Turning Page - Sleeping At Last',
-        timeline: [
+        timeline: createdEventData.timeline || [
             { time: createdEventData.time || '19:00', title: 'Cerimônia', description: createdEventData.location || "Local do Evento" }
         ],
+        dressCode: (createdEventData.dressCodeTitle || createdEventData.dressCodeDescription) ? { title: createdEventData.dressCodeTitle, description: createdEventData.dressCodeDescription } : undefined,
         gifts: [ { type: 'IBAN', title: 'Presente', description: 'Dados bancários para contribuição', value: createdEventData.iban || '', accountName: createdEventData.accountName || '', bankName: createdEventData.bankName || '' } ],
         mapLink: createdEventData.location || '#',
         phone: createdEventData.contactPhone,
@@ -75,9 +96,27 @@ const InvitationView: React.FC = () => {
         
         if (docSnap.exists()) {
           const data = docSnap.data();
+          let finalWhiteLabelName = data.whiteLabelName;
+          let finalWhiteLabelLogo = data.whiteLabelLogo;
+          
+          if (data.ownerId && (!finalWhiteLabelName || !finalWhiteLabelLogo) && (data.plan === 'Business' || data.plan === 'Corporate')) {
+              try {
+                  const ownerSnap = await getDoc(doc(db, 'users', data.ownerId));
+                  if (ownerSnap.exists()) {
+                      const ownerData = ownerSnap.data();
+                      finalWhiteLabelName = finalWhiteLabelName || ownerData.whiteLabelName;
+                      finalWhiteLabelLogo = finalWhiteLabelLogo || ownerData.whiteLabelLogo;
+                  }
+              } catch(err) {
+                  console.warn("Could not fetch owner data for white label", err);
+              }
+          }
+
           setEvent({
             ...data,
             id: docSnap.id,
+            whiteLabelName: finalWhiteLabelName,
+            whiteLabelLogo: finalWhiteLabelLogo,
             type: data.type || 'WEDDING',
             layoutMode: data.layoutMode || 'MODERN',
             heroImage: data.heroImage || 'https://images.unsplash.com/photo-1511285560982-1356c11d4606?q=80&w=2670&auto=format&fit=crop',
@@ -85,8 +124,10 @@ const InvitationView: React.FC = () => {
             isoDate: data.date || new Date().toISOString(),
             timeline: data.timeline || [{ time: data.time || '19:00', title: 'Cerimônia', description: data.location || "Local" }],
             gifts: data.iban ? [ { type: 'IBAN', title: 'Presente', description: 'Dados bancários para contribuição', value: data.iban || '', accountName: data.accountName || '', bankName: data.bankName || '' } ] : data.gifts,
+            dressCode: (data.dressCodeTitle || data.dressCodeDescription) ? { title: data.dressCodeTitle, description: data.dressCodeDescription } : data.dressCode,
             address: data.address || 'Luanda, Angola',
-            locationName: data.location || 'Local do Evento',
+            locationName: data.locationName || data.location || 'Local do Evento',
+            mapLink: data.location || '#',
             phone: data.contactPhone || ''
           });
         }
@@ -123,12 +164,24 @@ const InvitationView: React.FC = () => {
       <TocaPlayer trackName={event.musicTrack} isDark={event.layoutMode === 'LUXURY' || event.layoutMode === 'INDUSTRIAL'} />
       
       {isTemplate && (
-        <div className="fixed top-4 left-1/2 -translate-x-1/2 z-[100] w-[90%] max-w-lg bg-white/95 backdrop-blur-xl border border-brand-blue/20 rounded-2xl p-4 shadow-[0_10px_40px_-10px_rgba(0,40,100,0.2)] flex items-center justify-between">
+        <Link to="/" className="fixed top-4 left-4 z-[110] flex items-center justify-center w-10 h-10 bg-white/90 backdrop-blur-sm text-slate-800 rounded-full shadow-xl hover:bg-white transition-all border border-slate-200">
+           <ArrowLeft size={16} />
+        </Link>
+      )}
+
+      {isTemplate && (
+        <div className="fixed top-4 left-1/2 -translate-x-1/2 z-[100] w-[85%] md:w-[90%] max-w-lg bg-white/95 backdrop-blur-xl border border-brand-blue/20 rounded-2xl p-4 shadow-[0_10px_40px_-10px_rgba(0,40,100,0.2)] flex items-center justify-between">
            <div className="flex flex-col mr-4">
               <span className="text-[10px] uppercase font-bold text-slate-400 tracking-widest leading-none mb-1 text-left">Pré-visualização</span>
-              <span className="text-sm font-serif font-bold text-brand-blue leading-none text-left">Modelo {event.layoutMode}</span>
+              <span className="text-sm font-serif font-bold text-brand-blue leading-none text-left flex items-center gap-1">
+                  Modelo {event.layoutMode}
+                  {event.layoutMode !== 'MODERN' && (
+                      <span className="text-[9px] bg-brand-blue/10 text-brand-blue px-2 py-0.5 rounded-full">PRO</span>
+                  )}
+              </span>
            </div>
            <Link 
+              onClick={handleUseTemplate}
               to={`/create-invitation?template=${event.layoutMode}`}
               className="bg-brand-blue text-white px-5 py-2.5 rounded-xl text-xs font-bold shadow-lg shadow-brand-blue/30 hover:bg-brand-blue/90 hover:scale-105 transition-all text-center flex-shrink-0"
            >
@@ -551,6 +604,15 @@ const ModernLayout: React.FC<{ event: EventDetails; onRSVP: () => void; guestNam
       </FadeInSection>
 
       {/* 6. DRESS CODE & TIPS */}
+      {event.dressCode && (
+         <FadeInSection className="py-16 bg-white text-center px-6 border-b border-gray-100">
+             <span className="font-display text-[10px] uppercase tracking-[0.3em] text-gray-400 mb-4 block">Dress Code</span>
+             <h4 className="text-2xl font-serif mb-4 text-[#1a1a1a]">{event.dressCode.title}</h4>
+             <p className="text-gray-500 max-w-md mx-auto leading-relaxed font-light">
+                 {event.dressCode.description}
+             </p>
+         </FadeInSection>
+      )}
 
       {/* 7. GIFTS / IBAN Section */}
       {event.gifts && event.gifts[0].value && (
@@ -578,7 +640,7 @@ const ModernLayout: React.FC<{ event: EventDetails; onRSVP: () => void; guestNam
             </p>
             
             <button 
-               onClick={() => {navigator.clipboard.writeText(event.gifts![0].value); alert('IBAN Copiado!')}}
+               onClick={() => {navigator.clipboard.writeText(event.gifts![0].value); toast.success('IBAN Copiado!')}}
                className="px-8 py-3 border border-[#C2B280] text-[#C2B280] text-xs font-bold uppercase tracking-widest hover:bg-[#C2B280] hover:text-white transition-colors"
             >
                Copiar IBAN
@@ -778,7 +840,7 @@ const GardenLayout: React.FC<{ event: EventDetails; onRSVP: () => void; guestNam
               <h4 className="text-lg font-serif font-bold mb-2">Lista de Presentes</h4>
               <p className="text-sm text-[#5D5C61] mb-4">{event.gifts[0].description}</p>
               <button 
-                 onClick={() => {navigator.clipboard.writeText(event.gifts![0].value); alert('IBAN Copiado!')}}
+                 onClick={() => {navigator.clipboard.writeText(event.gifts![0].value); toast.success('IBAN Copiado!')}}
                  className={`px-6 py-2 rounded-full border border-[#D6CFC7] text-xs font-bold uppercase tracking-widest hover:bg-[#F9F6F2] transition-colors`}
               >
                  Copiar IBAN
@@ -883,7 +945,7 @@ const RusticLayout: React.FC<{ event: EventDetails; onRSVP: () => void; guestNam
              <span className="material-symbols-outlined text-4xl text-[#5D4037] mb-4">card_giftcard</span>
              <h3 className="text-2xl font-serif text-[#4E342E] mb-2">Presentes</h3>
              <button 
-                onClick={() => {navigator.clipboard.writeText(event.gifts![0].value); alert('IBAN Copiado!')}}
+                onClick={() => {navigator.clipboard.writeText(event.gifts![0].value); toast.success('IBAN Copiado!')}}
                 className="mt-4 px-6 py-2 border border-[#5D4037] text-[#5D4037] rounded-full text-xs font-bold uppercase tracking-widest hover:bg-[#5D4037] hover:text-white transition-colors"
              >
                 Copiar IBAN
@@ -1299,13 +1361,17 @@ const RSVPForm: React.FC<{ event: EventDetails | any; onClose: () => void }> = (
 
        const checkCapacity = async () => {
            try {
-               if (event.plan === 'Essencial' || !event.plan) {
-                   const q = query(collection(db, 'events', event.id, 'guests'), where('status', '==', 'CONFIRMED'));
-                   const snap = await getCountFromServer(q);
-                   if (snap.data().count >= 50) {
-                      setIsFull(true);
-                   }
-               }
+               const q = query(collection(db, 'events', event.id, 'guests'), where('status', '==', 'CONFIRMED'));
+                const snap = await getCountFromServer(q);
+                const count = snap.data().count;
+
+                if (event.plan === 'Essencial' || !event.plan) {
+                    if (count >= 100) setIsFull(true);
+                } else if (event.plan === 'Premium') {
+                    if (count >= 500) setIsFull(true);
+                } else if (event.plan === 'Business') {
+                    if (count >= 5000) setIsFull(true);
+                }
            } catch(e) {
                console.error(e);
            } finally {
@@ -1378,7 +1444,7 @@ const RSVPForm: React.FC<{ event: EventDetails | any; onClose: () => void }> = (
            if (!err.message?.includes("Missing or insufficient permissions")) {
                handleFirestoreError(err, OperationType.WRITE, `events/${event.id}/guests`);
            }
-           alert("Houve um erro ao enviar seu RSVP. Tente novamente.");
+           toast.error("Houve um erro ao enviar seu RSVP. Tente novamente.");
        } finally {
            setIsSubmitting(false);
        }
@@ -1395,7 +1461,7 @@ const RSVPForm: React.FC<{ event: EventDetails | any; onClose: () => void }> = (
                link.click();
            } catch (err) {
                console.error('Oops, something went wrong!', err);
-               alert("Falha ao transferir o convite. Tente novamente.");
+               toast.error("Falha ao transferir o convite. Tente novamente.");
            }
        }
    };
@@ -1416,7 +1482,7 @@ const RSVPForm: React.FC<{ event: EventDetails | any; onClose: () => void }> = (
                 <Users size={32} />
              </div>
              <h3 className="font-bold text-lg text-red-600">Lista Cheia!</h3>
-             <p className="text-sm opacity-80">A lista de convidados para este evento atingiu a capacidade máxima (50 convidados).</p>
+             <p className="text-sm opacity-80">A lista de convidados para este evento atingiu a capacidade máxima.</p>
              <Button onClick={onClose} fullWidth variant={isLuxury ? 'outline' : 'primary'}>Fechar</Button>
          </div>
        );

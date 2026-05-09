@@ -1,5 +1,6 @@
 import React from 'react';
 import { HashRouter as Router, Routes, Route } from 'react-router-dom';
+import { Toaster } from 'react-hot-toast';
 import { LandingPage } from './features/landing/LandingPage';
 import InvitationView from './features/invitation/InvitationView';
 import { InvitationCreator } from './features/invitation/InvitationCreator';
@@ -7,18 +8,35 @@ import { ProtectedRoute } from './components/ProtectedRoute';
 import { Dashboard } from './features/dashboard/Dashboard';
 import { UserDashboard } from './features/dashboard/UserDashboard';
 import { CreateBusiness } from './features/business/CreateBusiness';
+import { BusinessDashboard } from './features/business/BusinessDashboard';
+import { ClientDashboard } from './features/dashboard/ClientDashboard';
+import { CheckinScanner } from './features/checkin/CheckinScanner';
 import { AuthPage } from './features/auth/AuthPage';
 import { PlansPage } from './features/plans/PlansPage';
+import { TermsPage } from './features/landing/TermsPage';
+import { PrivacyPage } from './features/landing/PrivacyPage';
+import { AboutPage } from './features/landing/AboutPage';
 
 const App: React.FC = () => {
   return (
-    <Router>
-      <Routes>
+    <>
+      <Toaster position="top-center" />
+      <Router>
+        <Routes>
         <Route path="/" element={<LandingPage />} />
+        <Route path="/terms" element={<TermsPage />} />
+        <Route path="/privacy" element={<PrivacyPage />} />
+        <Route path="/about" element={<AboutPage />} />
         <Route path="/invite/:id" element={<InvitationView />} />
+        <Route path="/checkin/:id" element={<CheckinScanner />} />
         <Route path="/business/create" element={
             <ProtectedRoute>
                 <CreateBusiness />
+            </ProtectedRoute>
+        } />
+        <Route path="/b2b" element={
+            <ProtectedRoute>
+                <BusinessDashboard />
             </ProtectedRoute>
         } />
         <Route path="/dashboard" element={
@@ -31,6 +49,7 @@ const App: React.FC = () => {
                 <Dashboard />
             </ProtectedRoute>
         } />
+        <Route path="/client-dashboard/:id" element={<ClientDashboard />} />
         <Route path="/auth" element={<AuthPage />} />
         <Route path="/plans" element={<PlansPage />} />
         <Route path="/create-invitation" element={
@@ -45,6 +64,7 @@ const App: React.FC = () => {
         } />
       </Routes>
     </Router>
+    </>
   );
 };
 

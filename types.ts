@@ -14,10 +14,12 @@ export interface TimelineItem {
 }
 
 export interface GiftItem {
-  type: 'IBAN' | 'LINK' | 'BANK'; // Alterado de PIX para IBAN
+  type: 'IBAN' | 'LINK' | 'BANK'; 
   title: string;
-  value: string; // IBAN number or URL
+  value: string; 
   description?: string;
+  bankName?: string;
+  accountName?: string;
   qrCode?: string;
 }
 
@@ -57,7 +59,7 @@ export interface EventDetails {
   musicTrack: string;
   timeline: TimelineItem[];
   mapImage?: string;
-  gallery?: string[];
+  gallery?: Array<string | { id: string; url: string; likes: number }>;
   themeColor?: string;
   
   // New Sections

@@ -16,16 +16,37 @@ export const EVENTS: EventDetails[] = [
     address: 'Cidade Alta, Luanda, Angola',
     receptionName: 'Salão Nobre',
     receptionAddress: 'Clube Naval de Luanda',
+    mapLink: 'https://goo.gl/maps/example',
     heroImage: 'https://images.unsplash.com/photo-1519741497674-611481863552?q=80&w=2574&auto=format&fit=crop',
     description: 'Com a bênção de Deus e de nossos pais, convidamos você para o nosso casamento. Um dia de amor, tradição e alegria.',
     musicTrack: 'Canon in D - Piano',
     themeColor: '#1B365D', // Navy Blue Classic
     mapImage: 'https://images.unsplash.com/photo-1465495976277-4387d4b0b4c6?q=80&w=2698&auto=format&fit=crop',
+    gallery: [
+      'https://images.unsplash.com/photo-1511285560982-1356c11d4606?q=80&w=2670&auto=format&fit=crop',
+      'https://images.unsplash.com/photo-1583939003579-730e3918a45a?q=80&w=2670&auto=format&fit=crop',
+      'https://images.unsplash.com/photo-1515934751635-c81c6bc9a2d8?q=80&w=2574&auto=format&fit=crop'
+    ],
     timeline: [
       { time: '15:30', title: 'Cerimônia Religiosa', description: "Catedral da Sé" },
       { time: '17:30', title: 'Cumprimentos', description: 'Jardins da Catedral' },
       { time: '19:00', title: 'Recepção', description: 'Clube Naval' },
       { time: '21:00', title: 'Jantar', description: 'Buffet Completo' }
+    ],
+    dressCode: {
+      title: 'Passeio Completo',
+      description: 'Sugerimos trajes formais. Homens de terno e gravata, mulheres de vestido longo ou midi elegante.',
+      image: 'https://images.unsplash.com/photo-1511285560982-1356c11d4606?q=80&w=2670&auto=format&fit=crop'
+    },
+    gifts: [
+      {
+        type: 'IBAN',
+        title: 'Presentes em Dinheiro',
+        description: 'Sua presença é o nosso maior presente! Se desejar nos abençoar com alguma contribuição, sinta-se à vontade:',
+        value: 'AO06 0000 0000 0000 0000 0000 0',
+        bankName: 'BAI',
+        accountName: 'Isabela e Lucas'
+      }
     ]
   },
 
@@ -125,9 +146,11 @@ export const EVENTS: EventDetails[] = [
     gifts: [
        {
          type: 'IBAN',
-         title: 'Nossa Casa Nova',
-         description: 'Ajude-nos a construir nosso lar:',
-         value: 'AO06 0000 0000 0000 0000 0000 0'
+         title: 'Presentes em Dinheiro',
+         description: 'Agradecemos por celebrar este momento conosco. Qualquer contribuição será recebida com muito amor:',
+         value: 'AO06 0000 0000 0000 0000 0000 0',
+         bankName: 'BAI',
+         accountName: 'Eduardo e Laura'
        }
     ],
     dressCode: {

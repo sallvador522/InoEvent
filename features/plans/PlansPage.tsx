@@ -20,7 +20,7 @@ const plans = [
     icon: <Sparkles className="w-8 h-8 text-blue-400" />,
     features: [
       'Até 5 convites por mês',
-      '1 Modelo premium',
+      '2 Modelos Base',
       'RSVP Até 100 convidados',
       'Código QR Único',
       'Localização no Maps',

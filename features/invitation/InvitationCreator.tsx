@@ -5,6 +5,7 @@ import { QRCodeSVG } from 'qrcode.react';
 import { Save, QrCode, ArrowLeft, MapPin, Clock, Plus, Trash2 } from 'lucide-react';
 import { useNavigate, useParams, Link } from 'react-router-dom';
 import { useFirebase, db, handleFirestoreError, OperationType } from '../../components/FirebaseProvider';
+import { ImageUploader } from '../../components/ImageUploader';
 import { doc, setDoc, getDoc, getDocs, updateDoc, collection, query, where } from 'firebase/firestore';
 import toast from 'react-hot-toast';
 
@@ -24,8 +25,10 @@ export const InvitationCreator: React.FC = () => {
         iban: '',
         accountName: '',
         bankName: '',
+        giftTitle: '',
+        giftDescription: '',
         contactPhone: '',
-        gallery: [] as string[],
+        gallery: [] as Array<{ id: string; url: string; likes: number } | string>,
         timeline: [] as { time: string, title: string, description: string }[],
         dressCodeTitle: '',
         dressCodeDescription: '',
@@ -48,7 +51,7 @@ export const InvitationCreator: React.FC = () => {
         if (userProfile === null) return; // Aguarda o perfil carregar
         
         const actualPlan = userProfile?.plan || formData.plan;
-        if (actualPlan === 'Essencial' && formData.layoutMode !== 'MODERN') {
+        if (actualPlan === 'Essencial' && formData.layoutMode !== 'MODERN' && formData.layoutMode !== 'CLASSIC') {
             const requestedMode = formData.layoutMode;
             setFormData(prev => ({ ...prev, layoutMode: 'MODERN' }));
             // Instead of an aggressive alert, we seamlessly fallback. We can offer a gentle confirmation.
@@ -78,6 +81,9 @@ export const InvitationCreator: React.FC = () => {
                 const docSnap = await getDoc(docRef);
                 if (docSnap.exists()) {
                     const data = docSnap.data();
+                    const firstGift = (data.gifts && data.gifts.length > 0) ? data.gifts[0] : null;
+                    const dressCode = data.dressCode || {};
+                    
                     setFormData({
                         groomName: data.groomName || '',
                         brideName: data.brideName || '',
@@ -87,14 +93,16 @@ export const InvitationCreator: React.FC = () => {
                         address: data.address || '',
                         location: data.location || '',
                         description: data.description || '',
-                        iban: data.iban || '',
-                        accountName: data.accountName || '',
-                        bankName: data.bankName || '',
+                        iban: firstGift?.value || data.iban || '',
+                        accountName: firstGift?.accountName || data.accountName || '',
+                        bankName: firstGift?.bankName || data.bankName || '',
+                        giftTitle: firstGift?.title || data.giftTitle || '',
+                        giftDescription: firstGift?.description || data.giftDescription || '',
                         contactPhone: data.contactPhone || '',
                         gallery: data.gallery || [],
                         timeline: data.timeline || [],
-                        dressCodeTitle: data.dressCodeTitle || '',
-                        dressCodeDescription: data.dressCodeDescription || '',
+                        dressCodeTitle: dressCode.title || data.dressCodeTitle || '',
+                        dressCodeDescription: dressCode.description || data.dressCodeDescription || '',
                         plan: data.plan || 'Essencial',
                         layoutMode: data.layoutMode || 'MODERN'
                     });
@@ -163,7 +171,22 @@ export const InvitationCreator: React.FC = () => {
                 title: `${formData.groomName} & ${formData.brideName}`,
                 ownerId: user.uid,
                 whiteLabelName: (userProfile?.plan === 'Business' || userProfile?.plan === 'Corporate') ? (userProfile?.whiteLabelName || null) : null,
-                whiteLabelLogo: (userProfile?.plan === 'Business' || userProfile?.plan === 'Corporate') ? (userProfile?.whiteLabelLogo || null) : null
+                whiteLabelLogo: (userProfile?.plan === 'Business' || userProfile?.plan === 'Corporate') ? (userProfile?.whiteLabelLogo || null) : null,
+                gifts: formData.iban ? [
+                    {
+                        type: 'IBAN',
+                        title: formData.giftTitle || 'Presentes em Dinheiro',
+                        description: formData.giftDescription || 'Agradecemos por celebrar este momento conosco. Qualquer contribuição será recebida com muito amor:',
+                        value: formData.iban,
+                        accountName: formData.accountName || '',
+                        bankName: formData.bankName || ''
+                    }
+                ] : [],
+                dressCode: (formData.dressCodeTitle || formData.dressCodeDescription) ? {
+                    title: formData.dressCodeTitle,
+                    description: formData.dressCodeDescription,
+                    image: 'https://images.unsplash.com/photo-1511285560982-1356c11d4606?q=80&w=2670&auto=format&fit=crop'
+                } : null
             };
             if (isNewEvent) {
                 finalData.createdAt = new Date().toISOString();
@@ -253,10 +276,10 @@ export const InvitationCreator: React.FC = () => {
                         </Link>
                     </div>
 
-                    {formData.plan !== 'Essencial' && (
-                        <div className="space-y-3">
-                            <label className="text-xs font-bold text-slate-400 uppercase tracking-widest pl-1">Identidade Visual</label>
-                            <div className="grid grid-cols-3 gap-4">
+                    {/* Visual Identity Picker */}
+                    <div className="space-y-3">
+                        <label className="text-xs font-bold text-slate-400 uppercase tracking-widest pl-1">Identidade Visual</label>
+                        <div className="grid grid-cols-3 gap-4">
                                 {['CLASSIC', 'ESSENTIAL', 'MODERN', 'LUXURY', 'GARDEN', 'RUSTIC', 'INDUSTRIAL'].map(mode => (
                                     <motion.div 
                                         whileHover={{ y: -2 }}
@@ -264,7 +287,7 @@ export const InvitationCreator: React.FC = () => {
                                         key={mode}
                                         onClick={() => {
                                             const actualPlan = userProfile?.plan || formData.plan;
-                                            if (actualPlan === 'Essencial' && mode !== 'MODERN') {
+                                            if (actualPlan === 'Essencial' && mode !== 'MODERN' && mode !== 'CLASSIC') {
                                                 toast.custom((t) => (
                                                     <div className={`${t.visible ? 'animate-enter' : 'animate-leave'} max-w-sm w-full bg-white shadow-[0_8px_30px_rgb(0,0,0,0.12)] rounded-xl flex flex-col border border-slate-100 overflow-hidden`}>
                                                         <div className="p-4">
@@ -297,7 +320,6 @@ export const InvitationCreator: React.FC = () => {
                                 ))}
                             </div>
                         </div>
-                    )}
 
                     <div className="space-y-6">
                         <div className="space-y-3">
@@ -369,19 +391,26 @@ export const InvitationCreator: React.FC = () => {
                         </div>
                         
                         <div className="space-y-3">
-                            <label className="text-xs font-bold text-slate-400 uppercase tracking-widest pl-1">Presentes (Opcional)</label>
-                            <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-                                <input type="text" placeholder="IBAN" value={formData.iban} onChange={e => setFormData({...formData, iban: e.target.value})} className="w-full p-4 rounded-2xl border-2 border-slate-100 bg-slate-50/50 text-slate-900 focus:border-brand-blue/30 focus:bg-white focus:ring-4 focus:ring-brand-blue/5 outline-none transition-all placeholder:text-slate-400 font-medium" />
-                                <input type="text" placeholder="Nome da Conta" value={formData.accountName} onChange={e => setFormData({...formData, accountName: e.target.value})} className="w-full p-4 rounded-2xl border-2 border-slate-100 bg-slate-50/50 text-slate-900 focus:border-brand-blue/30 focus:bg-white focus:ring-4 focus:ring-brand-blue/5 outline-none transition-all placeholder:text-slate-400 font-medium" />
-                                <input type="text" placeholder="Banco" value={formData.bankName} onChange={e => setFormData({...formData, bankName: e.target.value})} className="w-full p-4 rounded-2xl border-2 border-slate-100 bg-slate-50/50 text-slate-900 focus:border-brand-blue/30 focus:bg-white focus:ring-4 focus:ring-brand-blue/5 outline-none transition-all placeholder:text-slate-400 font-medium" />
-                            </div>
-                        </div>
-                        
-                        <div className="space-y-3">
                             <label className="text-xs font-bold text-slate-400 uppercase tracking-widest pl-1">Dress Code (Opcional)</label>
                             <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                                 <input type="text" placeholder="Ex: Esporte Fino, Black Tie..." value={formData.dressCodeTitle} onChange={e => setFormData({...formData, dressCodeTitle: e.target.value})} className="w-full p-4 rounded-2xl border-2 border-slate-100 bg-slate-50/50 text-slate-900 focus:border-brand-blue/30 focus:bg-white focus:ring-4 focus:ring-brand-blue/5 outline-none transition-all placeholder:text-slate-400 font-medium" />
                                 <input type="text" placeholder="Instruções adicionais (ex: Evite a cor branca)" value={formData.dressCodeDescription} onChange={e => setFormData({...formData, dressCodeDescription: e.target.value})} className="w-full p-4 rounded-2xl border-2 border-slate-100 bg-slate-50/50 text-slate-900 focus:border-brand-blue/30 focus:bg-white focus:ring-4 focus:ring-brand-blue/5 outline-none transition-all placeholder:text-slate-400 font-medium" />
+                            </div>
+                        </div>
+
+                        <div className="space-y-3">
+                            <label className="text-xs font-bold text-slate-400 uppercase tracking-widest pl-1">Lista de Presentes (Opcional)</label>
+                            <div className="bg-slate-50/50 p-4 rounded-2xl border-2 border-slate-100 mb-4">
+                                <p className="text-xs text-slate-500 mb-4 font-medium">Você pode personalizar a seção de presentes e pedir contribuições em dinheiro via IBAN.</p>
+                                <div className="grid grid-cols-1 md:grid-cols-2 gap-4 mb-4">
+                                    <input type="text" placeholder="Título (Ex: Presentes em Dinheiro)" value={formData.giftTitle} onChange={e => setFormData({...formData, giftTitle: e.target.value})} className="w-full p-3 rounded-xl border-2 border-slate-100 bg-white text-slate-900 focus:border-brand-blue/30 focus:bg-white outline-none transition-all placeholder:text-slate-400 font-medium text-sm" />
+                                    <input type="text" placeholder="Mensagem aos convidados" value={formData.giftDescription} onChange={e => setFormData({...formData, giftDescription: e.target.value})} className="w-full p-3 rounded-xl border-2 border-slate-100 bg-white text-slate-900 focus:border-brand-blue/30 focus:bg-white outline-none transition-all placeholder:text-slate-400 font-medium text-sm" />
+                                </div>
+                                <div className="grid grid-cols-1 md:grid-cols-2 gap-4 mb-4">
+                                    <input type="text" placeholder="Nome do Banco (ex: BAI, BFA)" value={formData.bankName} onChange={e => setFormData({...formData, bankName: e.target.value})} className="w-full p-3 rounded-xl border-2 border-slate-100 bg-white text-slate-900 focus:border-brand-blue/30 focus:bg-white outline-none transition-all placeholder:text-slate-400 font-medium text-sm" />
+                                    <input type="text" placeholder="Nome do Beneficiário" value={formData.accountName} onChange={e => setFormData({...formData, accountName: e.target.value})} className="w-full p-3 rounded-xl border-2 border-slate-100 bg-white text-slate-900 focus:border-brand-blue/30 focus:bg-white outline-none transition-all placeholder:text-slate-400 font-medium text-sm" />
+                                </div>
+                                <input type="text" placeholder="IBAN (ex: AO06 0000...)" value={formData.iban} onChange={e => setFormData({...formData, iban: e.target.value})} className="w-full p-3 rounded-xl border-2 border-slate-100 bg-white text-slate-900 focus:border-brand-blue/30 focus:bg-white outline-none transition-all placeholder:text-slate-400 font-medium text-sm" />
                             </div>
                         </div>
                         
@@ -394,13 +423,11 @@ export const InvitationCreator: React.FC = () => {
 
                         {(formData.plan === 'Premium' || formData.plan === 'Business' || formData.plan === 'Corporate') && (
                             <div className="space-y-3">
-                                <label className="text-xs font-bold text-slate-400 uppercase tracking-widest pl-1">Galeria de Fotos (Links separados por vírgula)</label>
-                                <textarea 
-                                    placeholder="Aconselhamos no mínimo 5 fotos...\nEx: https://url1.jpg,\nhttps://url2.jpg" 
-                                    value={formData.gallery.join(', ')} 
-                                    onChange={e => setFormData({...formData, gallery: e.target.value.split(',').map(s => s.trim()).filter(s => s)})} 
-                                    className="w-full p-4 rounded-2xl border-2 border-slate-100 bg-slate-50/50 text-slate-900 focus:border-brand-blue/30 focus:bg-white focus:ring-4 focus:ring-brand-blue/5 outline-none transition-all placeholder:text-slate-400 font-medium resize-none" 
-                                    rows={4}
+                                <label className="text-xs font-bold text-slate-400 uppercase tracking-widest pl-1">Galeria de Fotos</label>
+                                <ImageUploader 
+                                    images={formData.gallery} 
+                                    onChange={(newImages) => setFormData({...formData, gallery: newImages})} 
+                                    maxPhotos={5} 
                                 />
                                 <p className="text-[10px] text-slate-400 pl-1 uppercase tracking-wider font-bold">Recurso Exclusivo {formData.plan}</p>
                             </div>

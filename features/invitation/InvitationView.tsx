@@ -10,6 +10,7 @@ import { Button } from '../../components/ui/Button';
 import { QRCodeSVG } from 'qrcode.react';
 import { Users, CalendarClock, Mail, PartyPopper, Shirt, Camera, Music4, Smile, ArrowLeft } from 'lucide-react';
 import { toPng } from 'html-to-image';
+import { GalleryLightbox } from '../../components/GalleryLightbox';
 import { useFirebase, db, handleFirestoreError, OperationType } from '../../components/FirebaseProvider';
 import { doc, getDoc, setDoc, getCountFromServer, collection, query, where } from 'firebase/firestore';
 import toast from 'react-hot-toast';
@@ -26,7 +27,7 @@ const InvitationView: React.FC = () => {
   const [loading, setLoading] = useState(true);
   
   const handleUseTemplate = (e: React.MouseEvent) => {
-      if (userProfile && userProfile.plan === 'Essencial' && event.layoutMode !== 'MODERN') {
+      if (userProfile && userProfile.plan === 'Essencial' && event.layoutMode !== 'MODERN' && event.layoutMode !== 'CLASSIC') {
           e.preventDefault();
           toast.custom((t) => (
               <div className={`${t.visible ? 'animate-enter' : 'animate-leave'} max-w-sm w-full bg-white shadow-[0_8px_30px_rgb(0,0,0,0.12)] rounded-xl flex flex-col border border-slate-100 overflow-hidden`}>
@@ -157,7 +158,12 @@ const InvitationView: React.FC = () => {
   const isOwner = user && event.ownerId === user.uid && !isTemplate;
 
   // Common Props passed to all layouts
-  const props = { event, onRSVP: () => setRSVPOpen(true), guestName };
+  const props = { 
+    event, 
+    onRSVP: () => setRSVPOpen(true), 
+    guestName,
+    onLikeUpdate: (newGallery: any) => setEvent({ ...event, gallery: newGallery }) 
+  };
 
   return (
     <>
@@ -304,9 +310,19 @@ const CountdownTimer: React.FC<{ targetDate: string; colorClass?: string }> = ({
 
 
 // ============================================================================
+// DEFINITIONS
+// ============================================================================
+export interface LayoutProps {
+  event: EventDetails;
+  onRSVP: () => void;
+  guestName: string;
+  onLikeUpdate: (newGallery: any) => void;
+}
+
+// ============================================================================
 // LAYOUT ESSENTIAL: CLEAN & FAST
 // ============================================================================
-const EssentialLayout: React.FC<{ event: EventDetails; onRSVP: () => void; guestName: string }> = ({ event, onRSVP }) => {
+const EssentialLayout: React.FC<LayoutProps> = ({ event, onRSVP, onLikeUpdate }) => {
   return (
     <div className="min-h-screen bg-slate-50 font-display pb-28">
       {/* Hero Image */}
@@ -335,8 +351,15 @@ const EssentialLayout: React.FC<{ event: EventDetails; onRSVP: () => void; guest
         </div>
       </div>
       
-      <GuestManual />
-
+      {event.gallery && event.gallery.length > 0 && (
+          <div className="max-w-xl mx-auto px-6 mt-8 relative z-10">
+            <h2 className="font-bold text-brand-blue mb-4 text-center">Nossa Galeria</h2>
+            <GalleryLightbox eventId={event.id} gallery={event.gallery} onLikeUpdate={onLikeUpdate} renderMode="ESSENTIAL" />
+          </div>
+      )}
+      
+      <GuestManual mode="ESSENTIAL" />
+      
       <div className="fixed bottom-6 left-1/2 -translate-x-1/2 z-50 w-full max-w-sm px-4">
           <Button onClick={onRSVP} variant="navy" fullWidth>Confirmar Presença</Button>
       </div>
@@ -347,7 +370,7 @@ const EssentialLayout: React.FC<{ event: EventDetails; onRSVP: () => void; guest
 // ============================================================================
 // LAYOUT 1: CLASSIC ROMANTIC (Refined)
 // ============================================================================
-const ClassicLayout: React.FC<{ event: EventDetails; onRSVP: () => void; guestName: string }> = ({ event, onRSVP }) => {
+const ClassicLayout: React.FC<LayoutProps> = ({ event, onRSVP, onLikeUpdate }) => {
   return (
     <div className="min-h-screen bg-slate-50 font-serif pb-28">
       {/* Formal Header */}
@@ -421,21 +444,62 @@ const ClassicLayout: React.FC<{ event: EventDetails; onRSVP: () => void; guestNa
             </div>
          </FadeInSection>
 
-         {event.gallery && (
+         {event.gallery && event.gallery.length > 0 && (
             <FadeInSection>
                <h3 className="text-xs font-bold uppercase tracking-[0.2em] text-slate-400 mb-6">Nossa Galeria</h3>
-               <div className="grid grid-cols-2 gap-4">
-                  {event.gallery.map((img, i) => (
-                     <div key={i} className={`rounded-xl overflow-hidden shadow-sm ${i === 0 ? 'col-span-2' : ''}`}>
-                        <img src={img} className="w-full h-full object-cover hover:scale-105 transition-transform duration-500" />
-                     </div>
+               <GalleryLightbox eventId={event.id} gallery={event.gallery} onLikeUpdate={onLikeUpdate} renderMode="CLASSIC" />
+            </FadeInSection>
+         )}
+
+         {event.dressCode && (
+            <FadeInSection>
+               <div className="bg-white p-6 rounded-xl shadow-lg border border-slate-100 mt-8">
+                  <h3 className="text-xs font-bold uppercase tracking-[0.2em] text-slate-400 mb-4">Dress Code (Trajes)</h3>
+                  <h4 className="font-bold text-xl mb-2 text-slate-800">{event.dressCode.title}</h4>
+                  <p className="text-slate-500 text-sm mb-4">{event.dressCode.description}</p>
+                  {event.dressCode.image && (
+                      <div className="mt-4 rounded-xl overflow-hidden shadow-sm">
+                          <img src={event.dressCode.image} alt="Referência de Traje" className="w-full h-64 object-cover" />
+                      </div>
+                  )}
+               </div>
+            </FadeInSection>
+         )}
+
+         {event.gifts && event.gifts.length > 0 && (
+            <FadeInSection>
+               <div className="bg-white p-6 rounded-xl shadow-lg border border-slate-100 mt-8 mb-4">
+                  <h3 className="text-xs font-bold uppercase tracking-[0.2em] text-slate-400 mb-4 text-center">Lista de Presentes</h3>
+                  {event.gifts.map((gift, i) => (
+                      <div key={i} className="mb-6 last:mb-0 text-center">
+                          <h4 className="font-bold text-xl mb-2 text-slate-800">{gift.title}</h4>
+                          <p className="text-slate-500 text-sm mb-4">{gift.description}</p>
+                          {gift.type === 'IBAN' && (
+                              <div className="bg-slate-50 p-4 rounded-xl border border-slate-100 text-center mt-4">
+                                  {gift.bankName && <p className="text-xs text-slate-400 font-bold uppercase tracking-widest mb-1">{gift.bankName}</p>}
+                                  {gift.accountName && <p className="text-sm font-bold text-slate-800 mb-2">{gift.accountName}</p>}
+                                  <span className="font-mono text-sm tracking-wider font-bold text-brand-blue block mb-4">{gift.value}</span>
+                                  <Button onClick={() => {
+                                      navigator.clipboard.writeText(gift.value || '');
+                                      toast.success('IBAN copiado!');
+                                  }} className="bg-brand-blue text-white hover:bg-brand-blue/90 text-xs py-2 px-6 rounded-full font-bold uppercase tracking-widest transition-colors w-full">
+                                      Copiar IBAN
+                                  </Button>
+                              </div>
+                          )}
+                          {gift.type === 'LINK' && (
+                              <Button onClick={() => window.open(gift.value || '#', '_blank')} className="bg-brand-blue text-white hover:bg-brand-blue/90 text-xs py-3 px-8 rounded-full font-bold uppercase tracking-widest transition-colors mt-4">
+                                  Acessar Lista
+                              </Button>
+                          )}
+                      </div>
                   ))}
                </div>
             </FadeInSection>
          )}
       </div>
 
-      <GuestManual />
+      <GuestManual mode="CLASSIC" />
 
       <div className="fixed bottom-6 left-1/2 -translate-x-1/2 z-50">
         <button onClick={onRSVP} className="bg-brand-blue text-white px-10 py-4 rounded-full font-sans font-bold shadow-2xl shadow-brand-blue/40 uppercase tracking-widest text-xs hover:scale-105 transition-transform">
@@ -450,7 +514,7 @@ const ClassicLayout: React.FC<{ event: EventDetails; onRSVP: () => void; guestNa
 // ============================================================================
 // HELPER: MANUAL DO CONVIDADO
 // ============================================================================
-const GuestManual: React.FC<{ isDark?: boolean }> = ({ isDark }) => {
+const GuestManual: React.FC<{ isDark?: boolean; mode?: string }> = ({ isDark, mode }) => {
     const points = [
         { icon: Users, text: "Contamos com a sua presença!" },
         { icon: CalendarClock, text: "Seja pontual!" },
@@ -462,14 +526,59 @@ const GuestManual: React.FC<{ isDark?: boolean }> = ({ isDark }) => {
         { icon: Smile, text: "Sorria e seja muito feliz!" },
     ];
     
-    const textColor = isDark ? "text-gray-300" : "text-gray-600";
-    const iconColor = isDark ? "text-white/70" : "text-[#C2B280]";
-    const headingColor = isDark ? "text-white" : "text-[#C2B280]";
-    const bgColor = isDark ? "bg-black/20 border-white/10" : "bg-white border-gray-100";
+    let textColor = "text-gray-600";
+    let iconColor = "text-[#C2B280]";
+    let headingColor = "text-[#C2B280]";
+    let bgColor = "bg-white border-gray-100";
+    let footerTextColor = "text-gray-500";
+    
+    if (mode === 'CLASSIC') {
+        textColor = "text-slate-500";
+        iconColor = "text-brand-blue";
+        headingColor = "text-slate-800";
+        bgColor = "bg-slate-50 border-slate-200";
+        footerTextColor = "text-slate-400";
+    } else if (mode === 'ESSENTIAL') {
+        textColor = "text-gray-500";
+        iconColor = "text-brand-blue";
+        headingColor = "text-brand-blue";
+        bgColor = "bg-white border-slate-100";
+        footerTextColor = "text-gray-400";
+    } else if (mode === 'MODERN') {
+        textColor = "text-gray-500";
+        iconColor = "text-[#8A817C]";
+        headingColor = "text-[#2C2C2C]";
+        bgColor = "bg-[#F9F9F9] border-gray-200";
+        footerTextColor = "text-gray-400";
+    } else if (mode === 'GARDEN') {
+        textColor = "text-[#5D5C61]";
+        iconColor = "text-[#5D6B5A]";
+        headingColor = "text-[#5D6B5A]";
+        bgColor = "bg-[#F9F6F2] border-[#EAE5DF]";
+        footerTextColor = "text-[#8C8C8C]";
+    } else if (mode === 'RUSTIC') {
+        textColor = "text-[#5D4037]";
+        iconColor = "text-[#8D6E63]";
+        headingColor = "text-[#4E342E]";
+        bgColor = "bg-[#FDF5E6] border-[#DED0B6]";
+        footerTextColor = "text-[#8D6E63]";
+    } else if (mode === 'INDUSTRIAL' || isDark) {
+        textColor = "text-gray-400";
+        iconColor = "text-[#BF9B30]";
+        headingColor = "text-white";
+        bgColor = "bg-[#111111] border-gray-800";
+        footerTextColor = "text-gray-500";
+    } else if (mode === 'LUXURY') {
+        textColor = "text-gray-400";
+        iconColor = "text-[#BF9B30]";
+        headingColor = "text-[#BF9B30]";
+        bgColor = "bg-[#0A0D10] border-[#BF9B30]/20";
+        footerTextColor = "text-gray-500";
+    }
     
     return (
         <FadeInSection className={`py-16 md:py-24 px-6 ${bgColor} border-t mt-12 text-center`}>
-            <h3 className={`text-3xl font-serif ${headingColor} mb-12`}>Manual do Convidado</h3>
+            <h3 className={`text-2xl md:text-3xl font-serif ${headingColor} mb-12`}>Manual do Convidado</h3>
             <div className="grid grid-cols-2 md:grid-cols-4 gap-8 max-w-4xl mx-auto">
                 {points.map((p, i) => (
                     <div key={i} className="flex flex-col items-center">
@@ -478,7 +587,7 @@ const GuestManual: React.FC<{ isDark?: boolean }> = ({ isDark }) => {
                     </div>
                 ))}
             </div>
-            <p className={`mt-12 text-sm ${isDark ? 'text-gray-400' : 'text-gray-500'} italic`}>Agradecemos o carinho e a compreensão!</p>
+            <p className={`mt-12 text-sm ${footerTextColor} italic`}>Agradecemos o carinho e a compreensão!</p>
         </FadeInSection>
     )
 }
@@ -487,7 +596,7 @@ const GuestManual: React.FC<{ isDark?: boolean }> = ({ isDark }) => {
 // LAYOUT 2: MINIMALIST ETHEREAL (Redesigned Modern)
 // High-End, Clean, Airy, with Bible Verse, Gallery, Gifts, etc.
 // ============================================================================
-const ModernLayout: React.FC<{ event: EventDetails; onRSVP: () => void; guestName: string }> = ({ event, onRSVP, guestName }) => {
+const ModernLayout: React.FC<LayoutProps> = ({ event, onRSVP, guestName, onLikeUpdate }) => {
   // Ethereal Color Palette
   const accentText = "text-[#8A817C]"; // Taupe gray
   const darkText = "text-[#2C2C2C]";
@@ -567,7 +676,7 @@ const ModernLayout: React.FC<{ event: EventDetails; onRSVP: () => void; guestNam
          {event.receptionName && (
             <FadeInSection className="flex flex-col md:flex-row-reverse items-center gap-12">
                <div className="w-full md:w-1/2 aspect-[4/5] bg-gray-100 relative overflow-hidden group">
-                   <img src={event.mapImage} className="w-full h-full object-cover grayscale group-hover:grayscale-0 transition-all duration-700" />
+                   {event.mapImage && <img src={event.mapImage} className="w-full h-full object-cover grayscale group-hover:grayscale-0 transition-all duration-700" />}
                    <div className="absolute top-4 right-4 bg-white px-4 py-2 text-xs font-bold tracking-widest uppercase">Recepção</div>
                </div>
                <div className="w-full md:w-1/2 text-center md:text-right space-y-4">
@@ -615,57 +724,68 @@ const ModernLayout: React.FC<{ event: EventDetails; onRSVP: () => void; guestNam
       )}
 
       {/* 7. GIFTS / IBAN Section */}
-      {event.gifts && event.gifts[0].value && (
+      {event.gifts && event.gifts.length > 0 && (
          <FadeInSection className="py-12 border-t border-gray-100 mt-12 text-center px-6">
             <span className="font-display text-[10px] uppercase tracking-[0.3em] text-gray-400 mb-4 block">Presente</span>
             <h4 className="text-xl font-serif mb-6">Querido(a) convidado(a)!</h4>
-            <p className="text-gray-500 mb-8 max-w-sm mx-auto leading-relaxed">
-              {event.gifts[0].description} Caso queira nos presentear, agradecemos desde já o seu lindo gesto e gostaríamos que o fizesse por transferência bancária para o IBAN indicado abaixo:
-            </p>
             
-            <div className="bg-[#F4F4F4] p-6 rounded-2xl border border-gray-200 mb-8 max-w-sm mx-auto shadow-inner">
-               <p className="text-xl md:text-2xl font-mono text-gray-900 tracking-widest mb-4">{event.gifts[0].value}</p>
-               <div className="space-y-1">
-                 <p className="text-xs text-gray-500 uppercase tracking-widest">Titular</p>
-                 <p className="text-sm text-gray-800 font-bold mb-2">{event.gifts[0].accountName}</p>
-                 <p className="text-xs text-gray-500 uppercase tracking-widest">Banco</p>
-                 <p className="text-sm text-gray-800 font-bold">{event.gifts[0].bankName}</p>
-               </div>
+            <div className="space-y-8 max-w-sm mx-auto">
+              {event.gifts.map((gift, i) => (
+                <div key={i} className="mb-8 last:mb-0">
+                  {gift.title && <h5 className="font-bold text-gray-800 text-lg mb-2">{gift.title}</h5>}
+                  <p className="text-gray-500 mb-6 leading-relaxed">
+                    {gift.description}
+                  </p>
+                  
+                  {gift.type === 'IBAN' && gift.value && (
+                    <div className="bg-[#F4F4F4] p-6 rounded-2xl border border-gray-200 shadow-inner mt-4">
+                       <p className="text-xl md:text-2xl font-mono text-gray-900 tracking-widest mb-4 break-all">{gift.value}</p>
+                       <div className="space-y-4">
+                         {gift.accountName && (
+                           <div>
+                             <p className="text-xs text-gray-500 uppercase tracking-widest leading-tight">Titular</p>
+                             <p className="text-sm text-gray-800 font-bold">{gift.accountName}</p>
+                           </div>
+                         )}
+                         {gift.bankName && (
+                           <div>
+                             <p className="text-xs text-gray-500 uppercase tracking-widest leading-tight">Banco</p>
+                             <p className="text-sm text-gray-800 font-bold">{gift.bankName}</p>
+                           </div>
+                         )}
+                       </div>
+                       
+                       <button 
+                          onClick={() => {navigator.clipboard.writeText(gift.value); toast.success('IBAN Copiado!')}}
+                          className="mt-6 px-8 py-3 w-full border border-[#C2B280] text-[#C2B280] text-xs font-bold uppercase tracking-widest hover:bg-[#C2B280] hover:text-white transition-colors"
+                       >
+                          Copiar IBAN
+                       </button>
+                    </div>
+                  )}
+                </div>
+              ))}
             </div>
 
-            <p className="text-gray-500 mb-8 text-sm leading-relaxed">
+            <p className="text-gray-500 mb-8 mt-8 text-sm leading-relaxed max-w-sm mx-auto">
                Os comprovativos podem ser enviados via WhatsApp para o número {event.phone}. <br/>
                Muito obrigado(a)! <br/>
                Deus lhe abençoe sempre!
             </p>
-            
-            <button 
-               onClick={() => {navigator.clipboard.writeText(event.gifts![0].value); toast.success('IBAN Copiado!')}}
-               className="px-8 py-3 border border-[#C2B280] text-[#C2B280] text-xs font-bold uppercase tracking-widest hover:bg-[#C2B280] hover:text-white transition-colors"
-            >
-               Copiar IBAN
-            </button>
          </FadeInSection>
       )}
 
 
 
       {/* 7. GALLERY (Masonry-ish) */}
-      {event.gallery && (
+      {event.gallery && event.gallery.length > 0 && (
          <FadeInSection className="w-full">
-            <div className="grid grid-cols-1 md:grid-cols-3">
-               {event.gallery.map((img, i) => (
-                  <div key={i} className="aspect-square relative group overflow-hidden">
-                     <img src={img} className="w-full h-full object-cover transition-transform duration-1000 group-hover:scale-110" />
-                     <div className="absolute inset-0 bg-black/20 opacity-0 group-hover:opacity-100 transition-opacity duration-500"></div>
-                  </div>
-               ))}
-            </div>
+            <GalleryLightbox eventId={event.id} gallery={event.gallery} onLikeUpdate={onLikeUpdate} renderMode="MODERN" />
          </FadeInSection>
       )}
 
       {/* 8. MANUAL DO CONVIDADO */}
-      <GuestManual />
+      <GuestManual mode="MODERN" />
 
       {/* FOOTER ACTION */}
       <div className="fixed bottom-8 left-1/2 -translate-x-1/2 z-50">
@@ -686,7 +806,7 @@ const ModernLayout: React.FC<{ event: EventDetails; onRSVP: () => void; guestNam
 // LAYOUT 3: GARDEN ELEGANCE (New Model)
 // Soft, Floral, Serif, Comprehensive features (Bible, Gallery, etc.)
 // ============================================================================
-const GardenLayout: React.FC<{ event: EventDetails; onRSVP: () => void; guestName: string }> = ({ event, onRSVP, guestName }) => {
+const GardenLayout: React.FC<LayoutProps> = ({ event, onRSVP, guestName, onLikeUpdate }) => {
   const accentColor = "text-[#5D6D55]"; // Sage green
   const accentBg = "bg-[#5D6D55]";
   
@@ -774,7 +894,7 @@ const GardenLayout: React.FC<{ event: EventDetails; onRSVP: () => void; guestNam
            <FadeInSection className="flex flex-col md:flex-row items-center gap-8">
               <div className="flex-1">
                  <div className="aspect-[3/4] rounded-t-[100px] overflow-hidden shadow-lg">
-                    <img src={event.mapImage} className="w-full h-full object-cover" />
+                    {event.mapImage && <img src={event.mapImage} className="w-full h-full object-cover" />}
                  </div>
               </div>
               <div className="flex-1 text-center md:text-left">
@@ -808,21 +928,15 @@ const GardenLayout: React.FC<{ event: EventDetails; onRSVP: () => void; guestNam
       </FadeInSection>
 
       {/* 6. GALLERY (Grid Layout) */}
-      {event.gallery && (
+      {event.gallery && event.gallery.length > 0 && (
         <FadeInSection className="py-20 px-4 max-w-5xl mx-auto">
            <h3 className="text-center font-sans text-xs uppercase tracking-[0.2em] mb-8 text-[#8C8C8C]">Momentos Especiais</h3>
-           <div className="grid grid-cols-2 md:grid-cols-3 gap-2 md:gap-4">
-              {event.gallery.map((img, i) => (
-                <div key={i} className={`rounded-lg overflow-hidden shadow-sm ${i === 0 ? 'col-span-2 row-span-2' : ''}`}>
-                   <img src={img} className="w-full h-full object-cover hover:scale-105 transition-transform duration-700" />
-                </div>
-              ))}
-           </div>
+           <GalleryLightbox eventId={event.id} gallery={event.gallery} onLikeUpdate={onLikeUpdate} renderMode="GARDEN" />
         </FadeInSection>
       )}
 
       {/* MANUAL DO CONVIDADO */}
-      <GuestManual />
+      <GuestManual mode="GARDEN" />
 
       {/* 7. GIFTS & DRESS CODE */}
       <div className="grid md:grid-cols-2 gap-8 max-w-4xl mx-auto px-6 mb-24">
@@ -834,17 +948,31 @@ const GardenLayout: React.FC<{ event: EventDetails; onRSVP: () => void; guestNam
            </FadeInSection>
          )}
          
-         {event.gifts && (
+         {event.gifts && event.gifts.length > 0 && (
            <FadeInSection className="bg-white p-8 rounded-2xl shadow-sm border border-[#EAE5DF] text-center">
               <span className="material-symbols-outlined text-3xl mb-4 text-[#8C8C8C]">card_giftcard</span>
-              <h4 className="text-lg font-serif font-bold mb-2">Lista de Presentes</h4>
-              <p className="text-sm text-[#5D5C61] mb-4">{event.gifts[0].description}</p>
-              <button 
-                 onClick={() => {navigator.clipboard.writeText(event.gifts![0].value); toast.success('IBAN Copiado!')}}
-                 className={`px-6 py-2 rounded-full border border-[#D6CFC7] text-xs font-bold uppercase tracking-widest hover:bg-[#F9F6F2] transition-colors`}
-              >
-                 Copiar IBAN
-              </button>
+              <h4 className="text-lg font-serif font-bold mb-4">Lista de Presentes</h4>
+              <div className="space-y-6">
+                {event.gifts.map((gift, i) => (
+                  <div key={i}>
+                    {gift.title && <h5 className="font-bold text-[#2C2C2C] mb-1">{gift.title}</h5>}
+                    <p className="text-sm text-[#5D5C61] mb-4">{gift.description}</p>
+                    {gift.type === 'IBAN' && gift.value && (
+                      <div className="bg-[#F9F6F2] p-4 rounded-xl text-center space-y-2">
+                        <p className="font-mono text-[#2C2C2C] font-bold tracking-widest break-all">{gift.value}</p>
+                        {gift.accountName && <p className="text-xs text-[#5D5C61] uppercase tracking-widest">Titular: <strong className="text-[#2C2C2C]">{gift.accountName}</strong></p>}
+                        {gift.bankName && <p className="text-xs text-[#5D5C61] uppercase tracking-widest">Banco: <strong className="text-[#2C2C2C]">{gift.bankName}</strong></p>}
+                        <button 
+                           onClick={() => {navigator.clipboard.writeText(gift.value); toast.success('IBAN Copiado!')}}
+                           className={`mt-4 px-6 py-2 rounded-full border border-[#D6CFC7] text-xs font-bold uppercase tracking-widest hover:bg-[#EAE5DF] transition-colors w-full`}
+                        >
+                           Copiar IBAN
+                        </button>
+                      </div>
+                    )}
+                  </div>
+                ))}
+              </div>
            </FadeInSection>
          )}
       </div>
@@ -865,7 +993,7 @@ const GardenLayout: React.FC<{ event: EventDetails; onRSVP: () => void; guestNam
 // ============================================================================
 // LAYOUT 4: RUSTIC CHIC (Warm, Texture, Nature)
 // ============================================================================
-const RusticLayout: React.FC<{ event: EventDetails; onRSVP: () => void; guestName: string }> = ({ event, onRSVP, guestName }) => {
+const RusticLayout: React.FC<LayoutProps> = ({ event, onRSVP, guestName, onLikeUpdate }) => {
    const warmText = "text-[#5D4037]"; // Dark warm brown
    const lightText = "text-[#8D6E63]"; // Lighter brown
    const bgPaper = "bg-[#FDF5E6]"; // Old Lace / Paper
@@ -941,33 +1069,44 @@ const RusticLayout: React.FC<{ event: EventDetails; onRSVP: () => void; guestNam
              <h3 className="text-2xl font-serif mb-2">Dress Code</h3>
              <p className="opacity-80 text-sm max-w-xs">{event.dressCode?.description}</p>
           </FadeInSection>
-          <FadeInSection className="bg-white border border-[#EFEBE9] p-10 rounded-3xl text-center flex flex-col items-center justify-center">
-             <span className="material-symbols-outlined text-4xl text-[#5D4037] mb-4">card_giftcard</span>
-             <h3 className="text-2xl font-serif text-[#4E342E] mb-2">Presentes</h3>
-             <button 
-                onClick={() => {navigator.clipboard.writeText(event.gifts![0].value); toast.success('IBAN Copiado!')}}
-                className="mt-4 px-6 py-2 border border-[#5D4037] text-[#5D4037] rounded-full text-xs font-bold uppercase tracking-widest hover:bg-[#5D4037] hover:text-white transition-colors"
-             >
-                Copiar IBAN
-             </button>
-          </FadeInSection>
+          {event.gifts && event.gifts.length > 0 && (
+             <FadeInSection className="bg-white border border-[#EFEBE9] p-10 rounded-3xl text-center flex flex-col items-center justify-center">
+                <span className="material-symbols-outlined text-4xl text-[#5D4037] mb-4">card_giftcard</span>
+                <h3 className="text-2xl font-serif text-[#4E342E] mb-4">Presentes</h3>
+                <div className="space-y-6 w-full">
+                  {event.gifts.map((gift, i) => (
+                    <div key={i} className="space-y-4">
+                      {gift.title && <h5 className="font-bold text-[#5D4037]">{gift.title}</h5>}
+                      <p className="text-sm text-[#8D6E63]">{gift.description}</p>
+                      {gift.type === 'IBAN' && gift.value && (
+                        <div className="bg-[#FFF8E1] p-4 rounded-2xl text-center space-y-2 border border-[#EFEBE9]">
+                          {gift.accountName && <p className="text-xs text-[#5D4037] font-bold uppercase">{gift.accountName}</p>}
+                          {gift.bankName && <p className="text-xs text-[#8D6E63]">{gift.bankName}</p>}
+                          <p className="font-mono text-[#4E342E] font-bold tracking-widest break-all">{gift.value}</p>
+                          <button 
+                             onClick={() => {navigator.clipboard.writeText(gift.value); toast.success('IBAN Copiado!')}}
+                             className="mt-4 px-6 py-2 border border-[#5D4037] text-[#5D4037] rounded-full text-xs font-bold uppercase tracking-widest hover:bg-[#5D4037] hover:text-[#FDF5E6] transition-colors w-full"
+                          >
+                             Copiar IBAN
+                          </button>
+                        </div>
+                      )}
+                    </div>
+                  ))}
+                </div>
+             </FadeInSection>
+          )}
        </div>
 
        {/* GALLERY */}
-       {event.gallery && (
+       {event.gallery && event.gallery.length > 0 && (
           <FadeInSection className="max-w-5xl mx-auto px-6 mb-24">
              <h3 className="text-center font-serif text-3xl text-[#4E342E] mb-8">Nossa Galeria</h3>
-             <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
-                {event.gallery.map((img, i) => (
-                   <div key={i} className="aspect-square rounded-2xl overflow-hidden shadow-sm">
-                      <img src={img} className="w-full h-full object-cover hover:scale-110 transition-transform duration-700" />
-                   </div>
-                ))}
-             </div>
+             <GalleryLightbox eventId={event.id} gallery={event.gallery} onLikeUpdate={onLikeUpdate} renderMode="RUSTIC" />
           </FadeInSection>
        )}
        
-       <GuestManual />
+       <GuestManual mode="RUSTIC" />
  
        {/* FIXED ACTION */}
        <div className="fixed bottom-6 left-1/2 -translate-x-1/2 z-50 w-full max-w-sm px-4">
@@ -986,7 +1125,7 @@ const RusticLayout: React.FC<{ event: EventDetails; onRSVP: () => void; guestNam
 // ============================================================================
 // LAYOUT 5: INDUSTRIAL (Modern, Edgy, High Contrast)
 // ============================================================================
-const IndustrialLayout: React.FC<{ event: EventDetails; onRSVP: () => void; guestName: string }> = ({ event, onRSVP, guestName }) => {
+const IndustrialLayout: React.FC<LayoutProps> = ({ event, onRSVP, guestName, onLikeUpdate }) => {
    
    return (
      <div className="min-h-screen bg-[#111] text-white font-display pb-32 selection:bg-white selection:text-black">
@@ -1066,7 +1205,7 @@ const IndustrialLayout: React.FC<{ event: EventDetails; onRSVP: () => void; gues
              </div>
           </div>
           <div className="relative group overflow-hidden">
-             <img src={event.mapImage} className="w-full h-full object-cover grayscale group-hover:scale-105 transition-transform duration-700" />
+             {event.mapImage && <img src={event.mapImage} className="w-full h-full object-cover grayscale group-hover:scale-105 transition-transform duration-700" />}
              <div className="absolute bottom-0 left-0 p-8 bg-white/90 text-black w-full backdrop-blur-sm">
                 <p className="text-xs uppercase tracking-widest mb-1 text-gray-600">Recepção</p>
                 <h3 className="text-2xl font-bold uppercase">{event.receptionName}</h3>
@@ -1076,20 +1215,14 @@ const IndustrialLayout: React.FC<{ event: EventDetails; onRSVP: () => void; gues
        </div>
        
        {/* GALLERY */}
-       {event.gallery && (
+       {event.gallery && event.gallery.length > 0 && (
           <div className="p-8 md:p-16 border-b border-white/20">
              <h3 className="text-2xl font-bold uppercase mb-8 border-l-4 border-white pl-4">Galeria</h3>
-             <div className="grid grid-cols-2 md:grid-cols-3 gap-1">
-                {event.gallery.map((img, i) => (
-                   <div key={i} className="aspect-square overflow-hidden bg-white/5">
-                      <img src={img} className="w-full h-full object-cover grayscale hover:grayscale-0 transition-all duration-500" />
-                   </div>
-                ))}
-             </div>
+             <GalleryLightbox eventId={event.id} gallery={event.gallery} onLikeUpdate={onLikeUpdate} renderMode="INDUSTRIAL" />
           </div>
        )}
 
-       <GuestManual isDark />
+       <GuestManual mode="INDUSTRIAL" />
 
        {/* RSVP BUTTON */}
        <div className="fixed bottom-8 right-8 z-50">
@@ -1128,7 +1261,7 @@ const SectionTitle: React.FC<{ title: string }> = ({ title }) => (
 // ============================================================================
 // LUXURY LAYOUT (Existing - kept for reference, no changes needed here)
 // ============================================================================
-const LuxuryLayout: React.FC<{ event: EventDetails; onRSVP: () => void; guestName: string }> = ({ event, onRSVP, guestName }) => {
+const LuxuryLayout: React.FC<LayoutProps> = ({ event, onRSVP, guestName, onLikeUpdate }) => {
   const [copiedKey, setCopiedKey] = useState<string | null>(null);
 
   const handleCopy = (val: string) => {
@@ -1237,7 +1370,7 @@ const LuxuryLayout: React.FC<{ event: EventDetails; onRSVP: () => void; guestNam
                <SectionTitle title="Recepção & Festa" />
                <div className="border border-[#BF9B30]/30 rounded-xl overflow-hidden bg-[#0F1419] max-w-md mx-auto">
                   <div className="h-32 relative">
-                     <div className="absolute inset-0 bg-cover bg-center opacity-60" style={{ backgroundImage: `url('${event.mapImage}')` }}></div>
+                     {event.mapImage && <div className="absolute inset-0 bg-cover bg-center opacity-60" style={{ backgroundImage: `url('${event.mapImage}')` }}></div>}
                      <div className="absolute inset-0 bg-gradient-to-t from-[#0F1419] to-transparent"></div>
                      <div className="absolute bottom-3 left-4">
                         <p className="text-white text-lg font-serif">{event.receptionName}</p>
@@ -1277,6 +1410,20 @@ const LuxuryLayout: React.FC<{ event: EventDetails; onRSVP: () => void; guestNam
                     <div className="bg-black/60 p-4 rounded-lg border border-[#BF9B30]/30 shadow-inner">
                        <p className="text-[10px] text-[#BF9B30] mb-2 uppercase tracking-widest font-bold">Enviar Presentes</p>
                        <p className="text-white font-mono text-base break-all mb-4 tracking-wider select-all">{gift.value}</p>
+                       <div className="space-y-4 mb-4">
+                         {gift.accountName && (
+                           <div>
+                             <p className="text-[10px] text-gray-500 uppercase tracking-widest leading-tight">Titular</p>
+                             <p className="text-sm text-gray-200 font-bold">{gift.accountName}</p>
+                           </div>
+                         )}
+                         {gift.bankName && (
+                           <div>
+                             <p className="text-[10px] text-gray-500 uppercase tracking-widest leading-tight">Banco</p>
+                             <p className="text-sm text-gray-200 font-bold">{gift.bankName}</p>
+                           </div>
+                         )}
+                       </div>
                        <button 
                           onClick={() => handleCopy(gift.value)}
                           className={`
@@ -1299,19 +1446,15 @@ const LuxuryLayout: React.FC<{ event: EventDetails; onRSVP: () => void; guestNam
         )}
 
         {/* 10. GALLERY (Horizontal Scroll) */}
-        {event.gallery && (
+        {event.gallery && event.gallery.length > 0 && (
           <FadeInSection className="w-full mb-12 pl-6">
             <h3 className="text-[#BF9B30] font-bold uppercase tracking-widest text-xs mb-4 text-left">Nossa Galeria</h3>
-            <div className="flex overflow-x-auto gap-4 pb-4 no-scrollbar">
-               {event.gallery.map((img, i) => (
-                 <img key={i} src={img} className="h-48 w-36 object-cover rounded-lg border border-[#BF9B30]/20 grayscale hover:grayscale-0 transition-all duration-500" />
-               ))}
-            </div>
+            <GalleryLightbox eventId={event.id} gallery={event.gallery} onLikeUpdate={onLikeUpdate} renderMode="LUXURY" />
           </FadeInSection>
         )}
 
         <div className="w-full border-t border-[#BF9B30]/30 mt-8">
-           <GuestManual isDark />
+           <GuestManual mode="LUXURY" />
         </div>
 
         {/* Gold Action Button (Fixed Bottom Bar) */}

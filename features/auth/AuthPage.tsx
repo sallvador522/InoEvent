@@ -35,7 +35,7 @@ export const AuthPage: React.FC = () => {
               plan: 'Essencial'
           });
       }
-      navigate('/dashboard');
+      navigate('/');
     } catch (err: any) {
       if (err.code !== 'auth/popup-closed-by-user' && err.code !== 'auth/cancelled-popup-request') {
         console.error('Google Sign-in error:', err);
@@ -54,7 +54,7 @@ export const AuthPage: React.FC = () => {
     try {
       if (isLogin) {
         await signInWithEmailAndPassword(auth, email, password);
-        navigate('/dashboard');
+        navigate('/');
       } else {
         if (!name.trim()) {
            setError('Por favor, informe seu nome.');
@@ -76,7 +76,7 @@ export const AuthPage: React.FC = () => {
             plan: 'Essencial'
         });
         
-        navigate('/dashboard');
+        navigate('/');
       }
     } catch (err: any) {
       if (err.code === 'auth/email-already-in-use') {

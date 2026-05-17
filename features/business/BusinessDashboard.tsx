@@ -1,6 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { collection, query, where, getDocs, doc, updateDoc, setDoc } from 'firebase/firestore';
-import { db } from '../../components/FirebaseProvider';
+import { db, handleFirestoreError, OperationType } from '../../components/FirebaseProvider';
 import { useFirebase } from '../../components/FirebaseProvider';
 import { Link, useNavigate } from 'react-router-dom';
 import { Button } from '../../components/ui/Button';
@@ -62,6 +62,7 @@ export const BusinessDashboard: React.FC = () => {
 
             } catch (err) {
                 console.error(err);
+                handleFirestoreError(err, OperationType.LIST, 'events or guests or transactions');
             } finally {
                 setLoading(false);
             }

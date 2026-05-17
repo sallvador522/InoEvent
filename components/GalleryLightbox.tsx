@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
 import { ChevronLeft, ChevronRight, X, Heart } from 'lucide-react';
 import { doc, updateDoc } from 'firebase/firestore';
@@ -21,7 +21,32 @@ interface GalleryLightboxProps {
 export const GalleryLightbox: React.FC<GalleryLightboxProps> = ({ eventId, gallery, onLikeUpdate, renderMode }) => {
   const [selectedIndex, setSelectedIndex] = useState<number | null>(null);
   const [isLiking, setIsLiking] = useState(false);
-  const [likedPhotos, setLikedPhotos] = useState<Set<string>>(new Set());
+  const [likedPhotos, setLikedPhotos] = useState<Set<string>>(() => {
+    try {
+      const stored = localStorage.getItem(`liked_photos_${eventId}`);
+      if (stored) {
+        return new Set(JSON.parse(stored));
+      }
+    } catch (e) {
+      console.error(e);
+    }
+    return new Set();
+  });
+
+  const [showHeartAnimation, setShowHeartAnimation] = useState(false);
+
+  useEffect(() => {
+    try {
+      const stored = localStorage.getItem(`liked_photos_${eventId}`);
+      if (stored) {
+        setLikedPhotos(new Set(JSON.parse(stored)));
+      } else {
+        setLikedPhotos(new Set());
+      }
+    } catch (e) {
+      console.error(e);
+    }
+  }, [eventId]);
 
   // Normalize photos
   const photos: PhotoInfo[] = gallery.map((item, idx) => {
@@ -40,20 +65,35 @@ export const GalleryLightbox: React.FC<GalleryLightboxProps> = ({ eventId, galle
     }
 
     setIsLiking(true);
+    setShowHeartAnimation(true);
+    setTimeout(() => setShowHeartAnimation(false), 1000); // 1 second animation
+
     try {
       const newPhotos = [...photos];
       newPhotos[index] = { ...photo, likes: (photo.likes || 0) + 1 };
       
-      const eventRef = doc(db, 'events', eventId);
-      await updateDoc(eventRef, {
-        gallery: newPhotos
-      });
+      if (eventId !== 'created' && !eventId.startsWith('wedding-') && eventId.trim() !== '') {
+        const eventRef = doc(db, 'events', eventId);
+        await updateDoc(eventRef, {
+          gallery: newPhotos
+        });
+      }
       
-      setLikedPhotos(new Set([...likedPhotos, photo.id]));
+      const newLikedStatus = new Set([...likedPhotos, photo.id]);
+      setLikedPhotos(newLikedStatus);
+      try {
+        localStorage.setItem(`liked_photos_${eventId}`, JSON.stringify(Array.from(newLikedStatus)));
+      } catch (e) {
+        console.error(e);
+      }
       onLikeUpdate(newPhotos);
     } catch (error) {
       console.error(error);
-      toast.error('Erro ao adicionar coração.');
+      if (error instanceof Error && error.message.includes("permissions")) {
+        toast.error('Sem permissão para curtir.');
+      } else {
+        toast.error('Erro ao adicionar coração.');
+      }
     } finally {
       setIsLiking(false);
     }
@@ -206,20 +246,46 @@ export const GalleryLightbox: React.FC<GalleryLightboxProps> = ({ eventId, galle
                 exit={{ opacity: 0, scale: 0.95 }}
                 transition={{ duration: 0.2 }}
                 src={photos[selectedIndex].url}
-                className="max-w-full max-h-[70vh] object-contain"
+                className="max-w-full max-h-[70vh] object-contain cursor-pointer"
                 onClick={(e) => e.stopPropagation()}
+                onDoubleClick={(e) => {
+                  e.stopPropagation();
+                  if (!likedPhotos.has(photos[selectedIndex].id)) {
+                    handleLike(selectedIndex);
+                  }
+                }}
               />
+              <AnimatePresence>
+                {showHeartAnimation && (
+                  <motion.div
+                    initial={{ scale: 0.5, opacity: 0 }}
+                    animate={{ scale: 1.5, opacity: 1 }}
+                    exit={{ scale: 2, opacity: 0 }}
+                    transition={{ duration: 0.5, type: 'spring' }}
+                    className="absolute inset-0 flex items-center justify-center pointer-events-none"
+                  >
+                    <Heart size={120} className="text-red-500 drop-shadow-2xl" fill="currentColor" />
+                  </motion.div>
+                )}
+              </AnimatePresence>
             </div>
 
             {/* Bottom Actions */}
             <div className="absolute bottom-0 left-0 w-full p-8 flex justify-center items-center z-10 bg-gradient-to-t from-black/80 to-transparent">
-                <button 
+                <motion.button 
+                  whileHover={{ scale: 1.05 }}
+                  whileTap={{ scale: 0.9 }}
                   onClick={(e) => { e.stopPropagation(); handleLike(selectedIndex); }}
-                  className={`flex items-center gap-2 px-6 py-3 rounded-full transition-all ${likedPhotos.has(photos[selectedIndex].id) ? 'bg-red-500 text-white' : 'bg-white/10 text-white hover:bg-white/20 backdrop-blur-md'}`}
+                  className={`flex items-center gap-2 px-6 py-3 rounded-full transition-all ${likedPhotos.has(photos[selectedIndex].id) ? 'bg-white text-red-500 shadow-[0_0_20px_rgba(239,68,68,0.4)]' : 'bg-white/10 text-white hover:bg-white/20 backdrop-blur-md'}`}
                 >
-                  <Heart size={20} fill={likedPhotos.has(photos[selectedIndex].id) ? "currentColor" : "none"} />
+                  <motion.div
+                    animate={likedPhotos.has(photos[selectedIndex].id) ? { scale: [1, 1.5, 1] } : {}}
+                    transition={{ duration: 0.4, type: "spring", bounce: 0.5 }}
+                  >
+                    <Heart size={20} fill={likedPhotos.has(photos[selectedIndex].id) ? "currentColor" : "none"} />
+                  </motion.div>
                   <span className="font-bold">{photos[selectedIndex].likes > 0 ? photos[selectedIndex].likes : 'Gostei'}</span>
-                </button>
+                </motion.button>
             </div>
 
             {/* Nav Buttons */}

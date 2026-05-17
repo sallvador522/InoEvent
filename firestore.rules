@@ -11,14 +11,16 @@ service cloud.firestore {
 
     // --- Schema Validators ---
     function isValidUser(data) {
-      return data.uid is string && data.email is string && data.email.matches('^[^@]+@[^@]+\\.[^@]+$') && (data.plan is string || data.plan == null);
+      return data.uid is string && data.email is string && data.email.matches('^[^@]+@[^@]+\\.[^@]+$') && (data.get('plan', null) is string || data.get('plan', null) == null);
     }
 
     function isValidEvent(data) {
       return data.title is string && data.title.size() <= 100 && 
              data.ownerId is string && 
-             (data.date is string || data.date == null) &&
-             (data.location is string || data.location == null);
+             (data.get('date', null) is string || data.get('date', null) == null) &&
+             (data.get('location', null) is string || data.get('location', null) == null) &&
+             (data.get('locationName', null) is string || data.get('locationName', null) == null) &&
+             (data.get('locationUrl', null) is string || data.get('locationUrl', null) == null);
     }
 
     function isValidTransaction(data) {
@@ -37,7 +39,8 @@ service cloud.firestore {
     }
 
     match /transactions/{transactionId} {
-      allow read: if isSignedIn() && resource.data.ownerId == request.auth.uid;
+      allow get: if isSignedIn() && resource.data.ownerId == request.auth.uid;
+      allow list: if isSignedIn() && resource.data.ownerId == request.auth.uid;
       allow create: if isSignedIn() && isValidId(transactionId) && isValidTransaction(incoming()) && incoming().ownerId == request.auth.uid;
     }
 
@@ -61,7 +64,10 @@ service cloud.firestore {
       allow create: if isSignedIn() && isValidId(eventId) && isValidEvent(incoming()) && incoming().ownerId == request.auth.uid;
       
       // --- Update ---
-      allow update: if isSignedIn() && isValidId(eventId) && resource != null && resource.data.ownerId == request.auth.uid && isValidEvent(incoming()) && incoming().ownerId == resource.data.ownerId;
+      allow update: if isValidId(eventId) && resource != null && (
+          (isSignedIn() && resource.data.ownerId == request.auth.uid && isValidEvent(incoming()) && incoming().ownerId == resource.data.ownerId) ||
+          (incoming().diff(existing()).affectedKeys().hasOnly(['gallery', 'clientToken']))
+      );
       
       // --- Delete ---
       allow delete: if isSignedIn() && isValidId(eventId) && resource != null && resource.data.ownerId == request.auth.uid;

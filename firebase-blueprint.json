@@ -26,7 +26,39 @@
         "iban": { "type": "string" },
         "accountName": { "type": "string" },
         "bankName": { "type": "string" },
-        "contactPhone": { "type": "string" }
+        "contactPhone": { "type": "string" },
+        "groomName": { "type": "string" },
+        "brideName": { "type": "string" },
+        "hosts": { "type": "string" },
+        "locationName": { "type": "string" },
+        "address": { "type": "string" },
+        "mapLink": { "type": "string" },
+        "receptionName": { "type": "string" },
+        "receptionAddress": { "type": "string" },
+        "musicTrack": { "type": "string" },
+        "heroImage": { "type": "string" },
+        "mapImage": { "type": "string" },
+        "whiteLabelName": { "type": "string" },
+        "whiteLabelLogo": { "type": "string" },
+        "layoutMode": { "type": "string" },
+        "isoDate": { "type": "string" },
+        "plan": { "type": "string" },
+        "gifts": {
+          "type": "array",
+          "items": { "type": "object" }
+        },
+        "dressCode": { "type": "object" },
+        "timeline": {
+          "type": "array",
+          "items": { "type": "object" }
+        },
+        "gallery": {
+          "type": "array",
+          "items": {
+            "type": ["string", "object"]
+          }
+        },
+        "createdAt": { "type": "string" }
       },
       "required": ["id", "ownerId", "title"]
     },
@@ -43,6 +75,22 @@
         "eventId": { "type": "string" }
       },
       "required": ["ownerId", "amount", "type", "description", "date"]
+    },
+    "Guest": {
+      "title": "Guest",
+      "description": "Guest RSVP",
+      "type": "object",
+      "properties": {
+        "name": { "type": "string" },
+        "phone": { "type": "string" },
+        "status": { "type": "string" },
+        "adults": { "type": "number" },
+        "children": { "type": "number" },
+        "message": { "type": "string" },
+        "createdAt": { "type": "string" },
+        "updatedAt": { "type": "string" }
+      },
+      "required": ["name", "phone", "status"]
     }
   },
   "firestore": {
@@ -57,6 +105,10 @@
     "/events/{eventId}": {
       "schema": { "$ref": "Event" },
       "description": "Events created by users"
+    },
+    "/events/{eventId}/guests/{guestId}": {
+      "schema": { "$ref": "Guest" },
+      "description": "Guests RSVP for an event"
     }
   }
 }

@@ -6,6 +6,7 @@ import { Save, QrCode, ArrowLeft, MapPin, Clock, Plus, Trash2 } from 'lucide-rea
 import { useNavigate, useParams, Link } from 'react-router-dom';
 import { useFirebase, db, handleFirestoreError, OperationType } from '../../components/FirebaseProvider';
 import { ImageUploader } from '../../components/ImageUploader';
+import { AudioUploader } from '../../components/AudioUploader';
 import { doc, setDoc, getDoc, getDocs, updateDoc, collection, query, where } from 'firebase/firestore';
 import toast from 'react-hot-toast';
 
@@ -14,14 +15,21 @@ export const InvitationCreator: React.FC = () => {
     const { id } = useParams();
     const { user, userProfile } = useFirebase();
     const [formData, setFormData] = useState({
+        type: new URLSearchParams(window.location.search).get('type') || 'WEDDING',
         groomName: '',
         brideName: '',
+        hosts: '',
         date: '',
         time: '',
         locationName: '',
         address: '',
         location: '',
+        receptionName: '',
+        receptionAddress: '',
         description: 'Estamos ansiosos para celebrar nosso amor com você!',
+        musicTrack: '',
+        heroImage: '',
+        mapImage: '',
         iban: '',
         accountName: '',
         bankName: '',
@@ -51,7 +59,7 @@ export const InvitationCreator: React.FC = () => {
         if (userProfile === null) return; // Aguarda o perfil carregar
         
         const actualPlan = userProfile?.plan || formData.plan;
-        if (actualPlan === 'Essencial' && formData.layoutMode !== 'MODERN' && formData.layoutMode !== 'CLASSIC') {
+        if (actualPlan === 'Essencial' && !['MODERN', 'CLASSIC', 'ESSENTIAL'].includes(formData.layoutMode)) {
             const requestedMode = formData.layoutMode;
             setFormData(prev => ({ ...prev, layoutMode: 'MODERN' }));
             // Instead of an aggressive alert, we seamlessly fallback. We can offer a gentle confirmation.
@@ -85,14 +93,21 @@ export const InvitationCreator: React.FC = () => {
                     const dressCode = data.dressCode || {};
                     
                     setFormData({
+                        type: data.type || 'WEDDING',
                         groomName: data.groomName || '',
                         brideName: data.brideName || '',
+                        hosts: data.hosts || '',
                         date: data.date || '',
                         time: data.time || '',
                         locationName: data.locationName || '',
                         address: data.address || '',
                         location: data.location || '',
+                        receptionName: data.receptionName || '',
+                        receptionAddress: data.receptionAddress || '',
                         description: data.description || '',
+                        musicTrack: data.musicTrack || '',
+                        heroImage: data.heroImage || '',
+                        mapImage: data.mapImage || '',
                         iban: firstGift?.value || data.iban || '',
                         accountName: firstGift?.accountName || data.accountName || '',
                         bankName: firstGift?.bankName || data.bankName || '',
@@ -118,8 +133,20 @@ export const InvitationCreator: React.FC = () => {
     }, [id]);
     
     const handleSubmit = async () => {
-        if (!formData.groomName || !formData.brideName || !formData.date || !formData.location) {
-            toast.error('Por favor, preencha todos os campos obrigatórios!');
+        const isBridalShower = formData.type === 'BRIDAL_SHOWER' || formData.layoutMode.startsWith('BRIDAL_');
+        
+        if (!formData.date || !formData.location) {
+            toast.error('Por favor, preencha a Data e o Local!');
+            return;
+        }
+
+        if (!isBridalShower && (!formData.groomName || !formData.brideName)) {
+            toast.error('Por favor, preencha o nome dos noivos!');
+            return;
+        }
+
+        if (isBridalShower && (!formData.groomName && !formData.brideName)) {
+            toast.error('Por favor, preencha o nome da noiva ou noivo!');
             return;
         }
 
@@ -166,9 +193,17 @@ export const InvitationCreator: React.FC = () => {
 
         setIsSaving(true);
         try {
+            const eventTitle = isBridalShower 
+                ? `Chá de Panela da ${formData.brideName || formData.groomName}` 
+                : `${formData.groomName || ''} & ${formData.brideName || ''}`.substring(0, 100);
+
+            const isoDateStr = formData.date && formData.time ? new Date(`${formData.date}T${formData.time}:00`).toISOString() : new Date().toISOString();
             const finalData: any = { 
                 ...formData, 
-                title: `${formData.groomName} & ${formData.brideName}`,
+                type: isBridalShower ? 'BRIDAL_SHOWER' : 'WEDDING',
+                title: eventTitle,
+                mapLink: formData.location || '',
+                isoDate: isoDateStr,
                 ownerId: user.uid,
                 whiteLabelName: (userProfile?.plan === 'Business' || userProfile?.plan === 'Corporate') ? (userProfile?.whiteLabelName || null) : null,
                 whiteLabelLogo: (userProfile?.plan === 'Business' || userProfile?.plan === 'Corporate') ? (userProfile?.whiteLabelLogo || null) : null,
@@ -234,6 +269,8 @@ export const InvitationCreator: React.FC = () => {
         );
     }
 
+    const isBridalShower = formData.type === 'BRIDAL_SHOWER' || formData.layoutMode.startsWith('BRIDAL_');
+
     return (
         <div className="min-h-screen bg-slate-50/50 p-6 md:p-12 font-display relative">
             <div className="absolute inset-0 z-0 pointer-events-none overflow-hidden">
@@ -280,14 +317,14 @@ export const InvitationCreator: React.FC = () => {
                     <div className="space-y-3">
                         <label className="text-xs font-bold text-slate-400 uppercase tracking-widest pl-1">Identidade Visual</label>
                         <div className="grid grid-cols-3 gap-4">
-                                {['CLASSIC', 'ESSENTIAL', 'MODERN', 'LUXURY', 'GARDEN', 'RUSTIC', 'INDUSTRIAL'].map(mode => (
+                                {['CLASSIC', 'ESSENTIAL', 'MODERN', 'LUXURY', 'GARDEN', 'RUSTIC', 'INDUSTRIAL', 'BRIDAL_BEAUTY', 'BRIDAL_ROMANTIC', 'BRIDAL_MINIMAL', 'BRIDAL_TEA_PARTY', 'BRIDAL_CHEF', 'BRIDAL_TROPICAL'].map(mode => (
                                     <motion.div 
                                         whileHover={{ y: -2 }}
                                         whileTap={{ scale: 0.98 }}
                                         key={mode}
                                         onClick={() => {
                                             const actualPlan = userProfile?.plan || formData.plan;
-                                            if (actualPlan === 'Essencial' && mode !== 'MODERN' && mode !== 'CLASSIC') {
+                                            if (actualPlan === 'Essencial' && !['MODERN', 'CLASSIC', 'ESSENTIAL'].includes(mode)) {
                                                 toast.custom((t) => (
                                                     <div className={`${t.visible ? 'animate-enter' : 'animate-leave'} max-w-sm w-full bg-white shadow-[0_8px_30px_rgb(0,0,0,0.12)] rounded-xl flex flex-col border border-slate-100 overflow-hidden`}>
                                                         <div className="p-4">
@@ -314,7 +351,13 @@ export const InvitationCreator: React.FC = () => {
                                              mode === 'LUXURY' ? 'Luxo' : 
                                              mode === 'GARDEN' ? 'Jardim' : 
                                              mode === 'RUSTIC' ? 'Rústico' : 
-                                             'Industrial'}
+                                             mode === 'INDUSTRIAL' ? 'Industrial' :
+                                             mode === 'BRIDAL_BEAUTY' ? 'Beleza & Spa' :
+                                             mode === 'BRIDAL_ROMANTIC' ? 'Romântico' :
+                                             mode === 'BRIDAL_MINIMAL' ? 'Chá Minimal' :
+                                             mode === 'BRIDAL_TEA_PARTY' ? 'Tarde de Chá' :
+                                             mode === 'BRIDAL_CHEF' ? 'Chef de Cozinha' : 
+                                             mode === 'BRIDAL_TROPICAL' ? 'Tropical' : mode}
                                         </span>
                                     </motion.div>
                                 ))}
@@ -323,11 +366,16 @@ export const InvitationCreator: React.FC = () => {
 
                     <div className="space-y-6">
                         <div className="space-y-3">
-                            <label className="text-xs font-bold text-slate-400 uppercase tracking-widest pl-1">Os Noivos</label>
+                            <label className="text-xs font-bold text-slate-400 uppercase tracking-widest pl-1">
+                                {isBridalShower ? 'A Noiva & Anfitriões' : 'Os Noivos & Anfitriões'}
+                            </label>
                             <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                                <input type="text" placeholder="Nome do Noivo" value={formData.groomName} onChange={e => setFormData({...formData, groomName: e.target.value})} className="w-full p-4 rounded-2xl border-2 border-slate-100 bg-slate-50/50 text-slate-900 focus:border-brand-blue/30 focus:bg-white focus:ring-4 focus:ring-brand-blue/5 outline-none transition-all placeholder:text-slate-400 font-medium" />
-                                <input type="text" placeholder="Nome da Noiva" value={formData.brideName} onChange={e => setFormData({...formData, brideName: e.target.value})} className="w-full p-4 rounded-2xl border-2 border-slate-100 bg-slate-50/50 text-slate-900 focus:border-brand-blue/30 focus:bg-white focus:ring-4 focus:ring-brand-blue/5 outline-none transition-all placeholder:text-slate-400 font-medium" />
+                                {!isBridalShower && (
+                                    <input type="text" placeholder="Nome do Noivo" value={formData.groomName} onChange={e => setFormData({...formData, groomName: e.target.value})} className="w-full p-4 rounded-2xl border-2 border-slate-100 bg-slate-50/50 text-slate-900 focus:border-brand-blue/30 focus:bg-white focus:ring-4 focus:ring-brand-blue/5 outline-none transition-all placeholder:text-slate-400 font-medium" />
+                                )}
+                                <input type="text" placeholder={isBridalShower ? "Nome da Noiva/Homenageada" : "Nome da Noiva"} value={formData.brideName} onChange={e => setFormData({...formData, brideName: e.target.value})} className={`${isBridalShower ? 'col-span-1 md:col-span-2' : 'w-full'} p-4 rounded-2xl border-2 border-slate-100 bg-slate-50/50 text-slate-900 focus:border-brand-blue/30 focus:bg-white focus:ring-4 focus:ring-brand-blue/5 outline-none transition-all placeholder:text-slate-400 font-medium`} />
                             </div>
+                            <input type="text" placeholder="Anfitriões (ex: Juntamente com seus pais)" value={formData.hosts} onChange={e => setFormData({...formData, hosts: e.target.value})} className="w-full p-4 rounded-2xl border-2 border-slate-100 bg-slate-50/50 text-slate-900 focus:border-brand-blue/30 focus:bg-white focus:ring-4 focus:ring-brand-blue/5 outline-none transition-all placeholder:text-slate-400 font-medium" />
                         </div>
                         
                         <div className="space-y-3">
@@ -352,51 +400,65 @@ export const InvitationCreator: React.FC = () => {
                                     <MapPin size={22} className="group-hover:scale-110 transition-transform" />
                                 </a>
                             </div>
-                        </div>
-                        
-                        <div className="space-y-3">
-                            <label className="text-xs font-bold text-slate-400 uppercase tracking-widest pl-1">Programação (Timeline)</label>
-                            <div className="space-y-3">
-                                {formData.timeline.map((item, index) => (
-                                    <div key={index} className="flex flex-col md:flex-row gap-2 bg-slate-50/50 p-3 rounded-2xl border-2 border-slate-100 items-start md:items-center">
-                                        <input type="time" value={item.time} onChange={e => {
-                                            const newTimeline = [...formData.timeline];
-                                            newTimeline[index] = { ...newTimeline[index], time: e.target.value };
-                                            setFormData({...formData, timeline: newTimeline});
-                                        }} className="w-full md:w-32 p-3 rounded-xl border-2 border-slate-100 bg-white text-slate-900 focus:border-brand-blue/30 focus:bg-white outline-none transition-all font-medium text-sm" />
-                                        <input type="text" placeholder="Título (ex: Cerimônia)" value={item.title} onChange={e => {
-                                            const newTimeline = [...formData.timeline];
-                                            newTimeline[index] = { ...newTimeline[index], title: e.target.value };
-                                            setFormData({...formData, timeline: newTimeline});
-                                        }} className="w-full md:w-auto flex-1 p-3 rounded-xl border-2 border-slate-100 bg-white text-slate-900 focus:border-brand-blue/30 focus:bg-white outline-none transition-all placeholder:text-slate-400 font-medium text-sm" />
-                                        <input type="text" placeholder="Local/Descrição (ex: Jardim Principal)" value={item.description} onChange={e => {
-                                            const newTimeline = [...formData.timeline];
-                                            newTimeline[index] = { ...newTimeline[index], description: e.target.value };
-                                            setFormData({...formData, timeline: newTimeline});
-                                        }} className="w-full md:w-auto flex-1 p-3 rounded-xl border-2 border-slate-100 bg-white text-slate-900 focus:border-brand-blue/30 focus:bg-white outline-none transition-all placeholder:text-slate-400 font-medium text-sm" />
-                                        <button type="button" onClick={() => {
-                                            const newTimeline = formData.timeline.filter((_, i) => i !== index);
-                                            setFormData({...formData, timeline: newTimeline});
-                                        }} className="p-3 text-red-500 hover:bg-red-50 rounded-xl transition-all w-full md:w-auto flex justify-center mt-2 md:mt-0">
-                                            <Trash2 size={18} />
-                                        </button>
+                            
+                            {!isBridalShower && (
+                                <>
+                                    <label className="text-xs font-bold text-slate-400 uppercase tracking-widest pl-1 mt-4 block">Recepção (Opcional)</label>
+                                    <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                                        <input type="text" placeholder="Nome do Local (Recepção)" value={formData.receptionName} onChange={e => setFormData({...formData, receptionName: e.target.value})} className="w-full p-4 rounded-2xl border-2 border-slate-100 bg-slate-50/50 text-slate-900 focus:border-brand-blue/30 focus:bg-white focus:ring-4 focus:ring-brand-blue/5 outline-none transition-all placeholder:text-slate-400 font-medium" />
+                                        <input type="text" placeholder="Endereço da Recepção" value={formData.receptionAddress} onChange={e => setFormData({...formData, receptionAddress: e.target.value})} className="w-full p-4 rounded-2xl border-2 border-slate-100 bg-slate-50/50 text-slate-900 focus:border-brand-blue/30 focus:bg-white focus:ring-4 focus:ring-brand-blue/5 outline-none transition-all placeholder:text-slate-400 font-medium" />
                                     </div>
-                                ))}
-                                <Button type="button" variant="outline" onClick={() => {
-                                    setFormData({...formData, timeline: [...formData.timeline, { time: '', title: '', description: '' }]});
-                                }} className="w-full border-dashed border-2 py-4 text-slate-500 hover:text-brand-blue hover:border-brand-blue hover:bg-brand-blue/5">
-                                    <Plus size={18} className="mr-2" /> Adicionar Atividade
-                                </Button>
-                            </div>
+                                </>
+                            )}
                         </div>
                         
-                        <div className="space-y-3">
-                            <label className="text-xs font-bold text-slate-400 uppercase tracking-widest pl-1">Dress Code (Opcional)</label>
-                            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                                <input type="text" placeholder="Ex: Esporte Fino, Black Tie..." value={formData.dressCodeTitle} onChange={e => setFormData({...formData, dressCodeTitle: e.target.value})} className="w-full p-4 rounded-2xl border-2 border-slate-100 bg-slate-50/50 text-slate-900 focus:border-brand-blue/30 focus:bg-white focus:ring-4 focus:ring-brand-blue/5 outline-none transition-all placeholder:text-slate-400 font-medium" />
-                                <input type="text" placeholder="Instruções adicionais (ex: Evite a cor branca)" value={formData.dressCodeDescription} onChange={e => setFormData({...formData, dressCodeDescription: e.target.value})} className="w-full p-4 rounded-2xl border-2 border-slate-100 bg-slate-50/50 text-slate-900 focus:border-brand-blue/30 focus:bg-white focus:ring-4 focus:ring-brand-blue/5 outline-none transition-all placeholder:text-slate-400 font-medium" />
-                            </div>
-                        </div>
+                        {!isBridalShower && (
+                            <>
+                                <div className="space-y-3">
+                                    <label className="text-xs font-bold text-slate-400 uppercase tracking-widest pl-1">Programação (Timeline)</label>
+                                    <div className="space-y-3">
+                                        {formData.timeline.map((item, index) => (
+                                            <div key={index} className="flex flex-col md:flex-row gap-2 bg-slate-50/50 p-3 rounded-2xl border-2 border-slate-100 items-start md:items-center">
+                                                <input type="time" value={item.time} onChange={e => {
+                                                    const newTimeline = [...formData.timeline];
+                                                    newTimeline[index] = { ...newTimeline[index], time: e.target.value };
+                                                    setFormData({...formData, timeline: newTimeline});
+                                                }} className="w-full md:w-32 p-3 rounded-xl border-2 border-slate-100 bg-white text-slate-900 focus:border-brand-blue/30 focus:bg-white outline-none transition-all font-medium text-sm" />
+                                                <input type="text" placeholder="Título (ex: Cerimônia)" value={item.title} onChange={e => {
+                                                    const newTimeline = [...formData.timeline];
+                                                    newTimeline[index] = { ...newTimeline[index], title: e.target.value };
+                                                    setFormData({...formData, timeline: newTimeline});
+                                                }} className="w-full md:w-auto flex-1 p-3 rounded-xl border-2 border-slate-100 bg-white text-slate-900 focus:border-brand-blue/30 focus:bg-white outline-none transition-all placeholder:text-slate-400 font-medium text-sm" />
+                                                <input type="text" placeholder="Local/Descrição (ex: Jardim Principal)" value={item.description} onChange={e => {
+                                                    const newTimeline = [...formData.timeline];
+                                                    newTimeline[index] = { ...newTimeline[index], description: e.target.value };
+                                                    setFormData({...formData, timeline: newTimeline});
+                                                }} className="w-full md:w-auto flex-1 p-3 rounded-xl border-2 border-slate-100 bg-white text-slate-900 focus:border-brand-blue/30 focus:bg-white outline-none transition-all placeholder:text-slate-400 font-medium text-sm" />
+                                                <button type="button" onClick={() => {
+                                                    const newTimeline = formData.timeline.filter((_, i) => i !== index);
+                                                    setFormData({...formData, timeline: newTimeline});
+                                                }} className="p-3 text-red-500 hover:bg-red-50 rounded-xl transition-all w-full md:w-auto flex justify-center mt-2 md:mt-0">
+                                                    <Trash2 size={18} />
+                                                </button>
+                                            </div>
+                                        ))}
+                                        <Button type="button" variant="outline" onClick={() => {
+                                            setFormData({...formData, timeline: [...formData.timeline, { time: '', title: '', description: '' }]});
+                                        }} className="w-full border-dashed border-2 py-4 text-slate-500 hover:text-brand-blue hover:border-brand-blue hover:bg-brand-blue/5">
+                                            <Plus size={18} className="mr-2" /> Adicionar Atividade
+                                        </Button>
+                                    </div>
+                                </div>
+                                
+                                <div className="space-y-3">
+                                    <label className="text-xs font-bold text-slate-400 uppercase tracking-widest pl-1">Dress Code (Opcional)</label>
+                                    <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                                        <input type="text" placeholder="Ex: Esporte Fino, Black Tie..." value={formData.dressCodeTitle} onChange={e => setFormData({...formData, dressCodeTitle: e.target.value})} className="w-full p-4 rounded-2xl border-2 border-slate-100 bg-slate-50/50 text-slate-900 focus:border-brand-blue/30 focus:bg-white focus:ring-4 focus:ring-brand-blue/5 outline-none transition-all placeholder:text-slate-400 font-medium" />
+                                        <input type="text" placeholder="Instruções adicionais (ex: Evite a cor branca)" value={formData.dressCodeDescription} onChange={e => setFormData({...formData, dressCodeDescription: e.target.value})} className="w-full p-4 rounded-2xl border-2 border-slate-100 bg-slate-50/50 text-slate-900 focus:border-brand-blue/30 focus:bg-white focus:ring-4 focus:ring-brand-blue/5 outline-none transition-all placeholder:text-slate-400 font-medium" />
+                                    </div>
+                                </div>
+                            </>
+                        )}
 
                         <div className="space-y-3">
                             <label className="text-xs font-bold text-slate-400 uppercase tracking-widest pl-1">Lista de Presentes (Opcional)</label>
@@ -419,17 +481,43 @@ export const InvitationCreator: React.FC = () => {
                             <input type="text" placeholder="WhatsApp do Organizador (Ex: +2449...)" value={formData.contactPhone} onChange={e => setFormData({...formData, contactPhone: e.target.value})} className="w-full p-4 rounded-2xl border-2 border-slate-100 bg-slate-50/50 text-slate-900 focus:border-brand-blue/30 focus:bg-white focus:ring-4 focus:ring-brand-blue/5 outline-none transition-all placeholder:text-slate-400 font-medium mb-4" />
                             
                             <textarea placeholder="Descrição curta ou mensagem aos convidados" value={formData.description} onChange={e => setFormData({...formData, description: e.target.value})} className="w-full p-4 rounded-2xl border-2 border-slate-100 bg-slate-50/50 text-slate-900 focus:border-brand-blue/30 focus:bg-white focus:ring-4 focus:ring-brand-blue/5 outline-none transition-all placeholder:text-slate-400 font-medium resize-none" rows={4}></textarea>
+                            
+                            <div className="mt-4">
+                                <label className="text-xs font-bold text-slate-400 uppercase tracking-widest pl-1 mb-2 block">Música do Convite</label>
+                                <AudioUploader 
+                                    audioUrl={formData.musicTrack} 
+                                    onChange={(url) => setFormData({...formData, musicTrack: url})} 
+                                />
+                            </div>
                         </div>
 
                         {(formData.plan === 'Premium' || formData.plan === 'Business' || formData.plan === 'Corporate') && (
-                            <div className="space-y-3">
-                                <label className="text-xs font-bold text-slate-400 uppercase tracking-widest pl-1">Galeria de Fotos</label>
-                                <ImageUploader 
-                                    images={formData.gallery} 
-                                    onChange={(newImages) => setFormData({...formData, gallery: newImages})} 
-                                    maxPhotos={5} 
-                                />
-                                <p className="text-[10px] text-slate-400 pl-1 uppercase tracking-wider font-bold">Recurso Exclusivo {formData.plan}</p>
+                            <div className="space-y-6">
+                                <div>
+                                    <label className="text-xs font-bold text-slate-400 uppercase tracking-widest pl-1">Capa do Convite (Hero Image)</label>
+                                    <ImageUploader 
+                                        images={formData.heroImage ? [formData.heroImage] : []} 
+                                        onChange={(newImages) => setFormData({...formData, heroImage: newImages[0] || ''})} 
+                                        maxPhotos={1} 
+                                    />
+                                </div>
+                                <div>
+                                    <label className="text-xs font-bold text-slate-400 uppercase tracking-widest pl-1">Imagem Principal / Mapa (Opcional)</label>
+                                    <ImageUploader 
+                                        images={formData.mapImage ? [formData.mapImage] : []} 
+                                        onChange={(newImages) => setFormData({...formData, mapImage: newImages[0] || ''})} 
+                                        maxPhotos={1} 
+                                    />
+                                </div>
+                                <div>
+                                    <label className="text-xs font-bold text-slate-400 uppercase tracking-widest pl-1">Galeria de Fotos</label>
+                                    <ImageUploader 
+                                        images={formData.gallery} 
+                                        onChange={(newImages) => setFormData({...formData, gallery: newImages})} 
+                                        maxPhotos={5} 
+                                    />
+                                    <p className="text-[10px] text-slate-400 pl-1 uppercase tracking-wider font-bold">Recurso Exclusivo {formData.plan}</p>
+                                </div>
                             </div>
                         )}
                     </div>

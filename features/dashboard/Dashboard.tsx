@@ -331,7 +331,7 @@ export const Dashboard = () => {
                                     exit={{ opacity: 0, scale: 0.95 }}
                                     className="absolute top-12 right-0 w-48 bg-white rounded-2xl shadow-xl border border-slate-100 overflow-hidden z-50 flex flex-col"
                                 >
-                                    <Link to={`/edit-invitation/${event.id}`} className="px-4 py-3 flex items-center gap-2 hover:bg-slate-50 text-slate-700 font-bold text-sm transition-colors border-b border-slate-100">
+                                    <Link to={(event.type === 'BRIDAL_SHOWER' || event.layoutMode?.startsWith('BRIDAL_')) ? `/edit-bridal/${event.id}` : `/edit-invitation/${event.id}`} className="px-4 py-3 flex items-center gap-2 hover:bg-slate-50 text-slate-700 font-bold text-sm transition-colors border-b border-slate-100">
                                         <Edit2 size={16} /> Editar Evento
                                     </Link>
                                     <button 

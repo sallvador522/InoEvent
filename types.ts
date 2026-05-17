@@ -2,10 +2,11 @@
 export enum ThemeType {
   WEDDING = 'WEDDING',
   BIRTHDAY = 'BIRTHDAY',
-  CORPORATE = 'CORPORATE'
+  CORPORATE = 'CORPORATE',
+  BRIDAL_SHOWER = 'BRIDAL_SHOWER'
 }
 
-export type LayoutMode = 'CLASSIC' | 'MODERN' | 'LUXURY' | 'GARDEN' | 'RUSTIC' | 'INDUSTRIAL';
+export type LayoutMode = 'CLASSIC' | 'MODERN' | 'LUXURY' | 'GARDEN' | 'RUSTIC' | 'INDUSTRIAL' | 'BRIDAL_BEAUTY' | 'BRIDAL_ROMANTIC' | 'BRIDAL_MINIMAL' | 'BRIDAL_TEA_PARTY' | 'BRIDAL_CHEF' | 'BRIDAL_TROPICAL';
 
 export interface TimelineItem {
   time: string;

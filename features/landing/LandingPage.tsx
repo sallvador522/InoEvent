@@ -102,6 +102,7 @@ export const LandingPage: React.FC = () => {
     : EVENTS.filter(e => {
         if (selectedCategory === 'wedding') return e.type === ThemeType.WEDDING;
         if (selectedCategory === 'birthday' || selectedCategory === 'kids' || selectedCategory === '15years' || selectedCategory === 'adult') return e.type === ThemeType.BIRTHDAY;
+        if (selectedCategory === 'bridal') return e.type === ThemeType.BRIDAL_SHOWER;
         return true; 
       });
 
@@ -483,7 +484,7 @@ export const LandingPage: React.FC = () => {
                         <span className={`inline-block px-3 py-1 backdrop-blur-md rounded-full text-[10px] font-bold shadow-sm ${badge.className}`}>
                           {event.layoutMode}
                         </span>
-                        {event.layoutMode !== "MODERN" && (
+                        {!['MODERN', 'CLASSIC', 'ESSENTIAL'].includes(event.layoutMode) && (
                           <span className="inline-block px-3 py-1 ml-2 bg-gradient-to-r from-amber-200 to-amber-400 text-amber-900 rounded-full text-[10px] font-bold shadow-sm">
                               PRO
                           </span>

@@ -27,7 +27,7 @@ const InvitationView: React.FC = () => {
   const [loading, setLoading] = useState(true);
   
   const handleUseTemplate = (e: React.MouseEvent) => {
-      if (userProfile && userProfile.plan === 'Essencial' && event.layoutMode !== 'MODERN' && event.layoutMode !== 'CLASSIC') {
+      if (userProfile && userProfile.plan === 'Essencial' && !['MODERN', 'CLASSIC', 'ESSENTIAL'].includes(event.layoutMode)) {
           e.preventDefault();
           toast.custom((t) => (
               <div className={`${t.visible ? 'animate-enter' : 'animate-leave'} max-w-sm w-full bg-white shadow-[0_8px_30px_rgb(0,0,0,0.12)] rounded-xl flex flex-col border border-slate-100 overflow-hidden`}>
@@ -79,7 +79,12 @@ const InvitationView: React.FC = () => {
             { time: createdEventData.time || '19:00', title: 'Cerimônia', description: createdEventData.location || "Local do Evento" }
         ],
         dressCode: (createdEventData.dressCodeTitle || createdEventData.dressCodeDescription) ? { title: createdEventData.dressCodeTitle, description: createdEventData.dressCodeDescription } : undefined,
-        gifts: [ { type: 'IBAN', title: 'Presente', description: 'Dados bancários para contribuição', value: createdEventData.iban || '', accountName: createdEventData.accountName || '', bankName: createdEventData.bankName || '' } ],
+        gifts: (createdEventData.gifts && createdEventData.gifts.length > 0) ? createdEventData.gifts : (createdEventData.iban ? [ { type: 'IBAN', title: createdEventData.giftTitle || 'Presente', description: createdEventData.giftDescription || 'Dados bancários para contribuição', value: createdEventData.iban || '', accountName: createdEventData.accountName || '', bankName: createdEventData.bankName || '' } ] : []),
+        giftTitle: (createdEventData.gifts && createdEventData.gifts.length > 0) ? createdEventData.gifts[0].title : createdEventData.giftTitle,
+        giftDescription: (createdEventData.gifts && createdEventData.gifts.length > 0) ? createdEventData.gifts[0].description : createdEventData.giftDescription,
+        iban: (createdEventData.gifts && createdEventData.gifts.length > 0) ? createdEventData.gifts[0].value : createdEventData.iban,
+        bankName: (createdEventData.gifts && createdEventData.gifts.length > 0) ? createdEventData.gifts[0].bankName : createdEventData.bankName,
+        accountName: (createdEventData.gifts && createdEventData.gifts.length > 0) ? createdEventData.gifts[0].accountName : createdEventData.accountName,
         mapLink: createdEventData.location || '#',
         phone: createdEventData.contactPhone,
         ownerId: user?.uid
@@ -124,7 +129,12 @@ const InvitationView: React.FC = () => {
             musicTrack: data.musicTrack || 'Turning Page - Sleeping At Last',
             isoDate: data.date || new Date().toISOString(),
             timeline: data.timeline || [{ time: data.time || '19:00', title: 'Cerimônia', description: data.location || "Local" }],
-            gifts: data.iban ? [ { type: 'IBAN', title: 'Presente', description: 'Dados bancários para contribuição', value: data.iban || '', accountName: data.accountName || '', bankName: data.bankName || '' } ] : data.gifts,
+            gifts: (data.gifts && data.gifts.length > 0) ? data.gifts : (data.iban ? [ { type: 'IBAN', title: data.giftTitle || 'Presente', description: data.giftDescription || 'Dados bancários para contribuição', value: data.iban || '', accountName: data.accountName || '', bankName: data.bankName || '' } ] : []),
+            giftTitle: (data.gifts && data.gifts.length > 0) ? data.gifts[0].title : data.giftTitle,
+            giftDescription: (data.gifts && data.gifts.length > 0) ? data.gifts[0].description : data.giftDescription,
+            iban: (data.gifts && data.gifts.length > 0) ? data.gifts[0].value : data.iban,
+            bankName: (data.gifts && data.gifts.length > 0) ? data.gifts[0].bankName : data.bankName,
+            accountName: (data.gifts && data.gifts.length > 0) ? data.gifts[0].accountName : data.accountName,
             dressCode: (data.dressCodeTitle || data.dressCodeDescription) ? { title: data.dressCodeTitle, description: data.dressCodeDescription } : data.dressCode,
             address: data.address || 'Luanda, Angola',
             locationName: data.locationName || data.location || 'Local do Evento',
@@ -181,14 +191,14 @@ const InvitationView: React.FC = () => {
               <span className="text-[10px] uppercase font-bold text-slate-400 tracking-widest leading-none mb-1 text-left">Pré-visualização</span>
               <span className="text-sm font-serif font-bold text-brand-blue leading-none text-left flex items-center gap-1">
                   Modelo {event.layoutMode}
-                  {event.layoutMode !== 'MODERN' && (
+                  {!['MODERN', 'CLASSIC', 'ESSENTIAL'].includes(event.layoutMode) && (
                       <span className="text-[9px] bg-brand-blue/10 text-brand-blue px-2 py-0.5 rounded-full">PRO</span>
                   )}
               </span>
            </div>
            <Link 
               onClick={handleUseTemplate}
-              to={`/create-invitation?template=${event.layoutMode}`}
+              to={(event?.type === 'BRIDAL_SHOWER' || event?.layoutMode?.startsWith('BRIDAL_')) ? `/create-bridal?template=${event.layoutMode}` : `/create-invitation?template=${event.layoutMode}`}
               className="bg-brand-blue text-white px-5 py-2.5 rounded-xl text-xs font-bold shadow-lg shadow-brand-blue/30 hover:bg-brand-blue/90 hover:scale-105 transition-all text-center flex-shrink-0"
            >
               Usar Modelo
@@ -217,6 +227,7 @@ const InvitationView: React.FC = () => {
       {event.layoutMode === 'GARDEN' && <GardenLayout {...props} />}
       {event.layoutMode === 'RUSTIC' && <RusticLayout {...props} />}
       {event.layoutMode === 'INDUSTRIAL' && <IndustrialLayout {...props} />}
+      {event.layoutMode?.startsWith('BRIDAL_') && <BridalStandardLayout {...props} />}
 
       <div className="w-full flex flex-col items-center justify-center py-10 pb-32 text-xs font-bold tracking-widest uppercase text-slate-500 gap-3 z-10 relative">
         {event.whiteLabelName && (
@@ -232,7 +243,7 @@ const InvitationView: React.FC = () => {
       <BottomSheet 
         isOpen={isRSVPOpen} 
         onClose={() => setRSVPOpen(false)} 
-        title="Sua Presença"
+        title={getRSVPModalTitle(event)}
         themeClasses={
           event.layoutMode === 'LUXURY' || event.layoutMode === 'INDUSTRIAL' 
           ? 'bg-[#151515] text-white border-t border-gray-700' 
@@ -319,6 +330,20 @@ export interface LayoutProps {
   onLikeUpdate: (newGallery: any) => void;
 }
 
+export const getRSVPText = (event: any) => {
+  if (event?.type === 'BRIDAL_SHOWER' || event?.layoutMode?.startsWith('BRIDAL_')) {
+    return 'Confirmar Presença no Chá';
+  }
+  return 'Confirmar Presença';
+};
+
+export const getRSVPModalTitle = (event: any) => {
+  if (event?.type === 'BRIDAL_SHOWER' || event?.layoutMode?.startsWith('BRIDAL_')) {
+    return 'RSVP Chá de Panela';
+  }
+  return 'Sua Presença';
+};
+
 // ============================================================================
 // LAYOUT ESSENTIAL: CLEAN & FAST
 // ============================================================================
@@ -361,10 +386,116 @@ const EssentialLayout: React.FC<LayoutProps> = ({ event, onRSVP, onLikeUpdate })
       <GuestManual mode="ESSENTIAL" />
       
       <div className="fixed bottom-6 left-1/2 -translate-x-1/2 z-50 w-full max-w-sm px-4">
-          <Button onClick={onRSVP} variant="navy" fullWidth>Confirmar Presença</Button>
+          <Button onClick={onRSVP} variant="navy" fullWidth>{getRSVPText(event)}</Button>
       </div>
     </div>
   );
+};
+
+// ============================================================================
+// BRIDAL STANDARD LAYOUT (Based on provided image structure)
+// ============================================================================
+const getBridalTheme = (mode: string) => {
+    switch (mode) {
+        case 'BRIDAL_MINIMAL': return { color: '#BCAAA4', flower: '/bridal-templates/templateCha3.png', bg: '#FFFDFD', text: '#4E342E' };
+        case 'BRIDAL_BEAUTY': return { color: '#E57373', flower: '/bridal-templates/templateCha1.png', bg: '#FFFDFD', text: '#5D4037' };
+        case 'BRIDAL_TEA_PARTY': return { color: '#7986CB', flower: '/bridal-templates/templateCha2.png', bg: '#F8BBD0', text: '#3F51B5' };
+        case 'BRIDAL_CHEF': return { color: '#FF8A65', flower: '/bridal-templates/templateCha4.png', bg: '#FFF3E0', text: '#E64A19' };
+        case 'BRIDAL_TROPICAL': return { color: '#66BB6A', flower: '/bridal-templates/templateCha1.png', bg: '#F1F8E9', text: '#2E7D32' };
+        case 'BRIDAL_ROMANTIC': 
+        default: return { color: '#F48FB1', flower: '/bridal-templates/templateCha2.png', bg: '#FFF8FA', text: '#D81B60' };
+    }
+}
+
+const BridalStandardLayout: React.FC<LayoutProps> = ({ event, onRSVP }) => {
+    const theme = getBridalTheme(event.layoutMode || 'BRIDAL_ROMANTIC');
+    const titleLines = event.title.replace('Chá de Panela da ', '').replace('Chá da ', '') || 'A Noiva';
+    
+    return (
+        <div className="w-full h-[100dvh] relative overflow-hidden font-sans flex items-center justify-center" style={{ backgroundColor: theme.bg, color: theme.text }}>
+            {/* Background Image full fit */}
+            {theme.flower && (
+                <div 
+                    className="absolute inset-0 z-0 bg-center bg-no-repeat pointer-events-none" 
+                    style={{ backgroundImage: `url(${theme.flower})`, backgroundSize: '100% 100%', opacity: 1 }}
+                />
+            )}
+
+            {/* Framed Text Container */}
+            <div 
+                className="relative z-10 w-[80%] max-w-sm h-[80%] flex flex-col items-center text-center overflow-y-auto no-scrollbar"
+                style={{ color: theme.text }}
+            >
+                <div className="flex flex-col items-center justify-center min-h-full py-4 w-full space-y-12">
+                    <FadeInSection className="w-full flex justify-center items-center flex-col">
+                        <p className="text-[11px] uppercase tracking-[0.3em] font-bold mb-4" style={{ color: theme.color }}>
+                            CONVITE ESPECIAL
+                        </p>
+                        
+                        <div className="w-12 h-px mb-6" style={{ backgroundColor: theme.color, opacity: 0.5 }} />
+
+                        <div className="text-xl uppercase tracking-widest mb-1" style={{ color: theme.color }}>CHÁ DE</div>
+                        <h2 className="text-6xl mb-1 mt-2 leading-none" style={{ fontFamily: '"Pinyon Script", cursive', color: theme.color }}>Panela</h2>
+                        <div className="flex items-center justify-center gap-3 mb-6 mt-2">
+                            <div className="w-6 h-px" style={{ backgroundColor: theme.color, opacity: 0.5 }} />
+                            <div className="text-[10px] uppercase tracking-widest" style={{ color: theme.color }}>DA</div>
+                            <div className="w-6 h-px" style={{ backgroundColor: theme.color, opacity: 0.5 }} />
+                        </div>
+                        
+                        <h1 className="text-5xl md:text-6xl leading-tight font-extrabold" style={{ fontFamily: '"Pinyon Script", cursive', color: theme.color }}>
+                            {titleLines}
+                        </h1>
+                    </FadeInSection>
+
+                    {event.description && (
+                        <FadeInSection className="w-full flex justify-center items-center flex-col space-y-4 px-2">
+                            {event.description?.split('\n\n').map((paragraph: string, i: number) => (
+                                <p key={i} className="text-sm md:text-base leading-relaxed whitespace-pre-wrap font-serif text-gray-700">
+                                    {paragraph}
+                                </p>
+                            ))}
+                        </FadeInSection>
+                    )}
+
+                    <FadeInSection className="w-full space-y-6">
+                        <div className="w-full h-px mx-auto" style={{ backgroundColor: theme.color, opacity: 0.2 }} />
+                        
+                        {/* Data */}
+                        <div className="flex flex-col items-center">
+                            <p className="text-[11px] uppercase tracking-[0.2em] font-bold mb-1 opacity-80" style={{ color: theme.color }}>Data e Hora</p>
+                            <p className="text-lg font-serif text-gray-800">{event.date} às {event.time}</p>
+                        </div>
+
+                        <div className="w-full h-px mx-auto" style={{ backgroundColor: theme.color, opacity: 0.2 }} />
+                        
+                        {/* Local */}
+                        <div className="flex flex-col items-center">
+                            <p className="text-[11px] uppercase tracking-[0.2em] font-bold mb-1 opacity-80" style={{ color: theme.color }}>Local</p>
+                            <p className="text-lg font-serif text-gray-800">{event.locationName}</p>
+                            {event.address && <p className="text-xs mt-1 text-gray-600">{event.address}</p>}
+                        </div>
+
+                        {(event.giftTitle || event.giftDescription || event.iban) && (
+                            <>
+                                <div className="w-full h-px mx-auto" style={{ backgroundColor: theme.color, opacity: 0.2 }} />
+                                <div className="flex flex-col items-center mt-6">
+                                    <p className="text-[11px] uppercase tracking-[0.2em] font-bold mb-2 opacity-80" style={{ color: theme.color }}>Mimos</p>
+                                    {event.giftTitle && <p className="text-lg font-serif text-gray-800 mb-1">{event.giftTitle}</p>}
+                                    {event.giftDescription && <p className="text-xs text-gray-600 mb-2">{event.giftDescription}</p>}
+                                </div>
+                            </>
+                        )}
+                    </FadeInSection>
+
+                    <FadeInSection className="w-full pt-4 pb-12">
+                        <Button onClick={onRSVP} className="w-full max-w-[250px] mx-auto py-3 rounded-full shadow-md text-xs uppercase tracking-widest font-bold transition-transform hover:scale-105 active:scale-95" style={{ backgroundColor: theme.color, color: 'white' }}>
+                            {getRSVPText(event)}
+                        </Button>
+                    </FadeInSection>
+                </div>
+            </div>
+        </div>
+    );
 };
 
 // ============================================================================
@@ -503,7 +634,7 @@ const ClassicLayout: React.FC<LayoutProps> = ({ event, onRSVP, onLikeUpdate }) =
 
       <div className="fixed bottom-6 left-1/2 -translate-x-1/2 z-50">
         <button onClick={onRSVP} className="bg-brand-blue text-white px-10 py-4 rounded-full font-sans font-bold shadow-2xl shadow-brand-blue/40 uppercase tracking-widest text-xs hover:scale-105 transition-transform">
-           Confirmar Presença
+           {getRSVPText(event)}
         </button>
       </div>
     </div>
@@ -793,7 +924,7 @@ const ModernLayout: React.FC<LayoutProps> = ({ event, onRSVP, guestName, onLikeU
             onClick={onRSVP}
             className="bg-white text-[#1a1a1a] px-10 py-4 rounded-full font-display font-bold text-xs uppercase tracking-widest shadow-2xl hover:bg-[#1a1a1a] hover:text-white transition-colors duration-300 flex items-center gap-2 border border-gray-100"
          >
-            <span>Confirmar Presença</span>
+            <span>{getRSVPText(event)}</span>
          </button>
       </div>
 
@@ -983,7 +1114,7 @@ const GardenLayout: React.FC<LayoutProps> = ({ event, onRSVP, guestName, onLikeU
            onClick={onRSVP}
            className={`w-full max-w-md ${accentBg} text-white font-sans font-bold uppercase tracking-widest text-xs py-4 shadow-lg flex items-center justify-center gap-2 hover:opacity-90`}
          >
-           <span>Confirmar Presença</span>
+           <span>{getRSVPText(event)}</span>
          </Button>
       </div>
     </div>
@@ -1114,7 +1245,7 @@ const RusticLayout: React.FC<LayoutProps> = ({ event, onRSVP, guestName, onLikeU
              onClick={onRSVP}
              className="w-full bg-[#5D4037] text-[#FDF5E6] py-4 rounded-full font-bold shadow-2xl shadow-[#5D4037]/40 text-sm uppercase tracking-widest hover:scale-105 transition-transform"
           >
-             Confirmar Presença
+             {getRSVPText(event)}
           </button>
        </div>
      </div>
@@ -1467,6 +1598,631 @@ const LuxuryLayout: React.FC<LayoutProps> = ({ event, onRSVP, guestName, onLikeU
              <span className="material-symbols-outlined text-sm">mail</span>
            </Button>
         </div>
+      </div>
+    </div>
+  );
+};
+
+// ============================================================================
+// BRIDAL BEAUTY LAYOUT
+// Inspired by image 1: salons, soft pink gradient, hair/makeup items
+// ============================================================================
+const BridalBeautyLayout: React.FC<LayoutProps> = ({ event, onRSVP, guestName, onLikeUpdate }) => {
+  return (
+    <div className="min-h-screen bg-gradient-to-b from-[#FFF5F5] to-[#FFEBEB] text-[#5A3E36] font-serif pb-32 relative overflow-x-hidden pt-12">
+      {/* Top Floral Image */}
+      <div className="absolute top-0 left-0 w-full h-48 opacity-70 pointer-events-none">
+         <img src="https://images.unsplash.com/photo-1518895949257-2342800160b7?q=80&w=1000&auto=format&fit=crop" className="w-full h-full object-cover" style={{ maskImage: 'linear-gradient(to bottom, black, transparent)', WebkitMaskImage: 'linear-gradient(to bottom, black, transparent)' }} />
+      </div>
+
+      <div className="relative z-10 flex flex-col items-center px-6 max-w-lg mx-auto text-center">
+         
+         <FadeInSection>
+            <div className="w-48 h-48 rounded-full overflow-hidden mb-6 mx-auto border-4 border-white shadow-xl">
+               <img src={event.heroImage} className="w-full h-full object-cover" alt="Beauty Items" />
+            </div>
+         </FadeInSection>
+
+         <FadeInSection>
+            <h2 className="text-3xl font-display text-[#BD8C8C] mb-1">Chá de Panela</h2>
+            <p className="text-sm italic mb-2 opacity-80">da</p>
+            <h1 className="text-6xl text-[#784646] mb-8" style={{ fontFamily: '"Pinyon Script", cursive' }}>{event.title.replace('Chá de Panela da ', '').replace('Chá da ', '') || 'Jussineide'}</h1>
+            <p className="text-xl font-medium tracking-wide mb-8 font-sans uppercase text-[#BD8C8C]">{event.hosts || 'Vai Estar no Salão'}</p>
+         </FadeInSection>
+
+         <FadeInSection>
+            <p className="text-lg leading-relaxed mb-10 max-w-sm whitespace-pre-wrap">
+               {event.description}
+            </p>
+         </FadeInSection>
+
+         <FadeInSection className="w-full bg-white/60 p-8 rounded-3xl shadow-sm border border-white/80 mb-8 backdrop-blur-sm">
+            <h3 className="text-2xl font-bold mb-2 text-[#784646]">{event.date}</h3>
+            <p className="text-lg font-medium mb-4">{event.time}</p>
+            <p className="text-lg">{event.locationName}</p>
+            {event.address && <p className="text-sm opacity-80">{event.address}</p>}
+         </FadeInSection>
+
+         {(event.giftTitle || event.giftDescription || event.iban || event.bankName) && (
+             <FadeInSection className="w-full bg-white/60 p-8 rounded-3xl shadow-sm border border-white/80 mb-8 backdrop-blur-sm text-center">
+                 <h3 className="text-2xl font-bold mb-3 text-[#784646]">{event.giftTitle || 'Lista de Presentes'}</h3>
+                 <p className="text-sm opacity-80 mb-6 italic">{event.giftDescription}</p>
+                 
+                 {(event.iban || event.bankName) && (
+                     <div className="bg-[#FFF5F5] p-5 rounded-2xl border border-[#BD8C8C]/20">
+                         {event.bankName && <p className="font-bold text-[#784646] mb-1">{event.bankName}</p>}
+                         {event.accountName && <p className="text-sm opacity-80 mb-4">{event.accountName}</p>}
+                         {event.iban && (
+                             <div className="pt-4 border-t border-[#BD8C8C]/20">
+                                 <p className="text-xs uppercase tracking-widest text-[#BD8C8C] mb-2 font-bold">Chave / IBAN</p>
+                                 <p className="font-medium text-[#784646] break-all mb-4">{event.iban}</p>
+                                 <button 
+                                     onClick={() => {
+                                         navigator.clipboard.writeText(event.iban || '');
+                                         alert("Copiado com sucesso!");
+                                     }}
+                                     className="text-xs px-5 py-2.5 bg-[#BD8C8C] text-white hover:bg-[#784646] rounded-full transition-colors uppercase tracking-widest font-bold shadow-md"
+                                 >
+                                     Copiar
+                                 </button>
+                             </div>
+                         )}
+                     </div>
+                 )}
+             </FadeInSection>
+         )}
+
+         {event.gallery && event.gallery.length > 0 && (
+            <FadeInSection className="w-full mb-8">
+               <h3 className="text-xl font-bold mb-6 text-[#784646] text-center border-b border-[#BD8C8C]/30 pb-2 inline-block">Galeria</h3>
+               <GalleryLightbox eventId={event.id} gallery={event.gallery} onLikeUpdate={onLikeUpdate} renderMode="MODERN" />
+            </FadeInSection>
+         )}
+
+         {/* Bottom Floral Image */}
+         <div className="w-full h-48 opacity-70 mt-8 pointer-events-none">
+            <img src="https://images.unsplash.com/photo-1518895949257-2342800160b7?q=80&w=1000&auto=format&fit=crop" className="w-full h-full object-cover rounded-xl" style={{ maskImage: 'linear-gradient(to top, black, transparent)', WebkitMaskImage: 'linear-gradient(to top, black, transparent)' }} />
+         </div>
+         
+      </div>
+
+      <div className="fixed bottom-0 left-0 w-full bg-white/90 backdrop-blur-md p-4 z-50 flex items-center justify-center">
+          <Button onClick={onRSVP} className="w-full max-w-sm bg-[#E6A8A8] text-white hover:bg-[#D59898] py-4 rounded-full shadow-lg text-sm uppercase tracking-widest font-bold">
+             {getRSVPText(event)}
+          </Button>
+      </div>
+    </div>
+  );
+};
+
+// ============================================================================
+// BRIDAL ROMANTIC LAYOUT
+// Inspired by image 2: white bg, thin pink border, large watercolor pink flowers, structured list
+// ============================================================================
+const BridalRomanticLayout: React.FC<LayoutProps> = ({ event, onRSVP, guestName, onLikeUpdate }) => {
+  return (
+    <div className="min-h-screen bg-white text-[#6D5A5A] font-sans pb-32 p-4 relative overflow-x-hidden">
+        
+       {/* Corner Flowers */}
+       <img src="https://images.unsplash.com/photo-1563241527-3004b7be0ffd?q=80&w=800&auto=format&fit=crop" className="fixed top-[-50px] left-[-50px] w-64 h-64 object-cover opacity-50 rounded-full mix-blend-multiply pointer-events-none z-0" style={{ filter: 'blur(2px)' }} />
+       <img src="https://images.unsplash.com/photo-1563241527-3004b7be0ffd?q=80&w=800&auto=format&fit=crop" className="fixed bottom-[-50px] right-[-50px] w-64 h-64 object-cover opacity-50 rounded-full mix-blend-multiply pointer-events-none z-0" style={{ filter: 'blur(2px)' }} />
+
+       <div className="relative z-10 w-full h-full min-h-[calc(100vh-32px)] border-[2px] border-[#F48FB1]/40 rounded-xl p-6 flex flex-col items-center text-center bg-white/80 backdrop-blur-sm">
+           
+           <FadeInSection>
+               <p className="text-xs uppercase tracking-[0.3em] text-[#E06A8B] font-bold mt-8 mb-6">{event.hosts || 'CONVITE ESPECIAL'}</p>
+               
+               <p className="text-xl uppercase tracking-widest text-[#E06A8B] mb-2">Chá de</p>
+               <h2 className="text-6xl text-[#E06A8B] mb-2" style={{ fontFamily: '"Pinyon Script", cursive' }}>Panela</h2>
+               <p className="text-sm uppercase tracking-widest text-[#E06A8B] mb-4">da</p>
+               <h1 className="text-7xl text-[#E06A8B] mb-10" style={{ fontFamily: '"Pinyon Script", cursive' }}>{event.title.replace('Chá de Panela da ', '').replace('Chá da ', '') || 'Jussineide'}</h1>
+           </FadeInSection>
+
+           <FadeInSection>
+               <div className="text-[#E06A8B] mb-6">♥</div>
+               <p className="text-base leading-relaxed mb-6 max-w-sm whitespace-pre-wrap px-4 font-serif">
+                  {event.description}
+               </p>
+               <div className="text-[#E06A8B] mb-10">♥</div>
+           </FadeInSection>
+
+           <FadeInSection className="w-full max-w-xs space-y-8 mb-12">
+               
+               {/* Local */}
+               <div className="flex flex-col items-center">
+                   <div className="w-10 h-10 rounded-full border border-[#F48FB1] flex items-center justify-center text-[#E06A8B] mb-3">
+                       <span className="material-symbols-outlined text-lg">location_on</span>
+                   </div>
+                   <p className="text-xs uppercase tracking-widest text-[#E06A8B] font-bold mb-1">Local</p>
+                   <p className="text-lg font-serif">{event.locationName}</p>
+                   {event.address && <p className="text-sm opacity-80 font-serif">{event.address}</p>}
+               </div>
+               
+               <div className="w-16 h-px bg-[#F48FB1]/40 mx-auto" />
+
+               {/* Data */}
+               <div className="flex flex-col items-center">
+                   <div className="w-10 h-10 rounded-full border border-[#F48FB1] flex items-center justify-center text-[#E06A8B] mb-3">
+                       <span className="material-symbols-outlined text-lg">calendar_month</span>
+                   </div>
+                   <p className="text-xs uppercase tracking-widest text-[#E06A8B] font-bold mb-1">Data</p>
+                   <p className="text-lg font-serif">{event.date}</p>
+               </div>
+
+               <div className="w-16 h-px bg-[#F48FB1]/40 mx-auto" />
+
+               {/* Horário */}
+               <div className="flex flex-col items-center">
+                   <div className="w-10 h-10 rounded-full border border-[#F48FB1] flex items-center justify-center text-[#E06A8B] mb-3">
+                       <span className="material-symbols-outlined text-lg">schedule</span>
+                   </div>
+                   <p className="text-xs uppercase tracking-widest text-[#E06A8B] font-bold mb-1">Horário</p>
+                   <p className="text-lg font-serif">{event.time}</p>
+               </div>
+
+           </FadeInSection>
+
+           {(event.giftTitle || event.giftDescription || event.iban || event.bankName) && (
+               <FadeInSection className="w-full max-w-xs mb-12 flex flex-col items-center">
+                   <div className="w-10 h-10 rounded-full border border-[#F48FB1] flex items-center justify-center text-[#E06A8B] mb-3">
+                       <span className="material-symbols-outlined text-lg">featured_seasonal_and_gifts</span>
+                   </div>
+                   <p className="text-xs uppercase tracking-widest text-[#E06A8B] font-bold mb-3">Mimos</p>
+                   <div className="bg-[#FFF8FA] p-6 rounded-2xl border border-[#F48FB1]/30 w-full text-center">
+                       <h3 className="font-serif text-xl mb-2 text-[#E06A8B]">{event.giftTitle || 'Lista de Presentes'}</h3>
+                       <p className="text-xs text-[#6D5A5A] mb-4 max-w-[200px] mx-auto italic">{event.giftDescription}</p>
+                       
+                       {(event.iban || event.bankName) && (
+                           <div className="bg-white p-4 rounded-xl shadow-sm border border-[#F48FB1]/20">
+                               {event.bankName && <p className="text-sm font-bold text-[#E06A8B]">{event.bankName}</p>}
+                               {event.accountName && <p className="text-xs text-[#6D5A5A] mt-1">{event.accountName}</p>}
+                               {event.iban && (
+                                   <div className="mt-4 pt-3 border-t border-[#F48FB1]/20">
+                                       <p className="text-[10px] uppercase tracking-widest text-[#E06A8B] mb-1 font-bold">Chave / IBAN</p>
+                                       <p className="text-sm font-medium text-[#6D5A5A] break-all mb-3">{event.iban}</p>
+                                       <button 
+                                           onClick={() => {
+                                               navigator.clipboard.writeText(event.iban || '');
+                                               alert("Copiado com sucesso!");
+                                           }}
+                                           className="text-[10px] px-4 py-2 bg-[#F48FB1] text-white hover:bg-[#E06A8B] rounded-full transition-colors uppercase tracking-widest font-bold"
+                                       >
+                                           Copiar
+                                       </button>
+                                   </div>
+                               )}
+                           </div>
+                       )}
+                   </div>
+               </FadeInSection>
+           )}
+       </div>
+
+       <div className="fixed bottom-4 left-0 w-full px-4 z-50 flex items-center justify-center">
+           <Button onClick={onRSVP} className="w-full max-w-sm bg-[#F48FB1] text-white hover:bg-[#E06A8B] py-4 rounded-xl shadow-lg text-sm uppercase tracking-widest font-bold">
+              {getRSVPText(event)}
+           </Button>
+       </div>
+    </div>
+  );
+};
+
+// ============================================================================
+// BRIDAL MINIMAL LAYOUT
+// Sleek, nude/beige tones, high fashion, large elegant typography
+// ============================================================================
+const BridalMinimalLayout: React.FC<LayoutProps> = ({ event, onRSVP, guestName, onLikeUpdate }) => {
+  return (
+    <div className="min-h-screen bg-[#FDFBF7] text-[#333333] font-sans pb-32 overflow-x-hidden selection:bg-[#EDEAE1]">
+      <div className="max-w-md mx-auto">
+        <FadeInSection className="w-full h-[55vh] relative overflow-hidden">
+           <img src={event.heroImage} className="w-full h-full object-cover rounded-b-[40px]" alt="Minimal Decor" />
+           <div className="absolute inset-0 bg-gradient-to-t from-[#FDFBF7] to-transparent h-full max-h-[200px] mt-auto"></div>
+        </FadeInSection>
+
+        <div className="px-8 flex flex-col items-center text-center -mt-10 relative z-10">
+          <FadeInSection>
+            <p className="text-xs uppercase tracking-[0.3em] font-medium text-[#A09383] mb-4">
+               {event.hosts || "Let's Celebrate"}
+            </p>
+            <h1 className="text-7xl mb-4 text-[#333333]" style={{ fontFamily: '"Playfair Display", serif', letterSpacing: '-0.02em', lineHeight: '0.9' }}>
+               {event.title.replace('Chá de Panela da ', '').replace('Chá da ', '') || 'Sofia'}
+            </h1>
+            <p className="text-sm uppercase tracking-widest text-[#A09383] mb-8 relative inline-block">
+               Chá de Panela
+               <span className="absolute -bottom-2 left-1/4 right-1/4 h-[1px] bg-[#D3C4B7]"></span>
+            </p>
+          </FadeInSection>
+
+          <FadeInSection className="mt-8 mb-12">
+            <p className="text-[#555] font-serif text-lg leading-relaxed max-w-sm">
+               {event.description}
+            </p>
+          </FadeInSection>
+
+          <FadeInSection className="w-full grid grid-cols-2 gap-4 mb-16">
+            <div className="p-6 bg-white rounded-3xl shadow-[0_4px_20px_rgba(0,0,0,0.02)] border border-[#F0ECE1]">
+                <p className="text-[10px] uppercase tracking-widest text-[#A09383] mb-2">Quando</p>
+                <p className="font-serif text-xl">{event.date.split(' ')[0]}</p>
+                <p className="text-[#888] text-sm">{event.date.split(' ').slice(1).join(' ')}</p>
+                <p className="text-[#888] text-sm mt-1">{event.time}</p>
+            </div>
+            <div className="p-6 bg-white rounded-3xl shadow-[0_4px_20px_rgba(0,0,0,0.02)] border border-[#F0ECE1]">
+                <p className="text-[10px] uppercase tracking-widest text-[#A09383] mb-2">Onde</p>
+                <p className="font-serif text-xl leading-tight">{event.locationName}</p>
+                <p className="text-[#888] text-sm mt-2">{event.address}</p>
+            </div>
+          </FadeInSection>
+
+          {event.gallery && event.gallery.length > 0 && (
+            <FadeInSection className="w-full mb-12">
+               <p className="text-[10px] uppercase tracking-widest text-[#A09383] mb-6 inline-block border-b border-[#D3C4B7] pb-1">Galeria</p>
+               <GalleryLightbox eventId={event.id} gallery={event.gallery} onLikeUpdate={onLikeUpdate} renderMode="MODERN" />
+            </FadeInSection>
+          )}
+
+          {(event.giftTitle || event.giftDescription || event.iban || event.bankName) && (
+            <FadeInSection className="w-full mb-12">
+                <div className="p-8 bg-[#FDFBF7] border border-[#F0ECE1] rounded-3xl text-center">
+                    <p className="text-[10px] uppercase tracking-widest text-[#A09383] mb-4">Mimos</p>
+                    <h3 className="font-serif text-2xl mb-3 text-[#333333]">{event.giftTitle || 'Lista de Presentes'}</h3>
+                    <p className="text-sm text-[#888] mb-6 max-w-[250px] mx-auto">{event.giftDescription}</p>
+                    
+                    {(event.iban || event.bankName) && (
+                        <div className="bg-white p-4 rounded-xl border border-[#F0ECE1]">
+                            {event.bankName && <p className="text-sm font-bold text-[#333333]">{event.bankName}</p>}
+                            {event.accountName && <p className="text-xs text-[#888] mt-1">{event.accountName}</p>}
+                            {event.iban && (
+                                <div className="mt-4 pt-4 border-t border-[#F0ECE1]">
+                                    <p className="text-[10px] uppercase tracking-widest text-[#A09383] mb-2 font-bold">Chave / IBAN</p>
+                                    <p className="text-sm font-medium text-[#333333] break-all mb-3">{event.iban}</p>
+                                    <button 
+                                        onClick={() => {
+                                            const bankInfo = `Banco: ${event.bankName || ''}\nTitular: ${event.accountName || ''}\nIBAN: ${event.iban || ''}`;
+                                            navigator.clipboard.writeText(event.iban || bankInfo);
+                                            // Assume toast is available globally or just visual feedback on the button isn't strict here.
+                                            alert("Copiado com sucesso!");
+                                        }}
+                                        className="text-xs px-4 py-2 bg-[#F0ECE1] text-[#333333] hover:bg-[#E5DFD3] rounded-full transition-colors uppercase tracking-widest font-bold"
+                                    >
+                                        Copiar
+                                    </button>
+                                </div>
+                            )}
+                        </div>
+                    )}
+                </div>
+            </FadeInSection>
+          )}
+
+        </div>
+      </div>
+
+      <div className="fixed bottom-6 left-0 w-full px-6 z-50 flex justify-center pointer-events-none">
+          <Button onClick={onRSVP} className="pointer-events-auto w-full max-w-sm bg-[#333333] text-white hover:bg-[#1A1A1A] py-6 rounded-2xl shadow-xl text-xs uppercase tracking-[0.2em] transition-transform active:scale-95">
+             {getRSVPText(event)}
+          </Button>
+      </div>
+    </div>
+  );
+};
+
+// ============================================================================
+// BRIDAL TEA PARTY LAYOUT
+// Vintage, Bridgerton-esque, soft blues/lavander, elegant cursive
+// ============================================================================
+const BridalTeaPartyLayout: React.FC<LayoutProps> = ({ event, onRSVP, guestName, onLikeUpdate }) => {
+  return (
+    <div className="min-h-screen bg-[#F0F4F8] text-[#2C3E50] font-serif pb-32 overflow-x-hidden relative">
+      
+      {/* Background Decor - simple css pattern */}
+      <div className="fixed inset-0 opacity-20 pointer-events-none" style={{ backgroundImage: 'radial-gradient(#B5C1C8 1.5px, transparent 1.5px)', backgroundSize: '24px 24px' }}></div>
+
+      <div className="relative z-10 max-w-lg mx-auto pt-12 px-6 flex flex-col items-center text-center">
+         
+         <FadeInSection>
+            <div className="w-full aspect-[4/3] rounded-t-full bg-white p-2 shadow-sm mb-8 border border-[#D5DFE5]">
+               <img src={event.heroImage} className="w-full h-full object-cover rounded-t-full rounded-b-xl" alt="Tea Party" />
+            </div>
+         </FadeInSection>
+
+         <FadeInSection className="bg-white/80 backdrop-blur-md w-full p-8 rounded-3xl border border-white shadow-xl relative mt-[-60px] z-20">
+            <p className="text-xs font-sans uppercase tracking-[0.3em] text-[#8194A5] mb-2">{event.hosts || 'Chá de Panela'}</p>
+            <h1 className="text-5xl text-[#5C7487] mb-6" style={{ fontFamily: '"Playfair Display", serif', fontStyle: 'italic' }}>
+               {event.title}
+            </h1>
+            
+            <div className="w-12 h-px bg-[#B5C1C8] mx-auto mb-6"></div>
+            
+            <p className="text-base leading-relaxed text-[#5C7487] mb-8 px-2">
+               {event.description}
+            </p>
+
+            <div className="bg-[#F8FAFC] rounded-2xl p-6 border border-[#E2E8F0]">
+                <div className="flex items-center justify-center gap-3 mb-4">
+                    <span className="material-symbols-outlined text-[#8194A5] text-sm">calendar_today</span>
+                    <p className="uppercase font-sans text-xs tracking-widest font-bold text-[#5C7487]">{event.date} • {event.time}</p>
+                </div>
+                <div className="flex items-center justify-center gap-3">
+                    <span className="material-symbols-outlined text-[#8194A5] text-sm">location_on</span>
+                    <p className="uppercase font-sans text-xs tracking-widest font-bold text-[#5C7487]">{event.locationName}</p>
+                </div>
+                {event.address && <p className="text-sm mt-2 text-[#8194A5] italic">{event.address}</p>}
+            </div>
+         </FadeInSection>
+
+         {event.gallery && event.gallery.length > 0 && (
+            <FadeInSection className="w-full mt-12 bg-white/60 p-6 rounded-3xl border border-white">
+               <h3 className="font-sans uppercase text-xs tracking-[0.3em] font-bold text-[#8194A5] mb-6">Recordações</h3>
+               <GalleryLightbox eventId={event.id} gallery={event.gallery} onLikeUpdate={onLikeUpdate} renderMode="CLASSIC" />
+            </FadeInSection>
+         )}
+
+         {(event.giftTitle || event.giftDescription || event.iban || event.bankName) && (
+             <FadeInSection className="w-full mt-12 bg-[#F8FAFC] p-6 rounded-3xl border border-[#E2E8F0] text-center">
+                 <h3 className="font-sans uppercase text-xs tracking-[0.3em] font-bold text-[#8194A5] mb-4">Mimos</h3>
+                 <p className="font-serif text-xl text-[#5C7487] mb-2">{event.giftTitle || 'Lista de Presentes'}</p>
+                 <p className="text-sm text-[#8194A5] italic mb-6 max-w-[250px] mx-auto">{event.giftDescription}</p>
+                 
+                 {(event.iban || event.bankName) && (
+                     <div className="bg-white p-5 rounded-2xl shadow-sm border border-[#E2E8F0] text-left">
+                         {event.bankName && <p className="font-bold text-[#5C7487] text-sm">{event.bankName}</p>}
+                         {event.accountName && <p className="text-xs text-[#8194A5] mt-1">{event.accountName}</p>}
+                         {event.iban && (
+                             <div className="mt-4 pt-4 border-t border-[#E2E8F0]">
+                                 <p className="text-[10px] uppercase tracking-widest text-[#8194A5] mb-1 font-bold">Chave / IBAN</p>
+                                 <p className="text-sm font-medium text-[#5C7487] break-all mb-4">{event.iban}</p>
+                                 <div className="flex justify-center">
+                                     <button 
+                                         onClick={() => {
+                                             navigator.clipboard.writeText(event.iban || '');
+                                             alert("Copiado com sucesso!");
+                                         }}
+                                         className="text-xs px-6 py-2.5 bg-[#8194A5] text-white hover:bg-[#5C7487] rounded-full transition-colors uppercase tracking-[0.2em] font-bold"
+                                     >
+                                         Copiar
+                                     </button>
+                                 </div>
+                             </div>
+                         )}
+                     </div>
+                 )}
+             </FadeInSection>
+         )}
+
+      </div>
+
+      <div className="fixed bottom-0 left-0 w-full bg-gradient-to-t from-white via-white/80 to-transparent pt-12 pb-6 px-6 z-50 flex justify-center pointer-events-none">
+          <Button onClick={onRSVP} className="pointer-events-auto w-full max-w-sm bg-[#8194A5] text-white hover:bg-[#5C7487] py-6 rounded-full shadow-lg text-xs font-sans uppercase tracking-[0.2em] transition-transform active:scale-95">
+             {getRSVPText(event)}
+          </Button>
+      </div>
+    </div>
+  );
+};
+
+// ============================================================================
+// BRIDAL CHEF LAYOUT
+// Minimalista, focado em alta gastronomia, tons terrosos, line art
+// ============================================================================
+const BridalChefLayout: React.FC<LayoutProps> = ({ event, onRSVP, guestName, onLikeUpdate }) => {
+  return (
+    <div className="min-h-screen bg-[#FAF9F6] text-[#2C2C2C] font-sans pb-32">
+      
+      {/* Head decor - Line art */}
+      <div className="w-full flex justify-center pt-8 pb-4 opacity-80">
+        <svg viewBox="0 0 24 24" width="42" height="42" stroke="#CB6843" strokeWidth="1" fill="none">
+           <polygon points="12 2, 7 8, 17 8" />
+           <polygon points="7 8, 17 8, 15 13, 9 13" />
+           <rect x="9" y="13" width="6" height="1" />
+           <polygon points="9 14, 15 14, 17 22, 7 22" />
+           <path d="M16 5c1-1 2 1 3 2s-1 3-2 2" />
+           <path d="M7 18H5c-1 0-2-1-2-2v-1" />
+        </svg>
+      </div>
+
+      <div className="relative z-10 max-w-lg mx-auto px-6 flex flex-col items-center text-center">
+         <FadeInSection>
+            <p className="text-[10px] uppercase font-bold tracking-[0.4em] text-[#879F84] mb-3">{event.hosts || 'Chá de Panela'}</p>
+            <h1 className="text-5xl text-[#2C2C2C] mb-6 tracking-tight" style={{ fontFamily: '"Playfair Display", serif' }}>
+               {event.title}
+            </h1>
+         </FadeInSection>
+
+         <FadeInSection delay={0.1} className="w-full aspect-[4/5] rounded-[3rem] bg-white p-2 shadow-sm mb-10 border border-[#E8E6E1]">
+            <img src={event.heroImage} className="w-full h-full object-cover rounded-[2.5rem]" alt="Chef/Kitchen" />
+         </FadeInSection>
+
+         <FadeInSection delay={0.2} className="w-full bg-white p-8 rounded-[2rem] border border-[#E8E6E1] mb-10">
+            <div className="flex justify-center mb-6 opacity-40">
+                <svg viewBox="0 0 24 24" width="32" height="32" stroke="#2C2C2C" strokeWidth="1" fill="none">
+                  <path d="M12 22v-5M9 17h6v-3a3 3 0 00-6 0v3z" />
+                  <path d="M12 14c-2.5-3-4-8-2-12C11 3 12 6 12 14z" />
+                  <path d="M12 14c2.5-3 4-8 2-12C13 3 12 6 12 14z" />
+                </svg>
+            </div>
+            <p className="text-sm leading-relaxed text-[#555] mb-8 font-serif italic">
+               "{event.description}"
+            </p>
+
+            <div className="flex flex-col gap-6 items-center">
+                <div className="flex flex-col items-center">
+                    <span className="text-[10px] uppercase tracking-[0.3em] text-[#879F84] font-bold mb-1">Quando</span>
+                    <p className="font-serif text-lg text-[#2C2C2C]">{event.date} às {event.time}</p>
+                </div>
+                <div className="w-px h-8 bg-[#E8E6E1]"></div>
+                <div className="flex flex-col items-center">
+                    <span className="text-[10px] uppercase tracking-[0.3em] text-[#879F84] font-bold mb-1">Onde</span>
+                    <p className="font-serif text-lg text-[#2C2C2C]">{event.locationName}</p>
+                    {event.address && <p className="text-xs mt-2 text-[#777] max-w-[200px]">{event.address}</p>}
+                </div>
+            </div>
+         </FadeInSection>
+
+         {/* Gift Button as requested */}
+         {(event.giftTitle || event.giftDescription || event.iban || event.bankName) && (
+            <FadeInSection delay={0.3} className="w-full mb-10">
+               <div className="bg-[#CB6843]/5 border border-[#CB6843]/20 p-8 rounded-2xl flex flex-col items-center relative overflow-hidden">
+                   {/* Decorative wooden board SVG faded in background */}
+                   <svg viewBox="0 0 24 24" width="120" height="120" stroke="#CB6843" strokeWidth="0.5" fill="none" className="absolute -right-10 -bottom-10 opacity-10 rotate-12">
+                     <path d="M8 2h8a4 4 0 0 1 4 4v12a4 4 0 0 1-4 4H8a4 4 0 0 1-4-4V6a4 4 0 0 1 4-4z" />
+                     <circle cx="12" cy="5" r="1.5" />
+                   </svg>
+                   <h3 className="text-[#CB6843] font-serif text-xl mb-3 relative z-10">{event.giftTitle || 'Lista de Presentes'}</h3>
+                   <p className="text-xs text-[#666] mb-6 relative z-10 leading-relaxed font-serif italic">{event.giftDescription}</p>
+                   {(event.iban || event.bankName) && (
+                       <button onClick={() => {
+                           const bankInfo = `Banco: ${event.bankName || ''}\nTitular: ${event.accountName || ''}\nIBAN: ${event.iban || ''}`;
+                           navigator.clipboard.writeText(event.iban || bankInfo);
+                           toast.success('Informações bancárias copiadas!');
+                       }} className="bg-[#CB6843] text-white px-8 py-4 rounded-xl text-[10px] uppercase tracking-[0.2em] font-bold shadow-md hover:bg-[#B55938] transition-colors relative z-10 w-full max-w-[240px]">
+                          Copiar Informações
+                       </button>
+                   )}
+               </div>
+            </FadeInSection>
+         )}
+
+         {event.gallery && event.gallery.length > 0 && (
+            <FadeInSection className="w-full mb-12">
+               <h3 className="font-sans uppercase text-[10px] tracking-[0.4em] font-bold text-[#879F84] mb-8">Nossa Coleção</h3>
+               <GalleryLightbox eventId={event.id} gallery={event.gallery} onLikeUpdate={onLikeUpdate} renderMode="MODERN" />
+            </FadeInSection>
+         )}
+
+      </div>
+
+      <div className="fixed bottom-0 left-0 w-full bg-gradient-to-t from-[#FAF9F6] via-[#FAF9F6]/90 to-transparent pt-12 pb-6 px-6 z-50 flex justify-center pointer-events-none">
+          <Button onClick={onRSVP} className="pointer-events-auto w-full max-w-sm bg-[#879F84] text-[#FAF9F6] border border-[#879F84] hover:bg-[#FAF9F6] hover:text-[#879F84] py-5 rounded-full shadow-lg text-[10px] font-bold uppercase tracking-[0.3em] transition-all active:scale-95">
+             {getRSVPText(event)}
+          </Button>
+      </div>
+    </div>
+  );
+};
+
+// ============================================================================
+// BRIDAL TROPICAL LAYOUT
+// Focado em cores quentes, folhagens exóticas, contador e mapa dinâmico
+// ============================================================================
+const BridalTropicalLayout: React.FC<LayoutProps> = ({ event, onRSVP, guestName, onLikeUpdate }) => {
+  return (
+    <div className="min-h-screen bg-[#f4fdf6] text-gray-800 font-sans pb-32">
+      {/* Header / Hero Section */}
+      <div 
+        className="h-[400px] flex flex-col justify-center items-center text-center px-6 rounded-b-[3rem] relative"
+        style={{
+          backgroundImage: `linear-gradient(rgba(13, 40, 24, 0.6), rgba(13, 40, 24, 0.4)), url('${event.heroImage}')`,
+          backgroundSize: 'cover',
+          backgroundPosition: 'center',
+        }}
+      >
+        <FadeInSection>
+          <span className="text-emerald-200 text-xs uppercase tracking-[0.3em] mb-4 font-semibold block drop-shadow-md">
+            {event.hosts || 'Vocês estão convidados!'}
+          </span>
+          <h1 className="text-5xl text-white font-bold leading-tight drop-shadow-lg font-serif">
+            {event.title}
+          </h1>
+          <p className="text-white mt-6 text-sm font-light tracking-[0.2em] uppercase">Chá de Panela</p>
+        </FadeInSection>
+      </div>
+
+      <div className="relative -mt-16 z-10 max-w-lg mx-auto px-4">
+        
+        {/* Intro Card */}
+        <FadeInSection delay={0.1} className="bg-white px-8 py-10 text-center rounded-3xl shadow-[0_10px_25px_-5px_rgba(0,0,0,0.1)] mb-10 border border-emerald-50">
+          <h2 className="text-emerald-800 font-serif font-bold text-2xl mb-4">Celebrando o nosso novo lar!</h2>
+          <p className="text-gray-500 text-sm leading-relaxed mb-8">
+            {event.description}
+          </p>
+          
+          <div className="flex justify-center items-center gap-6 text-emerald-900">
+            <div className="text-center">
+              <p className="text-[10px] uppercase text-gray-400 font-bold tracking-[0.2em] mb-1">Data</p>
+              <p className="font-serif font-bold text-lg">{event.date.split(' de ')[0] + ' ' + (event.date.split(' de ')[1]?.substring(0,3) || '')}</p>
+            </div>
+            <div className="w-px h-10 bg-emerald-100"></div>
+            <div className="text-center">
+              <p className="text-[10px] uppercase text-gray-400 font-bold tracking-[0.2em] mb-1">Hora</p>
+              <p className="font-serif font-bold text-lg">{event.time}</p>
+            </div>
+          </div>
+        </FadeInSection>
+
+        {/* Contador Regressivo */}
+        <FadeInSection delay={0.2} className="mb-12">
+            <h3 className="text-center text-xs uppercase tracking-[0.3em] text-emerald-600 mb-6 font-bold">Contagem Regressiva</h3>
+            <div className="flex justify-center">
+                <CountdownTimer targetDate={event.isoDate} colorClass="text-emerald-800 text-3xl font-serif" />
+            </div>
+        </FadeInSection>
+
+        {/* Local & Map */}
+        <FadeInSection delay={0.3} className="mb-12 px-2">
+            <h3 className="text-center text-xs uppercase tracking-[0.3em] text-emerald-600 mb-3 font-bold">Localização</h3>
+            <p className="text-center text-gray-600 text-sm mb-6 font-serif">{event.locationName}<br/><span className="text-xs opacity-70 font-sans">{event.address}</span></p>
+            
+            <div className="rounded-3xl overflow-hidden shadow-[0_8px_20px_-6px_rgba(0,0,0,0.1)] h-48 bg-gray-200 border-2 border-white relative group">
+                <iframe 
+                    src={`https://www.google.com/maps?q=${encodeURIComponent(event.address || event.locationName)}&output=embed`} 
+                    width="100%" 
+                    height="100%" 
+                    style={{ border: 0 }} 
+                    allowFullScreen 
+                    loading="lazy">
+                </iframe>
+                <div className="absolute inset-0 bg-emerald-900/10 pointer-events-none group-hover:bg-transparent transition-colors"></div>
+            </div>
+            <div className="flex justify-center mt-6">
+               <button onClick={() => window.open(event.mapLink || event.location || `https://maps.google.com/?q=${encodeURIComponent(event.address || event.locationName)}`, '_blank')} className="text-[10px] font-bold uppercase tracking-[0.2em] text-emerald-600 border-b border-emerald-300 pb-1 hover:text-emerald-800 transition-colors">
+                  Ver no Google Maps
+               </button>
+            </div>
+        </FadeInSection>
+
+        {/* Gifts Section */}
+        {(event.giftTitle || event.giftDescription || event.iban || event.bankName) && (
+            <FadeInSection delay={0.4} className="mb-12 w-full">
+               <div className="bg-[#FFF8F5] border border-[#FFD2C1]/50 p-8 flex flex-col items-center rounded-3xl relative overflow-hidden shadow-sm">
+                   {/* Tropical decorative SVG */}
+                   <svg viewBox="0 0 24 24" width="100" height="100" stroke="#FF7F50" strokeWidth="1" fill="none" className="absolute -left-6 -bottom-6 opacity-[0.07] rotate-[-20deg]">
+                       <path d="M12 22C12 22 4 16 4 10C4 5.5 8 2 12 2C16 2 20 5.5 20 10C20 16 12 22 12 22Z" />
+                   </svg>
+                   <svg viewBox="0 0 24 24" width="80" height="80" stroke="#059669" strokeWidth="1" fill="none" className="absolute -right-4 -top-4 opacity-[0.05] rotate-[45deg]">
+                       <path d="M12 2L2 22l10-4 10 4L12 2z" />
+                   </svg>
+                   
+                   <h3 className="text-[#FF7F50] font-serif text-2xl mb-3 relative z-10 font-bold">{event.giftTitle || 'Lista de Presentes'}</h3>
+                   <p className="text-xs text-gray-500 mb-6 relative z-10 leading-relaxed text-center">{event.giftDescription}</p>
+                   {(event.iban || event.bankName) && (
+                       <button onClick={() => {
+                           const bankInfo = `Banco: ${event.bankName || ''}\nTitular: ${event.accountName || ''}\nIBAN: ${event.iban || ''}`;
+                           navigator.clipboard.writeText(event.iban || bankInfo);
+                           toast.success('Informações bancárias copiadas!');
+                       }} className="bg-white border-[#FF7F50] border text-[#FF7F50] px-6 py-3 rounded-full text-[10px] uppercase tracking-[0.2em] font-bold shadow-sm hover:bg-[#FF7F50] hover:text-white transition-colors relative z-10 w-full max-w-[240px]">
+                          Copiar Informações
+                       </button>
+                   )}
+               </div>
+            </FadeInSection>
+        )}
+
+        {/* Gallery */}
+        {event.gallery && event.gallery.length > 0 && (
+            <FadeInSection className="w-full mb-12">
+               <h3 className="text-center text-xs uppercase tracking-[0.3em] text-emerald-600 mb-8 font-bold">Nossa Coleção</h3>
+               <GalleryLightbox eventId={event.id} gallery={event.gallery} onLikeUpdate={onLikeUpdate} renderMode="MODERN" />
+            </FadeInSection>
+        )}
+
+      </div>
+
+      {/* Floating CTA */}
+      <div className="fixed bottom-0 left-0 w-full bg-gradient-to-t from-[#f4fdf6] via-[#f4fdf6]/90 to-transparent pt-12 pb-6 px-6 z-50 flex justify-center pointer-events-none">
+          <Button onClick={onRSVP} className="pointer-events-auto w-full max-w-sm bg-emerald-700 text-white hover:bg-emerald-800 py-5 rounded-2xl shadow-xl shadow-emerald-900/20 text-xs font-bold uppercase tracking-[0.2em] transition-all active:scale-95">
+             {getRSVPText(event)}
+          </Button>
       </div>
     </div>
   );

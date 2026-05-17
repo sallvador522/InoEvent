@@ -1,7 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
 import { collection, query, where, getDocs, doc, updateDoc } from 'firebase/firestore';
-import { db } from '../../components/FirebaseProvider';
+import { db, handleFirestoreError, OperationType } from '../../components/FirebaseProvider';
 import { useFirebase } from '../../components/FirebaseProvider';
 import { Link, useNavigate } from 'react-router-dom';
 import { Button } from '../../components/ui/Button';
@@ -27,6 +27,7 @@ export const UserDashboard: React.FC = () => {
                 setEvents(eventsList);
             } catch (err) {
                 console.error(err);
+                handleFirestoreError(err, OperationType.LIST, 'events');
             } finally {
                 setLoading(false);
             }

@@ -4,6 +4,7 @@ import { Toaster } from 'react-hot-toast';
 import { LandingPage } from './features/landing/LandingPage';
 import InvitationView from './features/invitation/InvitationView';
 import { InvitationCreator } from './features/invitation/InvitationCreator';
+import { BridalShowerCreator } from './features/invitation/BridalShowerCreator';
 import { ProtectedRoute } from './components/ProtectedRoute';
 import { Dashboard } from './features/dashboard/Dashboard';
 import { UserDashboard } from './features/dashboard/UserDashboard';
@@ -57,9 +58,19 @@ const App: React.FC = () => {
                 <InvitationCreator />
             </ProtectedRoute>
         } />
+        <Route path="/create-bridal" element={
+            <ProtectedRoute>
+                <BridalShowerCreator />
+            </ProtectedRoute>
+        } />
         <Route path="/edit-invitation/:id" element={
             <ProtectedRoute>
                 <InvitationCreator />
+            </ProtectedRoute>
+        } />
+        <Route path="/edit-bridal/:id" element={
+            <ProtectedRoute>
+                <BridalShowerCreator />
             </ProtectedRoute>
         } />
       </Routes>

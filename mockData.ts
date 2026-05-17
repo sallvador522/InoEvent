@@ -281,6 +281,145 @@ export const EVENTS: EventDetails[] = [
         value: 'AO06 9999 8888 7777 6666 5555 4'
       }
     ]
+  },
+
+  // 7. NOVO: Chá de Panela (BRIDAL BEAUTY)
+  {
+    id: 'bridal-beauty',
+    type: ThemeType.BRIDAL_SHOWER,
+    layoutMode: 'BRIDAL_BEAUTY',
+    title: 'Chá de Panela da Jussineide',
+    hosts: 'Vai Estar no Salão',
+    date: '20 de Junho de 2026',
+    isoDate: '2026-06-20T14:00:00',
+    time: '14h às 19h',
+    locationName: 'Casa da Noiva',
+    address: 'Luanda, Angola',
+    receptionName: '',
+    receptionAddress: '',
+    mapLink: 'https://goo.gl/maps/example',
+    heroImage: 'https://images.unsplash.com/photo-1596462502278-27bfdc403348?q=80&w=2000&auto=format&fit=crop', // Makeup/Beauty
+    description: 'Você é uma pessoa muito especial na minha vida e por isso, quero que esteja presente no meu chá de panela! Vamos reunir a mulherada e comemorar!',
+    musicTrack: 'Bossa Nova Cover',
+    themeColor: '#E6A8A8', // Pastel pink
+    timeline: [],
+    gifts: []
+  },
+
+  // 8. NOVO: Chá de Panela (BRIDAL ROMANTIC)
+  {
+    id: 'bridal-romantic',
+    type: ThemeType.BRIDAL_SHOWER,
+    layoutMode: 'BRIDAL_ROMANTIC',
+    title: 'Chá de Panela da Jussineide',
+    hosts: 'CONVITE ESPECIAL',
+    date: '20 de Junho de 2026',
+    isoDate: '2026-06-20T14:00:00',
+    time: '14h às 19h',
+    locationName: 'Casa da Noiva',
+    address: 'Talatona, Luanda',
+    heroImage: 'https://images.unsplash.com/photo-1563241527-3004b7be0ffd?q=80&w=2000&auto=format&fit=crop', // Pink Roses
+    description: 'Você é uma pessoa muito especial na minha vida e por isso, quero que esteja presente no meu chá de panela!\nVamos reunir a mulherada e comemorar!',
+    musicTrack: 'Acoustic Guitar',
+    themeColor: '#F48FB1', // Pink
+    timeline: []
+  },
+
+  // 9. NOVO: Chá de Panela (BRIDAL MINIMAL)
+  {
+    id: 'bridal-minimal',
+    type: ThemeType.BRIDAL_SHOWER,
+    layoutMode: 'BRIDAL_MINIMAL',
+    title: 'Chá da Sofia',
+    hosts: 'Let\'s Celebrate',
+    date: '15 de Agosto de 2026',
+    isoDate: '2026-08-15T15:00:00',
+    time: '15:00',
+    locationName: 'Rooftop Bar',
+    address: 'Luanda, Angola',
+    heroImage: 'https://images.unsplash.com/photo-1551024601-bec78aea704b?q=80&w=2000&auto=format&fit=crop', // Minimalist cake/decor
+    description: 'Um encontro intimista, minimalista e cheio de charme. Venha brindar comigo este novo capítulo em um chá de panela especial.',
+    musicTrack: 'Bossa Nova Cover',
+    themeColor: '#D3C4B7', // Nude / Beige
+    timeline: []
+  },
+
+  // 10. NOVO: Chá de Panela (BRIDAL TEA PARTY)
+  {
+    id: 'bridal-tea-party',
+    type: ThemeType.BRIDAL_SHOWER,
+    layoutMode: 'BRIDAL_TEA_PARTY',
+    title: 'Chá da Tarde da Ana',
+    hosts: 'Chá de Panela',
+    date: '05 de Setembro de 2026',
+    isoDate: '2026-09-05T16:00:00',
+    time: '16:00',
+    locationName: 'Jardim de Inverno',
+    address: 'Talatona, Luanda',
+    heroImage: 'https://images.unsplash.com/photo-1582662057262-6718cf2ce64b?q=80&w=2000&auto=format&fit=crop', // Tea party setting
+    description: 'Vista-se com amor e venha tomar uma xícara de chá comigo. Uma tarde vintage para celebrarmos juntas o meu chá de panela!',
+    musicTrack: 'Acoustic Guitar',
+    themeColor: '#B5C1C8', // Soft Blue / Lavender
+    timeline: []
+  },
+
+  // 11. NOVO: Chá de Panela (BRIDAL CHEF)
+  {
+    id: 'bridal-chef',
+    type: ThemeType.BRIDAL_SHOWER,
+    layoutMode: 'BRIDAL_CHEF',
+    title: 'Chá da Laura',
+    hosts: 'Chá de Panela',
+    date: '12 de Outubro de 2026',
+    isoDate: '2026-10-12T15:00:00',
+    time: '15:00',
+    locationName: 'Espaço Gastrô',
+    address: 'Mutamba, Luanda',
+    heroImage: 'https://images.unsplash.com/photo-1556910103-1c02745a872f?q=80&w=2000&auto=format&fit=crop', // Kitchen / Cooking setting
+    description: 'Uma tarde especial de muito afeto e boa gastronomia! Venha temperar meu dia e celebrar o início de uma nova fase.',
+    musicTrack: 'Bossa Nova Cover',
+    themeColor: '#CB6843', // Terracota
+    timeline: [],
+    gifts: [
+      {
+        type: 'IBAN',
+        title: 'Utensílios da Chef',
+        description: 'Sinta-se à vontade para nos ajudar a equipar nossa nova cozinha!',
+        value: 'AO06 0000 1111 2222 3333 4444 5',
+        bankName: 'BCA',
+        accountName: 'Laura Silva'
+      }
+    ]
+  },
+
+  // 12. NOVO: Chá de Panela (BRIDAL TROPICAL)
+  {
+    id: 'bridal-tropical',
+    type: ThemeType.BRIDAL_SHOWER,
+    layoutMode: 'BRIDAL_TROPICAL',
+    title: 'Salvador & Manuela',
+    hosts: 'Vocês estão convidados!',
+    date: '15 de Novembro de 2026',
+    isoDate: '2026-11-15T14:00:00',
+    time: '14:00',
+    locationName: 'Espaço das Palmeiras',
+    address: 'Ilha do Cabo, Luanda',
+    location: 'https://maps.app.goo.gl/Tropical',
+    heroImage: 'https://images.unsplash.com/photo-1528458909336-e7a0adfed0a5?ixlib=rb-4.0.3&auto=format&fit=crop&w=800&q=80',
+    description: 'Estamos montando a nossa cozinha e adoraríamos contar com a sua presença para uma tarde de boas risadas, comida gostosa e muita alegria.',
+    musicTrack: 'Samba Rock',
+    themeColor: '#059669', // Emerald
+    timeline: [],
+    gifts: [
+      {
+        type: 'IBAN',
+        title: 'Presente em Dinheiro',
+        description: 'Ajude-nos a mobilar nosso novo lar.',
+        value: 'AO06 0000 1111 2222 3333 4444 5',
+        bankName: 'BFA',
+        accountName: 'Manuela & Salvador'
+      }
+    ]
   }
 ];
 

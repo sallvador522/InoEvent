@@ -46,6 +46,7 @@ export const InvitationCreator: React.FC = () => {
     
     const [isSaving, setIsSaving] = useState(false);
     const [isLoading, setIsLoading] = useState(!!id);
+    const [showTemplateSelector, setShowTemplateSelector] = useState(!new URLSearchParams(window.location.search).get('template'));
 
     // Update plan from userProfile for new events
     useEffect(() => {
@@ -197,7 +198,15 @@ export const InvitationCreator: React.FC = () => {
                 ? `Chá de Panela da ${formData.brideName || formData.groomName}` 
                 : `${formData.groomName || ''} & ${formData.brideName || ''}`.substring(0, 100);
 
-            const isoDateStr = formData.date && formData.time ? new Date(`${formData.date}T${formData.time}:00`).toISOString() : new Date().toISOString();
+            let isoDateStr = new Date().toISOString();
+            try {
+                const testDate = new Date(`${formData.date}T${formData.time}:00`);
+                if (!isNaN(testDate.getTime())) {
+                    isoDateStr = testDate.toISOString();
+                }
+            } catch (e) {
+                // fallback to current time
+            }
             const finalData: any = { 
                 ...formData, 
                 type: isBridalShower ? 'BRIDAL_SHOWER' : 'WEDDING',
@@ -315,8 +324,16 @@ export const InvitationCreator: React.FC = () => {
 
                     {/* Visual Identity Picker */}
                     <div className="space-y-3">
-                        <label className="text-xs font-bold text-slate-400 uppercase tracking-widest pl-1">Identidade Visual</label>
-                        <div className="grid grid-cols-3 gap-4">
+                        <div className="flex items-center justify-between">
+                            <label className="text-xs font-bold text-slate-400 uppercase tracking-widest pl-1">Identidade Visual</label>
+                            {!showTemplateSelector && (
+                                <button type="button" onClick={() => setShowTemplateSelector(true)} className="text-xs text-brand-blue font-bold cursor-pointer hover:underline">
+                                    Alterar Modelo
+                                </button>
+                            )}
+                        </div>
+                        {showTemplateSelector && (
+                            <div className="grid grid-cols-3 gap-4">
                                 {['CLASSIC', 'ESSENTIAL', 'MODERN', 'LUXURY', 'GARDEN', 'RUSTIC', 'INDUSTRIAL', 'BRIDAL_BEAUTY', 'BRIDAL_ROMANTIC', 'BRIDAL_MINIMAL', 'BRIDAL_TEA_PARTY', 'BRIDAL_CHEF', 'BRIDAL_TROPICAL'].map(mode => (
                                     <motion.div 
                                         whileHover={{ y: -2 }}
@@ -362,7 +379,8 @@ export const InvitationCreator: React.FC = () => {
                                     </motion.div>
                                 ))}
                             </div>
-                        </div>
+                        )}
+                    </div>
 
                     <div className="space-y-6">
                         <div className="space-y-3">

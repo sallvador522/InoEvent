@@ -7,6 +7,7 @@ import { Link, useNavigate } from 'react-router-dom';
 import { Button } from '../../components/ui/Button';
 import { Calendar, Plus, Building2, Ticket, Settings, ArrowRight, ExternalLink, X } from 'lucide-react';
 import toast from 'react-hot-toast';
+import { Navbar } from '../../components/Navbar';
 
 export const UserDashboard: React.FC = () => {
     const { user, userProfile } = useFirebase();
@@ -100,43 +101,21 @@ export const UserDashboard: React.FC = () => {
 
     return (
         <div className="min-h-screen bg-slate-50 font-sans pb-20">
-            <header className="bg-white border-b border-slate-200 sticky top-0 z-30">
-                <div className="max-w-7xl mx-auto px-6 h-20 flex items-center justify-between">
-                    <Link to="/" className="flex items-center gap-2">
-                        <div className="w-8 h-8 bg-brand-blue rounded-xl flex items-center justify-center transform rotate-3">
-                            <div className="w-3 h-3 bg-white rounded-full"></div>
-                        </div>
-                        <span className="font-serif font-bold text-xl tracking-wide text-brand-blue">
-                           InoEvents
-                        </span>
-                    </Link>
-                    <div className="flex items-center gap-4">
-                        {(userProfile?.plan === 'Premium' || userProfile?.plan === 'Business' || userProfile?.plan === 'Corporate') && (
-                            <a 
-                                href="https://wa.me/244900000000?text=Olá,%20preciso%20de%20suporte%20VIP" 
-                                target="_blank" 
-                                rel="noopener noreferrer"
-                                className="hidden md:flex items-center gap-2 text-sm font-bold text-emerald-600 bg-emerald-50 px-4 py-2 rounded-full hover:bg-emerald-100 transition-colors"
-                            >
-                                <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className="lucide lucide-message-circle"><path d="M7.9 20A9 9 0 1 0 4 16.1L2 22Z"/></svg>
-                                Suporte VIP
-                            </a>
-                        )}
-                        <Button variant="outline" onClick={handleCreateEvent}>
-                           <Plus size={16} className="mr-2" /> Novo Evento
-                        </Button>
-                    </div>
-                </div>
-            </header>
+            <Navbar />
 
             <main className="max-w-7xl mx-auto px-6 py-12">
-                <div className="mb-10">
-                   <h1 className="text-3xl font-bold text-slate-800 mb-2">
-                      Olá, {user?.displayName?.split(' ')[0] || 'Usuário'}!
-                   </h1>
-                    <p className="text-slate-500">
-                      Aqui estão os seus eventos e convites.
-                   </p>
+                <div className="mb-10 flex flex-col md:flex-row justify-between md:items-end gap-6">
+                   <div>
+                       <h1 className="text-3xl font-bold text-slate-800 mb-2">
+                          Olá, {user?.displayName?.split(' ')[0] || 'Usuário'}!
+                       </h1>
+                       <p className="text-slate-500">
+                          Aqui estão os seus eventos e convites.
+                       </p>
+                   </div>
+                   <Button onClick={handleCreateEvent}>
+                       <Plus size={16} className="mr-2" /> Novo Evento
+                   </Button>
                 </div>
 
                 {(userProfile?.plan === 'Business' || userProfile?.plan === 'Corporate') && (

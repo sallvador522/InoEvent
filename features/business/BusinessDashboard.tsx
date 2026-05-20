@@ -116,26 +116,10 @@ export const BusinessDashboard: React.FC = () => {
 
     return (
         <div className="min-h-screen bg-slate-50 font-sans pb-20">
-            <header className="bg-white border-b border-slate-200 sticky top-0 z-30">
-                <div className="max-w-7xl mx-auto px-6 h-20 flex items-center justify-between">
-                    <Link to="/" className="flex items-center gap-2">
-                        <div className="w-8 h-8 bg-brand-blue rounded-xl flex items-center justify-center transform rotate-3">
-                            <div className="w-3 h-3 bg-white rounded-full"></div>
-                        </div>
-                        <span className="font-serif font-bold text-xl tracking-wide text-brand-blue">
-                           {userProfile?.whiteLabelName || 'InoEvents Partner'}
-                        </span>
-                    </Link>
-                    <div className="flex items-center gap-4">
-                        <Button variant="outline" onClick={() => navigate('/create-invitation')}>
-                           <Plus size={16} className="mr-2" /> Novo Evento de Cliente
-                        </Button>
-                    </div>
-                </div>
-            </header>
+            <Navbar />
 
             <main className="max-w-7xl mx-auto px-6 py-12">
-                <div className="mb-10 flex justify-between items-end">
+                <div className="mb-10 flex flex-col md:flex-row justify-between md:items-end gap-6">
                     <div>
                         <h1 className="text-3xl font-bold text-slate-800 mb-2">
                             Painel B2B: {userProfile?.whiteLabelName || 'Minha Empresa'}
@@ -144,9 +128,14 @@ export const BusinessDashboard: React.FC = () => {
                             Central de gerenciamento do seu negócio e dos eventos de seus clientes.
                         </p>
                     </div>
-                    <Button variant="outline" onClick={() => navigate('/business/create')} className="flex items-center gap-2">
-                        <Settings size={18} /> Configurar Empresa
-                    </Button>
+                    <div className="flex items-center gap-4">
+                        <Button variant="outline" onClick={() => navigate('/create-invitation')}>
+                           <Plus size={16} className="mr-2" /> Novo Evento de Cliente
+                        </Button>
+                        <Button variant="outline" onClick={() => navigate('/business/create')} className="flex items-center gap-2">
+                            <Settings size={18} /> Configurar Empresa
+                        </Button>
+                    </div>
                 </div>
 
                 <div className="grid grid-cols-1 md:grid-cols-4 gap-6 mb-12">

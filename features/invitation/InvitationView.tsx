@@ -46,6 +46,38 @@ const InvitationView: React.FC = () => {
   };
   const [isRSVPOpen, setRSVPOpen] = useState(false);
 
+  const handleDownloadDesign = async () => {
+      const node = document.getElementById('invitation-capture-node');
+      if (!node) return;
+      
+      const toastId = toast.loading('Gerando imagem do convite em alta qualidade...');
+      try {
+          const dataUrl = await toPng(node, { 
+              quality: 1, 
+              backgroundColor: '#ffffff',
+              pixelRatio: 2,
+              filter: (n) => {
+                  // Remove text nodes check that don't have classList
+                  if (n && (n as Element).classList) {
+                      const classes = (n as Element).classList;
+                      if (classes.contains('fixed') && (classes.contains('z-50') || classes.contains('bottom-0') || classes.contains('bottom-6') || classes.contains('bottom-8'))) {
+                          return false; // Exclude floating action elements like RSVP
+                      }
+                  }
+                  return true;
+              }
+          });
+          const link = document.createElement('a');
+          link.download = `convite-${event?.title?.replace(/\s+/g, '-').toLowerCase() || 'design'}.png`;
+          link.href = dataUrl;
+          link.click();
+          toast.success('Imagem baixada com sucesso!', { id: toastId });
+      } catch (err) {
+          toast.error('Erro ao baixar imagem do convite.', { id: toastId });
+          console.error(err);
+      }
+  };
+
   useEffect(() => {
     window.scrollTo(0, 0);
     
@@ -207,10 +239,15 @@ const InvitationView: React.FC = () => {
       )}
 
       {isOwner && (
-        <div className="fixed top-4 left-4 z-50 flex gap-2">
+        <div className="fixed top-4 left-4 z-50 flex flex-wrap gap-2">
            <Link to="/" className="flex items-center gap-2 bg-white/90 backdrop-blur-sm text-slate-800 px-4 py-2 rounded-full shadow-xl hover:bg-white transition-all font-display text-sm font-bold border border-slate-200">
-              <ArrowLeft size={16} /> Voltar para Início
+              <ArrowLeft size={16} /> <span className="hidden md:inline">Voltar para Início</span>
            </Link>
+           {isOwner && (
+             <button onClick={handleDownloadDesign} className="flex items-center gap-2 bg-emerald-600 text-white px-4 py-2 rounded-full shadow-xl hover:bg-emerald-700 transition-all font-display text-sm font-bold">
+                <Camera size={16} /> {(event?.type === 'BRIDAL_SHOWER' || event?.layoutMode?.startsWith('BRIDAL_')) ? 'Baixar Convite do Chá' : 'Baixar Imagem'}
+             </button>
+           )}
            {event.id !== 'created' && (
              <Link to={`/dashboard/${event.id}`} className="flex items-center gap-2 bg-brand-blue text-white px-4 py-2 rounded-full shadow-xl hover:bg-brand-blue/90 transition-all font-display text-sm font-bold">
                 Gerenciar RSVP
@@ -220,23 +257,25 @@ const InvitationView: React.FC = () => {
       )}
 
       {/* Dynamic Layout Rendering */}
-      {event.layoutMode === 'CLASSIC' && <ClassicLayout {...props} />}
-      {event.layoutMode === 'ESSENTIAL' && <EssentialLayout {...props} />}
-      {event.layoutMode === 'MODERN' && <ModernLayout {...props} />}
-      {event.layoutMode === 'LUXURY' && <LuxuryLayout {...props} />}
-      {event.layoutMode === 'GARDEN' && <GardenLayout {...props} />}
-      {event.layoutMode === 'RUSTIC' && <RusticLayout {...props} />}
-      {event.layoutMode === 'INDUSTRIAL' && <IndustrialLayout {...props} />}
-      {event.layoutMode?.startsWith('BRIDAL_') && <BridalStandardLayout {...props} />}
-
-      <div className="w-full flex flex-col items-center justify-center py-10 pb-32 text-xs font-bold tracking-widest uppercase text-slate-500 gap-3 z-10 relative">
-        {event.whiteLabelName && (
-           <span className="opacity-70">Powered by</span>
-        )}
-        {event.whiteLabelLogo && (
-            <img src={event.whiteLabelLogo} alt={event.whiteLabelName} className="h-10 object-contain" />
-        )}
-        <span>{event.whiteLabelName ? event.whiteLabelName : 'Criado com InoEvents'}</span>
+      <div id="invitation-capture-node" className="w-full relative bg-white">
+          {event.layoutMode === 'CLASSIC' && <ClassicLayout {...props} />}
+          {event.layoutMode === 'ESSENTIAL' && <EssentialLayout {...props} />}
+          {event.layoutMode === 'MODERN' && <ModernLayout {...props} />}
+          {event.layoutMode === 'LUXURY' && <LuxuryLayout {...props} />}
+          {event.layoutMode === 'GARDEN' && <GardenLayout {...props} />}
+          {event.layoutMode === 'RUSTIC' && <RusticLayout {...props} />}
+          {event.layoutMode === 'INDUSTRIAL' && <IndustrialLayout {...props} />}
+          {event.layoutMode?.startsWith('BRIDAL_') && <BridalStandardLayout {...props} />}
+          
+          <div className="w-full flex flex-col items-center justify-center py-10 pb-32 text-xs font-bold tracking-widest uppercase text-slate-500 gap-3 z-10 relative">
+            {event.whiteLabelName && (
+               <span className="opacity-70">Powered by</span>
+            )}
+            {event.whiteLabelLogo && (
+                <img src={event.whiteLabelLogo} alt={event.whiteLabelName} className="h-10 object-contain" />
+            )}
+            <span>{event.whiteLabelName ? event.whiteLabelName : 'Criado com InoEvents'}</span>
+          </div>
       </div>
 
       {/* Shared RSVP Modal */}
@@ -397,13 +436,31 @@ const EssentialLayout: React.FC<LayoutProps> = ({ event, onRSVP, onLikeUpdate })
 // ============================================================================
 const getBridalTheme = (mode: string) => {
     switch (mode) {
-        case 'BRIDAL_MINIMAL': return { color: '#BCAAA4', flower: '/bridal-templates/templateCha3.png', bg: '#FFFDFD', text: '#4E342E' };
-        case 'BRIDAL_BEAUTY': return { color: '#E57373', flower: '/bridal-templates/templateCha1.png', bg: '#FFFDFD', text: '#5D4037' };
-        case 'BRIDAL_TEA_PARTY': return { color: '#7986CB', flower: '/bridal-templates/templateCha2.png', bg: '#F8BBD0', text: '#3F51B5' };
-        case 'BRIDAL_CHEF': return { color: '#FF8A65', flower: '/bridal-templates/templateCha4.png', bg: '#FFF3E0', text: '#E64A19' };
-        case 'BRIDAL_TROPICAL': return { color: '#66BB6A', flower: '/bridal-templates/templateCha1.png', bg: '#F1F8E9', text: '#2E7D32' };
+        case 'BRIDAL_MINIMAL': return { 
+            color: '#BCAAA4', flower: '/bridal-templates/templateCha3.png', bg: '#FFFDFD', text: '#4E342E',
+            titleFont: '"Josefin Sans", sans-serif', cursiveFont: '"Dancing Script", cursive', bodyFont: '"Inter", sans-serif'
+        };
+        case 'BRIDAL_BEAUTY': return { 
+            color: '#E57373', flower: '/bridal-templates/templateCha1.png', bg: '#FFFDFD', text: '#5D4037',
+            titleFont: '"Cormorant Garamond", serif', cursiveFont: '"Pinyon Script", cursive', bodyFont: '"Cormorant Garamond", serif'
+        };
+        case 'BRIDAL_TEA_PARTY': return { 
+            color: '#7986CB', flower: '/bridal-templates/templateCha2.png', bg: '#F8BBD0', text: '#3F51B5',
+            titleFont: '"Playfair Display", serif', cursiveFont: '"Great Vibes", cursive', bodyFont: '"Playfair Display", serif'
+        };
+        case 'BRIDAL_CHEF': return { 
+            color: '#FF8A65', flower: '/bridal-templates/templateCha4.png', bg: '#FFF3E0', text: '#E64A19',
+            titleFont: '"Montserrat", sans-serif', cursiveFont: '"Great Vibes", cursive', bodyFont: '"Montserrat", sans-serif'
+        };
+        case 'BRIDAL_TROPICAL': return { 
+            color: '#66BB6A', flower: '/bridal-templates/templateCha1.png', bg: '#F1F8E9', text: '#2E7D32',
+            titleFont: '"Cormorant Garamond", serif', cursiveFont: '"Pinyon Script", cursive', bodyFont: '"Cormorant Garamond", serif'
+        };
         case 'BRIDAL_ROMANTIC': 
-        default: return { color: '#F48FB1', flower: '/bridal-templates/templateCha2.png', bg: '#FFF8FA', text: '#D81B60' };
+        default: return { 
+            color: '#F48FB1', flower: '/bridal-templates/templateCha2.png', bg: '#FFF8FA', text: '#D81B60',
+            titleFont: '"Playfair Display", serif', cursiveFont: '"Pinyon Script", cursive', bodyFont: '"Inter", sans-serif'
+        };
     }
 }
 
@@ -412,7 +469,7 @@ const BridalStandardLayout: React.FC<LayoutProps> = ({ event, onRSVP }) => {
     const titleLines = event.title.replace('Chá de Panela da ', '').replace('Chá da ', '') || 'A Noiva';
     
     return (
-        <div className="w-full h-[100dvh] relative overflow-hidden font-sans flex items-center justify-center" style={{ backgroundColor: theme.bg, color: theme.text }}>
+        <div className="w-full h-[100dvh] relative overflow-hidden flex items-center justify-center" style={{ backgroundColor: theme.bg, color: theme.text, fontFamily: theme.bodyFont }}>
             {/* Background Image full fit */}
             {theme.flower && (
                 <div 
@@ -423,72 +480,67 @@ const BridalStandardLayout: React.FC<LayoutProps> = ({ event, onRSVP }) => {
 
             {/* Framed Text Container */}
             <div 
-                className="relative z-10 w-[80%] max-w-sm h-[80%] flex flex-col items-center text-center overflow-y-auto no-scrollbar"
+                className="relative z-10 w-[85%] max-w-md h-[85%] flex flex-col items-center text-center overflow-y-auto no-scrollbar"
                 style={{ color: theme.text }}
             >
-                <div className="flex flex-col items-center justify-center min-h-full py-4 w-full space-y-12">
+                <div className="flex flex-col items-center justify-start min-h-full py-12 w-full space-y-6 md:space-y-8">
                     <FadeInSection className="w-full flex justify-center items-center flex-col">
-                        <p className="text-[11px] uppercase tracking-[0.3em] font-bold mb-4" style={{ color: theme.color }}>
-                            CONVITE ESPECIAL
-                        </p>
-                        
-                        <div className="w-12 h-px mb-6" style={{ backgroundColor: theme.color, opacity: 0.5 }} />
-
-                        <div className="text-xl uppercase tracking-widest mb-1" style={{ color: theme.color }}>CHÁ DE</div>
-                        <h2 className="text-6xl mb-1 mt-2 leading-none" style={{ fontFamily: '"Pinyon Script", cursive', color: theme.color }}>Panela</h2>
-                        <div className="flex items-center justify-center gap-3 mb-6 mt-2">
-                            <div className="w-6 h-px" style={{ backgroundColor: theme.color, opacity: 0.5 }} />
-                            <div className="text-[10px] uppercase tracking-widest" style={{ color: theme.color }}>DA</div>
-                            <div className="w-6 h-px" style={{ backgroundColor: theme.color, opacity: 0.5 }} />
+                        <h2 className="text-2xl md:text-3xl uppercase tracking-[0.2em] font-bold mb-2 text-center" style={{ color: theme.color, fontFamily: theme.titleFont }}>
+                            CHÁ DE PANELA
+                        </h2>
+                        <div className="flex items-center justify-center gap-3 mb-4 mt-1">
+                            <div className="w-8 h-[1px]" style={{ backgroundColor: theme.color, opacity: 0.5 }} />
+                            <div className="text-[11px] uppercase tracking-[0.3em]" style={{ color: theme.color, fontFamily: theme.titleFont }}>DA</div>
+                            <div className="w-8 h-[1px]" style={{ backgroundColor: theme.color, opacity: 0.5 }} />
                         </div>
                         
-                        <h1 className="text-5xl md:text-6xl leading-tight font-extrabold" style={{ fontFamily: '"Pinyon Script", cursive', color: theme.color }}>
+                        <h1 className="text-5xl md:text-6xl leading-tight font-extrabold pb-1 text-center" style={{ fontFamily: theme.cursiveFont, color: theme.color }}>
                             {titleLines}
                         </h1>
                     </FadeInSection>
 
                     {event.description && (
-                        <FadeInSection className="w-full flex justify-center items-center flex-col space-y-4 px-2">
+                        <FadeInSection className="w-full flex justify-center items-center flex-col space-y-3 px-2">
                             {event.description?.split('\n\n').map((paragraph: string, i: number) => (
-                                <p key={i} className="text-sm md:text-base leading-relaxed whitespace-pre-wrap font-serif text-gray-700">
+                                <p key={i} className="text-[13px] md:text-sm leading-relaxed whitespace-pre-wrap text-gray-700" style={{ fontFamily: theme.bodyFont }}>
                                     {paragraph}
                                 </p>
                             ))}
                         </FadeInSection>
                     )}
 
-                    <FadeInSection className="w-full space-y-6">
+                    <FadeInSection className="w-full space-y-5">
                         <div className="w-full h-px mx-auto" style={{ backgroundColor: theme.color, opacity: 0.2 }} />
                         
                         {/* Data */}
                         <div className="flex flex-col items-center">
-                            <p className="text-[11px] uppercase tracking-[0.2em] font-bold mb-1 opacity-80" style={{ color: theme.color }}>Data e Hora</p>
-                            <p className="text-lg font-serif text-gray-800">{event.date} às {event.time}</p>
+                            <p className="text-[10px] md:text-[11px] uppercase tracking-[0.2em] font-bold mb-1 opacity-80" style={{ color: theme.color, fontFamily: theme.titleFont }}>Data e Hora</p>
+                            <p className="text-sm md:text-base text-gray-800" style={{ fontFamily: theme.bodyFont }}>{event.date} às {event.time}</p>
                         </div>
 
                         <div className="w-full h-px mx-auto" style={{ backgroundColor: theme.color, opacity: 0.2 }} />
                         
                         {/* Local */}
                         <div className="flex flex-col items-center">
-                            <p className="text-[11px] uppercase tracking-[0.2em] font-bold mb-1 opacity-80" style={{ color: theme.color }}>Local</p>
-                            <p className="text-lg font-serif text-gray-800">{event.locationName}</p>
-                            {event.address && <p className="text-xs mt-1 text-gray-600">{event.address}</p>}
+                            <p className="text-[10px] md:text-[11px] uppercase tracking-[0.2em] font-bold mb-1 opacity-80" style={{ color: theme.color, fontFamily: theme.titleFont }}>Local</p>
+                            <p className="text-sm md:text-base text-gray-800 text-center" style={{ fontFamily: theme.bodyFont }}>{event.locationName || event.location}</p>
+                            {event.address && <p className="text-xs mt-1 text-gray-600 text-center mx-1" style={{ fontFamily: theme.bodyFont }}>{event.address}</p>}
                         </div>
 
                         {(event.giftTitle || event.giftDescription || event.iban) && (
                             <>
                                 <div className="w-full h-px mx-auto" style={{ backgroundColor: theme.color, opacity: 0.2 }} />
-                                <div className="flex flex-col items-center mt-6">
-                                    <p className="text-[11px] uppercase tracking-[0.2em] font-bold mb-2 opacity-80" style={{ color: theme.color }}>Mimos</p>
-                                    {event.giftTitle && <p className="text-lg font-serif text-gray-800 mb-1">{event.giftTitle}</p>}
-                                    {event.giftDescription && <p className="text-xs text-gray-600 mb-2">{event.giftDescription}</p>}
+                                <div className="flex flex-col items-center mt-4">
+                                    <p className="text-[10px] md:text-[11px] uppercase tracking-[0.2em] font-bold mb-1 opacity-80" style={{ color: theme.color, fontFamily: theme.titleFont }}>Mimos</p>
+                                    {event.giftTitle && <p className="text-sm md:text-base text-gray-800 mb-1 text-center" style={{ fontFamily: theme.bodyFont }}>{event.giftTitle}</p>}
+                                    {event.giftDescription && <p className="text-[11px] md:text-xs text-gray-600 mb-2 text-center" style={{ fontFamily: theme.bodyFont }}>{event.giftDescription}</p>}
                                 </div>
                             </>
                         )}
                     </FadeInSection>
 
-                    <FadeInSection className="w-full pt-4 pb-12">
-                        <Button onClick={onRSVP} className="w-full max-w-[250px] mx-auto py-3 rounded-full shadow-md text-xs uppercase tracking-widest font-bold transition-transform hover:scale-105 active:scale-95" style={{ backgroundColor: theme.color, color: 'white' }}>
+                    <FadeInSection className="w-full pt-2 pb-8">
+                        <Button onClick={onRSVP} className="w-full max-w-[250px] mx-auto py-3 rounded-full shadow-md text-xs uppercase tracking-widest font-bold transition-transform hover:scale-105 active:scale-95" style={{ backgroundColor: theme.color, color: 'white', fontFamily: theme.titleFont }}>
                             {getRSVPText(event)}
                         </Button>
                     </FadeInSection>
@@ -552,18 +604,20 @@ const ClassicLayout: React.FC<LayoutProps> = ({ event, onRSVP, onLikeUpdate }) =
             <CountdownTimer targetDate={event.isoDate} colorClass="text-slate-800" />
          </FadeInSection>
 
-         <FadeInSection>
-           <h3 className="text-xs font-bold uppercase tracking-[0.2em] text-slate-400 mb-6">Programação</h3>
-           <div className="space-y-8 relative before:absolute before:inset-y-0 before:left-1/2 before:w-px before:bg-slate-200">
-              {event.timeline.map((item, idx) => (
-                <div key={idx} className="relative flex flex-col items-center bg-white p-4 rounded-lg shadow-sm z-10 w-[80%] mx-auto border border-slate-100">
-                   <span className="text-brand-blue font-bold text-lg mb-1">{item.time}</span>
-                   <span className="font-bold text-slate-800">{item.title}</span>
-                   <span className="text-xs text-slate-500">{item.description}</span>
-                </div>
-              ))}
-           </div>
-         </FadeInSection>
+         {event.timeline && event.timeline.length > 0 && (
+           <FadeInSection>
+             <h3 className="text-xs font-bold uppercase tracking-[0.2em] text-slate-400 mb-6">Programação</h3>
+             <div className="space-y-8 relative before:absolute before:inset-y-0 before:left-1/2 before:w-px before:bg-slate-200">
+                {event.timeline.map((item, idx) => (
+                  <div key={idx} className="relative flex flex-col items-center bg-white p-4 rounded-lg shadow-sm z-10 w-[80%] mx-auto border border-slate-100">
+                     <span className="text-brand-blue font-bold text-lg mb-1">{item.time}</span>
+                     <span className="font-bold text-slate-800">{item.title}</span>
+                     <span className="text-xs text-slate-500">{item.description}</span>
+                  </div>
+                ))}
+             </div>
+           </FadeInSection>
+         )}
 
          <FadeInSection>
             <div className="bg-white p-6 rounded-xl shadow-lg border border-slate-100">
@@ -823,25 +877,27 @@ const ModernLayout: React.FC<LayoutProps> = ({ event, onRSVP, guestName, onLikeU
       </div>
 
       {/* 5. TIMELINE (Clean Vertical) */}
-      <FadeInSection className="bg-[#F4F4F4] py-24 px-6">
-         <div className="max-w-xl mx-auto text-center mb-12">
-            <h3 className="text-3xl font-serif italic text-[#1a1a1a]">Nosso Dia</h3>
-         </div>
-         <div className="max-w-md mx-auto space-y-12 relative before:absolute before:inset-y-0 before:left-1/2 before:w-px before:bg-gray-300">
-            {event.timeline.map((item, i) => (
-               <div key={i} className="relative flex items-center justify-between">
-                  <div className={`w-[45%] ${i % 2 === 0 ? 'text-right' : 'order-last text-left'}`}>
-                     <h4 className="font-serif text-xl">{item.title}</h4>
-                     <p className="text-xs text-gray-500 mt-1 font-display uppercase tracking-wider">{item.description}</p>
+      {event.timeline && event.timeline.length > 0 && (
+         <FadeInSection className="bg-[#F4F4F4] py-24 px-6">
+            <div className="max-w-xl mx-auto text-center mb-12">
+               <h3 className="text-3xl font-serif italic text-[#1a1a1a]">Nosso Dia</h3>
+            </div>
+            <div className="max-w-md mx-auto space-y-12 relative before:absolute before:inset-y-0 before:left-1/2 before:w-px before:bg-gray-300">
+               {event.timeline.map((item, i) => (
+                  <div key={i} className="relative flex items-center justify-between">
+                     <div className={`w-[45%] ${i % 2 === 0 ? 'text-right' : 'order-last text-left'}`}>
+                        <h4 className="font-serif text-xl">{item.title}</h4>
+                        <p className="text-xs text-gray-500 mt-1 font-display uppercase tracking-wider">{item.description}</p>
+                     </div>
+                     <div className="absolute left-1/2 -translate-x-1/2 w-3 h-3 bg-[#C2B280] rounded-full border-4 border-[#F4F4F4]"></div>
+                     <div className={`w-[45%] ${i % 2 === 0 ? 'text-left' : 'text-right'}`}>
+                        <span className="font-display font-bold text-[#C2B280]">{item.time}</span>
+                     </div>
                   </div>
-                  <div className="absolute left-1/2 -translate-x-1/2 w-3 h-3 bg-[#C2B280] rounded-full border-4 border-[#F4F4F4]"></div>
-                  <div className={`w-[45%] ${i % 2 === 0 ? 'text-left' : 'text-right'}`}>
-                     <span className="font-display font-bold text-[#C2B280]">{item.time}</span>
-                  </div>
-               </div>
-            ))}
-         </div>
-      </FadeInSection>
+               ))}
+            </div>
+         </FadeInSection>
+      )}
 
       {/* 6. DRESS CODE & TIPS */}
       {event.dressCode && (
@@ -1042,21 +1098,23 @@ const GardenLayout: React.FC<LayoutProps> = ({ event, onRSVP, guestName, onLikeU
       </div>
 
       {/* 5. TIMELINE (Elegant Vertical) */}
-      <FadeInSection className="bg-white py-20 px-6 border-y border-[#EAE5DF]">
-         <div className="max-w-lg mx-auto">
-            <h3 className="text-center font-serif text-3xl mb-12 italic">Cronograma</h3>
-            <div className="space-y-10 relative pl-8 border-l border-[#EAE5DF]">
-               {event.timeline.map((item, i) => (
-                 <div key={i} className="relative">
-                    <div className={`absolute -left-[37px] top-1 w-4 h-4 rounded-full border-4 border-white ${accentBg} shadow-sm`}></div>
-                    <span className="text-xs font-bold font-sans text-[#8C8C8C] block mb-1">{item.time}</span>
-                    <h4 className="text-xl font-serif text-[#2C2C2C] mb-1">{item.title}</h4>
-                    <p className="text-sm text-[#5D5C61] font-light">{item.description}</p>
-                 </div>
-               ))}
+      {event.timeline && event.timeline.length > 0 && (
+         <FadeInSection className="bg-white py-20 px-6 border-y border-[#EAE5DF]">
+            <div className="max-w-lg mx-auto">
+               <h3 className="text-center font-serif text-3xl mb-12 italic">Cronograma</h3>
+               <div className="space-y-10 relative pl-8 border-l border-[#EAE5DF]">
+                  {event.timeline.map((item, i) => (
+                    <div key={i} className="relative">
+                       <div className={`absolute -left-[37px] top-1 w-4 h-4 rounded-full border-4 border-white ${accentBg} shadow-sm`}></div>
+                       <span className="text-xs font-bold font-sans text-[#8C8C8C] block mb-1">{item.time}</span>
+                       <h4 className="text-xl font-serif text-[#2C2C2C] mb-1">{item.title}</h4>
+                       <p className="text-sm text-[#5D5C61] font-light">{item.description}</p>
+                    </div>
+                  ))}
+               </div>
             </div>
-         </div>
-      </FadeInSection>
+         </FadeInSection>
+      )}
 
       {/* 6. GALLERY (Grid Layout) */}
       {event.gallery && event.gallery.length > 0 && (
@@ -1179,19 +1237,21 @@ const RusticLayout: React.FC<LayoutProps> = ({ event, onRSVP, guestName, onLikeU
        </div>
  
        {/* TIMELINE - Rustic Path */}
-       <FadeInSection className="bg-[#FFF8E1] py-16 px-6 relative overflow-hidden">
-          <div className="absolute top-0 left-1/2 -translate-x-1/2 w-full max-w-3xl h-full border-l-2 border-dashed border-[#D7CCC8] opacity-50"></div>
-          <div className="relative z-10 max-w-xl mx-auto space-y-12">
-             <h3 className="text-center font-script text-4xl text-[#5D4037] mb-12">Nosso Grande Dia</h3>
-             {event.timeline.map((item, i) => (
-                <div key={i} className="bg-white p-6 rounded-xl shadow-sm border border-[#EFEBE9] text-center relative">
-                   <div className="absolute top-1/2 -left-[45px] md:-left-[calc(50vw-50%+20px)] w-4 h-4 bg-[#8D6E63] rounded-full border-4 border-[#FFF8E1]"></div>
-                   <span className="text-[#8D6E63] font-bold block mb-1">{item.time}</span>
-                   <h4 className="text-xl font-serif text-[#4E342E]">{item.title}</h4>
-                </div>
-             ))}
-          </div>
-       </FadeInSection>
+       {event.timeline && event.timeline.length > 0 && (
+          <FadeInSection className="bg-[#FFF8E1] py-16 px-6 relative overflow-hidden">
+             <div className="absolute top-0 left-1/2 -translate-x-1/2 w-full max-w-3xl h-full border-l-2 border-dashed border-[#D7CCC8] opacity-50"></div>
+             <div className="relative z-10 max-w-xl mx-auto space-y-12">
+                <h3 className="text-center font-script text-4xl text-[#5D4037] mb-12">Nosso Grande Dia</h3>
+                {event.timeline.map((item, i) => (
+                   <div key={i} className="bg-white p-6 rounded-xl shadow-sm border border-[#EFEBE9] text-center relative">
+                      <div className="absolute top-1/2 -left-[45px] md:-left-[calc(50vw-50%+20px)] w-4 h-4 bg-[#8D6E63] rounded-full border-4 border-[#FFF8E1]"></div>
+                      <span className="text-[#8D6E63] font-bold block mb-1">{item.time}</span>
+                      <h4 className="text-xl font-serif text-[#4E342E]">{item.title}</h4>
+                   </div>
+                ))}
+             </div>
+          </FadeInSection>
+       )}
 
        {/* GIFTS & DRESS CODE */}
        <div className="grid md:grid-cols-2 gap-4 px-4 mt-16 mb-24">
@@ -1310,20 +1370,22 @@ const IndustrialLayout: React.FC<LayoutProps> = ({ event, onRSVP, guestName, onL
        </div>
 
        {/* TIMELINE - Raw List */}
-       <div className="p-8 md:p-16">
-          <h3 className="text-4xl md:text-6xl font-black uppercase mb-12 text-transparent stroke-white" style={{ WebkitTextStroke: '1px white' }}>Timeline</h3>
-          <div className="space-y-6">
-             {event.timeline.map((item, i) => (
-                <FadeInSection key={i} className="group flex items-baseline border-b border-white/10 pb-6 hover:border-white transition-colors cursor-default">
-                   <span className="w-24 font-mono text-sm text-gray-500 group-hover:text-white transition-colors">{item.time}</span>
-                   <div>
-                      <h4 className="text-2xl font-bold uppercase group-hover:translate-x-2 transition-transform">{item.title}</h4>
-                      <p className="text-sm text-gray-500 mt-1">{item.description}</p>
-                   </div>
-                </FadeInSection>
-             ))}
+       {event.timeline && event.timeline.length > 0 && (
+          <div className="p-8 md:p-16">
+             <h3 className="text-4xl md:text-6xl font-black uppercase mb-12 text-transparent stroke-white" style={{ WebkitTextStroke: '1px white' }}>Timeline</h3>
+             <div className="space-y-6">
+                {event.timeline.map((item, i) => (
+                   <FadeInSection key={i} className="group flex items-baseline border-b border-white/10 pb-6 hover:border-white transition-colors cursor-default">
+                      <span className="w-24 font-mono text-sm text-gray-500 group-hover:text-white transition-colors">{item.time}</span>
+                      <div>
+                         <h4 className="text-2xl font-bold uppercase group-hover:translate-x-2 transition-transform">{item.title}</h4>
+                         <p className="text-sm text-gray-500 mt-1">{item.description}</p>
+                      </div>
+                   </FadeInSection>
+                ))}
+             </div>
           </div>
-       </div>
+       )}
 
        {/* LOCATIONS */}
        <div className="grid grid-cols-1 md:grid-cols-2 h-[60vh]">
@@ -2353,7 +2415,11 @@ const RSVPForm: React.FC<{ event: EventDetails | any; onClose: () => void }> = (
        const node = document.getElementById('qr-ticket');
        if (node) {
            try {
-               const dataUrl = await toPng(node, { quality: 1, backgroundColor: '#ffffff' });
+               const dataUrl = await toPng(node, { 
+                   quality: 1, 
+                   backgroundColor: '#ffffff',
+                   pixelRatio: 2
+               });
                const link = document.createElement('a');
                link.download = `convite-${event.title.replace(/\s+/g, '-').toLowerCase()}.png`;
                link.href = dataUrl;

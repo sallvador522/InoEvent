@@ -4,6 +4,7 @@ import { Check, ArrowLeft, Gem, Sparkles, Building2, X } from 'lucide-react';
 import { Link, useNavigate } from 'react-router-dom';
 import { doc, updateDoc, getDoc, setDoc } from 'firebase/firestore';
 import { useFirebase, db, handleFirestoreError, OperationType } from '../../components/FirebaseProvider';
+import { Navbar } from '../../components/Navbar';
 import { Button } from '../../components/ui/Button';
 import toast from 'react-hot-toast';
 
@@ -146,7 +147,8 @@ export const PlansPage: React.FC = () => {
   const currentPlan = userProfile?.plan || 'Essencial';
 
   return (
-    <div className="min-h-screen bg-slate-50 py-12 px-4 font-display relative overflow-hidden flex flex-col justify-center">
+    <div className="min-h-screen bg-slate-50 font-display relative overflow-x-hidden flex flex-col">
+      <Navbar />
       
       {/* Elegant Ambient Background */}
       <div className="absolute inset-0 z-0 pointer-events-none overflow-hidden">
@@ -154,7 +156,7 @@ export const PlansPage: React.FC = () => {
         <div className="absolute bottom-[0%] right-[-10%] w-[60vw] h-[60vw] bg-emerald-500/5 rounded-full blur-[150px]" />
       </div>
 
-      <div className="max-w-7xl mx-auto w-full relative z-10 my-auto pb-12">
+      <div className="max-w-7xl mx-auto w-full relative z-10 my-auto py-12 px-4">
         <motion.div 
           initial={{ opacity: 0, x: -20 }}
           animate={{ opacity: 1, x: 0 }}

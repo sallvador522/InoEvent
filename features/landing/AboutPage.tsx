@@ -3,6 +3,7 @@ import { motion } from 'framer-motion';
 import { ArrowLeft, Users, Zap, Target } from 'lucide-react';
 import { Link, useNavigate } from 'react-router-dom';
 import { useFirebase } from '../../components/FirebaseProvider';
+import { Navbar } from '../../components/Navbar';
 
 export const AboutPage = () => {
     const navigate = useNavigate();
@@ -22,17 +23,9 @@ export const AboutPage = () => {
 
     return (
         <div className="min-h-screen bg-slate-50 text-slate-800 font-sans selection:bg-brand-blue/20">
-            {/* Header */}
-            <header className="fixed top-0 left-0 right-0 py-6 px-8 z-50 transition-all duration-300 bg-white/80 backdrop-blur-md border-b border-slate-200 shadow-sm">
-                <div className="max-w-5xl mx-auto flex items-center justify-between">
-                    <Link to="/" className="flex items-center gap-2 group">
-                        <ArrowLeft className="w-5 h-5 text-slate-500 group-hover:-translate-x-1 transition-transform" />
-                        <span className="font-bold text-xl tracking-tight text-slate-900">InoEvents</span>
-                    </Link>
-                </div>
-            </header>
+            <Navbar />
 
-            <main className="pt-32 pb-24 px-6 max-w-5xl mx-auto">
+            <main className="pt-24 pb-24 px-6 max-w-5xl mx-auto">
                 <div className="text-center mb-16">
                     <motion.h1 
                         initial={{ opacity: 0, y: 20 }}

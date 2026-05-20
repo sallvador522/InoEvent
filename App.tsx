@@ -2,6 +2,7 @@ import React from 'react';
 import { HashRouter as Router, Routes, Route } from 'react-router-dom';
 import { Toaster } from 'react-hot-toast';
 import { LandingPage } from './features/landing/LandingPage';
+import { TemplateGalleryPage } from './features/landing/TemplateGalleryPage';
 import InvitationView from './features/invitation/InvitationView';
 import { InvitationCreator } from './features/invitation/InvitationCreator';
 import { BridalShowerCreator } from './features/invitation/BridalShowerCreator';
@@ -25,6 +26,7 @@ const App: React.FC = () => {
       <Router>
         <Routes>
         <Route path="/" element={<LandingPage />} />
+        <Route path="/templates" element={<TemplateGalleryPage />} />
         <Route path="/terms" element={<TermsPage />} />
         <Route path="/privacy" element={<PrivacyPage />} />
         <Route path="/about" element={<AboutPage />} />

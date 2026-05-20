@@ -22,6 +22,7 @@ export const BridalShowerCreator: React.FC = () => {
     
     const [isSaving, setIsSaving] = useState(false);
     const [isLoading, setIsLoading] = useState(!!id);
+    const [showTemplateSelector, setShowTemplateSelector] = useState(!new URLSearchParams(window.location.search).get('template'));
 
     useEffect(() => {
         const loadEvent = async () => {
@@ -71,7 +72,16 @@ export const BridalShowerCreator: React.FC = () => {
         setIsSaving(true);
         try {
             const eventTitle = `Chá de Panela da ${formData.brideName}`.substring(0, 100);
-            const isoDateStr = formData.date && formData.time ? new Date(`${formData.date}T${formData.time}:00`).toISOString() : new Date().toISOString();
+            let isoDateStr = new Date().toISOString();
+            try {
+                // Try to parse if it happens to be valid ISO format, otherwise just keep the current date to prevent error
+                const testDate = new Date(`${formData.date}T${formData.time}:00`);
+                if (!isNaN(testDate.getTime())) {
+                    isoDateStr = testDate.toISOString();
+                }
+            } catch (e) {
+                // fallback to current date
+            }
             
             const finalData: any = { 
                 ...formData, 
@@ -129,26 +139,35 @@ export const BridalShowerCreator: React.FC = () => {
                 
                 <div className="space-y-6">
                     <div className="space-y-2">
-                        <label className="text-xs font-bold text-slate-500 uppercase tracking-wider">Identidade Visual</label>
-                        <div className="grid grid-cols-2 md:grid-cols-3 gap-3">
-                            {[
-                                { mode: 'BRIDAL_BEAUTY', label: 'Tema 1 (Floral Suave)', preview: '/bridal-templates/templateCha1.png' },
-                                { mode: 'BRIDAL_TEA_PARTY', label: 'Tema 2 (Romântico Rosa)', preview: '/bridal-templates/templateCha2.png' },
-                                { mode: 'BRIDAL_MINIMAL', label: 'Tema 3 (Minimalista Nuvem)', preview: '/bridal-templates/templateCha3.png' },
-                                { mode: 'BRIDAL_CHEF', label: 'Tema 4 (Pêssego)', preview: '/bridal-templates/templateCha4.png' }
-                            ].map(theme => (
-                                <button 
-                                    key={theme.mode}
-                                    onClick={() => setFormData({...formData, layoutMode: theme.mode})}
-                                    className={`p-2 rounded-xl border-2 text-center text-xs font-bold transition-all relative overflow-hidden group flex flex-col items-center gap-2 ${formData.layoutMode === theme.mode ? 'border-pink-400 bg-pink-50' : 'border-slate-100 bg-white hover:border-slate-200'}`}
-                                >
-                                    <div className="w-full aspect-[2/3] rounded-lg overflow-hidden bg-slate-50 relative">
-                                        <img src={theme.preview} className="w-full h-full object-cover transition-transform group-hover:scale-105" alt={theme.label} />
-                                    </div>
-                                    <span className={formData.layoutMode === theme.mode ? 'text-pink-500' : 'text-slate-500'}>{theme.label}</span>
+                        <div className="flex items-center justify-between mb-2">
+                            <label className="text-xs font-bold text-slate-500 uppercase tracking-wider">Identidade Visual</label>
+                            {!showTemplateSelector && (
+                                <button type="button" onClick={() => setShowTemplateSelector(true)} className="text-xs text-brand-blue font-bold cursor-pointer hover:underline">
+                                    Alterar Modelo
                                 </button>
-                            ))}
+                            )}
                         </div>
+                        {showTemplateSelector && (
+                            <div className="grid grid-cols-2 md:grid-cols-3 gap-3">
+                                {[
+                                    { mode: 'BRIDAL_BEAUTY', label: 'Tema 1 (Floral Suave)', preview: '/bridal-templates/templateCha1.png' },
+                                    { mode: 'BRIDAL_TEA_PARTY', label: 'Tema 2 (Romântico Rosa)', preview: '/bridal-templates/templateCha2.png' },
+                                    { mode: 'BRIDAL_MINIMAL', label: 'Tema 3 (Minimalista Nuvem)', preview: '/bridal-templates/templateCha3.png' },
+                                    { mode: 'BRIDAL_CHEF', label: 'Tema 4 (Pêssego)', preview: '/bridal-templates/templateCha4.png' }
+                                ].map(theme => (
+                                    <button 
+                                        key={theme.mode}
+                                        onClick={() => setFormData({...formData, layoutMode: theme.mode})}
+                                        className={`p-2 rounded-xl border-2 text-center text-xs font-bold transition-all relative overflow-hidden group flex flex-col items-center gap-2 ${formData.layoutMode === theme.mode ? 'border-pink-400 bg-pink-50' : 'border-slate-100 bg-white hover:border-slate-200'}`}
+                                    >
+                                        <div className="w-full aspect-[2/3] rounded-lg overflow-hidden bg-slate-50 relative">
+                                            <img src={theme.preview} className="w-full h-full object-cover transition-transform group-hover:scale-105" alt={theme.label} />
+                                        </div>
+                                        <span className={formData.layoutMode === theme.mode ? 'text-pink-500' : 'text-slate-500'}>{theme.label}</span>
+                                    </button>
+                                ))}
+                            </div>
+                        )}
                     </div>
 
                     <div className="space-y-4">
@@ -170,11 +189,11 @@ export const BridalShowerCreator: React.FC = () => {
                         <div className="grid grid-cols-2 gap-4">
                             <div>
                                 <label className="text-xs font-bold text-slate-500 uppercase tracking-wider mb-2 block">Data</label>
-                                <input type="text" placeholder="Ex: 20 de Junho de 2026" value={formData.date} onChange={e => setFormData({...formData, date: e.target.value})} className="w-full p-4 rounded-xl border border-slate-200 bg-slate-50 text-slate-900 focus:border-pink-300 focus:bg-white outline-none transition-all" />
+                                <input type="date" value={formData.date} onChange={e => setFormData({...formData, date: e.target.value})} className="w-full p-4 rounded-xl border border-slate-200 bg-slate-50 text-slate-900 focus:border-pink-300 focus:bg-white outline-none transition-all" />
                             </div>
                             <div>
                                 <label className="text-xs font-bold text-slate-500 uppercase tracking-wider mb-2 block">Horário</label>
-                                <input type="text" placeholder="Ex: 14h às 19h" value={formData.time} onChange={e => setFormData({...formData, time: e.target.value})} className="w-full p-4 rounded-xl border border-slate-200 bg-slate-50 text-slate-900 focus:border-pink-300 focus:bg-white outline-none transition-all" />
+                                <input type="time" value={formData.time} onChange={e => setFormData({...formData, time: e.target.value})} className="w-full p-4 rounded-xl border border-slate-200 bg-slate-50 text-slate-900 focus:border-pink-300 focus:bg-white outline-none transition-all" />
                             </div>
                         </div>
                     </div>

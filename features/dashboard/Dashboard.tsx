@@ -239,7 +239,7 @@ export const Dashboard = () => {
         return (
             <div className="min-h-screen bg-[#FDFDFD] flex flex-col items-center justify-center p-6 text-center">
                 <h1 className="text-2xl font-serif text-slate-800 mb-4">Evento não encontrado ou já foi apagado.</h1>
-                <Link to="/" className="px-6 py-3 bg-brand-blue text-white rounded-xl font-bold">Voltar ao Início</Link>
+                <button type="button" onClick={() => navigate(-1)} className="px-6 py-3 bg-brand-blue text-white rounded-xl font-bold cursor-pointer outline-none">Voltar à Página Anterior</button>
             </div>
         );
     }
@@ -296,9 +296,9 @@ export const Dashboard = () => {
             {/* Minimalist Top Navbar */}
             <nav className="sticky top-0 z-40 bg-white/80 backdrop-blur-md border-b border-slate-100 px-6 py-4 flex items-center justify-between">
                 <div className="flex items-center gap-4">
-                    <Link to="/" className="w-10 h-10 flex items-center justify-center rounded-full hover:bg-slate-100 text-slate-500 transition-colors">
+                <button type="button" onClick={() => navigate(-1)} className="w-10 h-10 flex items-center justify-center rounded-full hover:bg-slate-100 text-slate-500 transition-colors outline-none cursor-pointer">
                         <ArrowLeft size={20} />
-                    </Link>
+                    </button>
                     <div className="flex flex-col">
                         <span className="text-xs font-bold text-slate-400 uppercase tracking-wider">Painel do Evento</span>
                         <h1 className="text-lg font-serif font-bold text-brand-blue leading-tight truncate max-w-[200px] md:max-w-md">{event.title}</h1>

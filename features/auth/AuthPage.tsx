@@ -107,9 +107,9 @@ export const AuthPage: React.FC = () => {
         animate={{ opacity: 1, y: 0 }}
         className="w-full max-w-md bg-white px-8 py-10 rounded-3xl shadow-xl border border-slate-100 relative overflow-hidden"
       >
-        <Link to="/" className="absolute top-6 left-6 text-slate-400 hover:text-brand-blue transition-colors">
+        <button type="button" onClick={() => navigate(-1)} className="absolute top-6 left-6 text-slate-400 hover:text-brand-blue transition-colors outline-none cursor-pointer">
           <ArrowLeft size={20} />
-        </Link>
+        </button>
         
         <div className="text-center mb-8 mt-2">
           <span className="material-symbols-outlined text-primary text-4xl mb-2">diamond</span>

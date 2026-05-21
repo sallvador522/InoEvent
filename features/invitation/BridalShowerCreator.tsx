@@ -1,14 +1,15 @@
 import React, { useState, useEffect } from 'react';
 import { motion } from 'framer-motion';
 import { ArrowLeft, Save } from 'lucide-react';
-import { useNavigate, useParams, Link } from 'react-router-dom';
+import { useNavigate, useParams, useSearchParams, Link } from 'react-router-dom';
 import { useFirebase, db, handleFirestoreError, OperationType } from '../../components/FirebaseProvider';
-import { doc, setDoc, getDoc, updateDoc } from 'firebase/firestore';
+import { doc, setDoc, getDoc, updateDoc, collection } from 'firebase/firestore';
 import toast from 'react-hot-toast';
 
 export const BridalShowerCreator: React.FC = () => {
     const navigate = useNavigate();
     const { id } = useParams();
+    const [searchParams] = useSearchParams();
     const { user, userProfile } = useFirebase();
     const [formData, setFormData] = useState({
         type: 'BRIDAL_SHOWER',
@@ -17,12 +18,12 @@ export const BridalShowerCreator: React.FC = () => {
         time: '',
         locationName: '',
         description: 'Você é uma pessoa muito especial na minha vida e por isso, quero que esteja presente no meu chá de panela!\n\nVamos reunir a mulherada e comemorar!',
-        layoutMode: new URLSearchParams(window.location.search).get('template') || 'BRIDAL_ROMANTIC'
+        layoutMode: searchParams.get('template') || 'BRIDAL_ROMANTIC'
     });
     
     const [isSaving, setIsSaving] = useState(false);
     const [isLoading, setIsLoading] = useState(!!id);
-    const [showTemplateSelector, setShowTemplateSelector] = useState(!new URLSearchParams(window.location.search).get('template'));
+    const [showTemplateSelector, setShowTemplateSelector] = useState(!searchParams.get('template'));
 
     useEffect(() => {
         const loadEvent = async () => {
@@ -69,6 +70,14 @@ export const BridalShowerCreator: React.FC = () => {
         }
 
         const isNewEvent = !id;
+        if (isNewEvent && userProfile?.plan !== 'Business' && userProfile?.plan !== 'Corporate') {
+            const currentCredits = userProfile?.credits || 0;
+            if (currentCredits < 1) {
+                toast.error(`Você não tem créditos suficientes. Custo: 1 crédito. Adquira mais créditos.`);
+                return;
+            }
+        }
+
         setIsSaving(true);
         try {
             const eventTitle = `Chá de Panela da ${formData.brideName}`.substring(0, 100);
@@ -94,6 +103,21 @@ export const BridalShowerCreator: React.FC = () => {
             };
             
             if (isNewEvent) {
+                if (userProfile?.plan !== 'Business' && userProfile?.plan !== 'Corporate') {
+                    const newCredits = (userProfile?.credits || 0) - 1;
+                    await updateDoc(doc(db, 'users', user.uid), { credits: newCredits });
+                    
+                    const newTransRef = doc(collection(db, 'transactions'));
+                    await setDoc(newTransRef, {
+                        ownerId: user.uid,
+                        amount: 1,
+                        type: 'DEBIT',
+                        description: `Criação do evento: ${finalData.title}`,
+                        date: new Date().toISOString(),
+                        eventId: newTransRef.id
+                    });
+                }
+
                 finalData.createdAt = new Date().toISOString();
                 const newEventId = "evt_" + Math.random().toString(36).substr(2, 9);
                 const docRef = doc(db, 'events', newEventId);
@@ -128,9 +152,9 @@ export const BridalShowerCreator: React.FC = () => {
                 className="max-w-2xl mx-auto bg-white rounded-3xl p-8 shadow-sm border border-pink-100"
             >
                 <div className="flex items-center mb-8">
-                    <Link to="/" className="w-10 h-10 flex items-center justify-center rounded-full hover:bg-pink-50 text-slate-400 hover:text-pink-500 transition-colors mr-4">
+                    <button type="button" onClick={() => navigate(-1)} className="w-10 h-10 flex items-center justify-center rounded-full hover:bg-pink-50 text-slate-400 hover:text-pink-500 transition-colors mr-4 outline-none cursor-pointer">
                         <ArrowLeft size={20} />
-                    </Link>
+                    </button>
                     <div>
                         <h1 className="text-2xl font-serif text-slate-900">{id ? "Editar Chá de Panela" : "Novo Chá de Panela"}</h1>
                         <p className="text-sm text-slate-500 mt-1">Preencha os detalhes do convite.</p>
@@ -138,16 +162,9 @@ export const BridalShowerCreator: React.FC = () => {
                 </div>
                 
                 <div className="space-y-6">
-                    <div className="space-y-2">
-                        <div className="flex items-center justify-between mb-2">
+                    {showTemplateSelector && (
+                        <div className="space-y-2">
                             <label className="text-xs font-bold text-slate-500 uppercase tracking-wider">Identidade Visual</label>
-                            {!showTemplateSelector && (
-                                <button type="button" onClick={() => setShowTemplateSelector(true)} className="text-xs text-brand-blue font-bold cursor-pointer hover:underline">
-                                    Alterar Modelo
-                                </button>
-                            )}
-                        </div>
-                        {showTemplateSelector && (
                             <div className="grid grid-cols-2 md:grid-cols-3 gap-3">
                                 {[
                                     { mode: 'BRIDAL_BEAUTY', label: 'Tema 1 (Floral Suave)', preview: '/bridal-templates/templateCha1.png' },
@@ -167,8 +184,8 @@ export const BridalShowerCreator: React.FC = () => {
                                     </button>
                                 ))}
                             </div>
-                        )}
-                    </div>
+                        </div>
+                    )}
 
                     <div className="space-y-4">
                         <div>

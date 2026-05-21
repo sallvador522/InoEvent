@@ -11,41 +11,39 @@ import toast from 'react-hot-toast';
 const plans = [
   {
     name: 'Essencial',
-    subtitle: 'Para comemorações íntimas',
+    subtitle: 'Para pequenas celebrações',
     prices: {
       monthly: '7.500 Kz',
       annual: '75.000 Kz'
     },
     savings: 'Economize 15.000 Kz ao ano',
-    description: 'O início perfeito para um evento inesquecível com o essencial que você precisa.',
+    description: 'Comece com 5 créditos mensais para criar eventos inesquecíveis.',
     icon: <Sparkles className="w-8 h-8 text-blue-400" />,
     features: [
-      'Até 5 convites por mês',
-      '2 Modelos Base',
+      '5 Créditos por mês',
+      'Casamento (Custa 2 Créditos)',
+      'Chá de Panela (Custa 1 Crédito)',
       'RSVP Até 100 convidados',
-      'Código QR Único',
-      'Localização no Maps',
-      'Suporte via E-mail',
+      'Código QR Exclusivo',
     ],
   },
   {
     name: 'Premium',
-    subtitle: 'Casamentos & Festas',
+    subtitle: 'Acesso VIP',
     prices: {
       monthly: '20.000 Kz',
       annual: '190.000 Kz'
     },
     savings: 'Economize 50.000 Kz ao ano',
     popular: true,
-    description: 'A experiência luxuosa completa para o seu grande dia.',
+    description: 'Inclui 20 créditos mensais. Ideal para noivos.',
     icon: <Gem className="w-8 h-8 text-purple-400" />,
     features: [
-      'Eventos Ilimitados',
-      'Modelos Exclusivos Ilimitados',
-      'RSVP Até 500 convidados',
-      'Código QR Individual por convidado',
-      'Maps + Galeria de Fotos Interativa',
-      'Suporte VIP via WhatsApp 24/7',
+      '20 Créditos por mês',
+      'Todos os temas premium',
+      'RSVP Ilimitado',
+      'Galeria de Fotos Interativa',
+      'Suporte VIP via WhatsApp',
     ],
   },
   {
@@ -57,16 +55,23 @@ const plans = [
       annual: 'Sob Consulta'
     },
     savings: '',
-    description: 'Solução robusta para quem organiza múltiplos eventos. Escale com o InoEvents.',
+    description: 'Créditos em massa para empresas que gerenciam múltiplos eventos.',
     icon: <Building2 className="w-8 h-8 text-amber-400" />,
     features: [
-      'Painel do Parceiro (Múltiplos Eventos)',
+      'Créditos Ilimitados ou Lotes customizados',
       'Design White-Label (Remoção da marca)',
-      'Pacote de Créditos (Desconto em Lote)',
-      'Check-in Inteligente via QR Code individual',
+      'Painel de Gestão de Clientes',
+      'Check-in Inteligente',
       'Gestor de Conta Dedicado',
     ],
   },
+];
+
+// Credit packages below plans
+const creditPackages = [
+  { amount: 1, price: '2.000 Kz', savings: '', bonus: '' },
+  { amount: 5, price: '8.500 Kz', savings: 'Economize 1.500 Kz', bonus: 'Mais Popular' },
+  { amount: 10, price: '15.000 Kz', savings: 'Economize 5.000 Kz', bonus: 'Melhor Valor' }
 ];
 
 const containerVariants = {
@@ -121,28 +126,238 @@ export const PlansPage: React.FC = () => {
     setIsSimulateModalOpen(true);
   };
 
+  const startPolling = (externalId: string, onSuccess: (data: any) => void) => {
+    const interval = setInterval(async () => {
+       try {
+         const res = await fetch(`/api/payments/status?externalId=${externalId}`);
+         const data = await res.json();
+         if (data.status === 'SUCCESS') {
+            clearInterval(interval);
+            onSuccess(data.data);
+         } else if (data.status === 'FAILED' || data.status === 'CANCELLED') {
+            clearInterval(interval);
+            toast.error("O pagamento foi cancelado ou falhou.");
+         }
+       } catch (e) {
+         console.warn("Polling error", e);
+       }
+    }, 5000);
+    // Timeout after 10 mins (120 attempts)
+    setTimeout(() => { clearInterval(interval); }, 600000);
+  };
+
   const handleSimulatePayment = async () => {
     if (!user || !selectedPlanToBuy) return;
     setLoadingPlan(selectedPlanToBuy.name);
     try {
-      const userRef = doc(db, 'users', user.uid);
-      const userDoc = await getDoc(userRef);
-      if (userDoc.exists()) {
-        await updateDoc(userRef, { plan: selectedPlanToBuy.name });
-      } else {
-        await setDoc(userRef, { uid: user.uid, email: user.email, plan: selectedPlanToBuy.name });
+      if (selectedPlanToBuy.name === 'Business') {
+          // B2B Contact fallback
+          setIsSimulateModalOpen(false);
+          toast.success("A nossa equipe entrará em contacto !");
+          return;
       }
+      
+      const priceKzStr = billingCycle === 'annual' ? selectedPlanToBuy.prices.annual : selectedPlanToBuy.prices.monthly;
+      const amountValue = Number(priceKzStr.replace(/\D/g, ''));
+
+      const externalId = 'trx_plan_' + Math.random().toString(36).substring(2, 10);
+      
+      const response = await fetch('/api/payments/create', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json'
+        },
+        body: JSON.stringify({
+          externalId,
+          userId: user.uid,
+          metadata: { type: 'PLAN', planTarget: selectedPlanToBuy.name },
+          client: {
+             name: user.displayName || 'No Name',
+             email: user.email || 'user@example.com',
+             phone: '+244923000000' 
+          },
+          items: [{
+             title: `Plano ${selectedPlanToBuy.name} (${billingCycle === 'annual' ? 'Anual' : 'Mensal'})`,
+             price: amountValue,
+             quantity: 1
+          }],
+          amount: amountValue
+        })
+      });
+
+      const data = await response.json();
+      if (!response.ok) {
+         throw new Error(data.error || 'Erro ao processar pagamento');
+      }
+
       setIsSimulateModalOpen(false);
       setSelectedPlanToBuy(null);
-      toast.success("Plano modificado com sucesso!");
+
+      // Save pending transaction reference to user's transactions 
+      try {
+         await setDoc(doc(db, 'transactions', externalId), {
+            ownerId: user.uid,
+            amount: amountValue,
+            type: 'PLAN',
+            planTarget: selectedPlanToBuy.name,
+            status: 'PENDING',
+            date: new Date().toISOString(),
+            description: `Pagamento de ${amountValue} Kz`,
+            ...data
+         });
+      } catch (e) {
+         console.warn("Could not save pending transaction", e);
+      }
+
+      if (data.data?.reference && data.data?.entity) {
+         toast.success((t) => (
+            <div className="flex flex-col gap-2 p-2">
+                <span className="font-bold text-slate-800">Use os dados no Multicaixa:</span>
+                <span className="text-sm">Entidade: <strong>{data.data.entity}</strong></span>
+                <span className="text-sm">Referência: <strong>{data.data.reference}</strong></span>
+                <span className="text-xs text-slate-500 mt-2">O seu plano será ativado automaticamente assim que o pagamento for recebido. A aguardar...</span>
+            </div>
+         ), { duration: 30000 });
+         
+         // Start checking for success
+         startPolling(externalId, async (webhookData) => {
+             // Since polling returned SUCCESS, the user has paid!
+             // We update the user document!
+             try {
+                const userRef = doc(db, 'users', user.uid);
+                const userDoc = await getDoc(userRef);
+                if (userDoc.exists()) {
+                   // Initial credit amounts
+                   let creditsToAdd = 0;
+                   const planTarget = webhookData.metadata?.planTarget || selectedPlanToBuy.name;
+                   if (planTarget === 'Premium') creditsToAdd = 20;
+                   else if (planTarget === 'Essencial') creditsToAdd = 5;
+                   
+                   const newCredits = (userDoc.data().credits || 0) + creditsToAdd;
+                   await updateDoc(userRef, { plan: planTarget, credits: newCredits });
+                   toast.success(`Pagamento confirmado! O seu plano ${planTarget} foi ativado com sucesso.`, { duration: 8000 });
+                }
+             } catch (e) {
+                console.error("Error updating user document", e);
+             }
+         });
+         
+      } else {
+         toast.success(`Pedido criado com sucesso! Guarde o comprovativo ou pague a referência gerada. (API PlinqPay)`);
+      }
     } catch (error) {
       console.error(error);
       toast.error("Erro ao alterar o plano. Tente novamente.");
-      handleFirestoreError(error, OperationType.WRITE, `users/${user.uid}`);
     } finally {
       setLoadingPlan(null);
     }
   }
+
+  const handleBuyCredits = async (amount: number, priceKzStr: string) => {
+    if (!user) {
+      toast.custom((t) => (
+        <div className={`${t.visible ? 'animate-enter' : 'animate-leave'} max-w-sm w-full bg-white shadow-[0_8px_30px_rgb(0,0,0,0.12)] rounded-xl flex flex-col border border-slate-100 overflow-hidden`}>
+            <div className="p-4">
+                <h3 className="font-bold text-slate-900 mb-1">Acesso Necessário</h3>
+                <p className="text-sm text-slate-500">Você precisa estar logado para comprar créditos.</p>
+            </div>
+            <div className="flex border-t border-slate-100">
+                <button onClick={() => toast.dismiss(t.id)} className="flex-1 px-4 py-3 text-sm font-bold text-slate-500 hover:bg-slate-50 transition-colors">Cancelar</button>
+                <div className="w-px bg-slate-100" />
+                <button onClick={() => { toast.dismiss(t.id); navigate('/auth'); }} className="flex-1 px-4 py-3 text-sm font-bold text-brand-blue hover:bg-slate-50 transition-colors">Fazer Login</button>
+            </div>
+        </div>
+      ), { duration: 5000 });
+      return;
+    }
+    
+    setLoadingPlan('buy_credits');
+    try {
+      const externalId = 'trx_' + Math.random().toString(36).substring(2, 10);
+      const amountValue = Number(priceKzStr.replace(/\D/g, ''));
+      
+      const response = await fetch('/api/payments/create', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json'
+        },
+        body: JSON.stringify({
+          externalId,
+          userId: user.uid,
+          metadata: { type: 'CREDITS', amount },
+          client: {
+             name: user.displayName || 'No Name',
+             email: user.email || 'user@example.com',
+             phone: '+244923000000'
+          },
+          items: [{
+             title: `Pacote de ${amount} Crédito(s)`,
+             price: amountValue,
+             quantity: 1
+          }],
+          amount: amountValue
+        })
+      });
+
+      const data = await response.json();
+      if (!response.ok) {
+         throw new Error(data.error || 'Erro ao processar pagamento');
+      }
+
+      // Save pending transaction reference to user's transactions 
+      try {
+         await setDoc(doc(db, 'transactions', externalId), {
+            ownerId: user.uid,
+            amount: amountValue,
+            type: 'CREDIT_PACK',
+            status: 'PENDING',
+            date: new Date().toISOString(),
+            description: `Pagamento de ${amountValue} Kz`,
+            ...data
+         });
+      } catch (e) {
+         console.warn("Could not save pending transaction", e);
+      }
+
+      if (data.data?.reference && data.data?.entity) {
+         toast.success((t) => (
+            <div className="flex flex-col gap-2 p-2">
+                <span className="font-bold text-slate-800">Use os dados no Multicaixa:</span>
+                <span className="text-sm">Entidade: <strong>{data.data.entity}</strong></span>
+                <span className="text-sm">Referência: <strong>{data.data.reference}</strong></span>
+                <span className="text-xs text-slate-500 mt-2">Os seus créditos serão adicionados automaticamente assim que o pagamento for recebido. A aguardar...</span>
+            </div>
+         ), { duration: 30000 });
+         
+         // Start checking for success
+         startPolling(externalId, async (webhookData) => {
+             // Since polling returned SUCCESS, the user has paid!
+             // We update the user document!
+             try {
+                const userRef = doc(db, 'users', user.uid);
+                const userDoc = await getDoc(userRef);
+                if (userDoc.exists()) {
+                   // Initial credit amounts
+                   let creditsToAdd = amount;
+                   const newCredits = (userDoc.data().credits || 0) + creditsToAdd;
+                   await updateDoc(userRef, { credits: newCredits });
+                   toast.success(`Pagamento confirmado! ${creditsToAdd} créditos foram adicionados à sua conta.`, { duration: 8000 });
+                }
+             } catch (e) {
+                console.error("Error updating user document", e);
+             }
+         });
+      } else {
+         toast.success(`Pedido criado com sucesso! Guarde o comprovativo ou pague a referência gerada.`);
+      }
+      
+    } catch (error) {
+      console.error(error);
+      toast.error("Erro ao iniciar compra de créditos.");
+    } finally {
+      setLoadingPlan(null);
+    }
+  };
 
   const currentPlan = userProfile?.plan || 'Essencial';
 
@@ -163,10 +378,10 @@ export const PlansPage: React.FC = () => {
           transition={{ duration: 0.6 }}
           className="mb-8 md:mb-12"
         >
-          <Link to="/" className="inline-flex items-center text-slate-500 hover:text-brand-blue transition-colors">
+          <button type="button" onClick={() => navigate(-1)} className="inline-flex items-center text-slate-500 hover:text-brand-blue transition-colors outline-none cursor-pointer">
             <ArrowLeft size={16} className="mr-2" /> 
-            <span className="text-sm font-medium tracking-wide uppercase">Voltar ao Início</span>
-          </Link>
+            <span className="text-sm font-medium tracking-wide uppercase">Voltar</span>
+          </button>
         </motion.div>
         
         <motion.div 
@@ -319,6 +534,60 @@ export const PlansPage: React.FC = () => {
             );
           })}
         </motion.div>
+
+        {/* Credit Packages Section */}
+        <motion.div 
+          initial={{ opacity: 0, y: 30 }}
+          whileInView={{ opacity: 1, y: 0 }}
+          viewport={{ once: true }}
+          className="mt-24 max-w-5xl mx-auto"
+        >
+          <div className="text-center mb-10">
+            <span className="text-brand-blue font-bold tracking-widest text-xs uppercase mb-3 block">Compre Apenas o Necessário</span>
+            <h2 className="text-3xl md:text-4xl font-script text-slate-900 mb-4">Pacotes de Créditos Avulsos</h2>
+            <p className="text-slate-500 text-sm md:text-base max-w-xl mx-auto">
+              Precisa apenas de mais um convite? Compre créditos sob demanda. (1 Casamento = 2 Créditos, 1 Chá de Panela = 1 Crédito)
+            </p>
+          </div>
+
+          <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
+            {creditPackages.map((pkg, idx) => (
+              <div key={idx} className="bg-white/80 backdrop-blur-md rounded-3xl p-8 border border-slate-200/60 shadow-lg shadow-slate-200/50 hover:shadow-xl hover:-translate-y-1 transition-all duration-300 relative overflow-hidden flex flex-col">
+                {pkg.bonus && (
+                  <div className="absolute top-0 right-0 bg-gradient-to-r from-brand-blue to-blue-500 text-white text-[10px] font-black uppercase tracking-widest px-4 py-1.5 rounded-bl-xl">
+                    {pkg.bonus}
+                  </div>
+                )}
+                <div className="flex items-center gap-4 mb-6">
+                  <div className="w-12 h-12 bg-blue-50 text-brand-blue rounded-2xl flex items-center justify-center text-xl shadow-inner border border-blue-100">
+                     <span className="font-bold">{pkg.amount}</span>
+                  </div>
+                  <div>
+                    <h3 className="text-xl font-bold text-slate-900">Crédito{pkg.amount > 1 ? 's' : ''}</h3>
+                  </div>
+                </div>
+                <div className="mb-2">
+                  <span className="text-3xl font-black text-slate-900 tracking-tight">{pkg.price}</span>
+                </div>
+                {pkg.savings ? (
+                  <div className="text-emerald-500 text-xs font-bold mb-8 uppercase tracking-wide bg-emerald-50 px-2 py-1 rounded inline-block self-start">{pkg.savings}</div>
+                ) : (
+                  <div className="h-[28px] mb-8"></div>
+                )}
+                <button 
+                  onClick={() => handleBuyCredits(pkg.amount, pkg.price)} 
+                  disabled={loadingPlan === 'buy_credits'}
+                  className={`w-full mt-auto py-3.5 rounded-xl font-bold text-sm tracking-wide transition-all duration-300 flex items-center justify-center gap-2 ${
+                    pkg.bonus ? 'bg-brand-blue text-white hover:bg-blue-700 shadow-md' : 'bg-slate-100 text-slate-700 hover:bg-slate-200 border border-slate-200'
+                  }`}
+                >
+                  {loadingPlan === 'buy_credits' ? "A PROCESSAR..." : `COMPRAR PACOTE`}
+                </button>
+              </div>
+            ))}
+          </div>
+        </motion.div>
+
       </div>
 
       <AnimatePresence>
@@ -332,14 +601,14 @@ export const PlansPage: React.FC = () => {
                       <div className="w-12 h-12 bg-emerald-50 text-emerald-500 rounded-xl flex items-center justify-center mb-6">
                           <Check size={24} />
                       </div>
-                      <h3 className="text-xl font-bold text-slate-800 mb-2">Simular Assinatura</h3>
+                      <h3 className="text-xl font-bold text-slate-800 mb-2">Confirmar Assinatura</h3>
                       <p className="text-slate-500 text-sm mb-6">
                         Você está prestes a transitar para o plano <strong>{selectedPlanToBuy.displayName || selectedPlanToBuy.name}</strong>.
-                        Como não possuímos gateway de pagamentos implementado para essa demonstração, esta ação é inteiramente gratuita e instantânea.
+                        O seu checkout será criado e a referência Multicaixa será fornecida (via PlinqPay).
                       </p>
                       
                       <Button fullWidth onClick={handleSimulatePayment} disabled={!!loadingPlan}>
-                          {loadingPlan ? "Processando..." : "Confirmar Modificação"}
+                          {loadingPlan ? "Processando..." : "Confirmar e Pagar"}
                       </Button>
                   </motion.div>
               </div>

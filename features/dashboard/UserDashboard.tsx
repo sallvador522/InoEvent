@@ -72,30 +72,7 @@ export const UserDashboard: React.FC = () => {
     }
 
     const handleCreateEvent = () => {
-        if (userProfile?.plan === 'Essencial') {
-            const now = new Date();
-            const currentMonthEvents = events.filter(event => {
-                const eventDate = event.createdAt ? new Date(event.createdAt) : new Date(0);
-                return eventDate.getFullYear() === now.getFullYear() && eventDate.getMonth() === now.getMonth();
-            });
-
-            if (currentMonthEvents.length >= 5) {
-                toast.custom((t) => (
-                    <div className={`${t.visible ? 'animate-enter' : 'animate-leave'} max-w-sm w-full bg-white shadow-[0_8px_30px_rgb(0,0,0,0.12)] rounded-xl flex flex-col border border-slate-100 overflow-hidden`}>
-                        <div className="p-4">
-                            <h3 className="font-bold text-slate-900 mb-1">Limite Atingido</h3>
-                            <p className="text-sm text-slate-500">O plano Essencial permite até 5 eventos por mês. Atualize para o Premium.</p>
-                        </div>
-                        <div className="flex border-t border-slate-100">
-                            <button onClick={() => toast.dismiss(t.id)} className="flex-1 px-4 py-3 text-sm font-bold text-slate-500 hover:bg-slate-50 transition-colors">Cancelar</button>
-                            <div className="w-px bg-slate-100" />
-                            <button onClick={() => { toast.dismiss(t.id); navigate('/plans'); }} className="flex-1 px-4 py-3 text-sm font-bold text-brand-blue hover:bg-slate-50 transition-colors">Ver Planos</button>
-                        </div>
-                    </div>
-                ), { duration: 5000 });
-                return;
-            }
-        }
+        // Redirecionamos para a criação, a validação de créditos ocorre no momento de salvar.
         navigate('/create-invitation');
     };
 
@@ -110,12 +87,17 @@ export const UserDashboard: React.FC = () => {
                           Olá, {user?.displayName?.split(' ')[0] || 'Usuário'}!
                        </h1>
                        <p className="text-slate-500">
-                          Aqui estão os seus eventos e convites.
+                          Você possui <strong className="text-brand-blue">{userProfile?.credits || 0} créditos</strong> disponíveis.
                        </p>
                    </div>
-                   <Button onClick={handleCreateEvent}>
-                       <Plus size={16} className="mr-2" /> Novo Evento
-                   </Button>
+                   <div className="flex gap-4">
+                       <Button variant="outline" onClick={() => navigate('/plans')} className="border-brand-blue/20 text-brand-blue hover:bg-blue-50">
+                           <Ticket size={16} className="mr-2" /> Comprar Créditos
+                       </Button>
+                       <Button onClick={handleCreateEvent}>
+                           <Plus size={16} className="mr-2" /> Novo Evento
+                       </Button>
+                   </div>
                 </div>
 
                 {(userProfile?.plan === 'Business' || userProfile?.plan === 'Corporate') && (
@@ -185,28 +167,6 @@ export const UserDashboard: React.FC = () => {
                     </div>
                 )}
             </main>
-
-            <AnimatePresence>
-                {isSimulateModalOpen && (
-                    <div className="fixed inset-0 z-50 flex items-center justify-center p-4">
-                        <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }} onClick={() => setIsSimulateModalOpen(false)} className="absolute inset-0 bg-slate-900/40 backdrop-blur-sm" />
-                        <motion.div initial={{ opacity: 0, scale: 0.95, y: 20 }} animate={{ opacity: 1, scale: 1, y: 0 }} exit={{ opacity: 0, scale: 0.95, y: 20 }} className="bg-white rounded-3xl p-8 max-w-md w-full relative z-10 shadow-2xl">
-                            <button onClick={() => setIsSimulateModalOpen(false)} className="absolute top-6 right-6 text-slate-400 hover:text-slate-600 transition-colors">
-                                <X size={24} />
-                            </button>
-                            <div className="w-12 h-12 bg-amber-50 text-amber-500 rounded-xl flex items-center justify-center mb-6">
-                                <Ticket size={24} />
-                            </div>
-                            <h3 className="text-xl font-bold text-slate-800 mb-2">Simular Compra</h3>
-                            <p className="text-slate-500 text-sm mb-6">Esta é uma integração simulada. Ao continuar, você receberá 10 créditos na sua conta de forma gratuita (para fins de demonstração).</p>
-                            
-                            <Button fullWidth onClick={handleBuyCredits} disabled={isSimulating}>
-                                {isSimulating ? "Processando..." : "Confirmar Recebimento (+10)"}
-                            </Button>
-                        </motion.div>
-                    </div>
-                )}
-            </AnimatePresence>
         </div>
     );
 };

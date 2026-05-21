@@ -66,7 +66,8 @@ service cloud.firestore {
       // --- Update ---
       allow update: if isValidId(eventId) && resource != null && (
           (isSignedIn() && resource.data.ownerId == request.auth.uid && isValidEvent(incoming()) && incoming().ownerId == resource.data.ownerId) ||
-          (incoming().diff(existing()).affectedKeys().hasOnly(['gallery', 'clientToken']))
+          (incoming().diff(existing()).affectedKeys().hasOnly(['gallery'])) ||
+          (isSignedIn() && resource.data.ownerId == request.auth.uid && incoming().diff(existing()).affectedKeys().hasOnly(['clientToken']))
       );
       
       // --- Delete ---
@@ -74,10 +75,15 @@ service cloud.firestore {
       
         // --- Guests Subcollection ---
       match /guests/{guestId} {
-        // Public can read guests to allow getCountFromServer
-        allow read: if true;
-        // Public can create and update guest (RSVP form)
-        allow create, update: if isValidId(guestId) && incoming().name is string;
+        allow read: if true; // Public read needed for ClientDashboard and capacity checks without Auth
+
+        // Public can create guest
+        allow create: if isValidId(guestId) && incoming().name is string;
+        // Public can update if they provide the existing phone number
+        allow update: if isValidId(guestId) && (
+            (isSignedIn() && get(/databases/$(database)/documents/events/$(eventId)).data.ownerId == request.auth.uid) ||
+            (existing().phone == incoming().phone)
+        );
         allow delete: if isSignedIn() && get(/databases/$(database)/documents/events/$(eventId)).data.ownerId == request.auth.uid;
       }
     }

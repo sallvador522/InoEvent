@@ -212,9 +212,9 @@ const InvitationView: React.FC = () => {
       <TocaPlayer trackName={event.musicTrack} isDark={event.layoutMode === 'LUXURY' || event.layoutMode === 'INDUSTRIAL'} />
       
       {isTemplate && (
-        <Link to="/" className="fixed top-4 left-4 z-[110] flex items-center justify-center w-10 h-10 bg-white/90 backdrop-blur-sm text-slate-800 rounded-full shadow-xl hover:bg-white transition-all border border-slate-200">
+        <button type="button" onClick={() => navigate(-1)} className="fixed top-4 left-4 z-[110] flex items-center justify-center w-10 h-10 bg-white/90 backdrop-blur-sm text-slate-800 rounded-full shadow-xl hover:bg-white transition-all border border-slate-200 outline-none cursor-pointer">
            <ArrowLeft size={16} />
-        </Link>
+        </button>
       )}
 
       {isTemplate && (
@@ -240,9 +240,9 @@ const InvitationView: React.FC = () => {
 
       {isOwner && (
         <div className="fixed top-4 left-4 z-50 flex flex-wrap gap-2">
-           <Link to="/" className="flex items-center gap-2 bg-white/90 backdrop-blur-sm text-slate-800 px-4 py-2 rounded-full shadow-xl hover:bg-white transition-all font-display text-sm font-bold border border-slate-200">
-              <ArrowLeft size={16} /> <span className="hidden md:inline">Voltar para Início</span>
-           </Link>
+           <button type="button" onClick={() => navigate(-1)} className="flex items-center gap-2 bg-white/90 backdrop-blur-sm text-slate-800 px-4 py-2 rounded-full shadow-xl hover:bg-white transition-all font-display text-sm font-bold border border-slate-200 outline-none cursor-pointer">
+              <ArrowLeft size={16} /> <span className="hidden md:inline">Voltar</span>
+           </button>
            {isOwner && (
              <button onClick={handleDownloadDesign} className="flex items-center gap-2 bg-emerald-600 text-white px-4 py-2 rounded-full shadow-xl hover:bg-emerald-700 transition-all font-display text-sm font-bold">
                 <Camera size={16} /> {(event?.type === 'BRIDAL_SHOWER' || event?.layoutMode?.startsWith('BRIDAL_')) ? 'Baixar Convite do Chá' : 'Baixar Imagem'}
@@ -480,21 +480,21 @@ const BridalStandardLayout: React.FC<LayoutProps> = ({ event, onRSVP }) => {
 
             {/* Framed Text Container */}
             <div 
-                className="relative z-10 w-[85%] max-w-md h-[85%] flex flex-col items-center text-center overflow-y-auto no-scrollbar"
+                className="relative z-10 w-[92%] max-w-lg h-[90%] flex flex-col items-center text-center overflow-y-auto no-scrollbar"
                 style={{ color: theme.text }}
             >
-                <div className="flex flex-col items-center justify-start min-h-full py-12 w-full space-y-6 md:space-y-8">
+                <div className="flex flex-col items-center justify-center min-h-full py-8 w-full space-y-5 md:space-y-6">
                     <FadeInSection className="w-full flex justify-center items-center flex-col">
-                        <h2 className="text-2xl md:text-3xl uppercase tracking-[0.2em] font-bold mb-2 text-center" style={{ color: theme.color, fontFamily: theme.titleFont }}>
+                        <h2 className="text-xl md:text-2xl uppercase tracking-[0.2em] font-bold mb-2 text-center" style={{ color: theme.color, fontFamily: theme.titleFont }}>
                             CHÁ DE PANELA
                         </h2>
-                        <div className="flex items-center justify-center gap-3 mb-4 mt-1">
+                        <div className="flex items-center justify-center gap-3 mb-3 mt-1">
                             <div className="w-8 h-[1px]" style={{ backgroundColor: theme.color, opacity: 0.5 }} />
-                            <div className="text-[11px] uppercase tracking-[0.3em]" style={{ color: theme.color, fontFamily: theme.titleFont }}>DA</div>
+                            <div className="text-[10px] uppercase tracking-[0.3em]" style={{ color: theme.color, fontFamily: theme.titleFont }}>DA</div>
                             <div className="w-8 h-[1px]" style={{ backgroundColor: theme.color, opacity: 0.5 }} />
                         </div>
                         
-                        <h1 className="text-5xl md:text-6xl leading-tight font-extrabold pb-1 text-center" style={{ fontFamily: theme.cursiveFont, color: theme.color }}>
+                        <h1 className="text-4xl md:text-5xl leading-tight font-extrabold pb-1 text-center" style={{ fontFamily: theme.cursiveFont, color: theme.color }}>
                             {titleLines}
                         </h1>
                     </FadeInSection>
@@ -539,11 +539,7 @@ const BridalStandardLayout: React.FC<LayoutProps> = ({ event, onRSVP }) => {
                         )}
                     </FadeInSection>
 
-                    <FadeInSection className="w-full pt-2 pb-8">
-                        <Button onClick={onRSVP} className="w-full max-w-[250px] mx-auto py-3 rounded-full shadow-md text-xs uppercase tracking-widest font-bold transition-transform hover:scale-105 active:scale-95" style={{ backgroundColor: theme.color, color: 'white', fontFamily: theme.titleFont }}>
-                            {getRSVPText(event)}
-                        </Button>
-                    </FadeInSection>
+
                 </div>
             </div>
         </div>
@@ -1748,11 +1744,7 @@ const BridalBeautyLayout: React.FC<LayoutProps> = ({ event, onRSVP, guestName, o
          
       </div>
 
-      <div className="fixed bottom-0 left-0 w-full bg-white/90 backdrop-blur-md p-4 z-50 flex items-center justify-center">
-          <Button onClick={onRSVP} className="w-full max-w-sm bg-[#E6A8A8] text-white hover:bg-[#D59898] py-4 rounded-full shadow-lg text-sm uppercase tracking-widest font-bold">
-             {getRSVPText(event)}
-          </Button>
-      </div>
+
     </div>
   );
 };
@@ -1860,11 +1852,7 @@ const BridalRomanticLayout: React.FC<LayoutProps> = ({ event, onRSVP, guestName,
            )}
        </div>
 
-       <div className="fixed bottom-4 left-0 w-full px-4 z-50 flex items-center justify-center">
-           <Button onClick={onRSVP} className="w-full max-w-sm bg-[#F48FB1] text-white hover:bg-[#E06A8B] py-4 rounded-xl shadow-lg text-sm uppercase tracking-widest font-bold">
-              {getRSVPText(event)}
-           </Button>
-       </div>
+
     </div>
   );
 };
@@ -1960,11 +1948,7 @@ const BridalMinimalLayout: React.FC<LayoutProps> = ({ event, onRSVP, guestName, 
         </div>
       </div>
 
-      <div className="fixed bottom-6 left-0 w-full px-6 z-50 flex justify-center pointer-events-none">
-          <Button onClick={onRSVP} className="pointer-events-auto w-full max-w-sm bg-[#333333] text-white hover:bg-[#1A1A1A] py-6 rounded-2xl shadow-xl text-xs uppercase tracking-[0.2em] transition-transform active:scale-95">
-             {getRSVPText(event)}
-          </Button>
-      </div>
+
     </div>
   );
 };
@@ -2054,11 +2038,7 @@ const BridalTeaPartyLayout: React.FC<LayoutProps> = ({ event, onRSVP, guestName,
 
       </div>
 
-      <div className="fixed bottom-0 left-0 w-full bg-gradient-to-t from-white via-white/80 to-transparent pt-12 pb-6 px-6 z-50 flex justify-center pointer-events-none">
-          <Button onClick={onRSVP} className="pointer-events-auto w-full max-w-sm bg-[#8194A5] text-white hover:bg-[#5C7487] py-6 rounded-full shadow-lg text-xs font-sans uppercase tracking-[0.2em] transition-transform active:scale-95">
-             {getRSVPText(event)}
-          </Button>
-      </div>
+
     </div>
   );
 };
@@ -2154,11 +2134,7 @@ const BridalChefLayout: React.FC<LayoutProps> = ({ event, onRSVP, guestName, onL
 
       </div>
 
-      <div className="fixed bottom-0 left-0 w-full bg-gradient-to-t from-[#FAF9F6] via-[#FAF9F6]/90 to-transparent pt-12 pb-6 px-6 z-50 flex justify-center pointer-events-none">
-          <Button onClick={onRSVP} className="pointer-events-auto w-full max-w-sm bg-[#879F84] text-[#FAF9F6] border border-[#879F84] hover:bg-[#FAF9F6] hover:text-[#879F84] py-5 rounded-full shadow-lg text-[10px] font-bold uppercase tracking-[0.3em] transition-all active:scale-95">
-             {getRSVPText(event)}
-          </Button>
-      </div>
+
     </div>
   );
 };
@@ -2280,12 +2256,7 @@ const BridalTropicalLayout: React.FC<LayoutProps> = ({ event, onRSVP, guestName,
 
       </div>
 
-      {/* Floating CTA */}
-      <div className="fixed bottom-0 left-0 w-full bg-gradient-to-t from-[#f4fdf6] via-[#f4fdf6]/90 to-transparent pt-12 pb-6 px-6 z-50 flex justify-center pointer-events-none">
-          <Button onClick={onRSVP} className="pointer-events-auto w-full max-w-sm bg-emerald-700 text-white hover:bg-emerald-800 py-5 rounded-2xl shadow-xl shadow-emerald-900/20 text-xs font-bold uppercase tracking-[0.2em] transition-all active:scale-95">
-             {getRSVPText(event)}
-          </Button>
-      </div>
+
     </div>
   );
 };
@@ -2349,24 +2320,15 @@ const RSVPForm: React.FC<{ event: EventDetails | any; onClose: () => void }> = (
            const normalizedPhone = formData.phone.trim().replace(/\D/g, ''); // Extract only digits
            
            // Check if guest already exists by phone
-           const guestsRef = collection(db, 'events', event.id, 'guests');
-           const q = query(guestsRef, where('phone', '==', normalizedPhone));
+           const guestRef = doc(db, 'events', event.id, 'guests', normalizedPhone);
            
-           // We need to import getDocs if not imported already. Let's assume we can get it from firebase/firestore which is already imported.
-           // Actually, let's just make sure getDocs is imported at the top of the file. I'll add it in a subsequent edit if needed.
-           // Wait, I can just use getDocs from firebase/firestore.
+           const { getDoc } = await import('firebase/firestore');
+           const snap = await getDoc(guestRef);
            
-           // Actually wait, let me just add getDocs to the imports if needed. Let me edit the imports too.
-           const { getDocs } = await import('firebase/firestore');
-           const snap = await getDocs(q);
+           let finalGuestId = normalizedPhone;
            
-           let finalGuestId = '';
-           
-           if (!snap.empty) {
+           if (snap.exists()) {
                // Update existing guest
-               const existingDoc = snap.docs[0];
-               finalGuestId = existingDoc.id;
-               const guestRef = doc(db, 'events', event.id, 'guests', finalGuestId);
                await setDoc(guestRef, {
                    name: formData.name,
                    phone: normalizedPhone,
@@ -2378,8 +2340,6 @@ const RSVPForm: React.FC<{ event: EventDetails | any; onClose: () => void }> = (
                }, { merge: true });
            } else {
                // Create new guest
-               finalGuestId = "gst_" + Math.random().toString(36).substr(2, 9);
-               const guestRef = doc(db, 'events', event.id, 'guests', finalGuestId);
                await setDoc(guestRef, {
                    name: formData.name,
                    phone: normalizedPhone,

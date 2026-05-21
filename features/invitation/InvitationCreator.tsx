@@ -3,7 +3,7 @@ import { motion } from 'framer-motion';
 import { Button } from '../../components/ui/Button';
 import { QRCodeSVG } from 'qrcode.react'; 
 import { Save, QrCode, ArrowLeft, MapPin, Clock, Plus, Trash2 } from 'lucide-react';
-import { useNavigate, useParams, Link } from 'react-router-dom';
+import { useNavigate, useParams, useSearchParams, Link } from 'react-router-dom';
 import { useFirebase, db, handleFirestoreError, OperationType } from '../../components/FirebaseProvider';
 import { ImageUploader } from '../../components/ImageUploader';
 import { AudioUploader } from '../../components/AudioUploader';
@@ -13,9 +13,10 @@ import toast from 'react-hot-toast';
 export const InvitationCreator: React.FC = () => {
     const navigate = useNavigate();
     const { id } = useParams();
+    const [searchParams] = useSearchParams();
     const { user, userProfile } = useFirebase();
     const [formData, setFormData] = useState({
-        type: new URLSearchParams(window.location.search).get('type') || 'WEDDING',
+        type: searchParams.get('type') || 'WEDDING',
         groomName: '',
         brideName: '',
         hosts: '',
@@ -41,12 +42,12 @@ export const InvitationCreator: React.FC = () => {
         dressCodeTitle: '',
         dressCodeDescription: '',
         plan: 'Essencial',
-        layoutMode: new URLSearchParams(window.location.search).get('template') || 'MODERN'
+        layoutMode: searchParams.get('template') || 'MODERN'
     });
     
     const [isSaving, setIsSaving] = useState(false);
     const [isLoading, setIsLoading] = useState(!!id);
-    const [showTemplateSelector, setShowTemplateSelector] = useState(!new URLSearchParams(window.location.search).get('template'));
+    const [showTemplateSelector, setShowTemplateSelector] = useState(!searchParams.get('template'));
 
     // Update plan from userProfile for new events
     useEffect(() => {
@@ -157,39 +158,14 @@ export const InvitationCreator: React.FC = () => {
         }
 
         const isNewEvent = !id;
-        if (isNewEvent) {
-             if (userProfile?.plan === 'Essencial') {
-                  const eventsRef = collection(db, 'events');
-                  const q = query(eventsRef, where("ownerId", "==", user.uid));
-                  const snap = await getDocs(q);
-                  
-                  const now = new Date();
-                  const currentMonthEvents = snap.docs.filter(doc => {
-                       const data = doc.data();
-                       const eventDate = data.createdAt ? new Date(data.createdAt) : new Date(0);
-                       return eventDate.getFullYear() === now.getFullYear() && eventDate.getMonth() === now.getMonth();
-                  });
+        const creditCost = isBridalShower ? 1 : 2;
 
-                  if (currentMonthEvents.length >= 5) {
-                      toast.custom((t) => (
-                          <div className={`${t.visible ? 'animate-enter' : 'animate-leave'} max-w-sm w-full bg-white shadow-[0_8px_30px_rgb(0,0,0,0.12)] rounded-xl flex flex-col border border-slate-100 overflow-hidden`}>
-                              <div className="p-4">
-                                  <h3 className="font-bold text-slate-900 mb-1">Limite Atingido</h3>
-                                  <p className="text-sm text-slate-500">O plano Essencial permite até 5 eventos por mês. Atualize para o Premium.</p>
-                              </div>
-                              <div className="flex border-t border-slate-100">
-                                  <button onClick={() => toast.dismiss(t.id)} className="flex-1 px-4 py-3 text-sm font-bold text-slate-500 hover:bg-slate-50 transition-colors">Cancelar</button>
-                                  <div className="w-px bg-slate-100" />
-                                  <button onClick={() => { toast.dismiss(t.id); navigate('/plans'); }} className="flex-1 px-4 py-3 text-sm font-bold text-brand-blue hover:bg-slate-50 transition-colors">Ver Planos</button>
-                              </div>
-                          </div>
-                      ), { duration: 5000 });
-                      return;
-                  }
-             } else if ((userProfile?.credits || 0) < 1) {
-                  toast.error('Você não tem créditos B2B suficientes para criar este evento. Por favor, adquira mais pacotes no seu painel.');
-                  return;
-             }
+        if (isNewEvent && userProfile?.plan !== 'Business' && userProfile?.plan !== 'Corporate') {
+            const currentCredits = userProfile?.credits || 0;
+            if (currentCredits < creditCost) {
+                toast.error(`Você não tem créditos suficientes. Custo: ${creditCost} crédito(s). Adquira mais créditos.`);
+                return;
+            }
         }
 
         setIsSaving(true);
@@ -241,15 +217,14 @@ export const InvitationCreator: React.FC = () => {
                 await updateDoc(docRef, finalData);
                 navigate(`/invite/${id}`);
             } else {
-                // Deduct credits and save transaction for B2B
-                if (userProfile?.plan !== 'Essencial') {
-                    const newCredits = (userProfile?.credits || 0) - 1;
+                if (userProfile?.plan !== 'Business' && userProfile?.plan !== 'Corporate') {
+                    const newCredits = (userProfile?.credits || 0) - (isBridalShower ? 1 : 2);
                     await updateDoc(doc(db, 'users', user.uid), { credits: newCredits });
                     
                     const newTransRef = doc(collection(db, 'transactions'));
                     await setDoc(newTransRef, {
                         ownerId: user.uid,
-                        amount: 1,
+                        amount: isBridalShower ? 1 : 2,
                         type: 'DEBIT',
                         description: `Criação do evento: ${finalData.title}`,
                         date: new Date().toISOString(),
@@ -293,9 +268,9 @@ export const InvitationCreator: React.FC = () => {
                 className="max-w-3xl mx-auto bg-white rounded-[32px] p-8 md:p-12 shadow-[0_20px_40px_-15px_rgba(0,40,100,0.05)] border border-slate-100 relative z-10"
             >
                 <div className="flex items-center mb-10">
-                    <Link to="/" className="w-12 h-12 flex items-center justify-center rounded-2xl hover:bg-slate-50 text-slate-400 hover:text-brand-blue transition-all mr-6 border border-transparent hover:border-slate-100">
+                    <button type="button" onClick={() => navigate(-1)} className="w-12 h-12 flex items-center justify-center rounded-2xl hover:bg-slate-50 text-slate-400 hover:text-brand-blue transition-all mr-6 border border-transparent hover:border-slate-100 outline-none cursor-pointer">
                         <ArrowLeft size={20} />
-                    </Link>
+                    </button>
                     <div>
                         <h1 className="text-3xl font-serif font-bold text-slate-900 leading-tight">{id ? "Editar Convite" : "Novo Evento"}</h1>
                         <p className="text-sm text-slate-500 mt-1 font-medium">Preencha os detalhes para criar uma experiência única.</p>
@@ -323,16 +298,9 @@ export const InvitationCreator: React.FC = () => {
                     </div>
 
                     {/* Visual Identity Picker */}
-                    <div className="space-y-3">
-                        <div className="flex items-center justify-between">
+                    {showTemplateSelector && (
+                        <div className="space-y-3">
                             <label className="text-xs font-bold text-slate-400 uppercase tracking-widest pl-1">Identidade Visual</label>
-                            {!showTemplateSelector && (
-                                <button type="button" onClick={() => setShowTemplateSelector(true)} className="text-xs text-brand-blue font-bold cursor-pointer hover:underline">
-                                    Alterar Modelo
-                                </button>
-                            )}
-                        </div>
-                        {showTemplateSelector && (
                             <div className="grid grid-cols-3 gap-4">
                                 {['CLASSIC', 'ESSENTIAL', 'MODERN', 'LUXURY', 'GARDEN', 'RUSTIC', 'INDUSTRIAL', 'BRIDAL_BEAUTY', 'BRIDAL_ROMANTIC', 'BRIDAL_MINIMAL', 'BRIDAL_TEA_PARTY', 'BRIDAL_CHEF', 'BRIDAL_TROPICAL'].map(mode => (
                                     <motion.div 
@@ -379,8 +347,8 @@ export const InvitationCreator: React.FC = () => {
                                     </motion.div>
                                 ))}
                             </div>
-                        )}
-                    </div>
+                        </div>
+                    )}
 
                     <div className="space-y-6">
                         <div className="space-y-3">

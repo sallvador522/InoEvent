@@ -82,8 +82,8 @@ export const CreateBusiness: React.FC = () => {
                     <Building2 size={32} />
                 </div>
                 
-                <button onClick={() => navigate('/dashboard')} className="text-sm text-slate-500 hover:text-slate-800 font-medium flex items-center gap-2 mb-4 transition-colors">
-                    <ArrowRight size={16} className="rotate-180" /> Voltar ao Painel
+                <button type="button" onClick={() => navigate(-1)} className="text-sm text-slate-500 hover:text-slate-800 font-medium flex items-center gap-2 mb-4 transition-colors outline-none cursor-pointer">
+                    <ArrowRight size={16} className="rotate-180" /> Voltar
                 </button>
 
                 <h1 className="text-3xl font-bold text-slate-800 mb-2">

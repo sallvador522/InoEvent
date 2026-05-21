@@ -149,7 +149,7 @@ export const BusinessDashboard: React.FC = () => {
                         </div>
                         <h3 className="text-4xl font-black mb-1">{userProfile?.credits || 0}</h3>
                         <p className="text-amber-100 text-sm font-medium">Créditos de Eventos</p>
-                        <button onClick={() => setIsSimulateModalOpen(true)} className="mt-6 w-full py-3 bg-white text-amber-600 font-bold rounded-xl text-sm hover:bg-amber-50 transition-colors shadow-sm">
+                        <button onClick={() => navigate('/plans')} className="mt-6 w-full py-3 bg-white text-amber-600 font-bold rounded-xl text-sm hover:bg-amber-50 transition-colors shadow-sm">
                             Comprar Pacotes de Convites
                         </button>
                     </div>
@@ -322,28 +322,6 @@ export const BusinessDashboard: React.FC = () => {
                     )}
                 </div>
             </main>
-
-            <AnimatePresence>
-                {isSimulateModalOpen && (
-                    <div className="fixed inset-0 z-50 flex items-center justify-center p-4">
-                        <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }} onClick={() => setIsSimulateModalOpen(false)} className="absolute inset-0 bg-slate-900/40 backdrop-blur-sm" />
-                        <motion.div initial={{ opacity: 0, scale: 0.95, y: 20 }} animate={{ opacity: 1, scale: 1, y: 0 }} exit={{ opacity: 0, scale: 0.95, y: 20 }} className="bg-white rounded-3xl p-8 max-w-md w-full relative z-10 shadow-2xl">
-                            <button onClick={() => setIsSimulateModalOpen(false)} className="absolute top-6 right-6 text-slate-400 hover:text-slate-600 transition-colors">
-                                <X size={24} />
-                            </button>
-                            <div className="w-12 h-12 bg-amber-50 text-amber-500 rounded-xl flex items-center justify-center mb-6">
-                                <Ticket size={24} />
-                            </div>
-                            <h3 className="text-xl font-bold text-slate-800 mb-2">Simular Compra</h3>
-                            <p className="text-slate-500 text-sm mb-6">Esta é uma integração simulada. Ao continuar, você receberá 10 créditos na sua conta de forma gratuita (para fins de demonstração).</p>
-                            
-                            <Button fullWidth onClick={handleBuyCredits} disabled={isSimulating}>
-                                {isSimulating ? "Processando..." : "Confirmar Recebimento (+10)"}
-                            </Button>
-                        </motion.div>
-                    </div>
-                )}
-            </AnimatePresence>
-        </div>
+      </div>
     );
 };

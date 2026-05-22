@@ -118,7 +118,7 @@ export const AboutPage = () => {
                         <button onClick={handleCreateEvent} className="px-8 py-4 bg-brand-blue text-white rounded-full font-bold shadow-[0_0_20px_rgba(37,99,235,0.4)] hover:bg-brand-blue/90 transition-all hover:scale-105 w-full sm:w-auto">
                             {user ? 'Criar Eventos' : 'Começar Agora'}
                         </button>
-                        <a href="https://wa.me/244957975771" className="px-8 py-4 bg-white/10 text-white rounded-full font-bold hover:bg-white/20 transition-colors w-full sm:w-auto border border-white/10">
+                        <a href="https://wa.me/244952815430" className="px-8 py-4 bg-white/10 text-white rounded-full font-bold hover:bg-white/20 transition-colors w-full sm:w-auto border border-white/10">
                             Fale Conosco
                         </a>
                     </div>

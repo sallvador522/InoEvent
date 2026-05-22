@@ -62,7 +62,7 @@ export const TermsPage = () => {
                     <section>
                         <h2 className="text-2xl font-bold text-slate-800 mb-4">6. Contato</h2>
                         <p className="text-slate-600 leading-relaxed">
-                            Para dúvidas ou esclarecimentos sobre estes termos, por favor, entre em contato através do nosso suporte pelo e-mail: <a href="mailto:suporte@inoevents.com" className="text-brand-blue hover:underline">suporte@inoevents.com</a>.
+                            Para dúvidas ou esclarecimentos sobre estes termos, por favor, entre em contato através do nosso suporte no WhatsApp: <a href="https://wa.me/244952815430" target="_blank" rel="noopener noreferrer" className="text-brand-blue hover:underline">+244 952 815 430</a>.
                         </p>
                     </section>
                 </motion.div>

@@ -1,6 +1,6 @@
 import React, { useState } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
-import { Check, ArrowLeft, Gem, Sparkles, Building2, X } from 'lucide-react';
+import { Check, ArrowLeft, Gem, Sparkles, Building2, X, Copy } from 'lucide-react';
 import { Link, useNavigate } from 'react-router-dom';
 import { doc, updateDoc, getDoc, setDoc } from 'firebase/firestore';
 import { useFirebase, db, handleFirestoreError, OperationType } from '../../components/FirebaseProvider';
@@ -104,6 +104,12 @@ export const PlansPage: React.FC = () => {
   const [isSimulateModalOpen, setIsSimulateModalOpen] = useState(false);
   const [selectedPlanToBuy, setSelectedPlanToBuy] = useState<any>(null);
   const [billingCycle, setBillingCycle] = useState<'monthly' | 'annual'>('monthly');
+  const [paymentReferenceModal, setPaymentReferenceModal] = useState<{ entity: string, reference: string, amount: number, isPolling: boolean } | null>(null);
+
+  const handleCopy = (text: string) => {
+    navigator.clipboard.writeText(text);
+    toast.success('Copiado!');
+  };
 
   const confirmPlanSelection = (plan: any) => {
     if (!user) {
@@ -210,17 +216,16 @@ export const PlansPage: React.FC = () => {
       }
 
       if (data.data?.reference && data.data?.entity) {
-         toast.success((t) => (
-            <div className="flex flex-col gap-2 p-2">
-                <span className="font-bold text-slate-800">Use os dados no Multicaixa:</span>
-                <span className="text-sm">Entidade: <strong>{data.data.entity}</strong></span>
-                <span className="text-sm">Referência: <strong>{data.data.reference}</strong></span>
-                <span className="text-xs text-slate-500 mt-2">O seu plano será ativado automaticamente assim que o pagamento for recebido. A aguardar...</span>
-            </div>
-         ), { duration: 30000 });
+         setPaymentReferenceModal({
+             entity: data.data.entity,
+             reference: data.data.reference,
+             amount: amountValue,
+             isPolling: true
+         });
          
          // Start checking for success
          startPolling(externalId, async (webhookData) => {
+             setPaymentReferenceModal(prev => prev ? { ...prev, isPolling: false } : null);
              // Since polling returned SUCCESS, the user has paid!
              // We update the user document!
              try {
@@ -320,17 +325,16 @@ export const PlansPage: React.FC = () => {
       }
 
       if (data.data?.reference && data.data?.entity) {
-         toast.success((t) => (
-            <div className="flex flex-col gap-2 p-2">
-                <span className="font-bold text-slate-800">Use os dados no Multicaixa:</span>
-                <span className="text-sm">Entidade: <strong>{data.data.entity}</strong></span>
-                <span className="text-sm">Referência: <strong>{data.data.reference}</strong></span>
-                <span className="text-xs text-slate-500 mt-2">Os seus créditos serão adicionados automaticamente assim que o pagamento for recebido. A aguardar...</span>
-            </div>
-         ), { duration: 30000 });
+         setPaymentReferenceModal({
+             entity: data.data.entity,
+             reference: data.data.reference,
+             amount: amountValue,
+             isPolling: true
+         });
          
          // Start checking for success
          startPolling(externalId, async (webhookData) => {
+             setPaymentReferenceModal(prev => prev ? { ...prev, isPolling: false } : null);
              // Since polling returned SUCCESS, the user has paid!
              // We update the user document!
              try {
@@ -610,6 +614,70 @@ export const PlansPage: React.FC = () => {
                       <Button fullWidth onClick={handleSimulatePayment} disabled={!!loadingPlan}>
                           {loadingPlan ? "Processando..." : "Confirmar e Pagar"}
                       </Button>
+                  </motion.div>
+              </div>
+          )}
+      </AnimatePresence>
+
+      <AnimatePresence>
+          {paymentReferenceModal && (
+              <div className="fixed inset-0 z-50 flex items-center justify-center p-4">
+                  <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }} className="absolute inset-0 bg-slate-900/60 backdrop-blur-md" />
+                  <motion.div initial={{ opacity: 0, scale: 0.95, y: 20 }} animate={{ opacity: 1, scale: 1, y: 0 }} exit={{ opacity: 0, scale: 0.95, y: 20 }} className="bg-white rounded-3xl p-6 md:p-8 max-w-md w-full relative z-10 shadow-2xl flex flex-col">
+                      <div className="flex justify-between items-start mb-6">
+                         <div>
+                            <span className="text-brand-blue font-bold tracking-widest text-[10px] uppercase mb-1 block">Pagamento por Referência</span>
+                            <h3 className="text-2xl font-bold text-slate-800 tracking-tight">Referência Multicaixa</h3>
+                         </div>
+                         <button onClick={() => setPaymentReferenceModal(null)} className="text-slate-400 hover:text-slate-600 transition-colors bg-slate-50 hover:bg-slate-100 p-2 rounded-full">
+                           <X size={20} />
+                         </button>
+                      </div>
+
+                      <div className="bg-blue-50 border border-blue-100 rounded-xl p-4 mb-6">
+                         <p className="text-sm text-blue-800 font-medium leading-relaxed">
+                           ℹ️ Este pagamento pode ser feito através do <strong>Multicaixa Express</strong> ou em qualquer <strong>Caixa Automático (ATM)</strong>.
+                         </p>
+                      </div>
+
+                      <div className="space-y-4 mb-8">
+                         <div className="bg-slate-50 border border-slate-200 rounded-2xl p-4 flex justify-between items-center group transition-colors hover:border-brand-blue/30">
+                            <div>
+                               <p className="text-xs text-slate-500 font-medium uppercase tracking-wider mb-1">Entidade</p>
+                               <p className="text-xl font-mono font-bold text-slate-900">{paymentReferenceModal.entity}</p>
+                            </div>
+                            <button onClick={() => handleCopy(paymentReferenceModal.entity)} className="p-3 bg-white text-slate-400 hover:text-brand-blue border border-slate-200 shadow-sm rounded-xl transition-all active:scale-95 group-hover:border-brand-blue/30 group-hover:shadow hover:bg-blue-50">
+                               <Copy size={18} />
+                            </button>
+                         </div>
+                         
+                         <div className="bg-slate-50 border border-slate-200 rounded-2xl p-4 flex justify-between items-center group transition-colors hover:border-brand-blue/30">
+                            <div>
+                               <p className="text-xs text-slate-500 font-medium uppercase tracking-wider mb-1">Referência</p>
+                               <p className="text-xl font-mono font-bold text-slate-900">{paymentReferenceModal.reference.match(/.{1,3}/g)?.join(' ') || paymentReferenceModal.reference}</p>
+                            </div>
+                            <button onClick={() => handleCopy(paymentReferenceModal.reference)} className="p-3 bg-white text-slate-400 hover:text-brand-blue border border-slate-200 shadow-sm rounded-xl transition-all active:scale-95 group-hover:border-brand-blue/30 group-hover:shadow hover:bg-blue-50">
+                               <Copy size={18} />
+                            </button>
+                         </div>
+
+                         <div className="flex justify-between items-center px-4 py-2 border-t border-slate-100 mt-4">
+                            <p className="text-sm text-slate-500 font-medium">Valor a Pagar</p>
+                            <p className="text-lg font-bold text-slate-900">{(paymentReferenceModal?.amount || 0).toLocaleString('pt-AO')} Kz</p>
+                         </div>
+                      </div>
+
+                      <div className="flex flex-col items-center justify-center gap-3">
+                         {paymentReferenceModal.isPolling ? (
+                            <div className="flex flex-col items-center animate-pulse">
+                               <div className="w-6 h-6 border-2 border-brand-blue border-t-transparent rounded-full animate-spin mb-3"></div>
+                               <p className="text-sm font-bold text-brand-blue">A aguardar pagamento...</p>
+                               <p className="text-xs text-slate-500 text-center max-w-xs mt-1">Dirija-se a um ATM ou use o Multicaixa Express para pagar a entidade acima.</p>
+                            </div>
+                         ) : (
+                            <p className="text-sm font-bold text-emerald-600">✅ Pagamento detetado com sucesso!</p>
+                         )}
+                      </div>
                   </motion.div>
               </div>
           )}

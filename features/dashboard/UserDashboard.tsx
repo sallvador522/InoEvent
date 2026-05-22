@@ -91,8 +91,15 @@ export const UserDashboard: React.FC = () => {
                        </p>
                    </div>
                    <div className="flex gap-4">
+                       <Button 
+                           variant="outline" 
+                           onClick={() => window.open('https://wa.me/244952815430', '_blank')} 
+                           className="hidden sm:flex border-emerald-500/20 text-emerald-600 hover:bg-emerald-50"
+                       >
+                           Suporte
+                       </Button>
                        <Button variant="outline" onClick={() => navigate('/plans')} className="border-brand-blue/20 text-brand-blue hover:bg-blue-50">
-                           <Ticket size={16} className="mr-2" /> Comprar Créditos
+                           <Ticket size={16} className="mr-2 hidden sm:block" /> {userProfile?.credits || 0} Créditos
                        </Button>
                        <Button onClick={handleCreateEvent}>
                            <Plus size={16} className="mr-2" /> Novo Evento

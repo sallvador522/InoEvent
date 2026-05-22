@@ -2,6 +2,7 @@ import React, { useState, useEffect } from 'react';
 import { collection, query, where, getDocs, doc, updateDoc, setDoc } from 'firebase/firestore';
 import { db, handleFirestoreError, OperationType } from '../../components/FirebaseProvider';
 import { useFirebase } from '../../components/FirebaseProvider';
+import { Navbar } from '../../components/Navbar';
 import { Link, useNavigate } from 'react-router-dom';
 import { Button } from '../../components/ui/Button';
 import { Calendar, Plus, Building2, Ticket, Settings, ArrowRight, ExternalLink, X, Users, Briefcase, Leaf, CheckCircle2 } from 'lucide-react';
@@ -207,7 +208,7 @@ export const BusinessDashboard: React.FC = () => {
                      <div className="bg-white border border-slate-200 rounded-3xl p-6 shadow-sm relative overflow-hidden flex items-center justify-between group hover:border-emerald-500/30 transition-colors">
                         <div>
                             <p className="text-slate-500 text-xs font-bold uppercase tracking-widest mb-1">Economia Gerada</p>
-                            <h3 className="text-3xl font-black text-slate-800">R$ {stats.paperSaved.toLocaleString('pt-BR', { minimumFractionDigits: 2 })}</h3>
+                            <h3 className="text-3xl font-black text-slate-800">R$ {(stats?.paperSaved || 0).toLocaleString('pt-BR', { minimumFractionDigits: 2 })}</h3>
                             <p className="text-sm text-emerald-600 mt-2 font-medium flex items-center gap-1">
                                 <Leaf size={14} /> Papel e logística evitados
                             </p>

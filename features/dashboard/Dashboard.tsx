@@ -1,6 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { useParams, Link, useNavigate } from 'react-router-dom';
-import { Users, CheckCircle2, QrCode, Share2, Download, Clock, Search, MessageSquare, ArrowLeft, MoreHorizontal, Settings, Copy, Check, Edit2, Trash2, Plus, MessageCircle, UploadCloud } from 'lucide-react';
+import { Users, CheckCircle2, QrCode, Share2, Download, Clock, Search, MessageSquare, ArrowLeft, MoreHorizontal, Settings, Copy, Check, Edit2, Trash2, Plus, MessageCircle, UploadCloud, Gem, Camera } from 'lucide-react';
 import { motion, AnimatePresence } from 'framer-motion';
 import { doc, collection, onSnapshot, deleteDoc, updateDoc, setDoc } from 'firebase/firestore';
 import { db, handleFirestoreError, OperationType } from '../../components/FirebaseProvider';
@@ -9,6 +9,9 @@ import { LineChart, Line, XAxis, YAxis, CartesianGrid, Tooltip as RechartsToolti
 import { SmartAssistant } from './SmartAssistant';
 import { playScanSound } from '../../lib/sound';
 import toast from 'react-hot-toast';
+
+import { VirtualGiftsManager } from './VirtualGiftsManager';
+import { GuestbookManager } from './GuestbookManager';
 
 export const Dashboard = () => {
     const { id } = useParams<{ id: string }>();
@@ -30,7 +33,7 @@ export const Dashboard = () => {
     const [scanState, setScanState] = useState<{status: 'idle' | 'processing' | 'success' | 'error' | 'already_scanned', message: string, guestName?: string}>({status: 'idle', message: ''});
     const [activeFilter, setActiveFilter] = useState<'all' | 'checkedIn' | 'confirmed' | 'pending' | 'declined'>('all');
 
-    const [activeTab, setActiveTab] = useState<'guests' | 'analytics' | 'assistant'>('guests');
+    const [activeTab, setActiveTab] = useState<'guests' | 'analytics' | 'assistant' | 'gifts' | 'messages'>('guests');
 
     useEffect(() => {
 
@@ -307,7 +310,7 @@ export const Dashboard = () => {
                 <div className="flex items-center gap-2">
                     {(event?.plan === 'Premium' || event?.plan === 'Business' || event?.plan === 'Corporate') && (
                         <a 
-                            href="https://wa.me/244900000000?text=Olá,%20preciso%20de%20suporte%20VIP" 
+                            href="https://wa.me/244952815430?text=Olá,%20preciso%20de%20suporte%20VIP" 
                             target="_blank" 
                             rel="noopener noreferrer"
                             className="hidden md:flex items-center gap-2 text-sm font-bold text-emerald-600 bg-emerald-50 px-4 py-2 rounded-full hover:bg-emerald-100 transition-colors"
@@ -433,13 +436,15 @@ export const Dashboard = () => {
                 </div>
 
                 {/* Spatial UI Stats Cards */}
-                <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-5 gap-4 mb-12">
-                    <StatCard title="Total" value={totalCount} icon={Users} color="bg-blue-50 text-blue-600" />
-                    <StatCard title="Entraram" value={checkedInCount} icon={CheckCircle2} color="bg-emerald-50 text-emerald-600" />
-                    <StatCard title="Confirmados" value={confirmedCount} icon={CheckCircle2} color="bg-green-50 text-green-600" />
-                    <StatCard title="Pendentes" value={pendingCount} icon={Clock} color="bg-orange-50 text-orange-600" />
-                    <StatCard title="Recusados" value={declinedCount} icon={Users} color="bg-red-50 text-red-600" />
-                </div>
+                {event?.type !== 'BRIDAL_SHOWER' && (
+                    <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-5 gap-4 mb-12">
+                        <StatCard title="Total" value={totalCount} icon={Users} color="bg-blue-50 text-blue-600" />
+                        <StatCard title="Entraram" value={checkedInCount} icon={CheckCircle2} color="bg-emerald-50 text-emerald-600" />
+                        <StatCard title="Confirmados" value={confirmedCount} icon={CheckCircle2} color="bg-green-50 text-green-600" />
+                        <StatCard title="Pendentes" value={pendingCount} icon={Clock} color="bg-orange-50 text-orange-600" />
+                        <StatCard title="Recusados" value={declinedCount} icon={Users} color="bg-red-50 text-red-600" />
+                    </div>
+                )}
 
                 {/* Tabs UI */}
                 <div className="flex flex-wrap gap-1 bg-slate-100 rounded-2xl lg:rounded-full p-1 mb-8 w-full md:w-fit mx-auto md:mx-0">
@@ -449,7 +454,7 @@ export const Dashboard = () => {
                     >
                         Gestão de Convidados
                     </button>
-                    {(event?.plan === 'Business' || event?.plan === 'Corporate' || event?.plan === 'Premium') && (
+                    {event?.type !== 'BRIDAL_SHOWER' && (event?.plan === 'Business' || event?.plan === 'Corporate' || event?.plan === 'Premium') && (
                         <button 
                             onClick={() => setActiveTab('analytics')}
                             className={`flex-1 md:flex-none justify-center px-4 md:px-6 py-2.5 rounded-xl lg:rounded-full font-bold text-sm transition-all flex items-center gap-2 ${activeTab === 'analytics' ? 'bg-white shadow-sm text-brand-blue' : 'text-slate-500 hover:text-slate-700'}`}
@@ -457,6 +462,20 @@ export const Dashboard = () => {
                             Analytics
                         </button>
                     )}
+                    {(event?.plan === 'Business' || event?.plan === 'Corporate' || event?.plan === 'Premium') && (
+                        <button 
+                            onClick={() => setActiveTab('gifts')}
+                            className={`flex-1 md:flex-none justify-center px-4 md:px-6 py-2.5 rounded-xl lg:rounded-full font-bold text-sm transition-all flex items-center gap-2 ${activeTab === 'gifts' ? 'bg-white shadow-sm text-brand-blue' : 'text-slate-500 hover:text-slate-700'}`}
+                        >
+                            <Gem size={16} className={activeTab === 'gifts' ? 'text-brand-blue' : 'text-slate-400'} /> Presentes
+                        </button>
+                    )}
+                    <button 
+                        onClick={() => setActiveTab('messages')}
+                        className={`flex-1 md:flex-none justify-center px-4 md:px-6 py-2.5 rounded-xl lg:rounded-full font-bold text-sm transition-all flex items-center gap-2 ${activeTab === 'messages' ? 'bg-white shadow-sm text-brand-blue' : 'text-slate-500 hover:text-slate-700'}`}
+                    >
+                        <MessageSquare size={16} className={activeTab === 'messages' ? 'text-brand-blue' : 'text-slate-400'} /> Mural
+                    </button>
                     {(event?.plan === 'Corporate' || event?.plan === 'Premium') && (
                         <button 
                             onClick={() => setActiveTab('assistant')}
@@ -548,9 +567,13 @@ export const Dashboard = () => {
                             </div>
                             <div className="flex gap-2 bg-slate-100 p-1.5 rounded-2xl overflow-x-auto no-scrollbar w-full xl:w-auto">
                                 <FilterButton label="Todos" active={activeFilter === 'all'} onClick={() => setActiveFilter('all')} />
-                                <FilterButton label="Entraram" active={activeFilter === 'checkedIn'} onClick={() => setActiveFilter('checkedIn')} />
-                                <FilterButton label="Confirmados" active={activeFilter === 'confirmed'} onClick={() => setActiveFilter('confirmed')} />
-                                <FilterButton label="Pendentes" active={activeFilter === 'pending'} onClick={() => setActiveFilter('pending')} />
+                                {event?.type !== 'BRIDAL_SHOWER' && (
+                                    <>
+                                        <FilterButton label="Entraram" active={activeFilter === 'checkedIn'} onClick={() => setActiveFilter('checkedIn')} />
+                                        <FilterButton label="Confirmados" active={activeFilter === 'confirmed'} onClick={() => setActiveFilter('confirmed')} />
+                                        <FilterButton label="Pendentes" active={activeFilter === 'pending'} onClick={() => setActiveFilter('pending')} />
+                                    </>
+                                )}
                             </div>
                         </div>
 
@@ -563,7 +586,10 @@ export const Dashboard = () => {
                                     </div>
                                     <h4 className="text-lg font-bold text-slate-700 mb-1">Nenhum convidado ainda</h4>
                                     <p className="text-slate-500 text-sm max-w-sm">
-                                        Compartilhe o link do seu convite para que as pessoas possam confirmar presença.
+                                        {event?.type === 'BRIDAL_SHOWER' 
+                                            ? 'Adicione pessoas à lista ou envie o link do evento diretamente aos convidados.'
+                                            : 'Compartilhe o link do seu convite para que as pessoas possam confirmar presença.'
+                                        }
                                     </p>
                                 </div>
                             ) : filteredGuests.length === 0 ? (
@@ -587,18 +613,26 @@ export const Dashboard = () => {
                                                         <p className="font-bold text-slate-800 truncate">{guest.name}</p>
                                                         <p className="text-sm text-slate-500 flex flex-wrap items-center gap-1">
                                                             <span className="truncate">{guest.phone}</span>
-                                                            <span className="opacity-50 mx-1 hidden sm:inline">•</span>
-                                                            <span className="whitespace-nowrap">{guest.adults || 1} Adulto(s)</span> {guest.children ? <span className="whitespace-nowrap">• {guest.children} Criança(s)</span> : ''}
+                                                            {event?.type !== 'BRIDAL_SHOWER' && (
+                                                                <>
+                                                                    <span className="opacity-50 mx-1 hidden sm:inline">•</span>
+                                                                    <span className="whitespace-nowrap">{guest.adults || 1} Adulto(s)</span> {guest.children ? <span className="whitespace-nowrap">• {guest.children} Criança(s)</span> : ''}
+                                                                </>
+                                                            )}
                                                         </p>
                                                     </div>
                                                 </div>
                                                 <div className="flex flex-wrap items-center justify-start sm:justify-end gap-2 sm:gap-4 ml-14 sm:ml-0">
-                                                    {guest.checkedIn && (
-                                                        <div className="bg-green-100 text-green-700 px-3 py-1.5 rounded-full inline-flex items-center justify-center text-xs font-bold gap-1 whitespace-nowrap" title="Check-in Realizado">
-                                                            <CheckCircle2 size={14} /> Check-in
-                                                        </div>
+                                                    {event?.type !== 'BRIDAL_SHOWER' && (
+                                                        <>
+                                                            {guest.checkedIn && (
+                                                                <div className="bg-green-100 text-green-700 px-3 py-1.5 rounded-full inline-flex items-center justify-center text-xs font-bold gap-1 whitespace-nowrap" title="Check-in Realizado">
+                                                                    <CheckCircle2 size={14} /> Check-in
+                                                                </div>
+                                                            )}
+                                                            <StatusBadge status={guest.status} />
+                                                        </>
                                                     )}
-                                                    <StatusBadge status={guest.status} />
                                                     <button 
                                                         onClick={(e) => {
                                                             e.stopPropagation();
@@ -686,10 +720,22 @@ export const Dashboard = () => {
                             <SmartAssistant event={event} guests={guests} />
                         </div>
                     )}
+                    
+                    {activeTab === 'gifts' && (
+                        <div className="lg:col-span-2 flex flex-col gap-6 min-w-0">
+                            <VirtualGiftsManager event={event} />
+                        </div>
+                    )}
+
+                    {activeTab === 'messages' && (
+                        <div className="lg:col-span-2 flex flex-col gap-6 min-w-0">
+                            <GuestbookManager event={event} />
+                        </div>
+                    )}
 
                     {/* Sidebar Actions */}
                     <div className="flex flex-col gap-6 min-w-0">
-                        {(event?.plan === 'Premium' || event?.plan === 'Business' || event?.plan === 'Corporate') ? (
+                        {event?.type !== 'BRIDAL_SHOWER' && (event?.plan === 'Premium' || event?.plan === 'Business' || event?.plan === 'Corporate') ? (
                          <div className="bg-brand-blue text-white rounded-3xl p-8 relative overflow-hidden shadow-xl shadow-brand-blue/20">
                             <div className="absolute top-0 right-0 w-64 h-64 bg-white/5 rounded-full blur-3xl -mr-10 -mt-10 pointer-events-none"></div>
                             <h3 className="text-xl font-bold mb-2">Check-in Digital</h3>
@@ -724,6 +770,17 @@ export const Dashboard = () => {
                             </Link>
                          </div>
                         )}
+
+                        <div className="bg-rose-50 text-slate-800 rounded-3xl p-6 border border-rose-100 shadow-sm">
+                            <h3 className="text-xl font-bold mb-2 flex items-center gap-2 text-rose-900">
+                                <Camera size={20} className="text-rose-500" />
+                                Live Photo Wall
+                            </h3>
+                            <p className="text-rose-900/70 text-sm mb-4">Projete numa tela grande as fotos enviadas pelos convidados ao vivo.</p>
+                            <Link to={`/live-wall/${event.id}`} target="_blank" className="w-full bg-rose-500 text-white py-3 rounded-xl font-bold flex items-center justify-center gap-2 hover:bg-rose-600 transition-colors shadow-lg shadow-rose-500/20">
+                                Abrir Telão
+                            </Link>
+                        </div>
 
                          <div className="bg-white border border-slate-100 rounded-3xl p-6 shadow-sm">
                             <h3 className="font-bold text-slate-800 mb-4">Informações</h3>

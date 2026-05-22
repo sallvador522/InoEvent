@@ -1,6 +1,6 @@
 
 import React, { useState, useEffect } from 'react';
-import { useParams, Link, useNavigate } from 'react-router-dom';
+import { useParams, Link, useNavigate, useLocation } from 'react-router-dom';
 import { motion } from 'framer-motion';
 import { getEventById } from '../../mockData';
 import { EventDetails } from '../../types';
@@ -14,6 +14,9 @@ import { GalleryLightbox } from '../../components/GalleryLightbox';
 import { useFirebase, db, handleFirestoreError, OperationType } from '../../components/FirebaseProvider';
 import { doc, getDoc, setDoc, getCountFromServer, collection, query, where } from 'firebase/firestore';
 import toast from 'react-hot-toast';
+import { VirtualGiftsGuest } from './VirtualGiftsGuest';
+import { Guestbook } from './Guestbook';
+import { LivePhotoGuest } from './LivePhotoGuest';
 
 // ============================================================================
 // COMPONENT: INVITATION CONTROLLER
@@ -22,6 +25,8 @@ import toast from 'react-hot-toast';
 const InvitationView: React.FC = () => {
   const { id } = useParams();
   const navigate = useNavigate();
+  const location = useLocation();
+  const queryObj = new URLSearchParams(location.search);
   const { user, userProfile } = useFirebase();
   const [event, setEvent] = useState<any>(null);
   const [loading, setLoading] = useState(true);
@@ -267,6 +272,18 @@ const InvitationView: React.FC = () => {
           {event.layoutMode === 'INDUSTRIAL' && <IndustrialLayout {...props} />}
           {event.layoutMode?.startsWith('BRIDAL_') && <BridalStandardLayout {...props} />}
           
+          {event.gifts && event.gifts.length > 0 && (
+             <div className="w-full bg-slate-50 py-12 px-4 shadow-inner border-y border-slate-200 z-10 relative">
+                 <div className="max-w-4xl mx-auto">
+                     <VirtualGiftsGuest event={event} guestId={queryObj.get('guest')} />
+                 </div>
+             </div>
+          )}
+
+          <div className="w-full bg-white z-10 relative">
+              <Guestbook eventId={event.id} layoutMode={event.layoutMode} />
+          </div>
+
           <div className="w-full flex flex-col items-center justify-center py-10 pb-32 text-xs font-bold tracking-widest uppercase text-slate-500 gap-3 z-10 relative">
             {event.whiteLabelName && (
                <span className="opacity-70">Powered by</span>
@@ -276,6 +293,8 @@ const InvitationView: React.FC = () => {
             )}
             <span>{event.whiteLabelName ? event.whiteLabelName : 'Criado com InoEvents'}</span>
           </div>
+
+          <LivePhotoGuest eventId={event.id} eventName={event.title} guestName={queryObj.get('guest') || 'Convidado'} />
       </div>
 
       {/* Shared RSVP Modal */}

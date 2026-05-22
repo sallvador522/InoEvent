@@ -404,7 +404,7 @@ export const EVENTS: EventDetails[] = [
     time: '14:00',
     locationName: 'Espaço das Palmeiras',
     address: 'Ilha do Cabo, Luanda',
-    location: 'https://maps.app.goo.gl/Tropical',
+    mapLink: 'https://maps.app.goo.gl/Tropical',
     heroImage: 'https://images.unsplash.com/photo-1528458909336-e7a0adfed0a5?ixlib=rb-4.0.3&auto=format&fit=crop&w=800&q=80',
     description: 'Estamos montando a nossa cozinha e adoraríamos contar com a sua presença para uma tarde de boas risadas, comida gostosa e muita alegria.',
     musicTrack: 'Samba Rock',

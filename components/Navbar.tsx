@@ -62,7 +62,7 @@ export const Navbar: React.FC = () => {
         <div className="hidden md:flex items-center gap-8 text-sm font-medium text-blue-100">
            <a href="/#features" className="hover:text-white transition-colors">Funcionalidades</a>
            <Link to="/plans" className="hover:text-white transition-colors">Preços</Link>
-           <a href="mailto:suporte@inoevents.com" className="hover:text-white transition-colors">Contactos</a>
+           <a href="https://wa.me/244952815430" target="_blank" rel="noopener noreferrer" className="hover:text-white transition-colors">Contactos</a>
            <a href="/#faq" className="hover:text-white transition-colors">Perguntas</a>
            <Link to="/about" className="hover:text-white transition-colors">Sobre Nós</Link>
            
@@ -226,7 +226,7 @@ export const Navbar: React.FC = () => {
                 <span className="flex items-center gap-3"><span className="material-symbols-outlined text-slate-400">info</span> Sobre Nós</span>
                 <span className="material-symbols-outlined text-slate-300">chevron_right</span>
               </Link>
-              <a href="mailto:suporte@inoevents.com" onClick={() => setMobileMenuOpen(false)} className="hover:text-primary transition-colors flex items-center justify-between">
+              <a href="https://wa.me/244952815430" target="_blank" rel="noopener noreferrer" onClick={() => setMobileMenuOpen(false)} className="hover:text-primary transition-colors flex items-center justify-between">
                 <span className="flex items-center gap-3"><span className="material-symbols-outlined text-slate-400">call</span> Contactos</span>
                 <span className="material-symbols-outlined text-slate-300">chevron_right</span>
               </a>

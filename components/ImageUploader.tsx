@@ -58,7 +58,7 @@ export const ImageUploader: React.FC<{
   const handleFileChange = async (e: React.ChangeEvent<HTMLInputElement>) => {
     if (!e.target.files?.length) return;
     
-    const files = Array.from(e.target.files);
+    const files = Array.from<File>(e.target.files);
     
     if (normalizedImages.length + files.length > maxPhotos) {
       toast.error(`Você pode adicionar no máximo ${maxPhotos} fotos.`);

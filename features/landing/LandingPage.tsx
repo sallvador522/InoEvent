@@ -321,7 +321,7 @@ export const LandingPage: React.FC = () => {
                  <ul className="space-y-4">
                      <li><Link to="/terms" className="hover:text-white transition-colors">Termos de Serviço</Link></li>
                      <li><Link to="/privacy" className="hover:text-white transition-colors">Políticas de Privacidade</Link></li>
-                     <li><a href="mailto:suporte@inoevents.com" className="hover:text-white transition-colors">Suporte</a></li>
+                     <li><a href="https://wa.me/244952815430" target="_blank" rel="noopener noreferrer" className="hover:text-white transition-colors">Suporte</a></li>
                  </ul>
              </div>
           </div>

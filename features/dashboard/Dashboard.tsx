@@ -3,7 +3,7 @@ import { useParams, Link, useNavigate } from 'react-router-dom';
 import { Users, CheckCircle2, QrCode, Share2, Download, Clock, Search, MessageSquare, ArrowLeft, MoreHorizontal, Settings, Copy, Check, Edit2, Trash2, Plus, MessageCircle, UploadCloud, Gem, Camera } from 'lucide-react';
 import { motion, AnimatePresence } from 'framer-motion';
 import { doc, collection, onSnapshot, deleteDoc, updateDoc, setDoc } from 'firebase/firestore';
-import { db, handleFirestoreError, OperationType } from '../../components/FirebaseProvider';
+import { db, handleFirestoreError, OperationType, useFirebase } from '../../components/FirebaseProvider';
 import { QRScanner } from '../../components/QRScanner';
 import { LineChart, Line, XAxis, YAxis, CartesianGrid, Tooltip as RechartsTooltip, ResponsiveContainer, PieChart, Pie, Cell } from 'recharts';
 import { SmartAssistant } from './SmartAssistant';
@@ -16,6 +16,7 @@ import { GuestbookManager } from './GuestbookManager';
 export const Dashboard = () => {
     const { id } = useParams<{ id: string }>();
     const navigate = useNavigate();
+    const { userProfile } = useFirebase();
     const [event, setEvent] = useState<any>(null);
     const [guests, setGuests] = useState<any[]>([]);
     const [loading, setLoading] = useState(true);
@@ -34,6 +35,12 @@ export const Dashboard = () => {
     const [activeFilter, setActiveFilter] = useState<'all' | 'checkedIn' | 'confirmed' | 'pending' | 'declined'>('all');
 
     const [activeTab, setActiveTab] = useState<'guests' | 'analytics' | 'assistant' | 'gifts' | 'messages'>('guests');
+
+    useEffect(() => {
+        if (event?.type === 'BRIDAL_SHOWER' && activeTab === 'guests') {
+            setActiveTab('messages');
+        }
+    }, [event?.type, activeTab]);
 
     useEffect(() => {
 
@@ -308,6 +315,10 @@ export const Dashboard = () => {
                     </div>
                 </div>
                 <div className="flex items-center gap-2">
+                    <span className="hidden sm:flex px-3 py-1 bg-brand-blue/10 rounded-full text-xs font-semibold text-brand-blue shadow-sm border border-brand-blue/10 mr-2 items-center gap-1">
+                        <span className="material-symbols-outlined text-[14px]">loyalty</span>
+                        {userProfile?.credits || 0} Créditos
+                    </span>
                     {(event?.plan === 'Premium' || event?.plan === 'Business' || event?.plan === 'Corporate') && (
                         <a 
                             href="https://wa.me/244952815430?text=Olá,%20preciso%20de%20suporte%20VIP" 
@@ -448,12 +459,14 @@ export const Dashboard = () => {
 
                 {/* Tabs UI */}
                 <div className="flex flex-wrap gap-1 bg-slate-100 rounded-2xl lg:rounded-full p-1 mb-8 w-full md:w-fit mx-auto md:mx-0">
-                    <button 
-                        onClick={() => setActiveTab('guests')}
-                        className={`flex-1 md:flex-none px-4 md:px-6 py-2.5 rounded-xl lg:rounded-full font-bold text-sm transition-all ${activeTab === 'guests' ? 'bg-white shadow-sm text-slate-800' : 'text-slate-500 hover:text-slate-700'}`}
-                    >
-                        Gestão de Convidados
-                    </button>
+                    {event?.type !== 'BRIDAL_SHOWER' && (
+                        <button 
+                            onClick={() => setActiveTab('guests')}
+                            className={`flex-1 md:flex-none px-4 md:px-6 py-2.5 rounded-xl lg:rounded-full font-bold text-sm transition-all ${activeTab === 'guests' ? 'bg-white shadow-sm text-slate-800' : 'text-slate-500 hover:text-slate-700'}`}
+                        >
+                            Gestão de Convidados
+                        </button>
+                    )}
                     {event?.type !== 'BRIDAL_SHOWER' && (event?.plan === 'Business' || event?.plan === 'Corporate' || event?.plan === 'Premium') && (
                         <button 
                             onClick={() => setActiveTab('analytics')}

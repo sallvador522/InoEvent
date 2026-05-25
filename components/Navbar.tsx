@@ -10,6 +10,8 @@ export const Navbar: React.FC = () => {
   const { user, userProfile } = useFirebase();
   const [userEvents, setUserEvents] = useState<any[]>([]);
   const navigate = useNavigate();
+  
+  const isAdmin = user?.email?.toLowerCase() === 'antoniosalvador522@gmail.com' || user?.email === import.meta.env.VITE_ADMIN_EMAIL;
 
   useEffect(() => {
     if (!user) {
@@ -101,7 +103,19 @@ export const Navbar: React.FC = () => {
                      )}
                   </div>
                
+                  <span className="px-3 py-1 bg-white/20 rounded-full text-xs font-semibold text-white shadow-sm border border-white/10 ml-2 flex items-center gap-1">
+                     <span className="material-symbols-outlined text-[14px]">loyalty</span>
+                     {userProfile?.credits || 0} Créditos
+                  </span>
                   <span className="px-3 py-1 bg-white/20 rounded-full text-xs font-semibold text-white shadow-sm border border-white/10 ml-2">{userProfile?.plan || 'Essencial'}</span>
+                  
+                  {isAdmin && (
+                    <Link to="/admin" className="ml-4 hover:text-primary transition-colors font-semibold text-white flex items-center gap-1">
+                      <span className="material-symbols-outlined text-sm">admin_panel_settings</span>
+                      Admin
+                    </Link>
+                  )}
+
                   <button onClick={() => signOut(auth)} className="hover:text-red-400 transition-colors font-semibold text-white ml-4">Sair</button>
                </div>
              ) : (
@@ -217,6 +231,13 @@ export const Navbar: React.FC = () => {
                     <span className="material-symbols-outlined text-slate-300">chevron_right</span>
                   </Link>
               )}
+
+              {isAdmin && (
+                  <Link to="/admin" onClick={() => setMobileMenuOpen(false)} className="hover:text-primary transition-colors flex items-center justify-between">
+                    <span className="flex items-center gap-3"><span className="material-symbols-outlined text-purple-600">admin_panel_settings</span> <span className="font-bold text-purple-600">Admin</span></span>
+                    <span className="material-symbols-outlined text-slate-300">chevron_right</span>
+                  </Link>
+              )}
               
               <a href="/#features" onClick={() => setMobileMenuOpen(false)} className="hover:text-primary transition-colors flex items-center justify-between">
                 <span className="flex items-center gap-3"><span className="material-symbols-outlined text-slate-400">favorite</span> Funcionalidades</span>
@@ -242,7 +263,7 @@ export const Navbar: React.FC = () => {
                          </div>
                          <div className="flex flex-col overflow-hidden w-full">
                            <span className="text-sm font-bold text-brand-blue truncate w-full">{userProfile?.name || user.email}</span>
-                           <span className="text-xs text-slate-500 font-medium whitespace-nowrap">Plano {userProfile?.plan || 'Essencial'}</span>
+                           <span className="text-xs text-slate-500 font-medium whitespace-nowrap">Plano {userProfile?.plan || 'Essencial'} • {userProfile?.credits || 0} Créditos</span>
                          </div>
                        </div>
                        <button onClick={() => { signOut(auth); setMobileMenuOpen(false); }} className="text-red-500 bg-red-50 w-10 h-10 flex-shrink-0 flex items-center justify-center rounded-xl hover:bg-red-100 transition-colors">

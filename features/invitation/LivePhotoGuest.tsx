@@ -96,7 +96,7 @@ export const LivePhotoGuest: React.FC<{ eventId: string, eventName: string, gues
                 whileHover={{ scale: 1.05 }}
                 whileTap={{ scale: 0.95 }}
                 onClick={() => setIsOpen(true)}
-                className="fixed bottom-6 right-6 z-40 bg-rose-500 hover:bg-rose-600 shadow-xl shadow-rose-500/30 text-white rounded-full px-5 py-4 flex items-center justify-center gap-2"
+                className="fixed bottom-[140px] md:bottom-28 right-4 md:right-8 z-[90] bg-rose-500 hover:bg-rose-600 shadow-[0_0_20px_rgba(244,63,94,0.4)] text-white rounded-full px-5 py-4 flex items-center justify-center gap-2"
                 style={{ backdropFilter: 'blur(8px)' }}
             >
                 <Camera size={20} />

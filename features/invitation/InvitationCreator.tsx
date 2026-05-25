@@ -9,6 +9,7 @@ import { ImageUploader } from '../../components/ImageUploader';
 import { AudioUploader } from '../../components/AudioUploader';
 import { doc, setDoc, getDoc, getDocs, updateDoc, collection, query, where } from 'firebase/firestore';
 import toast from 'react-hot-toast';
+import { getEventByLayoutMode } from '../../mockData';
 
 export const InvitationCreator: React.FC = () => {
     const navigate = useNavigate();
@@ -19,6 +20,8 @@ export const InvitationCreator: React.FC = () => {
         type: searchParams.get('type') || 'WEDDING',
         groomName: '',
         brideName: '',
+        groomParents: '',
+        brideParents: '',
         hosts: '',
         date: '',
         time: '',
@@ -98,6 +101,8 @@ export const InvitationCreator: React.FC = () => {
                         type: data.type || 'WEDDING',
                         groomName: data.groomName || '',
                         brideName: data.brideName || '',
+                        groomParents: data.groomParents || '',
+                        brideParents: data.brideParents || '',
                         hosts: data.hosts || '',
                         date: data.date || '',
                         time: data.time || '',
@@ -183,6 +188,9 @@ export const InvitationCreator: React.FC = () => {
             } catch (e) {
                 // fallback to current time
             }
+            const currentLayoutMode = formData.layoutMode || searchParams.get('template') || 'MODERN';
+            const templateDefaults = getEventByLayoutMode(currentLayoutMode);
+
             const finalData: any = { 
                 ...formData, 
                 type: isBridalShower ? 'BRIDAL_SHOWER' : 'WEDDING',
@@ -205,7 +213,7 @@ export const InvitationCreator: React.FC = () => {
                 dressCode: (formData.dressCodeTitle || formData.dressCodeDescription) ? {
                     title: formData.dressCodeTitle,
                     description: formData.dressCodeDescription,
-                    image: 'https://images.unsplash.com/photo-1511285560982-1356c11d4606?q=80&w=2670&auto=format&fit=crop'
+                    image: templateDefaults?.dressCode?.image || 'https://images.unsplash.com/photo-1511285560982-1356c11d4606?q=80&w=2670&auto=format&fit=crop'
                 } : null
             };
             if (isNewEvent) {
@@ -361,6 +369,12 @@ export const InvitationCreator: React.FC = () => {
                                 )}
                                 <input type="text" placeholder={isBridalShower ? "Nome da Noiva/Homenageada" : "Nome da Noiva"} value={formData.brideName} onChange={e => setFormData({...formData, brideName: e.target.value})} className={`${isBridalShower ? 'col-span-1 md:col-span-2' : 'w-full'} p-4 rounded-2xl border-2 border-slate-100 bg-slate-50/50 text-slate-900 focus:border-brand-blue/30 focus:bg-white focus:ring-4 focus:ring-brand-blue/5 outline-none transition-all placeholder:text-slate-400 font-medium`} />
                             </div>
+                            {!isBridalShower && (
+                                <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                                    <input type="text" placeholder="Nome dos Pais do Noivo" value={formData.groomParents} onChange={e => setFormData({...formData, groomParents: e.target.value})} className="w-full p-4 rounded-2xl border-2 border-slate-100 bg-slate-50/50 text-slate-900 focus:border-brand-blue/30 focus:bg-white focus:ring-4 focus:ring-brand-blue/5 outline-none transition-all placeholder:text-slate-400 font-medium" />
+                                    <input type="text" placeholder="Nome dos Pais da Noiva" value={formData.brideParents} onChange={e => setFormData({...formData, brideParents: e.target.value})} className="w-full p-4 rounded-2xl border-2 border-slate-100 bg-slate-50/50 text-slate-900 focus:border-brand-blue/30 focus:bg-white focus:ring-4 focus:ring-brand-blue/5 outline-none transition-all placeholder:text-slate-400 font-medium" />
+                                </div>
+                            )}
                             <input type="text" placeholder="Anfitriões (ex: Juntamente com seus pais)" value={formData.hosts} onChange={e => setFormData({...formData, hosts: e.target.value})} className="w-full p-4 rounded-2xl border-2 border-slate-100 bg-slate-50/50 text-slate-900 focus:border-brand-blue/30 focus:bg-white focus:ring-4 focus:ring-brand-blue/5 outline-none transition-all placeholder:text-slate-400 font-medium" />
                         </div>
                         

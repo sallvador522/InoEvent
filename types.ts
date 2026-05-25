@@ -45,6 +45,10 @@ export interface EventDetails {
   layoutMode: LayoutMode; 
   title: string;
   hosts: string;
+  brideName?: string;
+  groomName?: string;
+  brideParents?: string;
+  groomParents?: string;
   date: string;
   isoDate: string; 
   time: string;

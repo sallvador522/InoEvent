@@ -663,7 +663,7 @@ export const PlansPage: React.FC = () => {
 
                          <div className="flex justify-between items-center px-4 py-2 border-t border-slate-100 mt-4">
                             <p className="text-sm text-slate-500 font-medium">Valor a Pagar</p>
-                            <p className="text-lg font-bold text-slate-900">{(paymentReferenceModal?.amount || 0).toLocaleString('pt-AO')} Kz</p>
+                            <p className="text-lg font-bold text-slate-900">{Number(paymentReferenceModal?.amount || 0).toLocaleString('pt-AO')} Kz</p>
                          </div>
                       </div>
 

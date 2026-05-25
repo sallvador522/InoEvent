@@ -2,7 +2,7 @@
 import React, { useState, useEffect } from 'react';
 import { useParams, Link, useNavigate, useLocation } from 'react-router-dom';
 import { motion } from 'framer-motion';
-import { getEventById } from '../../mockData';
+import { getEventById, getEventByLayoutMode } from '../../mockData';
 import { EventDetails } from '../../types';
 import { TocaPlayer } from '../../components/music/TocaPlayer';
 import { BottomSheet } from '../../components/ui/BottomSheet';
@@ -17,6 +17,7 @@ import toast from 'react-hot-toast';
 import { VirtualGiftsGuest } from './VirtualGiftsGuest';
 import { Guestbook } from './Guestbook';
 import { LivePhotoGuest } from './LivePhotoGuest';
+import { TravelMap } from './TravelMap';
 
 // ============================================================================
 // COMPONENT: INVITATION CONTROLLER
@@ -155,15 +156,18 @@ const InvitationView: React.FC = () => {
               }
           }
 
+          const currentLayoutMode = data.layoutMode || 'MODERN';
+          const templateDefaults = getEventByLayoutMode(currentLayoutMode);
+
           setEvent({
             ...data,
             id: docSnap.id,
             whiteLabelName: finalWhiteLabelName,
             whiteLabelLogo: finalWhiteLabelLogo,
             type: data.type || 'WEDDING',
-            layoutMode: data.layoutMode || 'MODERN',
-            heroImage: data.heroImage || 'https://images.unsplash.com/photo-1511285560982-1356c11d4606?q=80&w=2670&auto=format&fit=crop',
-            musicTrack: data.musicTrack || 'Turning Page - Sleeping At Last',
+            layoutMode: currentLayoutMode,
+            heroImage: data.heroImage || templateDefaults?.heroImage || 'https://images.unsplash.com/photo-1511285560982-1356c11d4606?q=80&w=2670&auto=format&fit=crop',
+            musicTrack: data.musicTrack || templateDefaults?.musicTrack || 'Turning Page - Sleeping At Last',
             isoDate: data.date || new Date().toISOString(),
             timeline: data.timeline || [{ time: data.time || '19:00', title: 'Cerimônia', description: data.location || "Local" }],
             gifts: (data.gifts && data.gifts.length > 0) ? data.gifts : (data.iban ? [ { type: 'IBAN', title: data.giftTitle || 'Presente', description: data.giftDescription || 'Dados bancários para contribuição', value: data.iban || '', accountName: data.accountName || '', bankName: data.bankName || '' } ] : []),
@@ -172,10 +176,14 @@ const InvitationView: React.FC = () => {
             iban: (data.gifts && data.gifts.length > 0) ? data.gifts[0].value : data.iban,
             bankName: (data.gifts && data.gifts.length > 0) ? data.gifts[0].bankName : data.bankName,
             accountName: (data.gifts && data.gifts.length > 0) ? data.gifts[0].accountName : data.accountName,
-            dressCode: (data.dressCodeTitle || data.dressCodeDescription) ? { title: data.dressCodeTitle, description: data.dressCodeDescription } : data.dressCode,
+            dressCode: (data.dressCodeTitle || data.dressCodeDescription) 
+                ? { title: data.dressCodeTitle, description: data.dressCodeDescription, image: templateDefaults?.dressCode?.image } 
+                : (data.dressCode || templateDefaults?.dressCode),
             address: data.address || 'Luanda, Angola',
             locationName: data.locationName || data.location || 'Local do Evento',
             mapLink: data.location || '#',
+            mapImage: data.mapImage || templateDefaults?.mapImage || null,
+            gallery: (data.gallery && data.gallery.length > 0) ? data.gallery : (templateDefaults?.gallery || []),
             phone: data.contactPhone || ''
           });
         }
@@ -272,6 +280,12 @@ const InvitationView: React.FC = () => {
           {event.layoutMode === 'INDUSTRIAL' && <IndustrialLayout {...props} />}
           {event.layoutMode?.startsWith('BRIDAL_') && <BridalStandardLayout {...props} />}
           
+          <div className="w-full bg-slate-50 py-8 px-4 z-10 relative">
+             <div className="max-w-4xl mx-auto">
+                 <TravelMap event={event} />
+             </div>
+          </div>
+
           {event.gifts && event.gifts.length > 0 && (
              <div className="w-full bg-slate-50 py-12 px-4 shadow-inner border-y border-slate-200 z-10 relative">
                  <div className="max-w-4xl mx-auto">
@@ -425,7 +439,9 @@ const EssentialLayout: React.FC<LayoutProps> = ({ event, onRSVP, onLikeUpdate })
         </div>
         
         <div className="bg-white rounded-3xl p-8 shadow-sm border border-slate-100 space-y-4">
-            <h2 className="font-bold text-brand-blue">Informações</h2>
+            <h2 className="font-bold text-brand-blue uppercase tracking-widest text-xs text-center border-b border-slate-100 pb-2 mb-4">Apresentação</h2>
+            <ParentsSection brideParents={event.brideParents} groomParents={event.groomParents} titleClass="font-sans font-bold text-slate-500 uppercase tracking-widest text-[10px]" />
+            <h2 className="font-bold text-brand-blue pt-4 border-t border-slate-100">Informações</h2>
             <p className="text-sm text-slate-600">{event.description}</p>
             <Button onClick={() => window.open(event.mapLink || '#', '_blank')} variant="navy" fullWidth>Localização (Maps)</Button>
             {event.phone && (
@@ -565,6 +581,37 @@ const BridalStandardLayout: React.FC<LayoutProps> = ({ event, onRSVP }) => {
     );
 };
 
+const ParentsSection: React.FC<{ brideParents?: string, groomParents?: string, textColor?: string, dividerColor?: string, titleClass?: string }> = ({ brideParents, groomParents, textColor = "text-slate-600", dividerColor = "border-slate-300", titleClass = "font-serif italic" }) => {
+    if (!brideParents && !groomParents) return null;
+    
+    return (
+        <div className={`w-full max-w-lg mx-auto my-10 px-4 text-center ${textColor}`}>
+            <p className={`text-base md:text-lg mb-6 ${titleClass}`}>Com a benção de Deus e de seus Pais</p>
+            <div className="flex justify-center items-center gap-4 text-sm md:text-base font-serif">
+                {brideParents && (
+                    <div className="flex-1 text-right">
+                        {brideParents.split(/\n|,| e | & /i).map((name, i) => (
+                           name.trim() ? <div key={i} className="mb-1 leading-snug">{name.trim()}</div> : null
+                        ))}
+                    </div>
+                )}
+                
+                {brideParents && groomParents && (
+                    <div className={`h-12 w-px border-r ${dividerColor} opacity-50`}></div>
+                )}
+
+                {groomParents && (
+                    <div className="flex-1 text-left">
+                        {groomParents.split(/\n|,| e | & /i).map((name, i) => (
+                           name.trim() ? <div key={i} className="mb-1 leading-snug">{name.trim()}</div> : null
+                        ))}
+                    </div>
+                )}
+            </div>
+        </div>
+    );
+}
+
 // ============================================================================
 // LAYOUT 1: CLASSIC ROMANTIC (Refined)
 // ============================================================================
@@ -611,6 +658,7 @@ const ClassicLayout: React.FC<LayoutProps> = ({ event, onRSVP, onLikeUpdate }) =
       {/* Content */}
       <div className="max-w-lg mx-auto px-6 mt-8 text-center space-y-12">
          <FadeInSection>
+            <ParentsSection brideParents={event.brideParents} groomParents={event.groomParents} dividerColor="border-slate-300" />
             <p className="text-slate-600 italic text-lg leading-relaxed px-4">"{event.description}"</p>
          </FadeInSection>
 
@@ -838,7 +886,8 @@ const ModernLayout: React.FC<LayoutProps> = ({ event, onRSVP, guestName, onLikeU
       <div className="max-w-2xl mx-auto px-8 -mt-20 relative z-10">
          <FadeInSection className="bg-white p-10 shadow-[0_10px_40px_-10px_rgba(0,0,0,0.05)] text-center">
             <span className="font-script text-4xl text-[#C2B280] mb-4 block">Bem-vindos</span>
-            <p className="text-xl italic font-light leading-relaxed text-gray-600 mb-6">
+            <ParentsSection brideParents={event.brideParents} groomParents={event.groomParents} titleClass="font-serif italic" />
+            <p className="text-xl italic font-light leading-relaxed text-gray-600 mb-6 mt-4">
                {event.description}
             </p>
             <div className="py-4 border-t border-gray-100">
@@ -859,7 +908,7 @@ const ModernLayout: React.FC<LayoutProps> = ({ event, onRSVP, guestName, onLikeU
          {/* Ceremony */}
          <FadeInSection className="flex flex-col md:flex-row items-center gap-12">
              <div className="w-full md:w-1/2 aspect-[4/5] bg-gray-100 relative overflow-hidden group">
-                 <img src="https://images.unsplash.com/photo-1544070274-1b48b1111003?q=80&w=2670&auto=format&fit=crop" className="w-full h-full object-cover grayscale group-hover:grayscale-0 transition-all duration-700" />
+                 <img src={event.heroImage} className="w-full h-full object-cover grayscale group-hover:grayscale-0 transition-all duration-700" />
                  <div className="absolute top-4 left-4 bg-white px-4 py-2 text-xs font-bold tracking-widest uppercase">Cerimônia</div>
              </div>
              <div className="w-full md:w-1/2 text-center md:text-left space-y-4">
@@ -1046,7 +1095,8 @@ const GardenLayout: React.FC<LayoutProps> = ({ event, onRSVP, guestName, onLikeU
       {/* 2. BIBLE QUOTE & WELCOME */}
       <div className="max-w-2xl mx-auto px-6 -mt-10 relative z-10 text-center">
          <FadeInSection>
-            <div className="mb-8">
+            <ParentsSection brideParents={event.brideParents} groomParents={event.groomParents} textColor="text-[#5D6D55]" titleClass="font-serif italic" />
+            <div className="mb-8 mt-12">
                <span className="material-symbols-outlined text-4xl text-[#D6CFC7]">format_quote</span>
                <p className="text-xl md:text-2xl italic font-medium leading-relaxed mt-2 text-[#5D5C61]">
                  {event.description.split('(')[0].replace(/"/g, '')}
@@ -1087,7 +1137,7 @@ const GardenLayout: React.FC<LayoutProps> = ({ event, onRSVP, guestName, onLikeU
             </div>
             <div className="flex-1 order-1 md:order-2">
                <div className="aspect-[3/4] rounded-t-[100px] overflow-hidden shadow-lg">
-                  <img src="https://images.unsplash.com/photo-1544070274-1b48b1111003?q=80&w=2670&auto=format&fit=crop" className="w-full h-full object-cover" />
+                  <img src={event.heroImage} className="w-full h-full object-cover" />
                </div>
             </div>
          </FadeInSection>
@@ -1226,7 +1276,8 @@ const RusticLayout: React.FC<LayoutProps> = ({ event, onRSVP, guestName, onLikeU
  
        {/* INTRO & BIBLE */}
        <FadeInSection className="max-w-2xl mx-auto text-center px-6 py-12">
-          <span className="material-symbols-outlined text-4xl text-[#A1887F] mb-4">forest</span>
+          <ParentsSection brideParents={event.brideParents} groomParents={event.groomParents} textColor="text-[#5D4037]" dividerColor="border-[#D7CCC8]" titleClass="font-serif italic" />
+          <span className="material-symbols-outlined text-4xl text-[#A1887F] mb-4 mt-8">forest</span>
           <p className="text-xl md:text-2xl font-script leading-relaxed text-[#5D4037] mb-6">"{event.description}"</p>
           <div className="w-24 h-px bg-[#D7CCC8] mx-auto my-6"></div>
           <p className="uppercase tracking-widest text-xs text-[#8D6E63]">Convidado Especial</p>
@@ -1246,7 +1297,7 @@ const RusticLayout: React.FC<LayoutProps> = ({ event, onRSVP, guestName, onLikeU
                 <button onClick={() => window.open(event.mapLink || '#', '_blank')} className="text-xs font-bold border-b border-[#5D4037] pb-1 uppercase tracking-widest">Ver Mapa</button>
              </div>
              <div className="w-full md:w-1/3 aspect-square rounded-2xl overflow-hidden">
-                <img src="https://images.unsplash.com/photo-1515934751635-c81c6bc9a2d8?q=80&w=2670&auto=format&fit=crop" className="w-full h-full object-cover" />
+                <img src={event.heroImage} className="w-full h-full object-cover" />
              </div>
           </FadeInSection>
        </div>
@@ -1362,15 +1413,20 @@ const IndustrialLayout: React.FC<LayoutProps> = ({ event, onRSVP, guestName, onL
 
        {/* GRID LAYOUT FOR DETAILS */}
        <div className="grid grid-cols-1 md:grid-cols-2 border-b border-white/20">
-          <div className="p-8 md:p-16 border-b md:border-b-0 md:border-r border-white/20 flex flex-col justify-center">
-             <FadeInSection>
-               <span className="text-xs text-gray-400 uppercase tracking-widest mb-4 block">O Conceito</span>
-               <p className="text-xl md:text-2xl font-light leading-relaxed mb-10">
-                  {event.description}
-               </p>
-               <span className="text-xs text-gray-400 uppercase tracking-widest mb-4 block">Contagem Regressiva</span>
-               <CountdownTimer targetDate={event.isoDate} colorClass="text-white" />
-             </FadeInSection>
+          <div className="border-b md:border-b-0 md:border-r border-white/20 flex flex-col justify-center">
+             <div className="p-8 pb-4">
+                <ParentsSection brideParents={event.brideParents} groomParents={event.groomParents} textColor="text-white" dividerColor="border-white" titleClass="uppercase tracking-widest text-xs font-bold text-white mb-6" />
+             </div>
+             <div className="p-8 md:px-16 md:pb-16 pt-0">
+                 <FadeInSection>
+                   <span className="text-xs text-gray-400 uppercase tracking-widest mb-4 block">O Conceito</span>
+                   <p className="text-xl md:text-2xl font-light leading-relaxed mb-10">
+                      {event.description}
+                   </p>
+                   <span className="text-xs text-gray-400 uppercase tracking-widest mb-4 block">Contagem Regressiva</span>
+                   <CountdownTimer targetDate={event.isoDate} colorClass="text-white" />
+                 </FadeInSection>
+             </div>
           </div>
           <div className="p-8 md:p-16 flex flex-col justify-center bg-white text-black">
              <FadeInSection>
@@ -1405,7 +1461,7 @@ const IndustrialLayout: React.FC<LayoutProps> = ({ event, onRSVP, guestName, onL
        {/* LOCATIONS */}
        <div className="grid grid-cols-1 md:grid-cols-2 h-[60vh]">
           <div className="relative border-r border-white/20 group overflow-hidden">
-             <img src="https://images.unsplash.com/photo-1544070274-1b48b1111003?q=80&w=2670&auto=format&fit=crop" className="w-full h-full object-cover grayscale group-hover:scale-105 transition-transform duration-700" />
+             <img src={event.heroImage} className="w-full h-full object-cover grayscale group-hover:scale-105 transition-transform duration-700" />
              <div className="absolute bottom-0 left-0 p-8 bg-black/80 w-full backdrop-blur-sm">
                 <p className="text-xs uppercase tracking-widest mb-1 text-gray-400">Cerimônia</p>
                 <h3 className="text-2xl font-bold uppercase">{event.locationName}</h3>
@@ -1541,6 +1597,7 @@ const LuxuryLayout: React.FC<LayoutProps> = ({ event, onRSVP, guestName, onLikeU
 
         {/* 5. COUPLE MESSAGE */}
         <FadeInSection className="px-8 text-center max-w-md mx-auto pb-4">
+           <ParentsSection brideParents={event.brideParents} groomParents={event.groomParents} textColor="text-gray-400" dividerColor="border-[#BF9B30]" titleClass="font-serif italic text-white" />
            <p className="text-lg leading-relaxed font-light text-gray-400 border-t border-b border-[#BF9B30]/20 py-8">
              {event.description}
            </p>
@@ -1554,7 +1611,7 @@ const LuxuryLayout: React.FC<LayoutProps> = ({ event, onRSVP, guestName, onLikeU
              <SectionTitle title="Cerimônia Religiosa" />
              <div className="border border-[#BF9B30]/30 rounded-xl overflow-hidden bg-[#0F1419] max-w-md mx-auto">
                 <div className="h-32 relative">
-                   <div className="absolute inset-0 bg-cover bg-center opacity-60" style={{ backgroundImage: `url('https://images.unsplash.com/photo-1544070274-1b48b1111003?q=80&w=2670&auto=format&fit=crop')` }}></div>
+                   <div className="absolute inset-0 bg-cover bg-center opacity-60" style={{ backgroundImage: `url('${event.heroImage}')` }}></div>
                    <div className="absolute inset-0 bg-gradient-to-t from-[#0F1419] to-transparent"></div>
                    <div className="absolute bottom-3 left-4">
                       <p className="text-white text-lg font-serif">{event.locationName}</p>

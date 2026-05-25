@@ -1,5 +1,5 @@
 import React from 'react';
-import { HashRouter as Router, Routes, Route } from 'react-router-dom';
+import { BrowserRouter as Router, Routes, Route } from 'react-router-dom';
 import { Toaster } from 'react-hot-toast';
 import { LandingPage } from './features/landing/LandingPage';
 import { TemplateGalleryPage } from './features/landing/TemplateGalleryPage';
@@ -7,11 +7,13 @@ import InvitationView from './features/invitation/InvitationView';
 import { InvitationCreator } from './features/invitation/InvitationCreator';
 import { BridalShowerCreator } from './features/invitation/BridalShowerCreator';
 import { ProtectedRoute } from './components/ProtectedRoute';
+import { AdminRoute } from './components/AdminRoute';
 import { LiveWall } from './features/wall/LiveWall';
 import { Dashboard } from './features/dashboard/Dashboard';
 import { UserDashboard } from './features/dashboard/UserDashboard';
 import { CreateBusiness } from './features/business/CreateBusiness';
 import { BusinessDashboard } from './features/business/BusinessDashboard';
+import { AdminDashboard } from './features/admin/AdminDashboard';
 import { ClientDashboard } from './features/dashboard/ClientDashboard';
 import { CheckinScanner } from './features/checkin/CheckinScanner';
 import { AuthPage } from './features/auth/AuthPage';
@@ -76,6 +78,11 @@ const App: React.FC = () => {
             <ProtectedRoute>
                 <BridalShowerCreator />
             </ProtectedRoute>
+        } />
+        <Route path="/admin" element={
+            <AdminRoute>
+                <AdminDashboard />
+            </AdminRoute>
         } />
       </Routes>
     </Router>

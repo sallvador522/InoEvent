@@ -9,6 +9,8 @@ import { Calendar, Plus, Building2, Ticket, Settings, ArrowRight, ExternalLink, 
 import toast from 'react-hot-toast';
 import { Navbar } from '../../components/Navbar';
 
+import { getEventByLayoutMode } from '../../mockData';
+
 export const UserDashboard: React.FC = () => {
     const { user, userProfile } = useFirebase();
     const [events, setEvents] = useState<any[]>([]);
@@ -139,12 +141,15 @@ export const UserDashboard: React.FC = () => {
                     </div>
                 ) : (
                     <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
-                        {events.map((event: any) => (
+                        {events.map((event: any) => {
+                            const templateDefaults = getEventByLayoutMode(event.layoutMode || 'MODERN');
+                            const displayImage = event.heroImage || templateDefaults?.heroImage;
+                            return (
                             <div key={event.id} className="bg-white border border-slate-200 rounded-3xl overflow-hidden hover:border-brand-blue/30 hover:shadow-xl hover:shadow-brand-blue/5 transition-all group flex flex-col">
                                 <Link to={`/dashboard/${event.id}`} className="block">
                                   <div className="h-40 bg-slate-100 relative overflow-hidden">
-                                       {event.heroImage ? (
-                                           <img src={event.heroImage} className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-500" />
+                                       {displayImage ? (
+                                           <img src={displayImage} className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-500" />
                                        ) : (
                                            <div className="w-full h-full flex items-center justify-center text-slate-300">
                                               <Calendar size={40} />
@@ -170,7 +175,8 @@ export const UserDashboard: React.FC = () => {
                                      </div>
                                 </div>
                             </div>
-                        ))}
+                        );
+                        })}
                     </div>
                 )}
             </main>

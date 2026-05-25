@@ -151,7 +151,7 @@ export const VirtualGiftsManager: React.FC<{ event: any }> = ({ event }) => {
                        <div className="text-4xl mb-4 text-center mt-2">{gift.emoji}</div>
                        <div className="text-center">
                            <h4 className="font-bold text-slate-800 line-clamp-2">{gift.title}</h4>
-                           <div className="text-brand-blue font-black mt-2 bg-blue-50 py-1.5 px-3 rounded-lg inline-block">{(gift.price || 0).toLocaleString('pt-AO')} Kz</div>
+                           <div className="text-brand-blue font-black mt-2 bg-blue-50 py-1.5 px-3 rounded-lg inline-block">{Number(gift.price || 0).toLocaleString('pt-AO')} Kz</div>
                        </div>
                    </div>
                ))}
@@ -179,7 +179,7 @@ export const VirtualGiftsManager: React.FC<{ event: any }> = ({ event }) => {
                                        <td className="p-4 font-bold text-slate-800">{cont.guestName}</td>
                                        <td className="p-4 text-slate-500 font-mono text-xs">{cont.guestPhone}</td>
                                        <td className="p-4 text-slate-600 truncate max-w-[200px]">{cont.giftTitle}</td>
-                                       <td className="p-4 text-right font-bold text-brand-blue">{cont.amount?.toLocaleString('pt-AO')} Kz</td>
+                                       <td className="p-4 text-right font-bold text-brand-blue">{Number(cont.amount || 0).toLocaleString('pt-AO')} Kz</td>
                                    </tr>
                                ))}
                            </tbody>

@@ -4,6 +4,7 @@ service cloud.firestore {
     
     // --- Global Helpers ---
     function isSignedIn() { return request.auth != null; }
+    function isAdmin() { return isSignedIn() && request.auth.token.email == 'antoniosalvador522@gmail.com'; }
     function isOwner(uid) { return isSignedIn() && request.auth.uid == uid; }
     function isValidId(id) { return id is string && id.size() <= 128 && id.matches('^[a-zA-Z0-9_\\-]+$'); }
     function incoming() { return request.resource.data; }
@@ -39,23 +40,24 @@ service cloud.firestore {
     }
 
     match /transactions/{transactionId} {
-      allow get: if isSignedIn() && resource.data.ownerId == request.auth.uid;
-      allow list: if isSignedIn() && resource.data.ownerId == request.auth.uid;
+      allow get: if (isSignedIn() && resource.data.ownerId == request.auth.uid) || isAdmin();
+      allow list: if (isSignedIn() && resource.data.ownerId == request.auth.uid) || isAdmin();
       allow create: if isSignedIn() && isValidId(transactionId) && isValidTransaction(incoming()) && incoming().ownerId == request.auth.uid;
     }
 
     match /users/{userId} {
       allow get: if true;
+      allow list: if isAdmin();
       allow create: if isOwner(userId) && isValidUser(incoming()) && incoming().uid == request.auth.uid;
-      allow update: if isOwner(userId) && 
+      allow update: if isAdmin() || (isOwner(userId) && 
                        request.resource.data.diff(resource.data).affectedKeys().hasOnly(['plan', 'whiteLabelName', 'whiteLabelLogo', 'updatedAt', 'credits']) &&
                        request.resource.data.uid == resource.data.uid &&
-                       request.resource.data.email == resource.data.email;
+                       request.resource.data.email == resource.data.email);
     }
 
     match /events/{eventId} {
       // --- List ---
-      allow list: if isSignedIn() && resource.data.ownerId == request.auth.uid;
+      allow list: if (isSignedIn() && resource.data.ownerId == request.auth.uid) || isAdmin();
       
       // --- Get ---
       allow get: if isValidId(eventId);

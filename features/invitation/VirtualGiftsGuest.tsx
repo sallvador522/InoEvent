@@ -135,13 +135,13 @@ export const VirtualGiftsGuest: React.FC<{ event: any, guestId?: string | null }
            <div className="grid grid-cols-2 md:grid-cols-3 gap-4">
                {gifts.map((gift, idx) => (
                    <div 
-                       key={gift.id || idx} 
+                       key={`${gift.id || 'gift'}-${idx}`} 
                        onClick={() => setSelectedGift(gift)}
                        className="bg-white rounded-3xl p-5 border border-slate-100 shadow-sm hover:shadow-md transition-all cursor-pointer hover:-translate-y-1 hover:border-brand-blue/30 group text-center flex flex-col items-center"
                    >
                        <div className="text-4xl mb-3 transform group-hover:scale-110 transition-transform">{gift.emoji}</div>
                        <h3 className="font-bold text-slate-800 text-sm leading-tight mb-2 line-clamp-2">{gift.title}</h3>
-                       <div className="text-brand-blue font-black text-sm bg-blue-50 py-1.5 px-3 rounded-lg mt-auto">{(gift.price || 0).toLocaleString('pt-AO')} Kz</div>
+                       <div className="text-brand-blue font-black text-sm bg-blue-50 py-1.5 px-3 rounded-lg mt-auto">{Number(gift.price || 0).toLocaleString('pt-AO')} Kz</div>
                    </div>
                ))}
            </div>
@@ -164,7 +164,7 @@ export const VirtualGiftsGuest: React.FC<{ event: any, guestId?: string | null }
                            {!paymentData ? (
                                <div className="space-y-4">
                                    <div className="bg-blue-50 text-blue-800 p-4 rounded-xl text-center font-bold text-lg border border-blue-100">
-                                       {(selectedGift.price || 0).toLocaleString('pt-AO')} Kz
+                                       {Number(selectedGift.price || 0).toLocaleString('pt-AO')} Kz
                                    </div>
                                    <div>
                                        <label className="text-xs font-bold text-slate-500 mb-1 block">O seu Nome Completo</label>

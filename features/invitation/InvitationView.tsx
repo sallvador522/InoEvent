@@ -92,7 +92,7 @@ const InvitationView: React.FC = () => {
       await updateDoc(docRef, cleanData);
       setEvent(draftEvent);
       setIsEditing(false);
-      toast.success('Convite atualizado com sucesso!', { id: toastId });
+      toast.success('Convite salvo! Você está a ver como o convite ficou. Para alterar, clique em Editar Modelo.', { id: toastId, duration: 5000 });
     } catch (err) {
       console.error(err);
       toast.error('Erro ao guardar alterações.', { id: toastId });

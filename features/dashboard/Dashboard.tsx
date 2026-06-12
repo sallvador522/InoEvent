@@ -153,7 +153,7 @@ export const Dashboard = () => {
 
     const handleWhatsAppShare = (guest: any) => {
         if (!id || !event) return;
-        const msg = `Olá ${guest.name}! Segue o link do convite para "${event.title}": ${window.location.origin}/#/invite/${id}`;
+        const msg = `Olá ${guest.name}! Segue o link do convite para "${event.title}": ${window.location.origin}/invite/${id}`;
         const phone = (guest.phone || "").replace(/\D/g, '');
         if (phone) {
             window.open(`https://wa.me/${phone}?text=${encodeURIComponent(msg)}`, '_blank');
@@ -345,8 +345,8 @@ export const Dashboard = () => {
                                     exit={{ opacity: 0, scale: 0.95 }}
                                     className="absolute top-12 right-0 w-48 bg-white rounded-2xl shadow-xl border border-slate-100 overflow-hidden z-50 flex flex-col"
                                 >
-                                    <Link to={(event.type === 'BRIDAL_SHOWER' || event.layoutMode?.startsWith('BRIDAL_')) ? `/edit-bridal/${event.id}` : `/edit-invitation/${event.id}`} className="px-4 py-3 flex items-center gap-2 hover:bg-slate-50 text-slate-700 font-bold text-sm transition-colors border-b border-slate-100">
-                                        <Edit2 size={16} /> Editar Evento
+                                    <Link to={`/invite/${event.id}?edit=true`} className="px-4 py-3 flex items-center gap-2 hover:bg-slate-50 text-slate-700 font-bold text-sm transition-colors border-b border-slate-100">
+                                        <Edit2 size={16} /> Editar Modelo
                                     </Link>
                                     <button 
                                         onClick={confirmDelete}
@@ -434,7 +434,7 @@ export const Dashboard = () => {
                                         token = Math.random().toString(36).substring(2, 8).toUpperCase();
                                         await updateDoc(doc(db, 'events', event.id), { clientToken: token });
                                     }
-                                    const link = `${window.location.origin}/#/client-dashboard/${event.id}?token=${token}`;
+                                    const link = `${window.location.origin}/client-dashboard/${event.id}?token=${token}`;
                                     navigator.clipboard.writeText(link);
                                     toast.success("Link do cliente copiado para a área de transferência!");
                                 }}
@@ -764,7 +764,7 @@ export const Dashboard = () => {
                                             token = Math.random().toString(36).substring(2, 8).toUpperCase();
                                             await updateDoc(doc(db, 'events', event.id), { clientToken: token });
                                         }
-                                        const link = `${window.location.origin}/#/checkin/${event.id}?token=${token}&mode=reception`;
+                                        const link = `${window.location.origin}/checkin/${event.id}?token=${token}&mode=reception`;
                                         navigator.clipboard.writeText(link);
                                         toast.success("Link de Recepcionista copiado para a área de transferência!");
                                     }}

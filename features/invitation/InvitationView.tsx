@@ -1,6 +1,6 @@
 
 import React, { useState, useEffect } from 'react';
-import { useParams, Link, useNavigate, useLocation } from 'react-router-dom';
+import { useParams, Link, useNavigate, useLocation, useSearchParams } from 'react-router-dom';
 import { motion } from 'framer-motion';
 import { getEventById, getEventByLayoutMode } from '../../mockData';
 import { EventDetails } from '../../types';
@@ -8,16 +8,17 @@ import { TocaPlayer } from '../../components/music/TocaPlayer';
 import { BottomSheet } from '../../components/ui/BottomSheet';
 import { Button } from '../../components/ui/Button';
 import { QRCodeSVG } from 'qrcode.react';
-import { Users, CalendarClock, Mail, PartyPopper, Shirt, Camera, Music4, Smile, ArrowLeft } from 'lucide-react';
+import { Users, CalendarClock, Mail, PartyPopper, Shirt, Camera, Music4, Smile, ArrowLeft, Undo2, Redo2, Share2 } from 'lucide-react';
 import { toPng } from 'html-to-image';
 import { GalleryLightbox } from '../../components/GalleryLightbox';
 import { useFirebase, db, handleFirestoreError, OperationType } from '../../components/FirebaseProvider';
-import { doc, getDoc, setDoc, getCountFromServer, collection, query, where } from 'firebase/firestore';
+import { doc, getDoc, setDoc, getCountFromServer, collection, query, where, updateDoc } from 'firebase/firestore';
 import toast from 'react-hot-toast';
 import { VirtualGiftsGuest } from './VirtualGiftsGuest';
 import { Guestbook } from './Guestbook';
 import { LivePhotoGuest } from './LivePhotoGuest';
 import { TravelMap } from './TravelMap';
+import { InlineText, InlineImage } from '../../components/InlineEdit';
 
 // ============================================================================
 // COMPONENT: INVITATION CONTROLLER
@@ -31,6 +32,100 @@ const InvitationView: React.FC = () => {
   const { user, userProfile } = useFirebase();
   const [event, setEvent] = useState<any>(null);
   const [loading, setLoading] = useState(true);
+  
+  // Inline Edit State
+  const [isEditing, setIsEditing] = useState(false);
+  const [draftEvent, setDraftEvent] = useState<any>(null);
+  const [isSaving, setIsSaving] = useState(false);
+  
+  // Undo/Redo State
+  const [history, setHistory] = useState<any[]>([]);
+  const [historyIndex, setHistoryIndex] = useState(-1);
+
+  const handleStartEditing = () => {
+    setIsEditing(true);
+    setDraftEvent(event);
+    setHistory([event]);
+    setHistoryIndex(0);
+    toast.success('Modo de Edição Ativo. Clique nos textos ou ícones pontilhados para personalizá-los.', { duration: 6000, icon: '✏️' });
+  };
+
+  const handleFieldChange = (field: string, value: any) => {
+    setDraftEvent((prev: any) => {
+      const nextState = { ...prev, [field]: value };
+      
+      // We only insert into history if it's actually different from current to avoid duplicate states
+      const currentState = history[historyIndex];
+      if (JSON.stringify(currentState[field]) !== JSON.stringify(value)) {
+          const newHistory = history.slice(0, historyIndex + 1);
+          newHistory.push(nextState);
+          setHistory(newHistory);
+          setHistoryIndex(newHistory.length - 1);
+      }
+      return nextState;
+    });
+  };
+
+  const handleUndo = () => {
+    if (historyIndex > 0) {
+      const newIndex = historyIndex - 1;
+      setHistoryIndex(newIndex);
+      setDraftEvent(history[newIndex]);
+    }
+  };
+
+  const handleRedo = () => {
+    if (historyIndex < history.length - 1) {
+      const newIndex = historyIndex + 1;
+      setHistoryIndex(newIndex);
+      setDraftEvent(history[newIndex]);
+    }
+  };
+
+  const handleSaveInline = async () => {
+    if (!id || id === 'created') return;
+    setIsSaving(true);
+    const toastId = toast.loading('Guardando alterações...');
+    try {
+      const docRef = doc(db, 'events', id);
+      const cleanData = JSON.parse(JSON.stringify(draftEvent)); // Removes any undefined values efficiently
+      await updateDoc(docRef, cleanData);
+      setEvent(draftEvent);
+      setIsEditing(false);
+      toast.success('Convite atualizado com sucesso!', { id: toastId });
+    } catch (err) {
+      console.error(err);
+      toast.error('Erro ao guardar alterações.', { id: toastId });
+    } finally {
+      setIsSaving(false);
+    }
+  };
+
+  const handleCancelInline = () => {
+    setDraftEvent(event);
+    setIsEditing(false);
+  };
+
+  const handleShare = async () => {
+    const url = window.location.href;
+    const shareData = {
+      title: event?.title || 'Convite',
+      text: 'Você foi convidado! Confira os detalhes do evento:',
+      url: url
+    };
+
+    if (navigator.share) {
+      try {
+        await navigator.share(shareData);
+      } catch (err) {
+        console.warn('Share intent failed/cancelled', err);
+      }
+    } else {
+      navigator.clipboard.writeText(url);
+      toast.success('Link do convite copiado para a área de transferência!');
+    }
+  };
+
   
   const handleUseTemplate = (e: React.MouseEvent) => {
       if (userProfile && userProfile.plan === 'Essencial' && !['MODERN', 'CLASSIC', 'ESSENTIAL'].includes(event.layoutMode)) {
@@ -201,6 +296,15 @@ const InvitationView: React.FC = () => {
     fetchEvent();
   }, [id, user]);
 
+  useEffect(() => {
+    if (event) {
+      setDraftEvent(event);
+      if (queryObj.get('edit') === 'true' && event.ownerId === user?.uid && !isEditing) {
+         handleStartEditing();
+      }
+    }
+  }, [event, user, queryObj.get('edit')]);
+
   if (loading) return <div className="p-10 text-center font-display text-brand-blue">Carregando convite...</div>;
   if (!event) return <div className="p-10 text-center font-display text-brand-blue">Evento não encontrado ou fechado.</div>;
 
@@ -253,32 +357,59 @@ const InvitationView: React.FC = () => {
 
       {isOwner && (
         <div className="fixed top-4 left-4 z-50 flex flex-wrap gap-2">
-           <button type="button" onClick={() => navigate(-1)} className="flex items-center gap-2 bg-white/90 backdrop-blur-sm text-slate-800 px-4 py-2 rounded-full shadow-xl hover:bg-white transition-all font-display text-sm font-bold border border-slate-200 outline-none cursor-pointer">
-              <ArrowLeft size={16} /> <span className="hidden md:inline">Voltar</span>
-           </button>
-           {isOwner && (
-             <button onClick={handleDownloadDesign} className="flex items-center gap-2 bg-emerald-600 text-white px-4 py-2 rounded-full shadow-xl hover:bg-emerald-700 transition-all font-display text-sm font-bold">
-                <Camera size={16} /> {(event?.type === 'BRIDAL_SHOWER' || event?.layoutMode?.startsWith('BRIDAL_')) ? 'Baixar Convite do Chá' : 'Baixar Imagem'}
-             </button>
-           )}
-           {event.id !== 'created' && (
-             <Link to={`/dashboard/${event.id}`} className="flex items-center gap-2 bg-brand-blue text-white px-4 py-2 rounded-full shadow-xl hover:bg-brand-blue/90 transition-all font-display text-sm font-bold">
-                Gerenciar RSVP
-             </Link>
+           {!isEditing ? (
+             <>
+               <button type="button" onClick={() => navigate(-1)} className="flex items-center gap-2 bg-white/90 backdrop-blur-sm text-slate-800 px-4 py-2 rounded-full shadow-xl hover:bg-white transition-all font-display text-sm font-bold border border-slate-200 outline-none cursor-pointer">
+                  <ArrowLeft size={16} /> <span className="hidden md:inline">Voltar</span>
+               </button>
+               <button onClick={handleStartEditing} className="flex items-center gap-2 bg-slate-900 text-white px-4 py-2 rounded-full shadow-xl hover:bg-slate-800 transition-all font-display text-sm font-bold">
+                  Editar Modelo
+               </button>
+               {event.id !== 'created' && (
+                 <>
+                   <Link to={`/dashboard/${event.id}`} className="flex items-center gap-2 bg-brand-blue text-white px-4 py-2 rounded-full shadow-xl hover:bg-brand-blue/90 transition-all font-display text-sm font-bold">
+                      Gerenciar RSVP
+                   </Link>
+                   <button onClick={handleShare} className="flex items-center gap-2 bg-pink-100 text-pink-700 px-4 py-2 rounded-full shadow-xl hover:bg-pink-200 transition-all font-display text-sm font-bold border border-pink-200">
+                     <Share2 size={16} /> <span className="hidden md:inline">Partilhar</span>
+                   </button>
+                 </>
+               )}
+             </>
+           ) : (
+             <>
+               <span className="bg-amber-100 text-amber-800 text-xs font-bold px-3 py-2 rounded-full flex items-center shadow-md mr-2">
+                 Modo de Edição
+               </span>
+               <div className="flex gap-1 mr-2 bg-white rounded-full shadow p-1 border border-slate-200">
+                  <button onClick={handleUndo} disabled={historyIndex <= 0} className="p-1.5 rounded-full hover:bg-slate-100 disabled:opacity-30 disabled:hover:bg-transparent" title="Desfazer">
+                     <Undo2 size={16} />
+                  </button>
+                  <button onClick={handleRedo} disabled={historyIndex >= history.length - 1} className="p-1.5 rounded-full hover:bg-slate-100 disabled:opacity-30 disabled:hover:bg-transparent" title="Refazer">
+                     <Redo2 size={16} />
+                  </button>
+               </div>
+               <button onClick={handleSaveInline} disabled={isSaving} className="flex items-center gap-2 bg-brand-blue text-white px-4 py-2 rounded-full shadow-xl hover:bg-brand-blue/90 transition-all font-display text-sm font-bold disabled:opacity-70">
+                  {isSaving ? 'A Guardar...' : 'Guardar'}
+               </button>
+               <button onClick={handleCancelInline} disabled={isSaving} className="flex items-center gap-2 bg-white text-slate-800 px-4 py-2 rounded-full shadow-xl hover:bg-slate-50 transition-all font-display text-sm font-bold border border-slate-200">
+                  Cancelar
+               </button>
+             </>
            )}
         </div>
       )}
 
       {/* Dynamic Layout Rendering */}
       <div id="invitation-capture-node" className="w-full relative bg-white">
-          {event.layoutMode === 'CLASSIC' && <ClassicLayout {...props} />}
-          {event.layoutMode === 'ESSENTIAL' && <EssentialLayout {...props} />}
-          {event.layoutMode === 'MODERN' && <ModernLayout {...props} />}
-          {event.layoutMode === 'LUXURY' && <LuxuryLayout {...props} />}
-          {event.layoutMode === 'GARDEN' && <GardenLayout {...props} />}
-          {event.layoutMode === 'RUSTIC' && <RusticLayout {...props} />}
-          {event.layoutMode === 'INDUSTRIAL' && <IndustrialLayout {...props} />}
-          {event.layoutMode?.startsWith('BRIDAL_') && <BridalStandardLayout {...props} />}
+          {event.layoutMode === 'CLASSIC' && <ClassicLayout {...props} event={isEditing ? draftEvent : event} isEditing={isEditing} onFieldChange={handleFieldChange} />}
+          {event.layoutMode === 'ESSENTIAL' && <EssentialLayout {...props} event={isEditing ? draftEvent : event} isEditing={isEditing} onFieldChange={handleFieldChange} />}
+          {event.layoutMode === 'MODERN' && <ModernLayout {...props} event={isEditing ? draftEvent : event} isEditing={isEditing} onFieldChange={handleFieldChange} />}
+          {event.layoutMode === 'LUXURY' && <LuxuryLayout {...props} event={isEditing ? draftEvent : event} isEditing={isEditing} onFieldChange={handleFieldChange} />}
+          {event.layoutMode === 'GARDEN' && <GardenLayout {...props} event={isEditing ? draftEvent : event} isEditing={isEditing} onFieldChange={handleFieldChange} />}
+          {event.layoutMode === 'RUSTIC' && <RusticLayout {...props} event={isEditing ? draftEvent : event} isEditing={isEditing} onFieldChange={handleFieldChange} />}
+          {event.layoutMode === 'INDUSTRIAL' && <IndustrialLayout {...props} event={isEditing ? draftEvent : event} isEditing={isEditing} onFieldChange={handleFieldChange} />}
+          {event.layoutMode?.startsWith('BRIDAL_') && <BridalStandardLayout {...props} event={isEditing ? draftEvent : event} isEditing={isEditing} onFieldChange={handleFieldChange} />}
           
           <div className="w-full bg-slate-50 py-8 px-4 z-10 relative">
              <div className="max-w-4xl mx-auto">
@@ -307,6 +438,18 @@ const InvitationView: React.FC = () => {
             )}
             <span>{event.whiteLabelName ? event.whiteLabelName : 'Criado com InoEvents'}</span>
           </div>
+
+          {!isEditing && !isTemplate && (
+             <div className="fixed bottom-6 right-6 z-50">
+                <button
+                   onClick={handleShare}
+                   className="bg-brand-blue text-white p-4 rounded-full shadow-2xl hover:bg-brand-blue/90 hover:scale-105 transition-all flex items-center justify-center border-2 border-white/20"
+                   title="Partilhar Convite"
+                >
+                   <Share2 size={24} />
+                </button>
+             </div>
+          )}
 
           <LivePhotoGuest eventId={event.id} eventName={event.title} guestName={queryObj.get('guest') || 'Convidado'} />
       </div>
@@ -400,6 +543,8 @@ export interface LayoutProps {
   onRSVP: () => void;
   guestName: string;
   onLikeUpdate: (newGallery: any) => void;
+  isEditing?: boolean;
+  onFieldChange?: (field: string, value: any) => void;
 }
 
 export const getRSVPText = (event: any) => {
@@ -419,18 +564,29 @@ export const getRSVPModalTitle = (event: any) => {
 // ============================================================================
 // LAYOUT ESSENTIAL: CLEAN & FAST
 // ============================================================================
-const EssentialLayout: React.FC<LayoutProps> = ({ event, onRSVP, onLikeUpdate }) => {
+const EssentialLayout: React.FC<LayoutProps> = ({ event, onRSVP, onLikeUpdate, isEditing = false, onFieldChange }) => {
   return (
     <div className="min-h-screen bg-slate-50 font-display pb-28">
       {/* Hero Image */}
       <div className="h-[40vh] w-full overflow-hidden">
-        <img src={event.heroImage} className="w-full h-full object-cover" />
+        <InlineImage 
+          src={event.heroImage} 
+          isEditing={isEditing} 
+          onChange={(url) => onFieldChange?.('heroImage', url)} 
+          className="w-full h-full object-cover" 
+        />
       </div>
 
       <div className="max-w-xl mx-auto px-6 -mt-16 relative z-10 space-y-6">
         <div className="bg-white rounded-3xl p-8 shadow-sm border border-slate-100 text-center">
-          <h1 className="text-3xl font-bold text-brand-blue mb-2">{event.title}</h1>
-          <p className="text-sm text-slate-500 mb-6">{event.date} às {event.time}</p>
+          <h1 className="text-3xl font-bold text-brand-blue mb-2">
+            <InlineText value={event.title} isEditing={isEditing} onChange={(val) => onFieldChange?.('title', val)} />
+          </h1>
+          <p className="text-sm text-slate-500 mb-6 flex items-center justify-center gap-1">
+            <InlineText value={event.date} type="date" isEditing={isEditing} onChange={(val) => onFieldChange?.('date', val)} />
+            <span>às</span>
+            <InlineText value={event.time} type="time" isEditing={isEditing} onChange={(val) => onFieldChange?.('time', val)} />
+          </p>
         </div>
         
         <div className="bg-white rounded-3xl p-8 shadow-sm border border-slate-100 space-y-4">
@@ -440,12 +596,29 @@ const EssentialLayout: React.FC<LayoutProps> = ({ event, onRSVP, onLikeUpdate })
         
         <div className="bg-white rounded-3xl p-8 shadow-sm border border-slate-100 space-y-4">
             <h2 className="font-bold text-brand-blue uppercase tracking-widest text-xs text-center border-b border-slate-100 pb-2 mb-4">Apresentação</h2>
-            <ParentsSection brideParents={event.brideParents} groomParents={event.groomParents} titleClass="font-sans font-bold text-slate-500 uppercase tracking-widest text-[10px]" />
+            <ParentsSection brideParents={event.brideParents} groomParents={event.groomParents} isEditing={isEditing} onFieldChange={onFieldChange} titleClass="font-sans font-bold text-slate-500 uppercase tracking-widest text-[10px]" />
             <h2 className="font-bold text-brand-blue pt-4 border-t border-slate-100">Informações</h2>
-            <p className="text-sm text-slate-600">{event.description}</p>
-            <Button onClick={() => window.open(event.mapLink || '#', '_blank')} variant="navy" fullWidth>Localização (Maps)</Button>
-            {event.phone && (
-              <Button onClick={() => window.open(`https://wa.me/${event.phone.replace(/\D/g, '')}?text=Olá!`, '_blank')} variant="outline" fullWidth className="border-green-500 text-green-700 hover:bg-green-50">Falar no WhatsApp</Button>
+            <p className="text-sm text-slate-600">
+               <InlineText type="textarea" value={event.description} isEditing={isEditing} onChange={(val) => onFieldChange?.('description', val)} />
+            </p>
+            {isEditing ? (
+                <div className="space-y-3 mt-4">
+                   <div>
+                       <span className="text-xs font-bold text-slate-500 block mb-1">Link do Mapa (URL)</span>
+                       <InlineText value={event.mapLink || ''} isEditing={isEditing} onChange={(val) => onFieldChange?.('mapLink', val)} placeholder="https://maps.google.com/..." className="text-sm bg-slate-50 border border-slate-200 p-2 rounded-lg w-full" />
+                   </div>
+                   <div>
+                       <span className="text-xs font-bold text-slate-500 block mb-1">WhatsApp (Apenas Números)</span>
+                       <InlineText value={event.phone || ''} isEditing={isEditing} onChange={(val) => onFieldChange?.('phone', val)} placeholder="351900000000" className="text-sm bg-slate-50 border border-slate-200 p-2 rounded-lg w-full" />
+                   </div>
+                </div>
+            ) : (
+                <>
+                  <Button onClick={() => window.open(event.mapLink || '#', '_blank')} variant="navy" fullWidth>Localização (Maps)</Button>
+                  {event.phone && (
+                    <Button onClick={() => window.open(`https://wa.me/${event.phone.replace(/\D/g, '')}?text=Olá!`, '_blank')} variant="outline" fullWidth className="border-green-500 text-green-700 hover:bg-green-50">Falar no WhatsApp</Button>
+                  )}
+                </>
             )}
         </div>
       </div>
@@ -499,7 +672,7 @@ const getBridalTheme = (mode: string) => {
     }
 }
 
-const BridalStandardLayout: React.FC<LayoutProps> = ({ event, onRSVP }) => {
+const BridalStandardLayout: React.FC<LayoutProps> = ({ event, onRSVP, isEditing = false, onFieldChange }) => {
     const theme = getBridalTheme(event.layoutMode || 'BRIDAL_ROMANTIC');
     const titleLines = event.title.replace('Chá de Panela da ', '').replace('Chá da ', '') || 'A Noiva';
     
@@ -530,19 +703,21 @@ const BridalStandardLayout: React.FC<LayoutProps> = ({ event, onRSVP }) => {
                         </div>
                         
                         <h1 className="text-4xl md:text-5xl leading-tight font-extrabold pb-1 text-center" style={{ fontFamily: theme.cursiveFont, color: theme.color }}>
-                            {titleLines}
+                            <InlineText value={titleLines} isEditing={isEditing} onChange={(val) => onFieldChange?.('title', 'Chá de Panela da ' + val)} />
                         </h1>
                     </FadeInSection>
 
-                    {event.description && (
-                        <FadeInSection className="w-full flex justify-center items-center flex-col space-y-3 px-2">
-                            {event.description?.split('\n\n').map((paragraph: string, i: number) => (
-                                <p key={i} className="text-[13px] md:text-sm leading-relaxed whitespace-pre-wrap text-gray-700" style={{ fontFamily: theme.bodyFont }}>
-                                    {paragraph}
-                                </p>
-                            ))}
-                        </FadeInSection>
-                    )}
+                    <FadeInSection className="w-full flex justify-center items-center flex-col space-y-3 px-2">
+                        {isEditing ? (
+                           <InlineText type="textarea" value={event.description} isEditing={isEditing} onChange={(val) => onFieldChange?.('description', val)} className="text-[13px] md:text-sm leading-relaxed text-gray-700" style={{ fontFamily: theme.bodyFont }} />
+                        ) : (
+                           event.description?.split('\n\n').map((paragraph: string, i: number) => (
+                               <p key={i} className="text-[13px] md:text-sm leading-relaxed whitespace-pre-wrap text-gray-700" style={{ fontFamily: theme.bodyFont }}>
+                                   {paragraph}
+                               </p>
+                           ))
+                        )}
+                    </FadeInSection>
 
                     <FadeInSection className="w-full space-y-5">
                         <div className="w-full h-px mx-auto" style={{ backgroundColor: theme.color, opacity: 0.2 }} />
@@ -550,7 +725,11 @@ const BridalStandardLayout: React.FC<LayoutProps> = ({ event, onRSVP }) => {
                         {/* Data */}
                         <div className="flex flex-col items-center">
                             <p className="text-[10px] md:text-[11px] uppercase tracking-[0.2em] font-bold mb-1 opacity-80" style={{ color: theme.color, fontFamily: theme.titleFont }}>Data e Hora</p>
-                            <p className="text-sm md:text-base text-gray-800" style={{ fontFamily: theme.bodyFont }}>{event.date} às {event.time}</p>
+                            <p className="text-sm md:text-base text-gray-800 flex items-center justify-center gap-1" style={{ fontFamily: theme.bodyFont }}>
+                               <InlineText type="date" value={event.date} isEditing={isEditing} onChange={(val) => onFieldChange?.('date', val)} />
+                               <span>às</span>
+                               <InlineText type="time" value={event.time} isEditing={isEditing} onChange={(val) => onFieldChange?.('time', val)} />
+                            </p>
                         </div>
 
                         <div className="w-full h-px mx-auto" style={{ backgroundColor: theme.color, opacity: 0.2 }} />
@@ -558,8 +737,12 @@ const BridalStandardLayout: React.FC<LayoutProps> = ({ event, onRSVP }) => {
                         {/* Local */}
                         <div className="flex flex-col items-center">
                             <p className="text-[10px] md:text-[11px] uppercase tracking-[0.2em] font-bold mb-1 opacity-80" style={{ color: theme.color, fontFamily: theme.titleFont }}>Local</p>
-                            <p className="text-sm md:text-base text-gray-800 text-center" style={{ fontFamily: theme.bodyFont }}>{event.locationName || event.location}</p>
-                            {event.address && <p className="text-xs mt-1 text-gray-600 text-center mx-1" style={{ fontFamily: theme.bodyFont }}>{event.address}</p>}
+                            <p className="text-sm md:text-base text-gray-800 text-center flex flex-col items-center" style={{ fontFamily: theme.bodyFont }}>
+                               <InlineText value={event.locationName || event.location} isEditing={isEditing} onChange={(val) => onFieldChange?.('locationName', val)} placeholder="Nome do Local" />
+                            </p>
+                            <p className="text-xs mt-1 text-gray-600 text-center mx-1 flex flex-col items-center" style={{ fontFamily: theme.bodyFont }}>
+                               <InlineText value={event.address} isEditing={isEditing} onChange={(val) => onFieldChange?.('address', val)} placeholder="Morada / Bairro" />
+                            </p>
                         </div>
 
                         {(event.giftTitle || event.giftDescription || event.iban) && (
@@ -581,30 +764,47 @@ const BridalStandardLayout: React.FC<LayoutProps> = ({ event, onRSVP }) => {
     );
 };
 
-const ParentsSection: React.FC<{ brideParents?: string, groomParents?: string, textColor?: string, dividerColor?: string, titleClass?: string }> = ({ brideParents, groomParents, textColor = "text-slate-600", dividerColor = "border-slate-300", titleClass = "font-serif italic" }) => {
-    if (!brideParents && !groomParents) return null;
+const ParentsSection: React.FC<{ 
+    brideParents?: string, 
+    groomParents?: string, 
+    textColor?: string, 
+    dividerColor?: string, 
+    titleClass?: string,
+    isEditing?: boolean,
+    onFieldChange?: (field: string, value: any) => void
+}> = ({ brideParents, groomParents, textColor = "text-slate-600", dividerColor = "border-slate-300", titleClass = "font-serif italic", isEditing, onFieldChange }) => {
+    
+    if (!isEditing && !brideParents && !groomParents) return null;
     
     return (
         <div className={`w-full max-w-lg mx-auto my-10 px-4 text-center ${textColor}`}>
             <p className={`text-base md:text-lg mb-6 ${titleClass}`}>Com a benção de Deus e de seus Pais</p>
             <div className="flex justify-center items-center gap-4 text-sm md:text-base font-serif">
-                {brideParents && (
+                {(isEditing || brideParents) && (
                     <div className="flex-1 text-right">
-                        {brideParents.split(/\n|,| e | & /i).map((name, i) => (
-                           name.trim() ? <div key={i} className="mb-1 leading-snug">{name.trim()}</div> : null
-                        ))}
+                        {isEditing ? (
+                            <InlineText type="textarea" value={brideParents || ''} isEditing={isEditing} onChange={(val) => onFieldChange?.('brideParents', val)} placeholder="Pais da Noiva" className="text-right" />
+                        ) : (
+                            brideParents?.split(/\n|,| e | & /i).map((name, i) => (
+                               name.trim() ? <div key={i} className="mb-1 leading-snug">{name.trim()}</div> : null
+                            ))
+                        )}
                     </div>
                 )}
                 
-                {brideParents && groomParents && (
-                    <div className={`h-12 w-px border-r ${dividerColor} opacity-50`}></div>
+                {(isEditing || (brideParents && groomParents)) && (
+                    <div className={`h-12 w-px border-r ${dividerColor} opacity-50 mx-2`}></div>
                 )}
 
-                {groomParents && (
+                {(isEditing || groomParents) && (
                     <div className="flex-1 text-left">
-                        {groomParents.split(/\n|,| e | & /i).map((name, i) => (
-                           name.trim() ? <div key={i} className="mb-1 leading-snug">{name.trim()}</div> : null
-                        ))}
+                        {isEditing ? (
+                            <InlineText type="textarea" value={groomParents || ''} isEditing={isEditing} onChange={(val) => onFieldChange?.('groomParents', val)} placeholder="Pais do Noivo" className="text-left" />
+                        ) : (
+                            groomParents?.split(/\n|,| e | & /i).map((name, i) => (
+                               name.trim() ? <div key={i} className="mb-1 leading-snug">{name.trim()}</div> : null
+                            ))
+                        )}
                     </div>
                 )}
             </div>
@@ -615,7 +815,7 @@ const ParentsSection: React.FC<{ brideParents?: string, groomParents?: string, t
 // ============================================================================
 // LAYOUT 1: CLASSIC ROMANTIC (Refined)
 // ============================================================================
-const ClassicLayout: React.FC<LayoutProps> = ({ event, onRSVP, onLikeUpdate }) => {
+const ClassicLayout: React.FC<LayoutProps> = ({ event, onRSVP, onLikeUpdate, isEditing = false, onFieldChange }) => {
   return (
     <div className="min-h-screen bg-slate-50 font-serif pb-28">
       {/* Formal Header */}
@@ -626,30 +826,36 @@ const ClassicLayout: React.FC<LayoutProps> = ({ event, onRSVP, onLikeUpdate }) =
       {/* Hero Card */}
       <div className="p-4">
         <div className="relative h-[65vh] rounded-t-full rounded-b-[200px] overflow-hidden border-8 border-white shadow-2xl mx-auto max-w-lg">
-          <div className="absolute inset-0 bg-cover bg-center transition-transform duration-[10s] hover:scale-110" style={{ backgroundImage: `url('${event.heroImage}')` }} />
-          <div className="absolute inset-0 bg-black/30" />
+          <InlineImage 
+            src={event.heroImage} 
+            isEditing={isEditing} 
+            onChange={(url) => onFieldChange?.('heroImage', url)} 
+            className="absolute inset-0 bg-cover bg-center transition-transform duration-[10s] hover:scale-110 h-full w-full object-cover" 
+          />
+          <div className="absolute inset-0 bg-black/30 pointer-events-none" />
           <motion.div 
             initial={{ opacity: 0 }}
             animate={{ opacity: 1 }}
             transition={{ duration: 1.5 }}
-            className="absolute inset-0 flex flex-col justify-end items-center pb-24 text-white text-center p-6"
+            className="absolute inset-0 flex flex-col justify-end items-center pb-24 text-white text-center p-6 z-10 pointer-events-none"
           >
             <motion.h1 
               initial={{ y: 20, opacity: 0 }}
               animate={{ y: 0, opacity: 1 }}
               transition={{ delay: 0.3, duration: 1 }}
-              className="text-5xl font-script mb-2"
+              className="text-5xl font-script mb-2 pointer-events-auto"
             >
-              {event.title}
+              <InlineText value={event.title} isEditing={isEditing} onChange={(val) => onFieldChange?.('title', val)} />
             </motion.h1>
             <div className="w-12 h-px bg-white/60 my-4"></div>
             <motion.p 
               initial={{ y: 20, opacity: 0 }}
               animate={{ y: 0, opacity: 1 }}
               transition={{ delay: 0.5, duration: 1 }}
-              className="text-xl tracking-widest uppercase"
+              className="text-xl tracking-widest uppercase flex flex-col items-center gap-1"
             >
-              {event.date}
+              <InlineText type="date" value={event.date} isEditing={isEditing} onChange={(val) => onFieldChange?.('date', val)} />
+              {isEditing && <InlineText type="time" value={event.time} isEditing={isEditing} onChange={(val) => onFieldChange?.('time', val)} className="text-sm border-t border-white/30 pt-1 mt-1" />}
             </motion.p>
           </motion.div>
         </div>
@@ -658,8 +864,10 @@ const ClassicLayout: React.FC<LayoutProps> = ({ event, onRSVP, onLikeUpdate }) =
       {/* Content */}
       <div className="max-w-lg mx-auto px-6 mt-8 text-center space-y-12">
          <FadeInSection>
-            <ParentsSection brideParents={event.brideParents} groomParents={event.groomParents} dividerColor="border-slate-300" />
-            <p className="text-slate-600 italic text-lg leading-relaxed px-4">"{event.description}"</p>
+            <ParentsSection brideParents={event.brideParents} groomParents={event.groomParents} isEditing={isEditing} onFieldChange={onFieldChange} dividerColor="border-slate-300" />
+            <div className="text-slate-600 italic text-lg leading-relaxed px-4">
+              "<InlineText type="textarea" value={event.description} isEditing={isEditing} onChange={(val) => onFieldChange?.('description', val)} />"
+            </div>
          </FadeInSection>
 
          <FadeInSection>
@@ -673,9 +881,15 @@ const ClassicLayout: React.FC<LayoutProps> = ({ event, onRSVP, onLikeUpdate }) =
              <div className="space-y-8 relative before:absolute before:inset-y-0 before:left-1/2 before:w-px before:bg-slate-200">
                 {event.timeline.map((item, idx) => (
                   <div key={idx} className="relative flex flex-col items-center bg-white p-4 rounded-lg shadow-sm z-10 w-[80%] mx-auto border border-slate-100">
-                     <span className="text-brand-blue font-bold text-lg mb-1">{item.time}</span>
-                     <span className="font-bold text-slate-800">{item.title}</span>
-                     <span className="text-xs text-slate-500">{item.description}</span>
+                     <span className="text-brand-blue font-bold text-lg mb-1">
+                        <InlineText value={item.time} isEditing={isEditing} onChange={(val) => { const nt = [...(event.timeline||[])]; nt[idx] = {...nt[idx], time: val}; onFieldChange?.('timeline', nt); }} />
+                     </span>
+                     <span className="font-bold text-slate-800">
+                        <InlineText value={item.title} isEditing={isEditing} onChange={(val) => { const nt = [...(event.timeline||[])]; nt[idx] = {...nt[idx], title: val}; onFieldChange?.('timeline', nt); }} />
+                     </span>
+                     <span className="text-xs text-slate-500">
+                        <InlineText type="textarea" value={item.description} isEditing={isEditing} onChange={(val) => { const nt = [...(event.timeline||[])]; nt[idx] = {...nt[idx], description: val}; onFieldChange?.('timeline', nt); }} />
+                     </span>
                   </div>
                 ))}
              </div>
@@ -684,11 +898,22 @@ const ClassicLayout: React.FC<LayoutProps> = ({ event, onRSVP, onLikeUpdate }) =
 
          <FadeInSection>
             <div className="bg-white p-6 rounded-xl shadow-lg border border-slate-100">
-               <h3 className="font-bold text-xl mb-1 text-slate-800">{event.locationName}</h3>
-               <p className="text-slate-500 text-sm mb-4">{event.address}</p>
-               <Button onClick={() => window.open(event.mapLink || '#', '_blank')} variant="navy" fullWidth className="text-xs uppercase tracking-widest h-10">
-                 Ver Mapa
-               </Button>
+               <h3 className="font-bold text-xl mb-1 text-slate-800">
+                  <InlineText value={event.locationName} isEditing={isEditing} onChange={(val) => onFieldChange?.('locationName', val)} />
+               </h3>
+               <p className="text-slate-500 text-sm mb-4">
+                  <InlineText value={event.address} isEditing={isEditing} onChange={(val) => onFieldChange?.('address', val)} />
+               </p>
+               {isEditing ? (
+                  <div className="mt-2 text-left">
+                     <span className="text-xs bg-slate-100 text-slate-600 px-2 py-1 rounded block mb-1">Link do Mapa (URL):</span>
+                     <InlineText value={event.mapLink || ''} isEditing={isEditing} onChange={(val) => onFieldChange?.('mapLink', val)} placeholder="https://maps.google.com/..." className="text-xs text-blue-500 w-full" />
+                  </div>
+               ) : (
+                  <Button onClick={() => window.open(event.mapLink || '#', '_blank')} variant="navy" fullWidth className="text-xs uppercase tracking-widest h-10">
+                    Ver Mapa
+                  </Button>
+               )}
             </div>
          </FadeInSection>
 
@@ -699,15 +924,23 @@ const ClassicLayout: React.FC<LayoutProps> = ({ event, onRSVP, onLikeUpdate }) =
             </FadeInSection>
          )}
 
-         {event.dressCode && (
+         {(isEditing || event.dressCode) && (
             <FadeInSection>
                <div className="bg-white p-6 rounded-xl shadow-lg border border-slate-100 mt-8">
                   <h3 className="text-xs font-bold uppercase tracking-[0.2em] text-slate-400 mb-4">Dress Code (Trajes)</h3>
-                  <h4 className="font-bold text-xl mb-2 text-slate-800">{event.dressCode.title}</h4>
-                  <p className="text-slate-500 text-sm mb-4">{event.dressCode.description}</p>
-                  {event.dressCode.image && (
+                  <h4 className="font-bold text-xl mb-2 text-slate-800">
+                      <InlineText value={event.dressCode?.title || 'Esporte Fino'} isEditing={isEditing} onChange={(val) => onFieldChange?.('dressCode', { ...event.dressCode, title: val })} />
+                  </h4>
+                  <p className="text-slate-500 text-sm mb-4">
+                      <InlineText type="textarea" value={event.dressCode?.description || 'Use tons pastéis.'} isEditing={isEditing} onChange={(val) => onFieldChange?.('dressCode', { ...event.dressCode, description: val })} />
+                  </p>
+                  {(isEditing || event.dressCode?.image) && (
                       <div className="mt-4 rounded-xl overflow-hidden shadow-sm">
-                          <img src={event.dressCode.image} alt="Referência de Traje" className="w-full h-64 object-cover" />
+                          {isEditing ? (
+                              <InlineImage src={event.dressCode?.image} isEditing={isEditing} onChange={(val) => onFieldChange?.('dressCode', { ...event.dressCode, image: val })} className="w-full h-64 object-cover" />
+                          ) : (
+                              <img src={event.dressCode?.image} alt="Referência de Traje" className="w-full h-64 object-cover" />
+                          )}
                       </div>
                   )}
                </div>
@@ -844,7 +1077,7 @@ const GuestManual: React.FC<{ isDark?: boolean; mode?: string }> = ({ isDark, mo
 // LAYOUT 2: MINIMALIST ETHEREAL (Redesigned Modern)
 // High-End, Clean, Airy, with Bible Verse, Gallery, Gifts, etc.
 // ============================================================================
-const ModernLayout: React.FC<LayoutProps> = ({ event, onRSVP, guestName, onLikeUpdate }) => {
+const ModernLayout: React.FC<LayoutProps> = ({ event, onRSVP, guestName, onLikeUpdate, isEditing = false, onFieldChange }) => {
   // Ethereal Color Palette
   const accentText = "text-[#8A817C]"; // Taupe gray
   const darkText = "text-[#2C2C2C]";
@@ -855,29 +1088,44 @@ const ModernLayout: React.FC<LayoutProps> = ({ event, onRSVP, guestName, onLikeU
       
       {/* 1. HERO - Minimalist Split or Overlay */}
       <div className="h-screen relative w-full overflow-hidden">
-         <motion.div 
-            initial={{ scale: 1.1, opacity: 0 }}
-            animate={{ scale: 1, opacity: 1 }}
-            transition={{ duration: 1.5 }}
-            className="absolute inset-0 bg-cover bg-center"
-            style={{ backgroundImage: `url('${event.heroImage}')` }}
-         />
-         <div className="absolute inset-0 bg-white/30 mix-blend-screen" />
-         <div className="absolute inset-0 bg-gradient-to-b from-transparent via-transparent to-[#FDFDFD]" />
+         {!isEditing ? (
+             <motion.div 
+                initial={{ scale: 1.1, opacity: 0 }}
+                animate={{ scale: 1, opacity: 1 }}
+                transition={{ duration: 1.5 }}
+                className="absolute inset-0 bg-cover bg-center"
+                style={{ backgroundImage: `url('${event.heroImage}')` }}
+             />
+         ) : (
+             <InlineImage src={event.heroImage} isEditing={isEditing} onChange={(val) => onFieldChange?.('heroImage', val)} className="absolute inset-0 bg-cover bg-center w-full h-full object-cover" />
+         )}
+         <div className="absolute inset-0 bg-white/30 mix-blend-screen pointer-events-none" />
+         <div className="absolute inset-0 bg-gradient-to-b from-transparent via-transparent to-[#FDFDFD] pointer-events-none" />
 
          <motion.div 
            initial={{ opacity: 0, y: 40, filter: 'blur(5px)' }}
            animate={{ opacity: 1, y: 0, filter: 'blur(0px)' }}
            transition={{ delay: 0.5, duration: 1.2, ease: [0.22, 1, 0.36, 1] }}
-           className="absolute inset-0 flex flex-col items-center justify-center text-center p-8"
+           className="absolute inset-0 flex flex-col items-center justify-center text-center p-8 z-10 pointer-events-none"
          >
-            <div className="border border-[#8A817C]/30 bg-white/80 backdrop-blur-sm p-10 md:p-16 max-w-lg w-full shadow-2xl shadow-gray-200/50">
+            <div className="border border-[#8A817C]/30 bg-white/80 backdrop-blur-sm p-10 md:p-16 max-w-lg w-full shadow-2xl shadow-gray-200/50 pointer-events-auto">
                <span className="font-display text-[10px] uppercase tracking-[0.4em] text-gray-500 mb-6 block">Convite de Casamento</span>
                <h1 className="text-5xl md:text-7xl font-serif text-[#1a1a1a] mb-4 leading-tight">
-                  {event.title.split(' & ')[0]} <br/> <span className="text-3xl italic text-[#C2B280]">&</span> <br/> {event.title.split(' & ')[1]}
+                  {isEditing ? (
+                      <InlineText value={event.title} isEditing={isEditing} onChange={(val) => onFieldChange?.('title', val)} />
+                  ) : (
+                      event.title.includes(' & ') ? (
+                        <>
+                          {event.title.split(' & ')[0]} <br/> <span className="text-3xl italic text-[#C2B280]">&</span> <br/> {event.title.split(' & ')[1]}
+                        </>
+                      ) : event.title
+                  )}
                </h1>
                <div className="w-10 h-px bg-[#C2B280] mx-auto my-6"></div>
-               <p className="text-sm font-display uppercase tracking-widest text-gray-600">{event.date}</p>
+               <p className="text-sm font-display uppercase tracking-widest text-gray-600 flex flex-col items-center gap-1">
+                  <InlineText type="date" value={event.date} isEditing={isEditing} onChange={(val) => onFieldChange?.('date', val)} />
+                  {isEditing && <InlineText type="time" value={event.time} isEditing={isEditing} onChange={(val) => onFieldChange?.('time', val)} className="text-[10px]" />}
+               </p>
             </div>
          </motion.div>
       </div>
@@ -886,10 +1134,10 @@ const ModernLayout: React.FC<LayoutProps> = ({ event, onRSVP, guestName, onLikeU
       <div className="max-w-2xl mx-auto px-8 -mt-20 relative z-10">
          <FadeInSection className="bg-white p-10 shadow-[0_10px_40px_-10px_rgba(0,0,0,0.05)] text-center">
             <span className="font-script text-4xl text-[#C2B280] mb-4 block">Bem-vindos</span>
-            <ParentsSection brideParents={event.brideParents} groomParents={event.groomParents} titleClass="font-serif italic" />
-            <p className="text-xl italic font-light leading-relaxed text-gray-600 mb-6 mt-4">
-               {event.description}
-            </p>
+            <ParentsSection brideParents={event.brideParents} groomParents={event.groomParents} isEditing={isEditing} onFieldChange={onFieldChange} titleClass="font-serif italic" />
+            <div className="text-xl italic font-light leading-relaxed text-gray-600 mb-6 mt-4">
+               <InlineText type="textarea" value={event.description} isEditing={isEditing} onChange={(val) => onFieldChange?.('description', val)} />
+            </div>
             <div className="py-4 border-t border-gray-100">
                <p className="text-[10px] uppercase tracking-[0.2em] text-gray-400 mb-2">Especialmente para</p>
                <p className="text-lg font-bold text-[#2C2C2C] font-display">{guestName}</p>
@@ -912,12 +1160,25 @@ const ModernLayout: React.FC<LayoutProps> = ({ event, onRSVP, guestName, onLikeU
                  <div className="absolute top-4 left-4 bg-white px-4 py-2 text-xs font-bold tracking-widest uppercase">Cerimônia</div>
              </div>
              <div className="w-full md:w-1/2 text-center md:text-left space-y-4">
-                 <h2 className="text-4xl font-serif text-[#1a1a1a]">{event.locationName}</h2>
-                 <p className="text-[#C2B280] font-display uppercase tracking-widest text-sm">{event.time} Horas</p>
-                 <p className="text-gray-500 leading-relaxed font-light text-lg">{event.address}</p>
-                 <button onClick={() => window.open(event.mapLink || '#', '_blank')} className="mt-4 inline-block border-b border-black pb-1 text-xs font-bold uppercase tracking-widest hover:text-[#C2B280] hover:border-[#C2B280] transition-colors">
-                    Ver Localização
-                 </button>
+                 <h2 className="text-4xl font-serif text-[#1a1a1a]">
+                    <InlineText value={event.locationName} isEditing={isEditing} onChange={(val) => onFieldChange?.('locationName', val)} />
+                 </h2>
+                 <p className="text-[#C2B280] font-display uppercase tracking-widest text-sm">
+                    <InlineText type="time" value={event.time} isEditing={isEditing} onChange={(val) => onFieldChange?.('time', val)} /> Horas
+                 </p>
+                 <p className="text-gray-500 leading-relaxed font-light text-lg">
+                    <InlineText value={event.address} isEditing={isEditing} onChange={(val) => onFieldChange?.('address', val)} />
+                 </p>
+                 {isEditing ? (
+                     <div className="mt-4">
+                         <span className="text-xs text-gray-400 block mb-1">Link do Mapa (Google Maps)</span>
+                         <InlineText value={event.mapLink || ''} isEditing={isEditing} onChange={(val) => onFieldChange?.('mapLink', val)} placeholder="https://..." className="text-xs text-blue-500 underline" />
+                     </div>
+                 ) : (
+                     <button onClick={() => window.open(event.mapLink || '#', '_blank')} className="mt-4 inline-block border-b border-black pb-1 text-xs font-bold uppercase tracking-widest hover:text-[#C2B280] hover:border-[#C2B280] transition-colors">
+                        Ver Localização
+                     </button>
+                 )}
              </div>
          </FadeInSection>
 
@@ -929,9 +1190,9 @@ const ModernLayout: React.FC<LayoutProps> = ({ event, onRSVP, guestName, onLikeU
                    <div className="absolute top-4 right-4 bg-white px-4 py-2 text-xs font-bold tracking-widest uppercase">Recepção</div>
                </div>
                <div className="w-full md:w-1/2 text-center md:text-right space-y-4">
-                   <h2 className="text-4xl font-serif text-[#1a1a1a]">{event.receptionName}</h2>
+                   <h2 className="text-4xl font-serif text-[#1a1a1a]"><InlineText value={event.receptionName} isEditing={isEditing} onChange={(val) => onFieldChange?.("receptionName", val)} /></h2>
                    <p className="text-[#C2B280] font-display uppercase tracking-widest text-sm">Após a cerimônia</p>
-                   <p className="text-gray-500 leading-relaxed font-light text-lg">{event.receptionAddress}</p>
+                   <p className="text-gray-500 leading-relaxed font-light text-lg"><InlineText type="textarea" value={event.receptionAddress} isEditing={isEditing} onChange={(val) => onFieldChange?.("receptionAddress", val)} /></p>
                    <button onClick={() => window.open(`https://maps.google.com/?q=${event.receptionAddress}`, '_blank')} className="mt-4 inline-block border-b border-black pb-1 text-xs font-bold uppercase tracking-widest hover:text-[#C2B280] hover:border-[#C2B280] transition-colors">
                       Ver Localização
                    </button>
@@ -950,12 +1211,18 @@ const ModernLayout: React.FC<LayoutProps> = ({ event, onRSVP, guestName, onLikeU
                {event.timeline.map((item, i) => (
                   <div key={i} className="relative flex items-center justify-between">
                      <div className={`w-[45%] ${i % 2 === 0 ? 'text-right' : 'order-last text-left'}`}>
-                        <h4 className="font-serif text-xl">{item.title}</h4>
-                        <p className="text-xs text-gray-500 mt-1 font-display uppercase tracking-wider">{item.description}</p>
+                        <h4 className="font-serif text-xl">
+                            <InlineText value={item.title} isEditing={isEditing} onChange={(val) => { const nt = [...(event.timeline||[])]; nt[i] = {...nt[i], title: val}; onFieldChange?.('timeline', nt); }} />
+                        </h4>
+                        <p className="text-xs text-gray-500 mt-1 font-display uppercase tracking-wider">
+                            <InlineText type="textarea" value={item.description} isEditing={isEditing} onChange={(val) => { const nt = [...(event.timeline||[])]; nt[i] = {...nt[i], description: val}; onFieldChange?.('timeline', nt); }} />
+                        </p>
                      </div>
                      <div className="absolute left-1/2 -translate-x-1/2 w-3 h-3 bg-[#C2B280] rounded-full border-4 border-[#F4F4F4]"></div>
                      <div className={`w-[45%] ${i % 2 === 0 ? 'text-left' : 'text-right'}`}>
-                        <span className="font-display font-bold text-[#C2B280]">{item.time}</span>
+                        <span className="font-display font-bold text-[#C2B280]">
+                            <InlineText value={item.time} isEditing={isEditing} onChange={(val) => { const nt = [...(event.timeline||[])]; nt[i] = {...nt[i], time: val}; onFieldChange?.('timeline', nt); }} />
+                        </span>
                      </div>
                   </div>
                ))}
@@ -964,12 +1231,14 @@ const ModernLayout: React.FC<LayoutProps> = ({ event, onRSVP, guestName, onLikeU
       )}
 
       {/* 6. DRESS CODE & TIPS */}
-      {event.dressCode && (
+      {(isEditing || event.dressCode) && (
          <FadeInSection className="py-16 bg-white text-center px-6 border-b border-gray-100">
              <span className="font-display text-[10px] uppercase tracking-[0.3em] text-gray-400 mb-4 block">Dress Code</span>
-             <h4 className="text-2xl font-serif mb-4 text-[#1a1a1a]">{event.dressCode.title}</h4>
+             <h4 className="text-2xl font-serif mb-4 text-[#1a1a1a]">
+                 <InlineText value={event.dressCode?.title || 'Esporte Fino'} isEditing={isEditing} onChange={(val) => onFieldChange?.('dressCode', { ...event.dressCode, title: val })} />
+             </h4>
              <p className="text-gray-500 max-w-md mx-auto leading-relaxed font-light">
-                 {event.dressCode.description}
+                 <InlineText type="textarea" value={event.dressCode?.description || 'Descreva os tons e estilos.'} isEditing={isEditing} onChange={(val) => onFieldChange?.('dressCode', { ...event.dressCode, description: val })} />
              </p>
          </FadeInSection>
       )}
@@ -1057,7 +1326,7 @@ const ModernLayout: React.FC<LayoutProps> = ({ event, onRSVP, guestName, onLikeU
 // LAYOUT 3: GARDEN ELEGANCE (New Model)
 // Soft, Floral, Serif, Comprehensive features (Bible, Gallery, etc.)
 // ============================================================================
-const GardenLayout: React.FC<LayoutProps> = ({ event, onRSVP, guestName, onLikeUpdate }) => {
+const GardenLayout: React.FC<LayoutProps> = ({ event, onRSVP, guestName, onLikeUpdate, isEditing = false, onFieldChange }) => {
   const accentColor = "text-[#5D6D55]"; // Sage green
   const accentBg = "bg-[#5D6D55]";
   
@@ -1066,28 +1335,43 @@ const GardenLayout: React.FC<LayoutProps> = ({ event, onRSVP, guestName, onLikeU
       
       {/* 1. HERO WITH OVERLAY */}
       <div className="relative h-[85vh] w-full overflow-hidden">
-         <motion.div 
-           initial={{ scale: 1.1 }}
-           animate={{ scale: 1 }}
-           transition={{ duration: 10, ease: "linear" }}
-           className="absolute inset-0 bg-cover bg-center" 
-           style={{ backgroundImage: `url('${event.heroImage}')` }} 
-         />
-         <div className="absolute inset-0 bg-white/20 mix-blend-overlay" />
-         <div className="absolute inset-0 bg-gradient-to-t from-[#F9F6F2] via-transparent to-transparent h-40 bottom-0 top-auto" />
+         {!isEditing ? (
+            <motion.div 
+               initial={{ scale: 1.1 }}
+               animate={{ scale: 1 }}
+               transition={{ duration: 10, ease: "linear" }}
+               className="absolute inset-0 bg-cover bg-center" 
+               style={{ backgroundImage: `url('${event.heroImage}')` }} 
+            />
+         ) : (
+             <InlineImage src={event.heroImage} isEditing={isEditing} onChange={(val) => onFieldChange?.('heroImage', val)} className="absolute inset-0 bg-cover bg-center h-full w-full object-cover" />
+         )}
+         <div className="absolute inset-0 bg-white/20 mix-blend-overlay pointer-events-none" />
+         <div className="absolute inset-0 bg-gradient-to-t from-[#F9F6F2] via-transparent to-transparent h-40 bottom-0 top-auto pointer-events-none" />
          
          <motion.div 
             initial={{ opacity: 0, y: 30, filter: 'blur(5px)' }}
             animate={{ opacity: 1, y: 0, filter: 'blur(0px)' }}
             transition={{ delay: 0.5, duration: 1.2, ease: [0.22, 1, 0.36, 1] }}
-            className="absolute inset-0 flex flex-col items-center justify-center text-center p-6 drop-shadow-sm"
+            className="absolute inset-0 flex flex-col items-center justify-center text-center p-6 drop-shadow-sm z-10 pointer-events-none"
          >
-            <div className="bg-white/70 backdrop-blur-sm p-8 px-10 rounded-t-[100px] rounded-b-[100px] shadow-xl border border-white">
+            <div className="bg-white/70 backdrop-blur-sm p-8 px-10 rounded-t-[100px] rounded-b-[100px] shadow-xl border border-white pointer-events-auto">
                 <p className={`text-xs uppercase tracking-[0.3em] mb-4 ${accentColor} font-sans`}>O Casamento de</p>
                 <h1 className="text-5xl md:text-6xl font-script text-[#2C2C2C] mb-2 leading-tight">
-                  {event.title.split(' & ')[0]} <br/> <span className="text-3xl font-serif italic text-[#8A8A8A]">&</span> <br/> {event.title.split(' & ')[1]}
+                  {isEditing ? (
+                      <InlineText value={event.title} isEditing={isEditing} onChange={(val) => onFieldChange?.('title', val)} />
+                  ) : (
+                      event.title.includes(' & ') ? (
+                        <>
+                          {event.title.split(' & ')[0]} <br/> <span className="text-3xl font-serif italic text-[#8A8A8A]">&</span> <br/> {event.title.split(' & ')[1]}
+                        </>
+                      ) : event.title
+                  )}
                 </h1>
-                <p className="mt-4 font-sans text-sm uppercase tracking-widest text-gray-500">{event.date}</p>
+                <p className="mt-4 font-sans text-sm uppercase tracking-widest text-gray-500 flex flex-col items-center gap-1">
+                   <InlineText type="date" value={event.date} isEditing={isEditing} onChange={(val) => onFieldChange?.('date', val)} />
+                   {isEditing && <InlineText type="time" value={event.time} isEditing={isEditing} onChange={(val) => onFieldChange?.('time', val)} className="text-[10px]" />}
+                </p>
             </div>
          </motion.div>
       </div>
@@ -1095,16 +1379,24 @@ const GardenLayout: React.FC<LayoutProps> = ({ event, onRSVP, guestName, onLikeU
       {/* 2. BIBLE QUOTE & WELCOME */}
       <div className="max-w-2xl mx-auto px-6 -mt-10 relative z-10 text-center">
          <FadeInSection>
-            <ParentsSection brideParents={event.brideParents} groomParents={event.groomParents} textColor="text-[#5D6D55]" titleClass="font-serif italic" />
+            <ParentsSection brideParents={event.brideParents} groomParents={event.groomParents} isEditing={isEditing} onFieldChange={onFieldChange} textColor="text-[#5D6D55]" titleClass="font-serif italic" />
             <div className="mb-8 mt-12">
                <span className="material-symbols-outlined text-4xl text-[#D6CFC7]">format_quote</span>
-               <p className="text-xl md:text-2xl italic font-medium leading-relaxed mt-2 text-[#5D5C61]">
-                 {event.description.split('(')[0].replace(/"/g, '')}
-               </p>
-               {event.description.includes('(') && (
-                 <p className="text-sm font-sans uppercase tracking-widest mt-4 text-[#8C8C8C]">
-                   {event.description.split('(')[1].replace(')', '')}
-                 </p>
+               {isEditing ? (
+                  <div className="text-xl md:text-2xl italic font-medium leading-relaxed mt-2 text-[#5D5C61]">
+                     <InlineText type="textarea" value={event.description} isEditing={isEditing} onChange={(val) => onFieldChange?.('description', val)} />
+                  </div>
+               ) : (
+                  <>
+                     <p className="text-xl md:text-2xl italic font-medium leading-relaxed mt-2 text-[#5D5C61]">
+                       {event.description.split('(')[0].replace(/"/g, '')}
+                     </p>
+                     {event.description.includes('(') && (
+                       <p className="text-sm font-sans uppercase tracking-widest mt-4 text-[#8C8C8C]">
+                         {event.description.split('(')[1].replace(')', '')}
+                       </p>
+                     )}
+                  </>
                )}
             </div>
             
@@ -1128,12 +1420,25 @@ const GardenLayout: React.FC<LayoutProps> = ({ event, onRSVP, guestName, onLikeU
          <FadeInSection className="flex flex-col md:flex-row items-center gap-8">
             <div className="flex-1 text-center md:text-right order-2 md:order-1">
                <span className={`inline-block px-3 py-1 rounded-full text-[10px] font-bold text-white mb-4 ${accentBg} uppercase tracking-widest`}>Cerimônia</span>
-               <h3 className="text-3xl font-serif mb-2">{event.locationName}</h3>
-               <p className="text-[#8C8C8C] font-sans text-sm mb-1">{event.time} Horas</p>
-               <p className="text-[#5D5C61] mb-6 leading-relaxed">{event.address}</p>
-               <button onClick={() => window.open(event.mapLink || '#', '_blank')} className={`text-xs font-bold border-b border-[#2C2C2C] pb-0.5 hover:opacity-50 transition-opacity uppercase tracking-widest`}>
-                 Ver no Mapa
-               </button>
+               <h3 className="text-3xl font-serif mb-2">
+                  <InlineText value={event.locationName} isEditing={isEditing} onChange={(val) => onFieldChange?.('locationName', val)} />
+               </h3>
+               <p className="text-[#8C8C8C] font-sans text-sm mb-1">
+                  <InlineText type="time" value={event.time} isEditing={isEditing} onChange={(val) => onFieldChange?.('time', val)} /> Horas
+               </p>
+               <p className="text-[#5D5C61] mb-6 leading-relaxed">
+                   <InlineText value={event.address} isEditing={isEditing} onChange={(val) => onFieldChange?.('address', val)} />
+               </p>
+               {isEditing ? (
+                  <div className="mt-2 text-left">
+                     <span className="text-xs text-[#8C8C8C] block mb-1">Link do Mapa:</span>
+                     <InlineText value={event.mapLink || ''} isEditing={isEditing} onChange={(val) => onFieldChange?.('mapLink', val)} placeholder="https://maps.google.com/..." className="text-xs text-blue-500 underline" />
+                  </div>
+               ) : (
+                  <button onClick={() => window.open(event.mapLink || '#', '_blank')} className={`text-xs font-bold border-b border-[#2C2C2C] pb-0.5 hover:opacity-50 transition-opacity uppercase tracking-widest`}>
+                    Ver no Mapa
+                  </button>
+               )}
             </div>
             <div className="flex-1 order-1 md:order-2">
                <div className="aspect-[3/4] rounded-t-[100px] overflow-hidden shadow-lg">
@@ -1151,9 +1456,9 @@ const GardenLayout: React.FC<LayoutProps> = ({ event, onRSVP, guestName, onLikeU
               </div>
               <div className="flex-1 text-center md:text-left">
                  <span className={`inline-block px-3 py-1 rounded-full text-[10px] font-bold text-white mb-4 ${accentBg} uppercase tracking-widest`}>Recepção</span>
-                 <h3 className="text-3xl font-serif mb-2">{event.receptionName}</h3>
+                 <h3 className="text-3xl font-serif mb-2"><InlineText value={event.receptionName} isEditing={isEditing} onChange={(val) => onFieldChange?.("receptionName", val)} /></h3>
                  <p className="text-[#8C8C8C] font-sans text-sm mb-1">Após a cerimônia</p>
-                 <p className="text-[#5D5C61] mb-6 leading-relaxed">{event.receptionAddress}</p>
+                 <p className="text-[#5D5C61] mb-6 leading-relaxed"><InlineText type="textarea" value={event.receptionAddress} isEditing={isEditing} onChange={(val) => onFieldChange?.("receptionAddress", val)} /></p>
                  <button onClick={() => window.open(`https://maps.google.com/?q=${event.receptionAddress}`, '_blank')} className={`text-xs font-bold border-b border-[#2C2C2C] pb-0.5 hover:opacity-50 transition-opacity uppercase tracking-widest`}>
                    Ver no Mapa
                  </button>
@@ -1171,9 +1476,15 @@ const GardenLayout: React.FC<LayoutProps> = ({ event, onRSVP, guestName, onLikeU
                   {event.timeline.map((item, i) => (
                     <div key={i} className="relative">
                        <div className={`absolute -left-[37px] top-1 w-4 h-4 rounded-full border-4 border-white ${accentBg} shadow-sm`}></div>
-                       <span className="text-xs font-bold font-sans text-[#8C8C8C] block mb-1">{item.time}</span>
-                       <h4 className="text-xl font-serif text-[#2C2C2C] mb-1">{item.title}</h4>
-                       <p className="text-sm text-[#5D5C61] font-light">{item.description}</p>
+                       <span className="text-xs font-bold font-sans text-[#8C8C8C] block mb-1">
+                           <InlineText value={item.time} isEditing={isEditing} onChange={(val) => { const nt = [...(event.timeline||[])]; nt[i] = {...nt[i], time: val}; onFieldChange?.('timeline', nt); }} />
+                       </span>
+                       <h4 className="text-xl font-serif text-[#2C2C2C] mb-1">
+                           <InlineText value={item.title} isEditing={isEditing} onChange={(val) => { const nt = [...(event.timeline||[])]; nt[i] = {...nt[i], title: val}; onFieldChange?.('timeline', nt); }} />
+                       </h4>
+                       <p className="text-sm text-[#5D5C61] font-light">
+                           <InlineText type="textarea" value={item.description} isEditing={isEditing} onChange={(val) => { const nt = [...(event.timeline||[])]; nt[i] = {...nt[i], description: val}; onFieldChange?.('timeline', nt); }} />
+                       </p>
                     </div>
                   ))}
                </div>
@@ -1194,11 +1505,15 @@ const GardenLayout: React.FC<LayoutProps> = ({ event, onRSVP, guestName, onLikeU
 
       {/* 7. GIFTS & DRESS CODE */}
       <div className="grid md:grid-cols-2 gap-8 max-w-4xl mx-auto px-6 mb-24">
-         {event.dressCode && (
+         {(isEditing || event.dressCode) && (
            <FadeInSection className="bg-white p-8 rounded-2xl shadow-sm border border-[#EAE5DF] text-center">
               <span className="material-symbols-outlined text-3xl mb-4 text-[#8C8C8C]">styler</span>
-              <h4 className="text-lg font-serif font-bold mb-2">{event.dressCode.title}</h4>
-              <p className="text-sm text-[#5D5C61]">{event.dressCode.description}</p>
+              <h4 className="text-lg font-serif font-bold mb-2">
+                 <InlineText value={event.dressCode?.title || 'Esporte Fino'} isEditing={isEditing} onChange={(val) => onFieldChange?.('dressCode', { ...event.dressCode, title: val })} />
+              </h4>
+              <p className="text-sm text-[#5D5C61]">
+                 <InlineText type="textarea" value={event.dressCode?.description || 'Use tons claros e florais.'} isEditing={isEditing} onChange={(val) => onFieldChange?.('dressCode', { ...event.dressCode, description: val })} />
+              </p>
            </FadeInSection>
          )}
          
@@ -1247,7 +1562,7 @@ const GardenLayout: React.FC<LayoutProps> = ({ event, onRSVP, guestName, onLikeU
 // ============================================================================
 // LAYOUT 4: RUSTIC CHIC (Warm, Texture, Nature)
 // ============================================================================
-const RusticLayout: React.FC<LayoutProps> = ({ event, onRSVP, guestName, onLikeUpdate }) => {
+const RusticLayout: React.FC<LayoutProps> = ({ event, onRSVP, guestName, onLikeUpdate, isEditing = false, onFieldChange }) => {
    const warmText = "text-[#5D4037]"; // Dark warm brown
    const lightText = "text-[#8D6E63]"; // Lighter brown
    const bgPaper = "bg-[#FDF5E6]"; // Old Lace / Paper
@@ -1258,27 +1573,40 @@ const RusticLayout: React.FC<LayoutProps> = ({ event, onRSVP, guestName, onLikeU
        {/* HERO: Framed Image */}
        <div className="p-4 md:p-8">
           <div className="relative h-[75vh] w-full rounded-[40px] overflow-hidden border-8 border-white shadow-xl">
-             <div className="absolute inset-0 bg-cover bg-center" style={{ backgroundImage: `url('${event.heroImage}')` }} />
-             <div className="absolute inset-0 bg-gradient-to-t from-[#4E342E]/80 via-transparent to-transparent" />
+             {!isEditing ? (
+                 <div className="absolute inset-0 bg-cover bg-center" style={{ backgroundImage: `url('${event.heroImage}')` }} />
+             ) : (
+                 <InlineImage src={event.heroImage} isEditing={isEditing} onChange={(val) => onFieldChange?.('heroImage', val)} className="absolute inset-0 bg-cover bg-center h-full w-full object-cover" />
+             )}
+             <div className="absolute inset-0 bg-gradient-to-t from-[#4E342E]/80 via-transparent to-transparent pointer-events-none" />
              
              <motion.div 
                initial={{ opacity: 0, y: 20 }}
                animate={{ opacity: 1, y: 0 }}
                transition={{ delay: 0.5, duration: 1 }}
-               className="absolute bottom-0 w-full p-8 md:p-16 text-center text-[#FDF5E6]"
+               className="absolute bottom-0 w-full p-8 md:p-16 text-center text-[#FDF5E6] z-10 pointer-events-none"
              >
-                <p className="uppercase tracking-[0.3em] text-xs mb-2">Save the Date</p>
-                <h1 className="text-5xl md:text-7xl font-script mb-2">{event.title}</h1>
-                <p className="text-lg">{event.date}</p>
+                <div className="pointer-events-auto">
+                   <p className="uppercase tracking-[0.3em] text-xs mb-2">Save the Date</p>
+                   <h1 className="text-5xl md:text-7xl font-script mb-2">
+                      <InlineText value={event.title} isEditing={isEditing} onChange={(val) => onFieldChange?.('title', val)} />
+                   </h1>
+                   <p className="text-lg flex flex-col items-center gap-1 justify-center">
+                      <InlineText type="date" value={event.date} isEditing={isEditing} onChange={(val) => onFieldChange?.('date', val)} />
+                      {isEditing && <InlineText type="time" value={event.time} isEditing={isEditing} onChange={(val) => onFieldChange?.('time', val)} className="text-sm" />}
+                   </p>
+                </div>
              </motion.div>
           </div>
        </div>
  
        {/* INTRO & BIBLE */}
        <FadeInSection className="max-w-2xl mx-auto text-center px-6 py-12">
-          <ParentsSection brideParents={event.brideParents} groomParents={event.groomParents} textColor="text-[#5D4037]" dividerColor="border-[#D7CCC8]" titleClass="font-serif italic" />
+          <ParentsSection brideParents={event.brideParents} groomParents={event.groomParents} isEditing={isEditing} onFieldChange={onFieldChange} textColor="text-[#5D4037]" dividerColor="border-[#D7CCC8]" titleClass="font-serif italic" />
           <span className="material-symbols-outlined text-4xl text-[#A1887F] mb-4 mt-8">forest</span>
-          <p className="text-xl md:text-2xl font-script leading-relaxed text-[#5D4037] mb-6">"{event.description}"</p>
+          <div className="text-xl md:text-2xl font-script leading-relaxed text-[#5D4037] mb-6">
+             "<InlineText type="textarea" value={event.description} isEditing={isEditing} onChange={(val) => onFieldChange?.('description', val)} />"
+          </div>
           <div className="w-24 h-px bg-[#D7CCC8] mx-auto my-6"></div>
           <p className="uppercase tracking-widest text-xs text-[#8D6E63]">Convidado Especial</p>
           <p className="text-xl font-bold mt-2 mb-10">{guestName}</p>
@@ -1292,8 +1620,8 @@ const RusticLayout: React.FC<LayoutProps> = ({ event, onRSVP, guestName, onLikeU
           <FadeInSection className="bg-white p-8 rounded-3xl shadow-sm border border-[#EFEBE9] flex flex-col md:flex-row items-center gap-8">
              <div className="flex-1 text-center md:text-left">
                 <span className="inline-block px-3 py-1 bg-[#EFEBE9] text-[#5D4037] text-[10px] font-bold uppercase tracking-widest rounded-full mb-4">Cerimônia</span>
-                <h3 className="text-3xl font-serif mb-2 text-[#4E342E]">{event.locationName}</h3>
-                <p className="text-[#8D6E63] mb-4">{event.address}</p>
+                <h3 className="text-3xl font-serif mb-2 text-[#4E342E]"><InlineText value={event.locationName} isEditing={isEditing} onChange={(val) => onFieldChange?.("locationName", val)} /></h3>
+                <p className="text-[#8D6E63] mb-4"><InlineText type="textarea" value={event.address} isEditing={isEditing} onChange={(val) => onFieldChange?.("address", val)} /></p>
                 <button onClick={() => window.open(event.mapLink || '#', '_blank')} className="text-xs font-bold border-b border-[#5D4037] pb-1 uppercase tracking-widest">Ver Mapa</button>
              </div>
              <div className="w-full md:w-1/3 aspect-square rounded-2xl overflow-hidden">
@@ -1311,8 +1639,12 @@ const RusticLayout: React.FC<LayoutProps> = ({ event, onRSVP, guestName, onLikeU
                 {event.timeline.map((item, i) => (
                    <div key={i} className="bg-white p-6 rounded-xl shadow-sm border border-[#EFEBE9] text-center relative">
                       <div className="absolute top-1/2 -left-[45px] md:-left-[calc(50vw-50%+20px)] w-4 h-4 bg-[#8D6E63] rounded-full border-4 border-[#FFF8E1]"></div>
-                      <span className="text-[#8D6E63] font-bold block mb-1">{item.time}</span>
-                      <h4 className="text-xl font-serif text-[#4E342E]">{item.title}</h4>
+                      <span className="text-[#8D6E63] font-bold block mb-1">
+                          <InlineText value={item.time} isEditing={isEditing} onChange={(val) => { const nt = [...(event.timeline||[])]; nt[i] = {...nt[i], time: val}; onFieldChange?.('timeline', nt); }} />
+                      </span>
+                      <h4 className="text-xl font-serif text-[#4E342E]">
+                          <InlineText value={item.title} isEditing={isEditing} onChange={(val) => { const nt = [...(event.timeline||[])]; nt[i] = {...nt[i], title: val}; onFieldChange?.('timeline', nt); }} />
+                      </h4>
                    </div>
                 ))}
              </div>
@@ -1321,11 +1653,17 @@ const RusticLayout: React.FC<LayoutProps> = ({ event, onRSVP, guestName, onLikeU
 
        {/* GIFTS & DRESS CODE */}
        <div className="grid md:grid-cols-2 gap-4 px-4 mt-16 mb-24">
-          <FadeInSection className="bg-[#5D4037] text-[#FDF5E6] p-10 rounded-3xl text-center flex flex-col items-center justify-center">
-             <span className="material-symbols-outlined text-4xl mb-4">checkroom</span>
-             <h3 className="text-2xl font-serif mb-2">Dress Code</h3>
-             <p className="opacity-80 text-sm max-w-xs">{event.dressCode?.description}</p>
-          </FadeInSection>
+          {(isEditing || event.dressCode) && (
+             <FadeInSection className="bg-[#5D4037] text-[#FDF5E6] p-10 rounded-3xl text-center flex flex-col items-center justify-center">
+                <span className="material-symbols-outlined text-4xl mb-4">checkroom</span>
+                <h3 className="text-2xl font-serif mb-2">
+                    <InlineText value={event.dressCode?.title || 'Dress Code'} isEditing={isEditing} onChange={(val) => onFieldChange?.('dressCode', { ...event.dressCode, title: val })} />
+                </h3>
+                <div className="opacity-80 text-sm max-w-xs">
+                    <InlineText type="textarea" value={event.dressCode?.description || 'Descreva aqui'} isEditing={isEditing} onChange={(val) => onFieldChange?.('dressCode', { ...event.dressCode, description: val })} />
+                </div>
+             </FadeInSection>
+          )}
           {event.gifts && event.gifts.length > 0 && (
              <FadeInSection className="bg-white border border-[#EFEBE9] p-10 rounded-3xl text-center flex flex-col items-center justify-center">
                 <span className="material-symbols-outlined text-4xl text-[#5D4037] mb-4">card_giftcard</span>
@@ -1382,32 +1720,43 @@ const RusticLayout: React.FC<LayoutProps> = ({ event, onRSVP, guestName, onLikeU
 // ============================================================================
 // LAYOUT 5: INDUSTRIAL (Modern, Edgy, High Contrast)
 // ============================================================================
-const IndustrialLayout: React.FC<LayoutProps> = ({ event, onRSVP, guestName, onLikeUpdate }) => {
+const IndustrialLayout: React.FC<LayoutProps> = ({ event, onRSVP, guestName, onLikeUpdate, isEditing = false, onFieldChange }) => {
    
    return (
      <div className="min-h-screen bg-[#111] text-white font-display pb-32 selection:bg-white selection:text-black">
        
        {/* HERO: Full Typographic */}
        <div className="h-screen relative flex flex-col justify-between p-6 md:p-12 border-b border-white/20">
-          <div className="flex justify-between items-start">
+          <div className="flex justify-between items-start z-10 relative">
              <span className="text-xs font-bold uppercase tracking-widest border border-white px-2 py-1">Save The Date</span>
-             <span className="text-xs font-bold uppercase tracking-widest">{event.date}</span>
+             <span className="text-xs font-bold uppercase tracking-widest flex items-center gap-1">
+                <InlineText type="date" value={event.date} isEditing={isEditing} onChange={(val) => onFieldChange?.('date', val)} />
+                {isEditing && <InlineText type="time" value={event.time} isEditing={isEditing} onChange={(val) => onFieldChange?.('time', val)} className="text-[10px]" />}
+             </span>
           </div>
           
-          <div className="relative z-10">
+          <div className="relative z-10 whitespace-pre-wrap">
              <motion.h1 
                initial={{ y: 50, opacity: 0 }}
                animate={{ y: 0, opacity: 1 }}
                transition={{ duration: 0.8 }}
                className="text-6xl md:text-9xl font-black uppercase leading-[0.85] tracking-tighter mix-blend-difference"
              >
-                {event.title.replace(' & ', '\n&\n')}
+                {isEditing ? (
+                    <InlineText value={event.title} isEditing={isEditing} onChange={(val) => onFieldChange?.('title', val)} />
+                ) : (
+                    event.title.replace(' & ', '\n&\n')
+                )}
              </motion.h1>
           </div>
 
           <div className="absolute inset-0 z-0 opacity-40">
-             <div className="absolute inset-0 bg-gradient-to-t from-[#111] via-transparent to-transparent" />
-             <img src={event.heroImage} className="w-full h-full object-cover grayscale" />
+             <div className="absolute inset-0 bg-gradient-to-t from-[#111] via-transparent to-transparent pointer-events-none" />
+             {!isEditing ? (
+                 <img src={event.heroImage} className="w-full h-full object-cover grayscale" />
+             ) : (
+                 <InlineImage src={event.heroImage} isEditing={isEditing} onChange={(val) => onFieldChange?.('heroImage', val)} className="w-full h-full object-cover grayscale" />
+             )}
           </div>
        </div>
 
@@ -1415,14 +1764,14 @@ const IndustrialLayout: React.FC<LayoutProps> = ({ event, onRSVP, guestName, onL
        <div className="grid grid-cols-1 md:grid-cols-2 border-b border-white/20">
           <div className="border-b md:border-b-0 md:border-r border-white/20 flex flex-col justify-center">
              <div className="p-8 pb-4">
-                <ParentsSection brideParents={event.brideParents} groomParents={event.groomParents} textColor="text-white" dividerColor="border-white" titleClass="uppercase tracking-widest text-xs font-bold text-white mb-6" />
+                <ParentsSection brideParents={event.brideParents} groomParents={event.groomParents} isEditing={isEditing} onFieldChange={onFieldChange} textColor="text-white" dividerColor="border-white" titleClass="uppercase tracking-widest text-xs font-bold text-white mb-6" />
              </div>
              <div className="p-8 md:px-16 md:pb-16 pt-0">
                  <FadeInSection>
                    <span className="text-xs text-gray-400 uppercase tracking-widest mb-4 block">O Conceito</span>
-                   <p className="text-xl md:text-2xl font-light leading-relaxed mb-10">
-                      {event.description}
-                   </p>
+                   <div className="text-xl md:text-2xl font-light leading-relaxed mb-10">
+                      <InlineText type="textarea" value={event.description} isEditing={isEditing} onChange={(val) => onFieldChange?.('description', val)} />
+                   </div>
                    <span className="text-xs text-gray-400 uppercase tracking-widest mb-4 block">Contagem Regressiva</span>
                    <CountdownTimer targetDate={event.isoDate} colorClass="text-white" />
                  </FadeInSection>
@@ -1447,10 +1796,10 @@ const IndustrialLayout: React.FC<LayoutProps> = ({ event, onRSVP, guestName, onL
              <div className="space-y-6">
                 {event.timeline.map((item, i) => (
                    <FadeInSection key={i} className="group flex items-baseline border-b border-white/10 pb-6 hover:border-white transition-colors cursor-default">
-                      <span className="w-24 font-mono text-sm text-gray-500 group-hover:text-white transition-colors">{item.time}</span>
+                      <span className="w-24 font-mono text-sm text-gray-500 group-hover:text-white transition-colors"><InlineText value={item.time} isEditing={isEditing} onChange={(val) => { const nt = [...(event.timeline||[])]; nt[i] = {...nt[i], time: val}; onFieldChange?.("timeline", nt); }} /></span>
                       <div>
-                         <h4 className="text-2xl font-bold uppercase group-hover:translate-x-2 transition-transform">{item.title}</h4>
-                         <p className="text-sm text-gray-500 mt-1">{item.description}</p>
+                         <h4 className="text-2xl font-bold uppercase group-hover:translate-x-2 transition-transform"><InlineText value={item.title} isEditing={isEditing} onChange={(val) => { const nt = [...(event.timeline||[])]; nt[i] = {...nt[i], title: val}; onFieldChange?.("timeline", nt); }} /></h4>
+                         <p className="text-sm text-gray-500 mt-1"><InlineText type="textarea" value={item.description} isEditing={isEditing} onChange={(val) => { const nt = [...(event.timeline||[])]; nt[i] = {...nt[i], description: val}; onFieldChange?.("timeline", nt); }} /></p>
                       </div>
                    </FadeInSection>
                 ))}
@@ -1464,7 +1813,7 @@ const IndustrialLayout: React.FC<LayoutProps> = ({ event, onRSVP, guestName, onL
              <img src={event.heroImage} className="w-full h-full object-cover grayscale group-hover:scale-105 transition-transform duration-700" />
              <div className="absolute bottom-0 left-0 p-8 bg-black/80 w-full backdrop-blur-sm">
                 <p className="text-xs uppercase tracking-widest mb-1 text-gray-400">Cerimônia</p>
-                <h3 className="text-2xl font-bold uppercase">{event.locationName}</h3>
+                <h3 className="text-2xl font-bold uppercase"><InlineText value={event.locationName} isEditing={isEditing} onChange={(val) => onFieldChange?.("locationName", val)} /></h3>
                 <button onClick={() => window.open(event.mapLink || '#', '_blank')} className="mt-4 text-xs font-bold border border-white px-4 py-2 hover:bg-white hover:text-black transition-colors uppercase">Map</button>
              </div>
           </div>
@@ -1472,7 +1821,7 @@ const IndustrialLayout: React.FC<LayoutProps> = ({ event, onRSVP, guestName, onL
              {event.mapImage && <img src={event.mapImage} className="w-full h-full object-cover grayscale group-hover:scale-105 transition-transform duration-700" />}
              <div className="absolute bottom-0 left-0 p-8 bg-white/90 text-black w-full backdrop-blur-sm">
                 <p className="text-xs uppercase tracking-widest mb-1 text-gray-600">Recepção</p>
-                <h3 className="text-2xl font-bold uppercase">{event.receptionName}</h3>
+                <h3 className="text-2xl font-bold uppercase"><InlineText value={event.receptionName} isEditing={isEditing} onChange={(val) => onFieldChange?.("receptionName", val)} /></h3>
                 <button onClick={() => window.open(`https://maps.google.com/?q=${event.receptionAddress}`, '_blank')} className="mt-4 text-xs font-bold border border-black px-4 py-2 hover:bg-black hover:text-white transition-colors uppercase">Map</button>
              </div>
           </div>
@@ -1525,7 +1874,7 @@ const SectionTitle: React.FC<{ title: string }> = ({ title }) => (
 // ============================================================================
 // LUXURY LAYOUT (Existing - kept for reference, no changes needed here)
 // ============================================================================
-const LuxuryLayout: React.FC<LayoutProps> = ({ event, onRSVP, guestName, onLikeUpdate }) => {
+const LuxuryLayout: React.FC<LayoutProps> = ({ event, onRSVP, guestName, onLikeUpdate, isEditing = false, onFieldChange }) => {
   const [copiedKey, setCopiedKey] = useState<string | null>(null);
 
   const handleCopy = (val: string) => {
@@ -1538,7 +1887,7 @@ const LuxuryLayout: React.FC<LayoutProps> = ({ event, onRSVP, guestName, onLikeU
     <div className="min-h-screen bg-black text-gray-200 font-serif pb-28 border-[12px] border-[#111] overflow-x-hidden relative">
       
       {/* BACKGROUND: Deep Elegant Radial Gradient (Spotlight Effect) */}
-      <div className="fixed inset-0 bg-[radial-gradient(100%_100%_at_50%_0%,_#2C3038_0%,_#0F1419_50%,_#000000_100%)] z-0" />
+      <div className="fixed inset-0 bg-[radial-gradient(100%_100%_at_50%_0%,_#2C3038_0%,_#0F1419_50%,_#000000_100%)] z-0 pointer-events-none" />
       
       {/* BACKGROUND: Subtle Texture Overlay */}
       <div className="fixed inset-0 pointer-events-none opacity-5 bg-[url('https://www.transparenttextures.com/patterns/stardust.png')] z-0 mix-blend-screen"></div>
@@ -1563,9 +1912,11 @@ const LuxuryLayout: React.FC<LayoutProps> = ({ event, onRSVP, guestName, onLikeU
             transition={{ duration: 1.5, ease: [0.22, 1, 0.36, 1], delay: 0.4 }}
             className="text-4xl text-white mb-2"
           >
-            {event.title}
+            <InlineText value={event.title} isEditing={isEditing} onChange={(val) => onFieldChange?.('title', val)} />
           </motion.h1>
-          <p className="text-xs text-gray-500 uppercase tracking-widest">{event.hosts}</p>
+          <p className="text-xs text-gray-500 uppercase tracking-widest leading-loose">
+            <InlineText value={event.hosts} isEditing={isEditing} onChange={(val) => onFieldChange?.('hosts', val)} />
+          </p>
         </motion.div>
 
         {/* 2. GUEST PERSONALIZATION */}
@@ -1579,11 +1930,17 @@ const LuxuryLayout: React.FC<LayoutProps> = ({ event, onRSVP, guestName, onLikeU
         {/* 3. HERO IMAGE & DATE */}
         <FadeInSection delay={0.3} className="w-full px-6 mb-4">
            <div className="w-full aspect-[4/5] rounded-t-[10rem] rounded-b-xl overflow-hidden relative border border-[#BF9B30]/20 mx-auto max-w-sm">
-              <div className="absolute inset-0 bg-cover bg-center grayscale contrast-125" style={{ backgroundImage: `url('${event.heroImage}')` }} />
-              <div className="absolute inset-0 bg-[#0F1419]/30 mix-blend-color"></div>
+              {!isEditing ? (
+                 <div className="absolute inset-0 bg-cover bg-center grayscale contrast-125" style={{ backgroundImage: `url('${event.heroImage}')` }} />
+              ) : (
+                 <InlineImage src={event.heroImage} isEditing={isEditing} onChange={(val) => onFieldChange?.('heroImage', val)} className="absolute inset-0 bg-cover bg-center h-full w-full object-cover grayscale contrast-125" />
+              )}
+              <div className="absolute inset-0 bg-[#0F1419]/30 mix-blend-color pointer-events-none"></div>
               
-              <div className="absolute bottom-0 w-full bg-gradient-to-t from-[#0F1419] to-transparent pt-20 pb-6 text-center">
-                 <p className="text-2xl text-white font-italic">{event.date}</p>
+              <div className="absolute bottom-0 w-full bg-gradient-to-t from-[#0F1419] to-transparent pt-20 pb-6 text-center z-10">
+                 <p className="text-2xl text-white font-italic">
+                    <InlineText type="date" value={event.date} isEditing={isEditing} onChange={(val) => onFieldChange?.('date', val)} />
+                 </p>
                  <p className="text-[#BF9B30] text-sm">{event.time} Horas</p>
               </div>
            </div>
@@ -1597,7 +1954,7 @@ const LuxuryLayout: React.FC<LayoutProps> = ({ event, onRSVP, guestName, onLikeU
 
         {/* 5. COUPLE MESSAGE */}
         <FadeInSection className="px-8 text-center max-w-md mx-auto pb-4">
-           <ParentsSection brideParents={event.brideParents} groomParents={event.groomParents} textColor="text-gray-400" dividerColor="border-[#BF9B30]" titleClass="font-serif italic text-white" />
+           <ParentsSection brideParents={event.brideParents} groomParents={event.groomParents} isEditing={isEditing} onFieldChange={onFieldChange} textColor="text-gray-400" dividerColor="border-[#BF9B30]" titleClass="font-serif italic text-white" />
            <p className="text-lg leading-relaxed font-light text-gray-400 border-t border-b border-[#BF9B30]/20 py-8">
              {event.description}
            </p>
@@ -1619,7 +1976,7 @@ const LuxuryLayout: React.FC<LayoutProps> = ({ event, onRSVP, guestName, onLikeU
                    </div>
                 </div>
                 <div className="p-4 flex flex-col gap-3">
-                   <p className="text-xs text-gray-500 text-center leading-relaxed">{event.address}</p>
+                   <p className="text-xs text-gray-500 text-center leading-relaxed"><InlineText type="textarea" value={event.address} isEditing={isEditing} onChange={(val) => onFieldChange?.("address", val)} /></p>
                    <Button 
                      className="w-full bg-[#BF9B30] text-[#0F1419] hover:bg-white hover:text-black text-xs font-bold uppercase tracking-widest h-10 border-none shadow-lg"
                      onClick={() => window.open(event.mapLink || `https://maps.google.com/?q=${event.address}`, '_blank')}
@@ -1638,12 +1995,12 @@ const LuxuryLayout: React.FC<LayoutProps> = ({ event, onRSVP, guestName, onLikeU
                      {event.mapImage && <div className="absolute inset-0 bg-cover bg-center opacity-60" style={{ backgroundImage: `url('${event.mapImage}')` }}></div>}
                      <div className="absolute inset-0 bg-gradient-to-t from-[#0F1419] to-transparent"></div>
                      <div className="absolute bottom-3 left-4">
-                        <p className="text-white text-lg font-serif">{event.receptionName}</p>
+                        <p className="text-white text-lg font-serif"><InlineText value={event.receptionName} isEditing={isEditing} onChange={(val) => onFieldChange?.("receptionName", val)} /></p>
                         <p className="text-gray-400 text-xs">Logo após a cerimônia</p>
                      </div>
                   </div>
                   <div className="p-4 flex flex-col gap-3">
-                     <p className="text-xs text-gray-500 text-center leading-relaxed">{event.receptionAddress}</p>
+                     <p className="text-xs text-gray-500 text-center leading-relaxed"><InlineText type="textarea" value={event.receptionAddress} isEditing={isEditing} onChange={(val) => onFieldChange?.("receptionAddress", val)} /></p>
                      <Button 
                        className="w-full bg-[#BF9B30] text-[#0F1419] hover:bg-white hover:text-black text-xs font-bold uppercase tracking-widest h-10 border-none shadow-lg"
                        onClick={() => window.open(`https://maps.google.com/?q=${event.receptionAddress}`, '_blank')}
@@ -1771,16 +2128,36 @@ const BridalBeautyLayout: React.FC<LayoutProps> = ({ event, onRSVP, guestName, o
          </FadeInSection>
 
          <FadeInSection className="w-full bg-white/60 p-8 rounded-3xl shadow-sm border border-white/80 mb-8 backdrop-blur-sm">
-            <h3 className="text-2xl font-bold mb-2 text-[#784646]">{event.date}</h3>
-            <p className="text-lg font-medium mb-4">{event.time}</p>
-            <p className="text-lg">{event.locationName}</p>
-            {event.address && <p className="text-sm opacity-80">{event.address}</p>}
+            <h3 className="text-2xl font-bold mb-2 text-[#784646]">
+                <InlineText type="date" value={event.isoDate || event.date} isEditing={isEditing} onChange={(val) => onFieldChange?.('isoDate', val)} />
+            </h3>
+            <p className="text-lg font-medium mb-4">
+                <InlineText type="time" value={event.time} isEditing={isEditing} onChange={(val) => onFieldChange?.('time', val)} />
+            </p>
+            <p className="text-lg">
+                <InlineText value={event.locationName} isEditing={isEditing} onChange={(val) => onFieldChange?.('locationName', val)} />
+            </p>
+            {(isEditing || event.address) && (
+               <p className="text-sm opacity-80 mt-1">
+                   <InlineText value={event.address} isEditing={isEditing} onChange={(val) => onFieldChange?.('address', val)} />
+               </p>
+            )}
+            {isEditing && (
+                <div className="mt-2 text-left">
+                   <span className="text-xs text-slate-500 block mb-1">Link do Mapa (URL)</span>
+                   <InlineText value={event.mapLink || ''} isEditing={isEditing} onChange={(val) => onFieldChange?.('mapLink', val)} placeholder="https://maps.google.com/..." className="text-xs text-blue-500 w-full" />
+                </div>
+            )}
          </FadeInSection>
 
-         {(event.giftTitle || event.giftDescription || event.iban || event.bankName) && (
+         {(isEditing || event.giftTitle || event.giftDescription || event.iban || event.bankName) && (
              <FadeInSection className="w-full bg-white/60 p-8 rounded-3xl shadow-sm border border-white/80 mb-8 backdrop-blur-sm text-center">
-                 <h3 className="text-2xl font-bold mb-3 text-[#784646]">{event.giftTitle || 'Lista de Presentes'}</h3>
-                 <p className="text-sm opacity-80 mb-6 italic">{event.giftDescription}</p>
+                 <h3 className="text-2xl font-bold mb-3 text-[#784646]">
+                     <InlineText value={event.giftTitle || 'Lista de Presentes'} isEditing={isEditing} onChange={(val) => onFieldChange?.('giftTitle', val)} />
+                 </h3>
+                 <p className="text-sm opacity-80 mb-6 italic">
+                     <InlineText type="textarea" value={event.giftDescription} isEditing={isEditing} onChange={(val) => onFieldChange?.('giftDescription', val)} />
+                 </p>
                  
                  {(event.iban || event.bankName) && (
                      <div className="bg-[#FFF5F5] p-5 rounded-2xl border border-[#BD8C8C]/20">
@@ -1864,8 +2241,20 @@ const BridalRomanticLayout: React.FC<LayoutProps> = ({ event, onRSVP, guestName,
                        <span className="material-symbols-outlined text-lg">location_on</span>
                    </div>
                    <p className="text-xs uppercase tracking-widest text-[#E06A8B] font-bold mb-1">Local</p>
-                   <p className="text-lg font-serif">{event.locationName}</p>
-                   {event.address && <p className="text-sm opacity-80 font-serif">{event.address}</p>}
+                   <div className="text-lg font-serif">
+                       <InlineText value={event.locationName} isEditing={isEditing} onChange={(val) => onFieldChange?.('locationName', val)} />
+                   </div>
+                   {event.address && (
+                       <div className="text-sm opacity-80 font-serif">
+                           <InlineText type="textarea" value={event.address} isEditing={isEditing} onChange={(val) => onFieldChange?.('address', val)} />
+                       </div>
+                   )}
+                   {isEditing && (
+                       <div className="mt-2 text-left w-full">
+                          <span className="text-xs text-[#E06A8B] block mb-1">Link do Mapa (URL)</span>
+                          <InlineText value={event.mapLink || ''} isEditing={isEditing} onChange={(val) => onFieldChange?.('mapLink', val)} placeholder="https://..." className="text-xs text-blue-500 w-full" />
+                       </div>
+                   )}
                </div>
                
                <div className="w-16 h-px bg-[#F48FB1]/40 mx-auto" />
@@ -1876,7 +2265,9 @@ const BridalRomanticLayout: React.FC<LayoutProps> = ({ event, onRSVP, guestName,
                        <span className="material-symbols-outlined text-lg">calendar_month</span>
                    </div>
                    <p className="text-xs uppercase tracking-widest text-[#E06A8B] font-bold mb-1">Data</p>
-                   <p className="text-lg font-serif">{event.date}</p>
+                   <div className="text-lg font-serif">
+                       <InlineText type="date" value={event.isoDate || event.date} isEditing={isEditing} onChange={(val) => onFieldChange?.('isoDate', val)} />
+                   </div>
                </div>
 
                <div className="w-16 h-px bg-[#F48FB1]/40 mx-auto" />
@@ -1887,20 +2278,26 @@ const BridalRomanticLayout: React.FC<LayoutProps> = ({ event, onRSVP, guestName,
                        <span className="material-symbols-outlined text-lg">schedule</span>
                    </div>
                    <p className="text-xs uppercase tracking-widest text-[#E06A8B] font-bold mb-1">Horário</p>
-                   <p className="text-lg font-serif">{event.time}</p>
+                   <div className="text-lg font-serif">
+                       <InlineText type="time" value={event.time} isEditing={isEditing} onChange={(val) => onFieldChange?.('time', val)} />
+                   </div>
                </div>
 
            </FadeInSection>
 
-           {(event.giftTitle || event.giftDescription || event.iban || event.bankName) && (
+           {(isEditing || event.giftTitle || event.giftDescription || event.iban || event.bankName) && (
                <FadeInSection className="w-full max-w-xs mb-12 flex flex-col items-center">
                    <div className="w-10 h-10 rounded-full border border-[#F48FB1] flex items-center justify-center text-[#E06A8B] mb-3">
                        <span className="material-symbols-outlined text-lg">featured_seasonal_and_gifts</span>
                    </div>
                    <p className="text-xs uppercase tracking-widest text-[#E06A8B] font-bold mb-3">Mimos</p>
                    <div className="bg-[#FFF8FA] p-6 rounded-2xl border border-[#F48FB1]/30 w-full text-center">
-                       <h3 className="font-serif text-xl mb-2 text-[#E06A8B]">{event.giftTitle || 'Lista de Presentes'}</h3>
-                       <p className="text-xs text-[#6D5A5A] mb-4 max-w-[200px] mx-auto italic">{event.giftDescription}</p>
+                       <h3 className="font-serif text-xl mb-2 text-[#E06A8B]">
+                           <InlineText value={event.giftTitle || 'Lista de Presentes'} isEditing={isEditing} onChange={(val) => onFieldChange?.('giftTitle', val)} />
+                       </h3>
+                       <div className="text-xs text-[#6D5A5A] mb-4 max-w-[200px] mx-auto italic">
+                           <InlineText type="textarea" value={event.giftDescription} isEditing={isEditing} onChange={(val) => onFieldChange?.('giftDescription', val)} />
+                       </div>
                        
                        {(event.iban || event.bankName) && (
                            <div className="bg-white p-4 rounded-xl shadow-sm border border-[#F48FB1]/20">
@@ -1961,22 +2358,35 @@ const BridalMinimalLayout: React.FC<LayoutProps> = ({ event, onRSVP, guestName, 
           </FadeInSection>
 
           <FadeInSection className="mt-8 mb-12">
-            <p className="text-[#555] font-serif text-lg leading-relaxed max-w-sm">
-               {event.description}
-            </p>
+            <div className="text-[#555] font-serif text-lg leading-relaxed max-w-sm">
+               <InlineText type="textarea" value={event.description} isEditing={isEditing} onChange={(val) => onFieldChange?.('description', val)} />
+            </div>
           </FadeInSection>
 
           <FadeInSection className="w-full grid grid-cols-2 gap-4 mb-16">
             <div className="p-6 bg-white rounded-3xl shadow-[0_4px_20px_rgba(0,0,0,0.02)] border border-[#F0ECE1]">
-                <p className="text-[10px] uppercase tracking-widest text-[#A09383] mb-2">Quando</p>
-                <p className="font-serif text-xl">{event.date.split(' ')[0]}</p>
-                <p className="text-[#888] text-sm">{event.date.split(' ').slice(1).join(' ')}</p>
-                <p className="text-[#888] text-sm mt-1">{event.time}</p>
+                <p className="text-[10px] uppercase tracking-widest text-[#A09383] mb-2">Data</p>
+                <div className="font-serif text-xl">
+                    <InlineText type="date" value={event.isoDate || event.date} isEditing={isEditing} onChange={(val) => onFieldChange?.('isoDate', val)} />
+                </div>
+                <div className="text-[#888] text-sm mt-1">
+                    <InlineText type="time" value={event.time} isEditing={isEditing} onChange={(val) => onFieldChange?.('time', val)} />
+                </div>
             </div>
             <div className="p-6 bg-white rounded-3xl shadow-[0_4px_20px_rgba(0,0,0,0.02)] border border-[#F0ECE1]">
                 <p className="text-[10px] uppercase tracking-widest text-[#A09383] mb-2">Onde</p>
-                <p className="font-serif text-xl leading-tight">{event.locationName}</p>
-                <p className="text-[#888] text-sm mt-2">{event.address}</p>
+                <div className="font-serif text-xl leading-tight">
+                    <InlineText value={event.locationName} isEditing={isEditing} onChange={(val) => onFieldChange?.('locationName', val)} />
+                </div>
+                <div className="text-[#888] text-sm mt-2">
+                    <InlineText type="textarea" value={event.address} isEditing={isEditing} onChange={(val) => onFieldChange?.('address', val)} />
+                </div>
+                {isEditing && (
+                    <div className="mt-2 text-left">
+                       <span className="text-xs text-[#A09383] block mb-1">Link Mapa (URL)</span>
+                       <InlineText value={event.mapLink || ''} isEditing={isEditing} onChange={(val) => onFieldChange?.('mapLink', val)} placeholder="https://..." className="text-xs text-blue-500 w-full" />
+                    </div>
+                )}
             </div>
           </FadeInSection>
 
@@ -1987,12 +2397,16 @@ const BridalMinimalLayout: React.FC<LayoutProps> = ({ event, onRSVP, guestName, 
             </FadeInSection>
           )}
 
-          {(event.giftTitle || event.giftDescription || event.iban || event.bankName) && (
+          {(isEditing || event.giftTitle || event.giftDescription || event.iban || event.bankName) && (
             <FadeInSection className="w-full mb-12">
                 <div className="p-8 bg-[#FDFBF7] border border-[#F0ECE1] rounded-3xl text-center">
                     <p className="text-[10px] uppercase tracking-widest text-[#A09383] mb-4">Mimos</p>
-                    <h3 className="font-serif text-2xl mb-3 text-[#333333]">{event.giftTitle || 'Lista de Presentes'}</h3>
-                    <p className="text-sm text-[#888] mb-6 max-w-[250px] mx-auto">{event.giftDescription}</p>
+                    <h3 className="font-serif text-2xl mb-3 text-[#333333]">
+                        <InlineText value={event.giftTitle || 'Lista de Presentes'} isEditing={isEditing} onChange={(val) => onFieldChange?.('giftTitle', val)} />
+                    </h3>
+                    <div className="text-sm text-[#888] mb-6 max-w-[250px] mx-auto">
+                        <InlineText type="textarea" value={event.giftDescription} isEditing={isEditing} onChange={(val) => onFieldChange?.('giftDescription', val)} />
+                    </div>
                     
                     {(event.iban || event.bankName) && (
                         <div className="bg-white p-4 rounded-xl border border-[#F0ECE1]">
@@ -2051,25 +2465,41 @@ const BridalTeaPartyLayout: React.FC<LayoutProps> = ({ event, onRSVP, guestName,
          <FadeInSection className="bg-white/80 backdrop-blur-md w-full p-8 rounded-3xl border border-white shadow-xl relative mt-[-60px] z-20">
             <p className="text-xs font-sans uppercase tracking-[0.3em] text-[#8194A5] mb-2">{event.hosts || 'Chá de Panela'}</p>
             <h1 className="text-5xl text-[#5C7487] mb-6" style={{ fontFamily: '"Playfair Display", serif', fontStyle: 'italic' }}>
-               {event.title}
+               <InlineText value={event.title} isEditing={isEditing} onChange={(val) => onFieldChange?.('title', val)} />
             </h1>
             
             <div className="w-12 h-px bg-[#B5C1C8] mx-auto mb-6"></div>
             
-            <p className="text-base leading-relaxed text-[#5C7487] mb-8 px-2">
-               {event.description}
-            </p>
+            <div className="text-base leading-relaxed text-[#5C7487] mb-8 px-2">
+               <InlineText type="textarea" value={event.description} isEditing={isEditing} onChange={(val) => onFieldChange?.('description', val)} />
+            </div>
 
             <div className="bg-[#F8FAFC] rounded-2xl p-6 border border-[#E2E8F0]">
-                <div className="flex items-center justify-center gap-3 mb-4">
+                <div className="flex flex-col md:flex-row items-center justify-center gap-3 mb-4">
                     <span className="material-symbols-outlined text-[#8194A5] text-sm">calendar_today</span>
-                    <p className="uppercase font-sans text-xs tracking-widest font-bold text-[#5C7487]">{event.date} • {event.time}</p>
+                    <div className="uppercase font-sans text-xs tracking-widest font-bold text-[#5C7487] flex items-center gap-2">
+                        <InlineText type="date" value={event.isoDate || event.date} isEditing={isEditing} onChange={(val) => onFieldChange?.('isoDate', val)} /> 
+                        • 
+                        <InlineText type="time" value={event.time} isEditing={isEditing} onChange={(val) => onFieldChange?.('time', val)} />
+                    </div>
                 </div>
                 <div className="flex items-center justify-center gap-3">
                     <span className="material-symbols-outlined text-[#8194A5] text-sm">location_on</span>
-                    <p className="uppercase font-sans text-xs tracking-widest font-bold text-[#5C7487]">{event.locationName}</p>
+                    <div className="uppercase font-sans text-xs tracking-widest font-bold text-[#5C7487]">
+                        <InlineText value={event.locationName} isEditing={isEditing} onChange={(val) => onFieldChange?.('locationName', val)} />
+                    </div>
                 </div>
-                {event.address && <p className="text-sm mt-2 text-[#8194A5] italic">{event.address}</p>}
+                {event.address && (
+                    <div className="text-sm mt-2 text-[#8194A5] italic">
+                        <InlineText type="textarea" value={event.address} isEditing={isEditing} onChange={(val) => onFieldChange?.('address', val)} />
+                    </div>
+                )}
+                {isEditing && (
+                    <div className="mt-2 text-left">
+                       <span className="text-xs text-[#8194A5] block mb-1">Link do Mapa (URL)</span>
+                       <InlineText value={event.mapLink || ''} isEditing={isEditing} onChange={(val) => onFieldChange?.('mapLink', val)} placeholder="https://..." className="text-xs text-blue-500 w-full" />
+                    </div>
+                )}
             </div>
          </FadeInSection>
 
@@ -2080,11 +2510,15 @@ const BridalTeaPartyLayout: React.FC<LayoutProps> = ({ event, onRSVP, guestName,
             </FadeInSection>
          )}
 
-         {(event.giftTitle || event.giftDescription || event.iban || event.bankName) && (
+         {(isEditing || event.giftTitle || event.giftDescription || event.iban || event.bankName) && (
              <FadeInSection className="w-full mt-12 bg-[#F8FAFC] p-6 rounded-3xl border border-[#E2E8F0] text-center">
                  <h3 className="font-sans uppercase text-xs tracking-[0.3em] font-bold text-[#8194A5] mb-4">Mimos</h3>
-                 <p className="font-serif text-xl text-[#5C7487] mb-2">{event.giftTitle || 'Lista de Presentes'}</p>
-                 <p className="text-sm text-[#8194A5] italic mb-6 max-w-[250px] mx-auto">{event.giftDescription}</p>
+                 <div className="font-serif text-xl text-[#5C7487] mb-2">
+                     <InlineText value={event.giftTitle || 'Lista de Presentes'} isEditing={isEditing} onChange={(val) => onFieldChange?.('giftTitle', val)} />
+                 </div>
+                 <div className="text-sm text-[#8194A5] italic mb-6 max-w-[250px] mx-auto">
+                     <InlineText type="textarea" value={event.giftDescription} isEditing={isEditing} onChange={(val) => onFieldChange?.('giftDescription', val)} />
+                 </div>
                  
                  {(event.iban || event.bankName) && (
                      <div className="bg-white p-5 rounded-2xl shadow-sm border border-[#E2E8F0] text-left">
@@ -2143,7 +2577,7 @@ const BridalChefLayout: React.FC<LayoutProps> = ({ event, onRSVP, guestName, onL
          <FadeInSection>
             <p className="text-[10px] uppercase font-bold tracking-[0.4em] text-[#879F84] mb-3">{event.hosts || 'Chá de Panela'}</p>
             <h1 className="text-5xl text-[#2C2C2C] mb-6 tracking-tight" style={{ fontFamily: '"Playfair Display", serif' }}>
-               {event.title}
+               <InlineText value={event.title} isEditing={isEditing} onChange={(val) => onFieldChange?.('title', val)} />
             </h1>
          </FadeInSection>
 
@@ -2159,26 +2593,42 @@ const BridalChefLayout: React.FC<LayoutProps> = ({ event, onRSVP, guestName, onL
                   <path d="M12 14c2.5-3 4-8 2-12C13 3 12 6 12 14z" />
                 </svg>
             </div>
-            <p className="text-sm leading-relaxed text-[#555] mb-8 font-serif italic">
-               "{event.description}"
-            </p>
+            <div className="text-sm leading-relaxed text-[#555] mb-8 font-serif italic">
+               "<InlineText type="textarea" value={event.description} isEditing={isEditing} onChange={(val) => onFieldChange?.('description', val)} />"
+            </div>
 
             <div className="flex flex-col gap-6 items-center">
-                <div className="flex flex-col items-center">
+                <div className="flex flex-col items-center w-full">
                     <span className="text-[10px] uppercase tracking-[0.3em] text-[#879F84] font-bold mb-1">Quando</span>
-                    <p className="font-serif text-lg text-[#2C2C2C]">{event.date} às {event.time}</p>
+                    <div className="font-serif text-lg text-[#2C2C2C] flex items-center justify-center gap-2">
+                        <InlineText type="date" value={event.isoDate || event.date} isEditing={isEditing} onChange={(val) => onFieldChange?.('isoDate', val)} /> 
+                        às 
+                        <InlineText type="time" value={event.time} isEditing={isEditing} onChange={(val) => onFieldChange?.('time', val)} />
+                    </div>
                 </div>
                 <div className="w-px h-8 bg-[#E8E6E1]"></div>
-                <div className="flex flex-col items-center">
+                <div className="flex flex-col items-center w-full">
                     <span className="text-[10px] uppercase tracking-[0.3em] text-[#879F84] font-bold mb-1">Onde</span>
-                    <p className="font-serif text-lg text-[#2C2C2C]">{event.locationName}</p>
-                    {event.address && <p className="text-xs mt-2 text-[#777] max-w-[200px]">{event.address}</p>}
+                    <div className="font-serif text-lg text-[#2C2C2C]">
+                        <InlineText value={event.locationName} isEditing={isEditing} onChange={(val) => onFieldChange?.('locationName', val)} />
+                    </div>
+                    {event.address && (
+                        <div className="text-xs mt-2 text-[#777] max-w-[200px]">
+                            <InlineText type="textarea" value={event.address} isEditing={isEditing} onChange={(val) => onFieldChange?.('address', val)} />
+                        </div>
+                    )}
+                    {isEditing && (
+                        <div className="mt-2 text-left w-full">
+                           <span className="text-xs text-[#879F84] block mb-1">Link do Mapa (URL)</span>
+                           <InlineText value={event.mapLink || ''} isEditing={isEditing} onChange={(val) => onFieldChange?.('mapLink', val)} placeholder="https://..." className="text-xs text-blue-500 w-full" />
+                        </div>
+                    )}
                 </div>
             </div>
          </FadeInSection>
 
          {/* Gift Button as requested */}
-         {(event.giftTitle || event.giftDescription || event.iban || event.bankName) && (
+         {(isEditing || event.giftTitle || event.giftDescription || event.iban || event.bankName) && (
             <FadeInSection delay={0.3} className="w-full mb-10">
                <div className="bg-[#CB6843]/5 border border-[#CB6843]/20 p-8 rounded-2xl flex flex-col items-center relative overflow-hidden">
                    {/* Decorative wooden board SVG faded in background */}
@@ -2186,8 +2636,12 @@ const BridalChefLayout: React.FC<LayoutProps> = ({ event, onRSVP, guestName, onL
                      <path d="M8 2h8a4 4 0 0 1 4 4v12a4 4 0 0 1-4 4H8a4 4 0 0 1-4-4V6a4 4 0 0 1 4-4z" />
                      <circle cx="12" cy="5" r="1.5" />
                    </svg>
-                   <h3 className="text-[#CB6843] font-serif text-xl mb-3 relative z-10">{event.giftTitle || 'Lista de Presentes'}</h3>
-                   <p className="text-xs text-[#666] mb-6 relative z-10 leading-relaxed font-serif italic">{event.giftDescription}</p>
+                   <h3 className="text-[#CB6843] font-serif text-xl mb-3 relative z-10">
+                       <InlineText value={event.giftTitle || 'Lista de Presentes'} isEditing={isEditing} onChange={(val) => onFieldChange?.('giftTitle', val)} />
+                   </h3>
+                   <div className="text-xs text-[#666] mb-6 relative z-10 leading-relaxed font-serif italic text-center w-full">
+                       <InlineText type="textarea" value={event.giftDescription} isEditing={isEditing} onChange={(val) => onFieldChange?.('giftDescription', val)} />
+                   </div>
                    {(event.iban || event.bankName) && (
                        <button onClick={() => {
                            const bankInfo = `Banco: ${event.bankName || ''}\nTitular: ${event.accountName || ''}\nIBAN: ${event.iban || ''}`;
@@ -2236,7 +2690,7 @@ const BridalTropicalLayout: React.FC<LayoutProps> = ({ event, onRSVP, guestName,
             {event.hosts || 'Vocês estão convidados!'}
           </span>
           <h1 className="text-5xl text-white font-bold leading-tight drop-shadow-lg font-serif">
-            {event.title}
+            <InlineText value={event.title} isEditing={isEditing} onChange={(val) => onFieldChange?.('title', val)} />
           </h1>
           <p className="text-white mt-6 text-sm font-light tracking-[0.2em] uppercase">Chá de Panela</p>
         </FadeInSection>
@@ -2247,19 +2701,23 @@ const BridalTropicalLayout: React.FC<LayoutProps> = ({ event, onRSVP, guestName,
         {/* Intro Card */}
         <FadeInSection delay={0.1} className="bg-white px-8 py-10 text-center rounded-3xl shadow-[0_10px_25px_-5px_rgba(0,0,0,0.1)] mb-10 border border-emerald-50">
           <h2 className="text-emerald-800 font-serif font-bold text-2xl mb-4">Celebrando o nosso novo lar!</h2>
-          <p className="text-gray-500 text-sm leading-relaxed mb-8">
-            {event.description}
-          </p>
+          <div className="text-gray-500 text-sm leading-relaxed mb-8">
+            <InlineText type="textarea" value={event.description} isEditing={isEditing} onChange={(val) => onFieldChange?.('description', val)} />
+          </div>
           
           <div className="flex justify-center items-center gap-6 text-emerald-900">
             <div className="text-center">
               <p className="text-[10px] uppercase text-gray-400 font-bold tracking-[0.2em] mb-1">Data</p>
-              <p className="font-serif font-bold text-lg">{event.date.split(' de ')[0] + ' ' + (event.date.split(' de ')[1]?.substring(0,3) || '')}</p>
+              <div className="font-serif font-bold text-lg">
+                  <InlineText type="date" value={event.isoDate || event.date} isEditing={isEditing} onChange={(val) => onFieldChange?.('isoDate', val)} />
+              </div>
             </div>
             <div className="w-px h-10 bg-emerald-100"></div>
             <div className="text-center">
               <p className="text-[10px] uppercase text-gray-400 font-bold tracking-[0.2em] mb-1">Hora</p>
-              <p className="font-serif font-bold text-lg">{event.time}</p>
+              <div className="font-serif font-bold text-lg">
+                  <InlineText type="time" value={event.time} isEditing={isEditing} onChange={(val) => onFieldChange?.('time', val)} />
+              </div>
             </div>
           </div>
         </FadeInSection>
@@ -2275,7 +2733,13 @@ const BridalTropicalLayout: React.FC<LayoutProps> = ({ event, onRSVP, guestName,
         {/* Local & Map */}
         <FadeInSection delay={0.3} className="mb-12 px-2">
             <h3 className="text-center text-xs uppercase tracking-[0.3em] text-emerald-600 mb-3 font-bold">Localização</h3>
-            <p className="text-center text-gray-600 text-sm mb-6 font-serif">{event.locationName}<br/><span className="text-xs opacity-70 font-sans">{event.address}</span></p>
+            <div className="text-center text-gray-600 text-sm mb-6 font-serif">
+                <InlineText value={event.locationName} isEditing={isEditing} onChange={(val) => onFieldChange?.('locationName', val)} />
+                <br/>
+                <span className="text-xs opacity-70 font-sans">
+                    <InlineText type="textarea" value={event.address} isEditing={isEditing} onChange={(val) => onFieldChange?.('address', val)} />
+                </span>
+            </div>
             
             <div className="rounded-3xl overflow-hidden shadow-[0_8px_20px_-6px_rgba(0,0,0,0.1)] h-48 bg-gray-200 border-2 border-white relative group">
                 <iframe 
@@ -2288,15 +2752,22 @@ const BridalTropicalLayout: React.FC<LayoutProps> = ({ event, onRSVP, guestName,
                 </iframe>
                 <div className="absolute inset-0 bg-emerald-900/10 pointer-events-none group-hover:bg-transparent transition-colors"></div>
             </div>
-            <div className="flex justify-center mt-6">
-               <button onClick={() => window.open(event.mapLink || event.location || `https://maps.google.com/?q=${encodeURIComponent(event.address || event.locationName)}`, '_blank')} className="text-[10px] font-bold uppercase tracking-[0.2em] text-emerald-600 border-b border-emerald-300 pb-1 hover:text-emerald-800 transition-colors">
-                  Ver no Google Maps
-               </button>
-            </div>
+            {isEditing ? (
+                <div className="mt-6 text-left">
+                   <span className="text-xs text-emerald-600 block mb-1">Link do Mapa (URL)</span>
+                   <InlineText value={event.mapLink || ''} isEditing={isEditing} onChange={(val) => onFieldChange?.('mapLink', val)} placeholder="https://..." className="text-xs text-blue-500 w-full" />
+                </div>
+            ) : (
+                <div className="flex justify-center mt-6">
+                   <button onClick={() => window.open(event.mapLink || event.location || `https://maps.google.com/?q=${encodeURIComponent(event.address || event.locationName)}`, '_blank')} className="text-[10px] font-bold uppercase tracking-[0.2em] text-emerald-600 border-b border-emerald-300 pb-1 hover:text-emerald-800 transition-colors">
+                      Ver no Google Maps
+                   </button>
+                </div>
+            )}
         </FadeInSection>
 
         {/* Gifts Section */}
-        {(event.giftTitle || event.giftDescription || event.iban || event.bankName) && (
+        {(isEditing || event.giftTitle || event.giftDescription || event.iban || event.bankName) && (
             <FadeInSection delay={0.4} className="mb-12 w-full">
                <div className="bg-[#FFF8F5] border border-[#FFD2C1]/50 p-8 flex flex-col items-center rounded-3xl relative overflow-hidden shadow-sm">
                    {/* Tropical decorative SVG */}
@@ -2307,8 +2778,12 @@ const BridalTropicalLayout: React.FC<LayoutProps> = ({ event, onRSVP, guestName,
                        <path d="M12 2L2 22l10-4 10 4L12 2z" />
                    </svg>
                    
-                   <h3 className="text-[#FF7F50] font-serif text-2xl mb-3 relative z-10 font-bold">{event.giftTitle || 'Lista de Presentes'}</h3>
-                   <p className="text-xs text-gray-500 mb-6 relative z-10 leading-relaxed text-center">{event.giftDescription}</p>
+                   <h3 className="text-[#FF7F50] font-serif text-2xl mb-3 relative z-10 font-bold">
+                       <InlineText value={event.giftTitle || 'Lista de Presentes'} isEditing={isEditing} onChange={(val) => onFieldChange?.('giftTitle', val)} />
+                   </h3>
+                   <div className="text-xs text-gray-500 mb-6 relative z-10 leading-relaxed text-center">
+                       <InlineText type="textarea" value={event.giftDescription} isEditing={isEditing} onChange={(val) => onFieldChange?.('giftDescription', val)} />
+                   </div>
                    {(event.iban || event.bankName) && (
                        <button onClick={() => {
                            const bankInfo = `Banco: ${event.bankName || ''}\nTitular: ${event.accountName || ''}\nIBAN: ${event.iban || ''}`;
@@ -2499,9 +2974,9 @@ const RSVPForm: React.FC<{ event: EventDetails | any; onClose: () => void }> = (
                     <h4 className="font-bold text-center text-lg leading-tight mt-2">{event.title}</h4>
                     <p className="text-[10px] uppercase tracking-widest text-slate-400">{event.date} • {event.time}</p>
                     {(!event.plan || event.plan === 'Essencial') ? (
-                        <QRCodeSVG value={`${window.location.origin}/#/invite/${event.id}`} size={160} />
+                        <QRCodeSVG value={`${window.location.origin}/invite/${event.id}`} size={160} />
                     ) : (
-                        <QRCodeSVG value={`${window.location.origin}/#/checkin/${event.id}?guest=${guestId}`} size={160} />
+                        <QRCodeSVG value={`${window.location.origin}/checkin/${event.id}?guest=${guestId}`} size={160} />
                     )}
                     <p className="text-xs font-bold bg-slate-100 px-4 py-1.5 rounded-full uppercase tracking-wider">{formData.name}</p>
                 </div>

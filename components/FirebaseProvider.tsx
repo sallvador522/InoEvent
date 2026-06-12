@@ -1,25 +1,16 @@
 import React, { createContext, useContext, useEffect, useState } from 'react';
 import { initializeApp } from 'firebase/app';
 import { getAuth, GoogleAuthProvider, onAuthStateChanged, User, signOut } from 'firebase/auth';
-import { getFirestore, doc, onSnapshot, getDocFromServer, initializeFirestore } from 'firebase/firestore';
+import { getFirestore, doc, onSnapshot, getDocFromServer, initializeFirestore, setLogLevel } from 'firebase/firestore';
 import firebaseConfig from '../firebase-applet-config.json';
 
 const app = initializeApp(firebaseConfig);
 export const auth = getAuth(app);
-export const db = initializeFirestore(app, {
-  experimentalForceLongPolling: true,
-}, firebaseConfig.firestoreDatabaseId);
+export const db = getFirestore(app, firebaseConfig.firestoreDatabaseId);
 
-async function testConnection() {
-  try {
-    await getDocFromServer(doc(db, 'test', 'connection'));
-  } catch (error) {
-    if(error instanceof Error && (error.message.includes('the client is offline') || error.message.includes('Could not reach'))) {
-      console.warn("Firebase is operating in offline mode or connection test timed out.");
-    }
-  }
-}
-testConnection();
+setLogLevel('error');
+
+
 
 export { signOut };
 
@@ -86,6 +77,10 @@ export const FirebaseProvider: React.FC<{ children: React.ReactNode }> = ({ chil
   useEffect(() => {
     const unsubscribe = onAuthStateChanged(auth, (user) => {
       setUser(user);
+      setLoading(false);
+    }, (error) => {
+      console.warn('Auth State Error (Normal for iframe previews): ', error);
+      setUser(null);
       setLoading(false);
     });
     return unsubscribe;

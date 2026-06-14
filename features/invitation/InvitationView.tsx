@@ -5,6 +5,7 @@ import { motion } from 'framer-motion';
 import { getEventById, getEventByLayoutMode } from '../../mockData';
 import { EventDetails } from '../../types';
 import { TocaPlayer } from '../../components/music/TocaPlayer';
+import { AudioUploader } from '../../components/AudioUploader';
 import { BottomSheet } from '../../components/ui/BottomSheet';
 import { Button } from '../../components/ui/Button';
 import { QRCodeSVG } from 'qrcode.react';
@@ -19,6 +20,23 @@ import { Guestbook } from './Guestbook';
 import { LivePhotoGuest } from './LivePhotoGuest';
 import { TravelMap } from './TravelMap';
 import { InlineText, InlineImage } from '../../components/InlineEdit';
+
+const getValidMapUrl = (link?: string, fallbackQuery?: string) => {
+  if (!link || typeof link !== 'string') {
+     return `https://www.google.com/maps/search/?api=1&query=${encodeURIComponent(fallbackQuery || 'Local do Evento')}`;
+  }
+  const cleanLink = link.trim();
+  if (cleanLink === '#' || cleanLink === '' || cleanLink.startsWith('/')) {
+     return `https://www.google.com/maps/search/?api=1&query=${encodeURIComponent(fallbackQuery || 'Local do Evento')}`;
+  }
+  if (cleanLink.startsWith('http://') || cleanLink.startsWith('https://')) {
+     return cleanLink;
+  }
+  if (/^[a-zA-Z0-9.-]+\.[a-zA-Z]{2,}(\/.*)?$/.test(cleanLink)) {
+     return `https://${cleanLink}`;
+  }
+  return `https://www.google.com/maps/search/?api=1&query=${encodeURIComponent(fallbackQuery || cleanLink)}`;
+};
 
 // ============================================================================
 // COMPONENT: INVITATION CONTROLLER
@@ -37,6 +55,9 @@ const InvitationView: React.FC = () => {
   const [isEditing, setIsEditing] = useState(false);
   const [draftEvent, setDraftEvent] = useState<any>(null);
   const [isSaving, setIsSaving] = useState(false);
+  const [isToolbarOpen, setIsToolbarOpen] = useState(true);
+  
+  const [isSectionsPanelOpen, setIsSectionsPanelOpen] = useState(false);
   
   // Undo/Redo State
   const [history, setHistory] = useState<any[]>([]);
@@ -271,14 +292,13 @@ const InvitationView: React.FC = () => {
             iban: (data.gifts && data.gifts.length > 0) ? data.gifts[0].value : data.iban,
             bankName: (data.gifts && data.gifts.length > 0) ? data.gifts[0].bankName : data.bankName,
             accountName: (data.gifts && data.gifts.length > 0) ? data.gifts[0].accountName : data.accountName,
-            dressCode: (data.dressCodeTitle || data.dressCodeDescription) 
-                ? { title: data.dressCodeTitle, description: data.dressCodeDescription, image: templateDefaults?.dressCode?.image } 
-                : (data.dressCode || templateDefaults?.dressCode),
+            dressCode: data.dressCode !== undefined ? data.dressCode : (data.dressCodeTitle || data.dressCodeDescription) ? { title: data.dressCodeTitle, description: data.dressCodeDescription, image: templateDefaults?.dressCode?.image } : templateDefaults?.dressCode,
             address: data.address || 'Luanda, Angola',
             locationName: data.locationName || data.location || 'Local do Evento',
-            mapLink: data.location || '#',
-            mapImage: data.mapImage || templateDefaults?.mapImage || null,
-            gallery: (data.gallery && data.gallery.length > 0) ? data.gallery : (templateDefaults?.gallery || []),
+            mapLink: data.mapLink || data.location || '#',
+            mapImage: data.mapImage !== undefined ? data.mapImage : (templateDefaults?.mapImage || null),
+            gallery: data.gallery !== undefined ? data.gallery : (templateDefaults?.gallery || []),
+            showGallery: data.showGallery !== undefined ? data.showGallery : true,
             phone: data.contactPhone || ''
           });
         }
@@ -355,8 +375,14 @@ const InvitationView: React.FC = () => {
         </div>
       )}
 
-      {isOwner && (
-        <div className="fixed top-4 left-4 z-50 flex flex-wrap gap-2">
+      {isOwner && isEditing && !isToolbarOpen && (
+        <button onClick={() => setIsToolbarOpen(true)} className="fixed top-4 right-4 z-[110] flex items-center justify-center bg-brand-blue text-white w-10 h-10 rounded-full shadow-2xl hover:bg-brand-blue/90 hover:scale-105 transition-all">
+          <span className="material-symbols-outlined text-[20px]">menu_open</span>
+        </button>
+      )}
+
+      {isOwner && (!isEditing || isToolbarOpen) && (
+        <div className="fixed top-4 left-1/2 -translate-x-1/2 z-[110] flex items-center gap-2 bg-white/90 backdrop-blur-md px-3 py-2.5 rounded-[30px] shadow-2xl border border-slate-200 w-auto max-w-[95%] overflow-x-auto scrollbar-hide whitespace-nowrap">
            {!isEditing ? (
              <>
                <button type="button" onClick={() => navigate(-1)} className="flex items-center gap-2 bg-white/90 backdrop-blur-sm text-slate-800 px-4 py-2 rounded-full shadow-xl hover:bg-white transition-all font-display text-sm font-bold border border-slate-200 outline-none cursor-pointer">
@@ -378,26 +404,165 @@ const InvitationView: React.FC = () => {
              </>
            ) : (
              <>
-               <span className="bg-amber-100 text-amber-800 text-xs font-bold px-3 py-2 rounded-full flex items-center shadow-md mr-2">
+               <button onClick={() => setIsToolbarOpen(false)} className="bg-slate-200 text-slate-600 p-1.5 rounded-full hover:bg-slate-300 mr-1 flex-shrink-0" title="Minimizar Menu">
+                  <span className="material-symbols-outlined text-[16px]">close_fullscreen</span>
+               </button>
+               <span className="bg-amber-100 text-amber-800 text-xs font-bold px-3 py-2 rounded-full flex items-center shadow-md flex-shrink-0">
                  Modo de Edição
                </span>
-               <div className="flex gap-1 mr-2 bg-white rounded-full shadow p-1 border border-slate-200">
-                  <button onClick={handleUndo} disabled={historyIndex <= 0} className="p-1.5 rounded-full hover:bg-slate-100 disabled:opacity-30 disabled:hover:bg-transparent" title="Desfazer">
+               <div className="flex gap-1 bg-white rounded-full shadow p-1 border border-slate-200 flex-shrink-0">
+                  <button onClick={handleUndo} disabled={historyIndex <= 0} className="p-1.5 rounded-full hover:bg-slate-100 disabled:opacity-30 disabled:hover:bg-transparent flex-shrink-0" title="Desfazer">
                      <Undo2 size={16} />
                   </button>
-                  <button onClick={handleRedo} disabled={historyIndex >= history.length - 1} className="p-1.5 rounded-full hover:bg-slate-100 disabled:opacity-30 disabled:hover:bg-transparent" title="Refazer">
+                  <button onClick={handleRedo} disabled={historyIndex >= history.length - 1} className="p-1.5 rounded-full hover:bg-slate-100 disabled:opacity-30 disabled:hover:bg-transparent flex-shrink-0" title="Refazer">
                      <Redo2 size={16} />
                   </button>
                </div>
-               <button onClick={handleSaveInline} disabled={isSaving} className="flex items-center gap-2 bg-brand-blue text-white px-4 py-2 rounded-full shadow-xl hover:bg-brand-blue/90 transition-all font-display text-sm font-bold disabled:opacity-70">
+               
+               <button onClick={() => setIsSectionsPanelOpen(true)} className="flex items-center gap-1.5 bg-indigo-50 text-indigo-700 px-3 py-2 rounded-full shadow-md hover:bg-indigo-100 transition-all font-display text-xs font-bold border border-indigo-200 flex-shrink-0">
+                  <span className="material-symbols-outlined text-sm">settings</span> Gerir Secções
+               </button>
+
+               <button onClick={handleSaveInline} disabled={isSaving} className="flex items-center gap-2 bg-brand-blue text-white px-4 py-2 rounded-full shadow-xl hover:bg-brand-blue/90 transition-all font-display text-sm font-bold disabled:opacity-70 flex-shrink-0">
                   {isSaving ? 'A Guardar...' : 'Guardar'}
                </button>
-               <button onClick={handleCancelInline} disabled={isSaving} className="flex items-center gap-2 bg-white text-slate-800 px-4 py-2 rounded-full shadow-xl hover:bg-slate-50 transition-all font-display text-sm font-bold border border-slate-200">
+               <button onClick={handleCancelInline} disabled={isSaving} className="flex items-center gap-2 bg-white text-slate-800 px-4 py-2 rounded-full shadow-xl hover:bg-slate-50 transition-all font-display text-sm font-bold border border-slate-200 flex-shrink-0">
                   Cancelar
                </button>
              </>
            )}
         </div>
+      )}
+
+      {/* Sections Configurator Modal */}
+      {isSectionsPanelOpen && isEditing && (
+         <div className="fixed inset-0 bg-slate-900/60 z-[100] flex items-center justify-center p-4 backdrop-blur-sm">
+             <div className="bg-white rounded-3xl shadow-2xl p-6 w-full max-w-md max-h-[85vh] overflow-y-auto font-sans">
+                 <div className="flex justify-between items-center mb-6">
+                     <h3 className="font-bold text-lg text-slate-800 flex items-center gap-2"><span className="material-symbols-outlined text-brand-blue">view_carousel</span> Gerir Secções</h3>
+                     <button onClick={() => setIsSectionsPanelOpen(false)} className="text-slate-400 hover:text-slate-600 bg-slate-100 hover:bg-slate-200 rounded-full w-8 h-8 flex items-center justify-center transition-colors">✕</button>
+                 </div>
+
+                 <div className="space-y-4">
+                     {/* GIFTS / IBAN Section */}
+                     <div className="border border-slate-200 p-5 rounded-2xl bg-white shadow-sm">
+                         <div className="flex justify-between items-center mb-2">
+                             <div>
+                                 <h4 className="font-bold text-slate-800 text-sm">Lista de Presentes (IBAN)</h4>
+                                 <p className="text-xs text-slate-500 mt-1">Permite que os convidados doem via transferência bancária.</p>
+                             </div>
+                             <label className="relative inline-flex items-center cursor-pointer flex-shrink-0">
+                               <input type="checkbox" className="sr-only peer" checked={!!(draftEvent.iban || draftEvent.bankName || (draftEvent.gifts && draftEvent.gifts.length > 0))} onChange={(e) => {
+                                   if (e.target.checked) {
+                                       handleFieldChange('giftTitle', 'Lista de Presentes');
+                                       handleFieldChange('giftDescription', 'Sua presença é o nosso maior presente! Mas se desejar nos presentear, deixamos abaixo os nossos dados.');
+                                       if (!draftEvent.gifts || draftEvent.gifts.length === 0) {
+                                           handleFieldChange('gifts', [{ type: 'IBAN', title: 'Lista de Presentes', description: 'Dados bancários', value: 'AO06.', bankName: '', accountName: '' }]);
+                                       }
+                                   } else {
+                                       handleFieldChange('giftTitle', '');
+                                       handleFieldChange('giftDescription', '');
+                                       handleFieldChange('iban', '');
+                                       handleFieldChange('bankName', '');
+                                       handleFieldChange('accountName', '');
+                                       handleFieldChange('gifts', []);
+                                   }
+                               }} />
+                               <div className="w-11 h-6 bg-slate-200 peer-focus:outline-none rounded-full peer peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:border-gray-300 after:border after:rounded-full after:h-5 after:w-5 after:transition-all peer-checked:bg-brand-blue"></div>
+                             </label>
+                         </div>
+                         
+                         {!!(draftEvent.iban || draftEvent.bankName || (draftEvent.gifts && draftEvent.gifts.length > 0)) && (
+                             <div className="space-y-3 mt-4 pt-4 border-t border-slate-100">
+                                 <div>
+                                     <label className="text-xs font-bold text-slate-500 mb-1 block">IBAN</label>
+                                     <input type="text" placeholder="AO06..." value={draftEvent.iban || (draftEvent.gifts && draftEvent.gifts.length > 0 ? draftEvent.gifts[0].value : '')} onChange={(e) => {
+                                         handleFieldChange('iban', e.target.value);
+                                         if (draftEvent.gifts && draftEvent.gifts.length > 0) {
+                                             const newGifts = [...draftEvent.gifts];
+                                             newGifts[0] = { ...newGifts[0], value: e.target.value };
+                                             handleFieldChange('gifts', newGifts);
+                                         }
+                                     }} className="w-full text-sm p-3 border border-slate-200 rounded-xl outline-none focus:border-brand-blue focus:ring-2 focus:ring-brand-blue/20 transition-all font-mono" />
+                                 </div>
+                                 <div>
+                                     <label className="text-xs font-bold text-slate-500 mb-1 block">Banco / Plataforma</label>
+                                     <input type="text" placeholder="BAI, Multicaixa, etc." value={draftEvent.bankName || (draftEvent.gifts && draftEvent.gifts.length > 0 ? draftEvent.gifts[0].bankName : '')} onChange={(e) => {
+                                         handleFieldChange('bankName', e.target.value);
+                                         if (draftEvent.gifts && draftEvent.gifts.length > 0) {
+                                             const newGifts = [...draftEvent.gifts];
+                                             newGifts[0] = { ...newGifts[0], bankName: e.target.value };
+                                             handleFieldChange('gifts', newGifts);
+                                         }
+                                     }} className="w-full text-sm p-3 border border-slate-200 rounded-xl outline-none focus:border-brand-blue focus:ring-2 focus:ring-brand-blue/20 transition-all" />
+                                 </div>
+                                 <div>
+                                     <label className="text-xs font-bold text-slate-500 mb-1 block">Nome do Titular</label>
+                                     <input type="text" placeholder="Ex: Maria José" value={draftEvent.accountName || (draftEvent.gifts && draftEvent.gifts.length > 0 ? draftEvent.gifts[0].accountName : '')} onChange={(e) => {
+                                         handleFieldChange('accountName', e.target.value);
+                                         if (draftEvent.gifts && draftEvent.gifts.length > 0) {
+                                             const newGifts = [...draftEvent.gifts];
+                                             newGifts[0] = { ...newGifts[0], accountName: e.target.value };
+                                             handleFieldChange('gifts', newGifts);
+                                         }
+                                     }} className="w-full text-sm p-3 border border-slate-200 rounded-xl outline-none focus:border-brand-blue focus:ring-2 focus:ring-brand-blue/20 transition-all" />
+                                 </div>
+                             </div>
+                         )}
+                     </div>
+
+                     {/* DRESS CODE Section */}
+                     <div className="border border-slate-200 p-5 rounded-2xl bg-white shadow-sm">
+                         <div className="flex justify-between items-center">
+                             <div>
+                                 <h4 className="font-bold text-slate-800 text-sm">Dress Code</h4>
+                                 <p className="text-xs text-slate-500 mt-1">Recomendações sobre o que vestir no evento.</p>
+                             </div>
+                             <label className="relative inline-flex items-center cursor-pointer flex-shrink-0">
+                               <input type="checkbox" className="sr-only peer" checked={!!draftEvent.dressCode} onChange={(e) => {
+                                   if (e.target.checked) {
+                                       handleFieldChange('dressCode', { title: 'Dress Code', description: 'Recomendamos trajes em tons claros e confortáveis.' });
+                                   } else {
+                                       handleFieldChange('dressCode', null);
+                                   }
+                               }} />
+                               <div className="w-11 h-6 bg-slate-200 peer-focus:outline-none rounded-full peer peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:border-gray-300 after:border after:rounded-full after:h-5 after:w-5 after:transition-all peer-checked:bg-brand-blue"></div>
+                             </label>
+                         </div>
+                     </div>
+
+                     {/* GALLERY Section */}
+                     <div className="border border-slate-200 p-5 rounded-2xl bg-white shadow-sm">
+                         <div className="flex justify-between items-center">
+                             <div>
+                                 <h4 className="font-bold text-slate-800 text-sm">Galeria de Fotos</h4>
+                                 <p className="text-xs text-slate-500 mt-1">Mostra a secção de galeria no seu convite.</p>
+                             </div>
+                             <label className="relative inline-flex items-center cursor-pointer flex-shrink-0">
+                               <input type="checkbox" className="sr-only peer" checked={draftEvent.showGallery !== false} onChange={(e) => {
+                                   handleFieldChange('showGallery', e.target.checked);
+                               }} />
+                               <div className="w-11 h-6 bg-slate-200 peer-focus:outline-none rounded-full peer peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:border-gray-300 after:border after:rounded-full after:h-5 after:w-5 after:transition-all peer-checked:bg-brand-blue"></div>
+                             </label>
+                         </div>
+                     </div>
+
+                     {/* MUSIC Section */}
+                     <div className="border border-slate-200 p-5 rounded-2xl bg-white shadow-sm">
+                         <h4 className="font-bold text-slate-800 text-sm mb-1">Música de Fundo</h4>
+                         <p className="text-xs text-slate-500 mb-4">Escolha a música que toca quando os convidados abrem o convite.</p>
+                         <AudioUploader 
+                            audioUrl={draftEvent.musicTrack?.startsWith('http') || draftEvent.musicTrack?.startsWith('data:audio') ? draftEvent.musicTrack : ''} 
+                            onChange={(url) => handleFieldChange('musicTrack', url)} 
+                         />
+                     </div>
+                 </div>
+
+                 <button onClick={() => setIsSectionsPanelOpen(false)} className="mt-8 w-full bg-brand-blue text-white font-bold py-3 rounded-xl shadow-lg hover:bg-brand-blue/90 transition-all">
+                     Concluir
+                 </button>
+             </div>
+         </div>
       )}
 
       {/* Dynamic Layout Rendering */}
@@ -417,7 +582,7 @@ const InvitationView: React.FC = () => {
              </div>
           </div>
 
-          {event.gifts && event.gifts.length > 0 && (
+          {event.gifts && event.gifts.length > 0 && event.gifts.some((g: any) => g.type !== 'IBAN') && (
              <div className="w-full bg-slate-50 py-12 px-4 shadow-inner border-y border-slate-200 z-10 relative">
                  <div className="max-w-4xl mx-auto">
                      <VirtualGiftsGuest event={event} guestId={queryObj.get('guest')} />
@@ -604,7 +769,7 @@ const EssentialLayout: React.FC<LayoutProps> = ({ event, onRSVP, onLikeUpdate, i
             {isEditing ? (
                 <div className="space-y-3 mt-4">
                    <div>
-                       <span className="text-xs font-bold text-slate-500 block mb-1">Link do Mapa (URL)</span>
+                       <div className="flex justify-between items-center mb-1"><span className="text-xs font-bold text-slate-500 block">Link do Mapa (URL)</span><button type="button" onClick={(e) => { e.preventDefault(); window.open(`https://www.google.com/maps/search/?api=1&query=${encodeURIComponent(event.address || event.locationName || 'Local')}`, '_blank'); }} className="text-[10px] bg-slate-100 text-blue-600 px-2 py-0.5 rounded shadow-sm hover:bg-white transition-colors flex items-center gap-1 font-sans border border-slate-200"><span className="material-symbols-outlined text-[12px]">search</span> Pesquisar no Maps</button></div>
                        <InlineText value={event.mapLink || ''} isEditing={isEditing} onChange={(val) => onFieldChange?.('mapLink', val)} placeholder="https://maps.google.com/..." className="text-sm bg-slate-50 border border-slate-200 p-2 rounded-lg w-full" />
                    </div>
                    <div>
@@ -614,7 +779,7 @@ const EssentialLayout: React.FC<LayoutProps> = ({ event, onRSVP, onLikeUpdate, i
                 </div>
             ) : (
                 <>
-                  <Button onClick={() => window.open(event.mapLink || '#', '_blank')} variant="navy" fullWidth>Localização (Maps)</Button>
+                  <Button onClick={() => window.open(getValidMapUrl(event.mapLink, event.locationName || event.receptionAddress || event.address || 'Local'), '_blank')} variant="navy" fullWidth>Localização (Maps)</Button>
                   {event.phone && (
                     <Button onClick={() => window.open(`https://wa.me/${event.phone.replace(/\D/g, '')}?text=Olá!`, '_blank')} variant="outline" fullWidth className="border-green-500 text-green-700 hover:bg-green-50">Falar no WhatsApp</Button>
                   )}
@@ -623,7 +788,7 @@ const EssentialLayout: React.FC<LayoutProps> = ({ event, onRSVP, onLikeUpdate, i
         </div>
       </div>
       
-      {event.gallery && event.gallery.length > 0 && (
+      {event.showGallery !== false && event.gallery && event.gallery.length > 0 && (
           <div className="max-w-xl mx-auto px-6 mt-8 relative z-10">
             <h2 className="font-bold text-brand-blue mb-4 text-center">Nossa Galeria</h2>
             <GalleryLightbox eventId={event.id} gallery={event.gallery} onLikeUpdate={onLikeUpdate} renderMode="ESSENTIAL" />
@@ -906,25 +1071,25 @@ const ClassicLayout: React.FC<LayoutProps> = ({ event, onRSVP, onLikeUpdate, isE
                </p>
                {isEditing ? (
                   <div className="mt-2 text-left">
-                     <span className="text-xs bg-slate-100 text-slate-600 px-2 py-1 rounded block mb-1">Link do Mapa (URL):</span>
+                     <div className="flex justify-between items-center mb-1"><span className="text-xs font-bold text-slate-500 block">Link do Mapa (URL)</span><button type="button" onClick={(e) => { e.preventDefault(); window.open(`https://www.google.com/maps/search/?api=1&query=${encodeURIComponent(event.address || event.locationName || 'Local')}`, '_blank'); }} className="text-[10px] bg-slate-100 text-blue-600 px-2 py-0.5 rounded shadow-sm hover:bg-white transition-colors flex items-center gap-1 font-sans border border-slate-200"><span className="material-symbols-outlined text-[12px]">search</span> Pesquisar no Maps</button></div>
                      <InlineText value={event.mapLink || ''} isEditing={isEditing} onChange={(val) => onFieldChange?.('mapLink', val)} placeholder="https://maps.google.com/..." className="text-xs text-blue-500 w-full" />
                   </div>
                ) : (
-                  <Button onClick={() => window.open(event.mapLink || '#', '_blank')} variant="navy" fullWidth className="text-xs uppercase tracking-widest h-10">
+                  <Button onClick={() => window.open(getValidMapUrl(event.mapLink, event.locationName || event.receptionAddress || event.address || 'Local'), '_blank')} variant="navy" fullWidth className="text-xs uppercase tracking-widest h-10">
                     Ver Mapa
                   </Button>
                )}
             </div>
          </FadeInSection>
 
-         {event.gallery && event.gallery.length > 0 && (
+         {event.showGallery !== false && event.gallery && event.gallery.length > 0 && (
             <FadeInSection>
                <h3 className="text-xs font-bold uppercase tracking-[0.2em] text-slate-400 mb-6">Nossa Galeria</h3>
                <GalleryLightbox eventId={event.id} gallery={event.gallery} onLikeUpdate={onLikeUpdate} renderMode="CLASSIC" />
             </FadeInSection>
          )}
 
-         {(isEditing || event.dressCode) && (
+         {(event.dressCode) && (
             <FadeInSection>
                <div className="bg-white p-6 rounded-xl shadow-lg border border-slate-100 mt-8">
                   <h3 className="text-xs font-bold uppercase tracking-[0.2em] text-slate-400 mb-4">Dress Code (Trajes)</h3>
@@ -1171,11 +1336,11 @@ const ModernLayout: React.FC<LayoutProps> = ({ event, onRSVP, guestName, onLikeU
                  </p>
                  {isEditing ? (
                      <div className="mt-4">
-                         <span className="text-xs text-gray-400 block mb-1">Link do Mapa (Google Maps)</span>
+                         <div className="flex justify-between items-center mb-1"><span className="text-xs text-gray-400 block mb-1">Link do Mapa (Google Maps)</span><button type="button" onClick={(e) => { e.preventDefault(); window.open(`https://www.google.com/maps/search/?api=1&query=${encodeURIComponent(event.address || event.locationName || 'Local')}`, '_blank'); }} className="text-[10px] bg-white/80 text-blue-600 px-2 py-0.5 rounded shadow-sm hover:bg-white transition-colors flex items-center gap-1 font-sans border border-blue-200"><span className="material-symbols-outlined text-[12px]">search</span> Pesquisar no Maps</button></div>
                          <InlineText value={event.mapLink || ''} isEditing={isEditing} onChange={(val) => onFieldChange?.('mapLink', val)} placeholder="https://..." className="text-xs text-blue-500 underline" />
                      </div>
                  ) : (
-                     <button onClick={() => window.open(event.mapLink || '#', '_blank')} className="mt-4 inline-block border-b border-black pb-1 text-xs font-bold uppercase tracking-widest hover:text-[#C2B280] hover:border-[#C2B280] transition-colors">
+                     <button onClick={() => window.open(getValidMapUrl(event.mapLink, event.locationName || event.receptionAddress || event.address || 'Local'), '_blank')} className="mt-4 inline-block border-b border-black pb-1 text-xs font-bold uppercase tracking-widest hover:text-[#C2B280] hover:border-[#C2B280] transition-colors">
                         Ver Localização
                      </button>
                  )}
@@ -1193,7 +1358,7 @@ const ModernLayout: React.FC<LayoutProps> = ({ event, onRSVP, guestName, onLikeU
                    <h2 className="text-4xl font-serif text-[#1a1a1a]"><InlineText value={event.receptionName} isEditing={isEditing} onChange={(val) => onFieldChange?.("receptionName", val)} /></h2>
                    <p className="text-[#C2B280] font-display uppercase tracking-widest text-sm">Após a cerimônia</p>
                    <p className="text-gray-500 leading-relaxed font-light text-lg"><InlineText type="textarea" value={event.receptionAddress} isEditing={isEditing} onChange={(val) => onFieldChange?.("receptionAddress", val)} /></p>
-                   <button onClick={() => window.open(`https://maps.google.com/?q=${event.receptionAddress}`, '_blank')} className="mt-4 inline-block border-b border-black pb-1 text-xs font-bold uppercase tracking-widest hover:text-[#C2B280] hover:border-[#C2B280] transition-colors">
+                   <button onClick={() => window.open(getValidMapUrl(event.mapLink, event.receptionAddress), '_blank')} className="mt-4 inline-block border-b border-black pb-1 text-xs font-bold uppercase tracking-widest hover:text-[#C2B280] hover:border-[#C2B280] transition-colors">
                       Ver Localização
                    </button>
                </div>
@@ -1231,7 +1396,7 @@ const ModernLayout: React.FC<LayoutProps> = ({ event, onRSVP, guestName, onLikeU
       )}
 
       {/* 6. DRESS CODE & TIPS */}
-      {(isEditing || event.dressCode) && (
+      {(event.dressCode) && (
          <FadeInSection className="py-16 bg-white text-center px-6 border-b border-gray-100">
              <span className="font-display text-[10px] uppercase tracking-[0.3em] text-gray-400 mb-4 block">Dress Code</span>
              <h4 className="text-2xl font-serif mb-4 text-[#1a1a1a]">
@@ -1298,7 +1463,7 @@ const ModernLayout: React.FC<LayoutProps> = ({ event, onRSVP, guestName, onLikeU
 
 
       {/* 7. GALLERY (Masonry-ish) */}
-      {event.gallery && event.gallery.length > 0 && (
+      {event.showGallery !== false && event.gallery && event.gallery.length > 0 && (
          <FadeInSection className="w-full">
             <GalleryLightbox eventId={event.id} gallery={event.gallery} onLikeUpdate={onLikeUpdate} renderMode="MODERN" />
          </FadeInSection>
@@ -1431,11 +1596,11 @@ const GardenLayout: React.FC<LayoutProps> = ({ event, onRSVP, guestName, onLikeU
                </p>
                {isEditing ? (
                   <div className="mt-2 text-left">
-                     <span className="text-xs text-[#8C8C8C] block mb-1">Link do Mapa:</span>
+                     <div className="flex justify-between items-center mb-1"><span className="text-xs text-[#8C8C8C] block mb-1">Link do Mapa:</span><button type="button" onClick={(e) => { e.preventDefault(); window.open(`https://www.google.com/maps/search/?api=1&query=${encodeURIComponent(event.address || event.locationName || 'Local')}`, '_blank'); }} className="text-[10px] bg-white/80 text-blue-600 px-2 py-0.5 rounded shadow-sm hover:bg-white transition-colors flex items-center gap-1 font-sans border border-blue-200"><span className="material-symbols-outlined text-[12px]">search</span> Pesquisar no Maps</button></div>
                      <InlineText value={event.mapLink || ''} isEditing={isEditing} onChange={(val) => onFieldChange?.('mapLink', val)} placeholder="https://maps.google.com/..." className="text-xs text-blue-500 underline" />
                   </div>
                ) : (
-                  <button onClick={() => window.open(event.mapLink || '#', '_blank')} className={`text-xs font-bold border-b border-[#2C2C2C] pb-0.5 hover:opacity-50 transition-opacity uppercase tracking-widest`}>
+                  <button onClick={() => window.open(getValidMapUrl(event.mapLink, event.locationName || event.receptionAddress || event.address || 'Local'), '_blank')} className={`text-xs font-bold border-b border-[#2C2C2C] pb-0.5 hover:opacity-50 transition-opacity uppercase tracking-widest`}>
                     Ver no Mapa
                   </button>
                )}
@@ -1459,7 +1624,7 @@ const GardenLayout: React.FC<LayoutProps> = ({ event, onRSVP, guestName, onLikeU
                  <h3 className="text-3xl font-serif mb-2"><InlineText value={event.receptionName} isEditing={isEditing} onChange={(val) => onFieldChange?.("receptionName", val)} /></h3>
                  <p className="text-[#8C8C8C] font-sans text-sm mb-1">Após a cerimônia</p>
                  <p className="text-[#5D5C61] mb-6 leading-relaxed"><InlineText type="textarea" value={event.receptionAddress} isEditing={isEditing} onChange={(val) => onFieldChange?.("receptionAddress", val)} /></p>
-                 <button onClick={() => window.open(`https://maps.google.com/?q=${event.receptionAddress}`, '_blank')} className={`text-xs font-bold border-b border-[#2C2C2C] pb-0.5 hover:opacity-50 transition-opacity uppercase tracking-widest`}>
+                 <button onClick={() => window.open(getValidMapUrl(event.mapLink, event.receptionAddress), '_blank')} className={`text-xs font-bold border-b border-[#2C2C2C] pb-0.5 hover:opacity-50 transition-opacity uppercase tracking-widest`}>
                    Ver no Mapa
                  </button>
               </div>
@@ -1493,7 +1658,7 @@ const GardenLayout: React.FC<LayoutProps> = ({ event, onRSVP, guestName, onLikeU
       )}
 
       {/* 6. GALLERY (Grid Layout) */}
-      {event.gallery && event.gallery.length > 0 && (
+      {event.showGallery !== false && event.gallery && event.gallery.length > 0 && (
         <FadeInSection className="py-20 px-4 max-w-5xl mx-auto">
            <h3 className="text-center font-sans text-xs uppercase tracking-[0.2em] mb-8 text-[#8C8C8C]">Momentos Especiais</h3>
            <GalleryLightbox eventId={event.id} gallery={event.gallery} onLikeUpdate={onLikeUpdate} renderMode="GARDEN" />
@@ -1505,7 +1670,7 @@ const GardenLayout: React.FC<LayoutProps> = ({ event, onRSVP, guestName, onLikeU
 
       {/* 7. GIFTS & DRESS CODE */}
       <div className="grid md:grid-cols-2 gap-8 max-w-4xl mx-auto px-6 mb-24">
-         {(isEditing || event.dressCode) && (
+         {(event.dressCode) && (
            <FadeInSection className="bg-white p-8 rounded-2xl shadow-sm border border-[#EAE5DF] text-center">
               <span className="material-symbols-outlined text-3xl mb-4 text-[#8C8C8C]">styler</span>
               <h4 className="text-lg font-serif font-bold mb-2">
@@ -1622,7 +1787,7 @@ const RusticLayout: React.FC<LayoutProps> = ({ event, onRSVP, guestName, onLikeU
                 <span className="inline-block px-3 py-1 bg-[#EFEBE9] text-[#5D4037] text-[10px] font-bold uppercase tracking-widest rounded-full mb-4">Cerimônia</span>
                 <h3 className="text-3xl font-serif mb-2 text-[#4E342E]"><InlineText value={event.locationName} isEditing={isEditing} onChange={(val) => onFieldChange?.("locationName", val)} /></h3>
                 <p className="text-[#8D6E63] mb-4"><InlineText type="textarea" value={event.address} isEditing={isEditing} onChange={(val) => onFieldChange?.("address", val)} /></p>
-                <button onClick={() => window.open(event.mapLink || '#', '_blank')} className="text-xs font-bold border-b border-[#5D4037] pb-1 uppercase tracking-widest">Ver Mapa</button>
+                <button onClick={() => window.open(getValidMapUrl(event.mapLink, event.locationName || event.receptionAddress || event.address || 'Local'), '_blank')} className="text-xs font-bold border-b border-[#5D4037] pb-1 uppercase tracking-widest">Ver Mapa</button>
              </div>
              <div className="w-full md:w-1/3 aspect-square rounded-2xl overflow-hidden">
                 <img src={event.heroImage} className="w-full h-full object-cover" />
@@ -1653,7 +1818,7 @@ const RusticLayout: React.FC<LayoutProps> = ({ event, onRSVP, guestName, onLikeU
 
        {/* GIFTS & DRESS CODE */}
        <div className="grid md:grid-cols-2 gap-4 px-4 mt-16 mb-24">
-          {(isEditing || event.dressCode) && (
+          {(event.dressCode) && (
              <FadeInSection className="bg-[#5D4037] text-[#FDF5E6] p-10 rounded-3xl text-center flex flex-col items-center justify-center">
                 <span className="material-symbols-outlined text-4xl mb-4">checkroom</span>
                 <h3 className="text-2xl font-serif mb-2">
@@ -1694,7 +1859,7 @@ const RusticLayout: React.FC<LayoutProps> = ({ event, onRSVP, guestName, onLikeU
        </div>
 
        {/* GALLERY */}
-       {event.gallery && event.gallery.length > 0 && (
+       {event.showGallery !== false && event.gallery && event.gallery.length > 0 && (
           <FadeInSection className="max-w-5xl mx-auto px-6 mb-24">
              <h3 className="text-center font-serif text-3xl text-[#4E342E] mb-8">Nossa Galeria</h3>
              <GalleryLightbox eventId={event.id} gallery={event.gallery} onLikeUpdate={onLikeUpdate} renderMode="RUSTIC" />
@@ -1814,7 +1979,7 @@ const IndustrialLayout: React.FC<LayoutProps> = ({ event, onRSVP, guestName, onL
              <div className="absolute bottom-0 left-0 p-8 bg-black/80 w-full backdrop-blur-sm">
                 <p className="text-xs uppercase tracking-widest mb-1 text-gray-400">Cerimônia</p>
                 <h3 className="text-2xl font-bold uppercase"><InlineText value={event.locationName} isEditing={isEditing} onChange={(val) => onFieldChange?.("locationName", val)} /></h3>
-                <button onClick={() => window.open(event.mapLink || '#', '_blank')} className="mt-4 text-xs font-bold border border-white px-4 py-2 hover:bg-white hover:text-black transition-colors uppercase">Map</button>
+                <button onClick={() => window.open(getValidMapUrl(event.mapLink, event.locationName || event.receptionAddress || event.address || 'Local'), '_blank')} className="mt-4 text-xs font-bold border border-white px-4 py-2 hover:bg-white hover:text-black transition-colors uppercase">Map</button>
              </div>
           </div>
           <div className="relative group overflow-hidden">
@@ -1822,13 +1987,13 @@ const IndustrialLayout: React.FC<LayoutProps> = ({ event, onRSVP, guestName, onL
              <div className="absolute bottom-0 left-0 p-8 bg-white/90 text-black w-full backdrop-blur-sm">
                 <p className="text-xs uppercase tracking-widest mb-1 text-gray-600">Recepção</p>
                 <h3 className="text-2xl font-bold uppercase"><InlineText value={event.receptionName} isEditing={isEditing} onChange={(val) => onFieldChange?.("receptionName", val)} /></h3>
-                <button onClick={() => window.open(`https://maps.google.com/?q=${event.receptionAddress}`, '_blank')} className="mt-4 text-xs font-bold border border-black px-4 py-2 hover:bg-black hover:text-white transition-colors uppercase">Map</button>
+                <button onClick={() => window.open(getValidMapUrl(event.mapLink, event.receptionAddress), '_blank')} className="mt-4 text-xs font-bold border border-black px-4 py-2 hover:bg-black hover:text-white transition-colors uppercase">Map</button>
              </div>
           </div>
        </div>
        
        {/* GALLERY */}
-       {event.gallery && event.gallery.length > 0 && (
+       {event.showGallery !== false && event.gallery && event.gallery.length > 0 && (
           <div className="p-8 md:p-16 border-b border-white/20">
              <h3 className="text-2xl font-bold uppercase mb-8 border-l-4 border-white pl-4">Galeria</h3>
              <GalleryLightbox eventId={event.id} gallery={event.gallery} onLikeUpdate={onLikeUpdate} renderMode="INDUSTRIAL" />
@@ -1941,7 +2106,7 @@ const LuxuryLayout: React.FC<LayoutProps> = ({ event, onRSVP, guestName, onLikeU
                  <p className="text-2xl text-white font-italic">
                     <InlineText type="date" value={event.date} isEditing={isEditing} onChange={(val) => onFieldChange?.('date', val)} />
                  </p>
-                 <p className="text-[#BF9B30] text-sm">{event.time} Horas</p>
+                 <p className="text-[#BF9B30] text-sm"><InlineText value={event.time} isEditing={isEditing} onChange={(val) => onFieldChange?.('time', val)} /> Horas</p>
               </div>
            </div>
         </FadeInSection>
@@ -1956,7 +2121,7 @@ const LuxuryLayout: React.FC<LayoutProps> = ({ event, onRSVP, guestName, onLikeU
         <FadeInSection className="px-8 text-center max-w-md mx-auto pb-4">
            <ParentsSection brideParents={event.brideParents} groomParents={event.groomParents} isEditing={isEditing} onFieldChange={onFieldChange} textColor="text-gray-400" dividerColor="border-[#BF9B30]" titleClass="font-serif italic text-white" />
            <p className="text-lg leading-relaxed font-light text-gray-400 border-t border-b border-[#BF9B30]/20 py-8">
-             {event.description}
+             <InlineText type="textarea" value={event.description} isEditing={isEditing} onChange={(val) => onFieldChange?.('description', val)} />
            </p>
         </FadeInSection>
 
@@ -1971,15 +2136,15 @@ const LuxuryLayout: React.FC<LayoutProps> = ({ event, onRSVP, guestName, onLikeU
                    <div className="absolute inset-0 bg-cover bg-center opacity-60" style={{ backgroundImage: `url('${event.heroImage}')` }}></div>
                    <div className="absolute inset-0 bg-gradient-to-t from-[#0F1419] to-transparent"></div>
                    <div className="absolute bottom-3 left-4">
-                      <p className="text-white text-lg font-serif">{event.locationName}</p>
-                      <p className="text-gray-400 text-xs">{event.time}</p>
+                      <p className="text-white text-lg font-serif"><InlineText value={event.locationName} isEditing={isEditing} onChange={(val) => onFieldChange?.('locationName', val)} /></p>
+                      <p className="text-gray-400 text-xs"><InlineText value={event.time} isEditing={isEditing} onChange={(val) => onFieldChange?.('time', val)} /></p>
                    </div>
                 </div>
                 <div className="p-4 flex flex-col gap-3">
                    <p className="text-xs text-gray-500 text-center leading-relaxed"><InlineText type="textarea" value={event.address} isEditing={isEditing} onChange={(val) => onFieldChange?.("address", val)} /></p>
                    <Button 
                      className="w-full bg-[#BF9B30] text-[#0F1419] hover:bg-white hover:text-black text-xs font-bold uppercase tracking-widest h-10 border-none shadow-lg"
-                     onClick={() => window.open(event.mapLink || `https://maps.google.com/?q=${event.address}`, '_blank')}
+                     onClick={() => window.open(getValidMapUrl(event.mapLink, event.address || event.locationName), '_blank')}
                    >
                       Ver no Mapa
                    </Button>
@@ -2003,7 +2168,7 @@ const LuxuryLayout: React.FC<LayoutProps> = ({ event, onRSVP, guestName, onLikeU
                      <p className="text-xs text-gray-500 text-center leading-relaxed"><InlineText type="textarea" value={event.receptionAddress} isEditing={isEditing} onChange={(val) => onFieldChange?.("receptionAddress", val)} /></p>
                      <Button 
                        className="w-full bg-[#BF9B30] text-[#0F1419] hover:bg-white hover:text-black text-xs font-bold uppercase tracking-widest h-10 border-none shadow-lg"
-                       onClick={() => window.open(`https://maps.google.com/?q=${event.receptionAddress}`, '_blank')}
+                       onClick={() => window.open(getValidMapUrl(event.mapLink, event.receptionAddress || event.address || event.locationName), '_blank')}
                      >
                         Ver no Mapa
                      </Button>
@@ -2068,7 +2233,7 @@ const LuxuryLayout: React.FC<LayoutProps> = ({ event, onRSVP, guestName, onLikeU
         )}
 
         {/* 10. GALLERY (Horizontal Scroll) */}
-        {event.gallery && event.gallery.length > 0 && (
+        {event.showGallery !== false && event.gallery && event.gallery.length > 0 && (
           <FadeInSection className="w-full mb-12 pl-6">
             <h3 className="text-[#BF9B30] font-bold uppercase tracking-widest text-xs mb-4 text-left">Nossa Galeria</h3>
             <GalleryLightbox eventId={event.id} gallery={event.gallery} onLikeUpdate={onLikeUpdate} renderMode="LUXURY" />
@@ -2144,13 +2309,13 @@ const BridalBeautyLayout: React.FC<LayoutProps> = ({ event, onRSVP, guestName, o
             )}
             {isEditing && (
                 <div className="mt-2 text-left">
-                   <span className="text-xs text-slate-500 block mb-1">Link do Mapa (URL)</span>
+                   <div className="flex justify-between items-center mb-1"><span className="text-xs text-slate-500">Link do Mapa (URL)</span><button type="button" onClick={(e) => { e.preventDefault(); window.open(`https://www.google.com/maps/search/?api=1&query=${encodeURIComponent(event.address || event.locationName || 'Local')}`, '_blank'); }} className="text-[10px] bg-slate-100 text-blue-600 px-2 py-0.5 rounded shadow-sm hover:bg-white transition-colors flex items-center gap-1 font-sans border border-slate-200"><span className="material-symbols-outlined text-[12px]">search</span> Pesquisar no Maps</button></div>
                    <InlineText value={event.mapLink || ''} isEditing={isEditing} onChange={(val) => onFieldChange?.('mapLink', val)} placeholder="https://maps.google.com/..." className="text-xs text-blue-500 w-full" />
                 </div>
             )}
          </FadeInSection>
 
-         {(isEditing || event.giftTitle || event.giftDescription || event.iban || event.bankName) && (
+         {((event.gifts && event.gifts.length > 0) || event.iban || event.bankName) && (
              <FadeInSection className="w-full bg-white/60 p-8 rounded-3xl shadow-sm border border-white/80 mb-8 backdrop-blur-sm text-center">
                  <h3 className="text-2xl font-bold mb-3 text-[#784646]">
                      <InlineText value={event.giftTitle || 'Lista de Presentes'} isEditing={isEditing} onChange={(val) => onFieldChange?.('giftTitle', val)} />
@@ -2183,7 +2348,7 @@ const BridalBeautyLayout: React.FC<LayoutProps> = ({ event, onRSVP, guestName, o
              </FadeInSection>
          )}
 
-         {event.gallery && event.gallery.length > 0 && (
+         {event.showGallery !== false && event.gallery && event.gallery.length > 0 && (
             <FadeInSection className="w-full mb-8">
                <h3 className="text-xl font-bold mb-6 text-[#784646] text-center border-b border-[#BD8C8C]/30 pb-2 inline-block">Galeria</h3>
                <GalleryLightbox eventId={event.id} gallery={event.gallery} onLikeUpdate={onLikeUpdate} renderMode="MODERN" />
@@ -2251,7 +2416,7 @@ const BridalRomanticLayout: React.FC<LayoutProps> = ({ event, onRSVP, guestName,
                    )}
                    {isEditing && (
                        <div className="mt-2 text-left w-full">
-                          <span className="text-xs text-[#E06A8B] block mb-1">Link do Mapa (URL)</span>
+                          <div className="flex justify-between items-center mb-1"><span className="text-xs text-slate-500">Link do Mapa (URL)</span><button type="button" onClick={(e) => { e.preventDefault(); window.open(`https://www.google.com/maps/search/?api=1&query=${encodeURIComponent(event.address || event.locationName || 'Local')}`, '_blank'); }} className="text-[10px] bg-slate-100 text-blue-600 px-2 py-0.5 rounded shadow-sm hover:bg-white transition-colors flex items-center gap-1 font-sans border border-slate-200"><span className="material-symbols-outlined text-[12px]">search</span> Pesquisar no Maps</button></div>
                           <InlineText value={event.mapLink || ''} isEditing={isEditing} onChange={(val) => onFieldChange?.('mapLink', val)} placeholder="https://..." className="text-xs text-blue-500 w-full" />
                        </div>
                    )}
@@ -2285,7 +2450,7 @@ const BridalRomanticLayout: React.FC<LayoutProps> = ({ event, onRSVP, guestName,
 
            </FadeInSection>
 
-           {(isEditing || event.giftTitle || event.giftDescription || event.iban || event.bankName) && (
+           {((event.gifts && event.gifts.length > 0) || event.iban || event.bankName) && (
                <FadeInSection className="w-full max-w-xs mb-12 flex flex-col items-center">
                    <div className="w-10 h-10 rounded-full border border-[#F48FB1] flex items-center justify-center text-[#E06A8B] mb-3">
                        <span className="material-symbols-outlined text-lg">featured_seasonal_and_gifts</span>
@@ -2383,21 +2548,21 @@ const BridalMinimalLayout: React.FC<LayoutProps> = ({ event, onRSVP, guestName, 
                 </div>
                 {isEditing && (
                     <div className="mt-2 text-left">
-                       <span className="text-xs text-[#A09383] block mb-1">Link Mapa (URL)</span>
+                       <div className="flex justify-between items-center mb-1"><span className="text-xs text-slate-500">Link do Mapa (URL)</span><button type="button" onClick={(e) => { e.preventDefault(); window.open(`https://www.google.com/maps/search/?api=1&query=${encodeURIComponent(event.address || event.locationName || 'Local')}`, '_blank'); }} className="text-[10px] bg-slate-100 text-blue-600 px-2 py-0.5 rounded shadow-sm hover:bg-white transition-colors flex items-center gap-1 font-sans border border-slate-200"><span className="material-symbols-outlined text-[12px]">search</span> Pesquisar no Maps</button></div>
                        <InlineText value={event.mapLink || ''} isEditing={isEditing} onChange={(val) => onFieldChange?.('mapLink', val)} placeholder="https://..." className="text-xs text-blue-500 w-full" />
                     </div>
                 )}
             </div>
           </FadeInSection>
 
-          {event.gallery && event.gallery.length > 0 && (
+          {event.showGallery !== false && event.gallery && event.gallery.length > 0 && (
             <FadeInSection className="w-full mb-12">
                <p className="text-[10px] uppercase tracking-widest text-[#A09383] mb-6 inline-block border-b border-[#D3C4B7] pb-1">Galeria</p>
                <GalleryLightbox eventId={event.id} gallery={event.gallery} onLikeUpdate={onLikeUpdate} renderMode="MODERN" />
             </FadeInSection>
           )}
 
-          {(isEditing || event.giftTitle || event.giftDescription || event.iban || event.bankName) && (
+          {((event.gifts && event.gifts.length > 0) || event.iban || event.bankName) && (
             <FadeInSection className="w-full mb-12">
                 <div className="p-8 bg-[#FDFBF7] border border-[#F0ECE1] rounded-3xl text-center">
                     <p className="text-[10px] uppercase tracking-widest text-[#A09383] mb-4">Mimos</p>
@@ -2496,21 +2661,21 @@ const BridalTeaPartyLayout: React.FC<LayoutProps> = ({ event, onRSVP, guestName,
                 )}
                 {isEditing && (
                     <div className="mt-2 text-left">
-                       <span className="text-xs text-[#8194A5] block mb-1">Link do Mapa (URL)</span>
+                       <div className="flex justify-between items-center mb-1"><span className="text-xs text-slate-500">Link do Mapa (URL)</span><button type="button" onClick={(e) => { e.preventDefault(); window.open(`https://www.google.com/maps/search/?api=1&query=${encodeURIComponent(event.address || event.locationName || 'Local')}`, '_blank'); }} className="text-[10px] bg-slate-100 text-blue-600 px-2 py-0.5 rounded shadow-sm hover:bg-white transition-colors flex items-center gap-1 font-sans border border-slate-200"><span className="material-symbols-outlined text-[12px]">search</span> Pesquisar no Maps</button></div>
                        <InlineText value={event.mapLink || ''} isEditing={isEditing} onChange={(val) => onFieldChange?.('mapLink', val)} placeholder="https://..." className="text-xs text-blue-500 w-full" />
                     </div>
                 )}
             </div>
          </FadeInSection>
 
-         {event.gallery && event.gallery.length > 0 && (
+         {event.showGallery !== false && event.gallery && event.gallery.length > 0 && (
             <FadeInSection className="w-full mt-12 bg-white/60 p-6 rounded-3xl border border-white">
                <h3 className="font-sans uppercase text-xs tracking-[0.3em] font-bold text-[#8194A5] mb-6">Recordações</h3>
                <GalleryLightbox eventId={event.id} gallery={event.gallery} onLikeUpdate={onLikeUpdate} renderMode="CLASSIC" />
             </FadeInSection>
          )}
 
-         {(isEditing || event.giftTitle || event.giftDescription || event.iban || event.bankName) && (
+         {((event.gifts && event.gifts.length > 0) || event.iban || event.bankName) && (
              <FadeInSection className="w-full mt-12 bg-[#F8FAFC] p-6 rounded-3xl border border-[#E2E8F0] text-center">
                  <h3 className="font-sans uppercase text-xs tracking-[0.3em] font-bold text-[#8194A5] mb-4">Mimos</h3>
                  <div className="font-serif text-xl text-[#5C7487] mb-2">
@@ -2619,7 +2784,7 @@ const BridalChefLayout: React.FC<LayoutProps> = ({ event, onRSVP, guestName, onL
                     )}
                     {isEditing && (
                         <div className="mt-2 text-left w-full">
-                           <span className="text-xs text-[#879F84] block mb-1">Link do Mapa (URL)</span>
+                           <div className="flex justify-between items-center mb-1"><span className="text-xs text-slate-500">Link do Mapa (URL)</span><button type="button" onClick={(e) => { e.preventDefault(); window.open(`https://www.google.com/maps/search/?api=1&query=${encodeURIComponent(event.address || event.locationName || 'Local')}`, '_blank'); }} className="text-[10px] bg-slate-100 text-blue-600 px-2 py-0.5 rounded shadow-sm hover:bg-white transition-colors flex items-center gap-1 font-sans border border-slate-200"><span className="material-symbols-outlined text-[12px]">search</span> Pesquisar no Maps</button></div>
                            <InlineText value={event.mapLink || ''} isEditing={isEditing} onChange={(val) => onFieldChange?.('mapLink', val)} placeholder="https://..." className="text-xs text-blue-500 w-full" />
                         </div>
                     )}
@@ -2628,7 +2793,7 @@ const BridalChefLayout: React.FC<LayoutProps> = ({ event, onRSVP, guestName, onL
          </FadeInSection>
 
          {/* Gift Button as requested */}
-         {(isEditing || event.giftTitle || event.giftDescription || event.iban || event.bankName) && (
+         {((event.gifts && event.gifts.length > 0) || event.iban || event.bankName) && (
             <FadeInSection delay={0.3} className="w-full mb-10">
                <div className="bg-[#CB6843]/5 border border-[#CB6843]/20 p-8 rounded-2xl flex flex-col items-center relative overflow-hidden">
                    {/* Decorative wooden board SVG faded in background */}
@@ -2655,7 +2820,7 @@ const BridalChefLayout: React.FC<LayoutProps> = ({ event, onRSVP, guestName, onL
             </FadeInSection>
          )}
 
-         {event.gallery && event.gallery.length > 0 && (
+         {event.showGallery !== false && event.gallery && event.gallery.length > 0 && (
             <FadeInSection className="w-full mb-12">
                <h3 className="font-sans uppercase text-[10px] tracking-[0.4em] font-bold text-[#879F84] mb-8">Nossa Coleção</h3>
                <GalleryLightbox eventId={event.id} gallery={event.gallery} onLikeUpdate={onLikeUpdate} renderMode="MODERN" />
@@ -2754,12 +2919,12 @@ const BridalTropicalLayout: React.FC<LayoutProps> = ({ event, onRSVP, guestName,
             </div>
             {isEditing ? (
                 <div className="mt-6 text-left">
-                   <span className="text-xs text-emerald-600 block mb-1">Link do Mapa (URL)</span>
+                   <div className="flex justify-between items-center mb-1"><span className="text-xs text-slate-500">Link do Mapa (URL)</span><button type="button" onClick={(e) => { e.preventDefault(); window.open(`https://www.google.com/maps/search/?api=1&query=${encodeURIComponent(event.address || event.locationName || 'Local')}`, '_blank'); }} className="text-[10px] bg-slate-100 text-blue-600 px-2 py-0.5 rounded shadow-sm hover:bg-white transition-colors flex items-center gap-1 font-sans border border-slate-200"><span className="material-symbols-outlined text-[12px]">search</span> Pesquisar no Maps</button></div>
                    <InlineText value={event.mapLink || ''} isEditing={isEditing} onChange={(val) => onFieldChange?.('mapLink', val)} placeholder="https://..." className="text-xs text-blue-500 w-full" />
                 </div>
             ) : (
                 <div className="flex justify-center mt-6">
-                   <button onClick={() => window.open(event.mapLink || event.location || `https://maps.google.com/?q=${encodeURIComponent(event.address || event.locationName)}`, '_blank')} className="text-[10px] font-bold uppercase tracking-[0.2em] text-emerald-600 border-b border-emerald-300 pb-1 hover:text-emerald-800 transition-colors">
+                   <button onClick={() => window.open(getValidMapUrl(event.mapLink, event.address || event.locationName), '_blank')} className="text-[10px] font-bold uppercase tracking-[0.2em] text-emerald-600 border-b border-emerald-300 pb-1 hover:text-emerald-800 transition-colors">
                       Ver no Google Maps
                    </button>
                 </div>
@@ -2767,7 +2932,7 @@ const BridalTropicalLayout: React.FC<LayoutProps> = ({ event, onRSVP, guestName,
         </FadeInSection>
 
         {/* Gifts Section */}
-        {(isEditing || event.giftTitle || event.giftDescription || event.iban || event.bankName) && (
+        {((event.gifts && event.gifts.length > 0) || event.iban || event.bankName) && (
             <FadeInSection delay={0.4} className="mb-12 w-full">
                <div className="bg-[#FFF8F5] border border-[#FFD2C1]/50 p-8 flex flex-col items-center rounded-3xl relative overflow-hidden shadow-sm">
                    {/* Tropical decorative SVG */}
@@ -2798,7 +2963,7 @@ const BridalTropicalLayout: React.FC<LayoutProps> = ({ event, onRSVP, guestName,
         )}
 
         {/* Gallery */}
-        {event.gallery && event.gallery.length > 0 && (
+        {event.showGallery !== false && event.gallery && event.gallery.length > 0 && (
             <FadeInSection className="w-full mb-12">
                <h3 className="text-center text-xs uppercase tracking-[0.3em] text-emerald-600 mb-8 font-bold">Nossa Coleção</h3>
                <GalleryLightbox eventId={event.id} gallery={event.gallery} onLikeUpdate={onLikeUpdate} renderMode="MODERN" />

@@ -75,7 +75,7 @@ export const InlineText: React.FC<InlineTextProps> = ({
     return (
       <input
         ref={inputRef}
-        type={type}
+        type={type === 'date' || type === 'time' ? 'text' : type}
         value={tempValue}
         onChange={(e) => setTempValue(e.target.value)}
         onBlur={handleCommit}

@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 import { motion } from 'framer-motion';
 import { useNavigate, useLocation } from 'react-router-dom';
 import { useFirebase, db, handleFirestoreError, OperationType } from '../../components/FirebaseProvider';
@@ -8,16 +8,20 @@ import toast from 'react-hot-toast';
 export const EventCreator: React.FC = () => {
     const navigate = useNavigate();
     const location = useLocation();
+    const queryObj = new URLSearchParams(location.search);
+    const initialTemplate = queryObj.get('template');
+    
     const { user, userProfile } = useFirebase();
     const isBridalShower = location.pathname.includes('bridal');
 
     const [isLoading, setIsLoading] = useState(false);
-    const [selectedLayout, setSelectedLayout] = useState(isBridalShower ? 'BRIDAL_ROMANTIC' : 'ESSENTIAL');
-    const [title, setTitle] = useState(isBridalShower ? 'Chá de Panela da Maria' : 'João & Maria');
+    const [selectedLayout, setSelectedLayout] = useState(initialTemplate || (isBridalShower ? 'BRIDAL_ROMANTIC' : 'ESSENTIAL'));
+    const [title, setTitle] = useState(isBridalShower ? 'Chá de Panela' : 'João & Maria');
     const [date, setDate] = useState('');
+    const autoCreateAttempted = useRef(false);
 
-    const handleCreate = async () => {
-        if (!date || !title) {
+    const handleCreate = async (autoDate = date, autoTitle = title) => {
+        if (!autoDate || !autoTitle) {
             toast.error('Preencha o título e a data.');
             return;
         }
@@ -45,7 +49,7 @@ export const EventCreator: React.FC = () => {
                     ownerId: user.uid,
                     amount: creditCost,
                     type: 'DEBIT',
-                    description: `Criação do evento: ${title}`,
+                    description: `Criação do evento: ${autoTitle}`,
                     date: new Date().toISOString(),
                     eventId: newTransRef.id
                 });
@@ -55,8 +59,8 @@ export const EventCreator: React.FC = () => {
             const docRef = doc(db, 'events', newEventId);
             
             await setDoc(docRef, {
-                title,
-                date,
+                title: autoTitle,
+                date: autoDate,
                 time: '18:00',
                 type: isBridalShower ? 'BRIDAL_SHOWER' : 'WEDDING',
                 layoutMode: selectedLayout,
@@ -77,6 +81,43 @@ export const EventCreator: React.FC = () => {
              setIsLoading(false);
         }
     };
+
+    useEffect(() => {
+        if (initialTemplate && user && userProfile && !autoCreateAttempted.current) {
+            autoCreateAttempted.current = true;
+            // Generate a default date (e.g., 30 days from now)
+            const futureDate = new Date();
+            futureDate.setDate(futureDate.getDate() + 30);
+            const formattedDate = futureDate.toISOString().split('T')[0];
+            
+            if (!date) setDate(formattedDate);
+            
+            // Trigger automatic creation
+            handleCreate(formattedDate, isBridalShower ? 'Meu Chá de Panela' : 'João & Maria');
+        }
+    }, [initialTemplate, user, userProfile]);
+
+    if (initialTemplate && (!autoCreateAttempted.current || isLoading)) {
+        return (
+            <div className="min-h-screen bg-slate-50 flex flex-col items-center justify-center p-4">
+                <div className="w-16 h-16 border-4 border-brand-blue border-t-transparent rounded-full animate-spin mb-4"></div>
+                <h2 className="text-xl font-bold font-sans text-slate-800">A preparar o seu template...</h2>
+                <p className="text-slate-500 mt-2">Isto pode demorar alguns segundos.</p>
+            </div>
+        );
+    }
+
+    if (initialTemplate && autoCreateAttempted.current && !isLoading) {
+        return (
+            <div className="min-h-screen bg-slate-50 flex flex-col items-center justify-center p-4 text-center">
+                 <div className="text-4xl mb-4">⚠️</div>
+                 <h2 className="text-xl font-bold font-sans text-slate-800 mb-2">Ação Interrompida</h2>
+                 <p className="text-slate-500 mb-6">Não foi possível criar o seu convite. Verifique se possui créditos suficientes ou o seu plano atual.</p>
+                 <button onClick={() => navigate('/plans')} className="px-6 py-3 bg-brand-blue text-white rounded-full font-bold shadow-lg">Ver Planos e Créditos</button>
+                 <button onClick={() => navigate(-1)} className="mt-4 px-6 py-3 bg-white text-slate-600 rounded-full font-bold border border-slate-200">Voltar</button>
+            </div>
+        );
+    }
 
     return (
         <div className="min-h-screen bg-slate-50 flex items-center justify-center p-4">

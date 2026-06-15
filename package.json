@@ -7,7 +7,8 @@
     "dev": "tsx server.ts",
     "build": "vite build && esbuild server.ts --bundle --platform=node --format=cjs --packages=external --sourcemap --outfile=dist/server.cjs",
     "preview": "vite preview",
-    "start": "node dist/server.cjs"
+    "start": "node dist/server.cjs",
+    "lint": "eslint . --ext .ts,.tsx"
   },
   "dependencies": {
     "@google/genai": "^2.0.0",
@@ -34,12 +35,17 @@
     "recharts": "^3.8.1"
   },
   "devDependencies": {
+    "@eslint/js": "^10.0.1",
     "@types/cors": "^2.8.19",
     "@types/express": "^5.0.6",
     "@types/leaflet": "^1.9.21",
     "@types/node": "^22.14.0",
+    "@typescript-eslint/eslint-plugin": "^8.61.1",
+    "@typescript-eslint/parser": "^8.61.1",
     "@vitejs/plugin-react": "^5.0.0",
     "esbuild": "^0.28.0",
+    "eslint": "^10.5.0",
+    "eslint-plugin-react-hooks": "^7.1.1",
     "tsx": "^4.22.3",
     "typescript": "~5.8.2",
     "vite": "^6.2.0"

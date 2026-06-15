@@ -83,7 +83,7 @@ export const QRScanner: React.FC<QRScannerProps> = ({ onScan, onError }) => {
                 console.error("Cleanup error", e);
             }
         };
-    }, []); // eslint-disable-line react-hooks/exhaustive-deps
+    }, []);
 
     return (
         <div className="relative w-full h-full bg-black flex items-center justify-center overflow-hidden">

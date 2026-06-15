@@ -5,7 +5,7 @@
       "destination": "/api/index.ts"
     },
     {
-      "source": "/((?!api|assets|favicon|logo|icon|manifest.json|bridal-templates).*)",
+      "source": "/((?!api).*)",
       "destination": "/index.html"
     }
   ]

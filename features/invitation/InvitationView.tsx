@@ -396,6 +396,13 @@ const InvitationView: React.FC = () => {
         <div className="fixed top-4 left-1/2 -translate-x-1/2 z-[110] flex items-center gap-2 bg-white/90 backdrop-blur-md px-3 py-2.5 rounded-[30px] shadow-2xl border border-slate-200 w-auto max-w-[95%] overflow-x-auto scrollbar-hide whitespace-nowrap">
            {!isEditing ? (
              <>
+               <span className="hidden md:inline-flex items-center gap-1.5 bg-amber-50 text-amber-800 text-[10px] font-bold px-3 py-1.5 rounded-full border border-amber-100 flex-shrink-0 select-none">
+                  <span className="w-1.5 h-1.5 bg-amber-500 rounded-full animate-pulse"></span>
+                  Modo Criador (Oculto para Convidados)
+               </span>
+               <span className="inline-flex md:hidden items-center gap-1 bg-amber-50 text-amber-800 text-[10px] font-bold px-2 py-1 rounded-full border border-amber-100 flex-shrink-0 select-none">
+                  Criador
+               </span>
                <button type="button" onClick={() => navigate(-1)} className="flex items-center gap-2 bg-white/90 backdrop-blur-sm text-slate-800 px-4 py-2 rounded-full shadow-xl hover:bg-white transition-all font-display text-sm font-bold border border-slate-200 outline-none cursor-pointer">
                   <ArrowLeft size={16} /> <span className="hidden md:inline">Voltar</span>
                </button>
@@ -593,14 +600,13 @@ const InvitationView: React.FC = () => {
           {event.layoutMode === 'INDUSTRIAL' && <IndustrialLayout {...props} event={isEditing ? draftEvent : event} isEditing={isEditing} onFieldChange={handleFieldChange} />}
           {event.layoutMode?.startsWith('BRIDAL_') && <BridalStandardLayout {...props} event={isEditing ? draftEvent : event} isEditing={isEditing} onFieldChange={handleFieldChange} />}
           
-          {false && (
-              <div className="w-full bg-slate-50 py-8 px-4 z-10 relative">
+          {/* 
+          <div className="w-full bg-slate-50 py-8 px-4 z-10 relative">
              <div className="max-w-4xl mx-auto">
                  <TravelMap event={isEditing ? draftEvent : event} isEditing={isEditing} onFieldChange={handleFieldChange} />
              </div>
           </div>
-
-          )}
+          */}
 
           {event.gifts && event.gifts.length > 0 && event.gifts.some((g: any) => g.type !== 'IBAN') && (
              <div className="w-full bg-slate-50 py-12 px-4 shadow-inner border-y border-slate-200 z-10 relative">
@@ -624,7 +630,7 @@ const InvitationView: React.FC = () => {
             <span>{event.whiteLabelName ? event.whiteLabelName : 'Criado com InoEvents'}</span>
           </div>
 
-          {!isEditing && !isTemplate && (
+          {!isEditing && !isTemplate && isOwner && (
              <div className="fixed bottom-6 right-6 z-50">
                 <button
                    onClick={handleShare}
@@ -675,14 +681,81 @@ const FadeInSection: React.FC<{ children: React.ReactNode; className?: string; d
 );
 
 // ============================================================================
-// HELPER: COUNTDOWN TIMER
+// HELPER: COUNTDOWN TIMER WITH SAFE BROWSER PARSING
 // ============================================================================
-const CountdownTimer: React.FC<{ targetDate: string; colorClass?: string }> = ({ targetDate, colorClass = "text-[#BF9B30]" }) => {
+const safeParseDate = (dateString?: string, timeString?: string): Date | null => {
+  if (!dateString) return null;
+  const clean = dateString.trim();
+  if (!clean) return null;
+
+  let year = new Date().getFullYear();
+  let month = new Date().getMonth(); 
+  let day = new Date().getDate();
+  let hours = 0;
+  let minutes = 0;
+  let seconds = 0;
+
+  const isoDateMatch = clean.match(/^(\d{4})[-/](\d{1,2})[-/](\d{1,2})/);
+  const altDateMatch = clean.match(/^(\d{1,2})[-/](\d{1,2})[-/](\d{4})/);
+
+  let success = false;
+
+  if (isoDateMatch) {
+    year = parseInt(isoDateMatch[1], 10);
+    month = parseInt(isoDateMatch[2], 10) - 1;
+    day = parseInt(isoDateMatch[3], 10);
+    success = true;
+  } else if (altDateMatch) {
+    day = parseInt(altDateMatch[1], 10);
+    month = parseInt(altDateMatch[2], 10) - 1;
+    year = parseInt(altDateMatch[3], 10);
+    success = true;
+  }
+
+  if (success) {
+    const timeInStringMatch = clean.match(/[T ](\d{1,2}):(\d{2})(?::(\d{2}))?/);
+    if (timeInStringMatch) {
+      hours = parseInt(timeInStringMatch[1], 10);
+      minutes = parseInt(timeInStringMatch[2], 10);
+      if (timeInStringMatch[3]) {
+        seconds = parseInt(timeInStringMatch[3], 10);
+      }
+    } else if (timeString && timeString.trim()) {
+      const tClean = timeString.trim().replace('h', ':');
+      const tPart = tClean.split(':');
+      if (tPart.length >= 1) {
+        const h = parseInt(tPart[0], 10);
+        if (!isNaN(h)) hours = h;
+      }
+      if (tPart.length >= 2) {
+        const m = parseInt(tPart[1], 10);
+        if (!isNaN(m)) minutes = m;
+      }
+    }
+    
+    const localDate = new Date(year, month, day, hours, minutes, seconds);
+    if (!isNaN(localDate.getTime())) {
+      return localDate;
+    }
+  }
+
+  const nativeFallback = new Date(clean);
+  if (!isNaN(nativeFallback.getTime())) {
+    return nativeFallback;
+  }
+
+  return null;
+};
+
+const CountdownTimer: React.FC<{ targetDate: string; time?: string; colorClass?: string }> = ({ targetDate, time, colorClass = "text-[#BF9B30]" }) => {
   const [timeLeft, setTimeLeft] = useState({ days: 0, hours: 0, minutes: 0, seconds: 0 });
 
   useEffect(() => {
     const calculateTimeLeft = () => {
-      const difference = +new Date(targetDate) - +new Date();
+      const parsedTarget = safeParseDate(targetDate, time);
+      if (!parsedTarget) return;
+
+      const difference = +parsedTarget - +new Date();
       if (difference > 0) {
         setTimeLeft({
           days: Math.floor(difference / (1000 * 60 * 60 * 24)),
@@ -690,12 +763,14 @@ const CountdownTimer: React.FC<{ targetDate: string; colorClass?: string }> = ({
           minutes: Math.floor((difference / 1000 / 60) % 60),
           seconds: Math.floor((difference / 1000) % 60),
         });
+      } else {
+        setTimeLeft({ days: 0, hours: 0, minutes: 0, seconds: 0 });
       }
     };
     const timer = setInterval(calculateTimeLeft, 1000);
     calculateTimeLeft();
     return () => clearInterval(timer);
-  }, [targetDate]);
+  }, [targetDate, time]);
 
   const TimeBox = ({ val, label }: { val: number, label: string }) => (
     <div className="flex flex-col items-center min-w-[60px] overflow-hidden">
@@ -788,7 +863,7 @@ const EssentialLayout: React.FC<LayoutProps> = ({ event, onRSVP, onLikeUpdate, i
         <FadeInSection delay={0.15}>
           <div className="bg-white rounded-3xl p-8 shadow-sm border border-slate-100 space-y-4">
               <h2 className="font-bold text-brand-blue uppercase tracking-widest text-xs text-center border-b border-slate-100 pb-2">Contagem Regressiva</h2>
-              <CountdownTimer targetDate={event.isoDate} colorClass="text-brand-blue" />
+              <CountdownTimer targetDate={event.isoDate} time={event.time} colorClass="text-brand-blue" />
           </div>
         </FadeInSection>
         
@@ -1066,7 +1141,7 @@ const ClassicLayout: React.FC<LayoutProps> = ({ event, onRSVP, onLikeUpdate, isE
 
          <FadeInSection>
             <h3 className="text-xs font-bold uppercase tracking-[0.2em] text-slate-400 mb-6">Contagem Regressiva</h3>
-            <CountdownTimer targetDate={event.isoDate} colorClass="text-slate-800" />
+            <CountdownTimer targetDate={event.isoDate} time={event.time} colorClass="text-slate-800" />
          </FadeInSection>
 
          {event.timeline && event.timeline.length > 0 && (
@@ -1343,7 +1418,7 @@ const ModernLayout: React.FC<LayoutProps> = ({ event, onRSVP, guestName, onLikeU
       {/* 3. COUNTDOWN (Minimal Line) */}
       <FadeInSection className="py-20 text-center">
          <p className="text-[10px] uppercase tracking-[0.3em] text-gray-400 mb-6">Contagem Regressiva</p>
-         <CountdownTimer targetDate={event.isoDate} colorClass="text-[#2C2C2C]" />
+         <CountdownTimer targetDate={event.isoDate} time={event.time} colorClass="text-[#2C2C2C]" />
       </FadeInSection>
 
       {/* 4. DETAILS SECTION (Ceremony & Party) */}
@@ -1607,7 +1682,7 @@ const GardenLayout: React.FC<LayoutProps> = ({ event, onRSVP, guestName, onLikeU
       {/* 3. COUNTDOWN */}
       <FadeInSection className="mt-16 bg-white py-12 px-4 shadow-[0_4px_20px_-10px_rgba(0,0,0,0.05)] border-y border-[#EAE5DF]">
          <p className="text-center font-sans text-xs uppercase tracking-[0.2em] mb-2 text-[#8C8C8C]">Falta Pouco</p>
-         <CountdownTimer targetDate={event.isoDate} colorClass="text-[#5D5C61]" />
+         <CountdownTimer targetDate={event.isoDate} time={event.time} colorClass="text-[#5D5C61]" />
       </FadeInSection>
 
       {/* 4. LOCATIONS (Ceremony & Reception) */}
@@ -1807,7 +1882,7 @@ const RusticLayout: React.FC<LayoutProps> = ({ event, onRSVP, guestName, onLikeU
           <p className="text-xl font-bold mt-2 mb-10">{guestName}</p>
           
           <p className="text-[10px] uppercase tracking-[0.3em] text-[#8D6E63] mb-6 border-t border-[#D7CCC8] pt-6 inline-block">Contagem Regressiva</p>
-          <CountdownTimer targetDate={event.isoDate} colorClass="text-[#4E342E]" />
+          <CountdownTimer targetDate={event.isoDate} time={event.time} colorClass="text-[#4E342E]" />
        </FadeInSection>
  
        {/* LOCATIONS - Side by Side Cards */}
@@ -1967,7 +2042,7 @@ const IndustrialLayout: React.FC<LayoutProps> = ({ event, onRSVP, guestName, onL
                       <InlineText type="textarea" value={event.description} isEditing={isEditing} onChange={(val) => onFieldChange?.('description', val)} />
                    </div>
                    <span className="text-xs text-gray-400 uppercase tracking-widest mb-4 block">Contagem Regressiva</span>
-                   <CountdownTimer targetDate={event.isoDate} colorClass="text-white" />
+                   <CountdownTimer targetDate={event.isoDate} time={event.time} colorClass="text-white" />
                  </FadeInSection>
              </div>
           </div>
@@ -2143,7 +2218,7 @@ const LuxuryLayout: React.FC<LayoutProps> = ({ event, onRSVP, guestName, onLikeU
         {/* 4. COUNTDOWN */}
         <FadeInSection className="w-full mb-8">
            <p className="text-center text-[10px] uppercase tracking-widest text-gray-500 mb-0">Contagem Regressiva</p>
-           <CountdownTimer targetDate={event.isoDate} />
+           <CountdownTimer targetDate={event.isoDate} time={event.time} />
         </FadeInSection>
 
         {/* 5. COUPLE MESSAGE */}
@@ -2920,7 +2995,7 @@ const BridalTropicalLayout: React.FC<LayoutProps> = ({ event, onRSVP, guestName,
         <FadeInSection delay={0.2} className="mb-12">
             <h3 className="text-center text-xs uppercase tracking-[0.3em] text-emerald-600 mb-6 font-bold">Contagem Regressiva</h3>
             <div className="flex justify-center">
-                <CountdownTimer targetDate={event.isoDate} colorClass="text-emerald-800 text-3xl font-serif" />
+                <CountdownTimer targetDate={event.isoDate} time={event.time} colorClass="text-emerald-800 text-3xl font-serif" />
             </div>
         </FadeInSection>
 

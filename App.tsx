@@ -7,7 +7,6 @@ import InvitationView from './features/invitation/InvitationView';
 import { EventCreator } from './features/invitation/EventCreator';
 import { ProtectedRoute } from './components/ProtectedRoute';
 import { AdminRoute } from './components/AdminRoute';
-import { LiveWall } from './features/wall/LiveWall';
 import { Dashboard } from './features/dashboard/Dashboard';
 import { UserDashboard } from './features/dashboard/UserDashboard';
 import { CreateBusiness } from './features/business/CreateBusiness';
@@ -54,7 +53,6 @@ const App: React.FC = () => {
                 <Dashboard />
             </ProtectedRoute>
         } />
-        <Route path="/live-wall/:id" element={<LiveWall />} />
         <Route path="/client-dashboard/:id" element={<ClientDashboard />} />
         <Route path="/auth" element={<AuthPage />} />
         <Route path="/plans" element={<PlansPage />} />

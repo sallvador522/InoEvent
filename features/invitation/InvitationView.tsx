@@ -17,9 +17,8 @@ import { doc, getDoc, setDoc, getCountFromServer, collection, query, where, upda
 import toast from 'react-hot-toast';
 import { VirtualGiftsGuest } from './VirtualGiftsGuest';
 import { Guestbook } from './Guestbook';
-import { LivePhotoGuest } from './LivePhotoGuest';
 import { TravelMap } from './TravelMap';
-import { InlineText, InlineImage } from '../../components/InlineEdit';
+import { InlineText, InlineImage, formatDisplayDateForTemplate } from '../../components/InlineEdit';
 
 const getValidMapUrl = (link?: string, fallbackQuery?: string) => {
   if (!link || typeof link !== 'string') {
@@ -73,11 +72,23 @@ const InvitationView: React.FC = () => {
 
   const handleFieldChange = (field: string, value: any) => {
     setDraftEvent((prev: any) => {
-      const nextState = { ...prev, [field]: value };
+      let nextState = { ...prev, [field]: value };
+      
+      // Keep date and isoDate in sync if either is updated with a YYYY-MM-DD or ISO value
+      if (field === 'date' || field === 'isoDate') {
+        const isDatePattern = /^\d{4}-\d{2}-\d{2}$/.test(value) || /^\d{4}-\d{2}-\d{2}T/.test(value);
+        if (isDatePattern) {
+          const rawDate = value.substring(0, 10); // "YYYY-MM-DD"
+          const formatted = formatDisplayDateForTemplate(rawDate, prev.date || '');
+          nextState.date = formatted;
+          nextState.isoDate = rawDate; // update countdown target date
+        }
+      }
       
       // We only insert into history if it's actually different from current to avoid duplicate states
       const currentState = history[historyIndex];
-      if (JSON.stringify(currentState[field]) !== JSON.stringify(value)) {
+      const isFieldDifferent = currentState ? JSON.stringify(currentState[field]) !== JSON.stringify(value) : true;
+      if (isFieldDifferent) {
           const newHistory = history.slice(0, historyIndex + 1);
           newHistory.push(nextState);
           setHistory(newHistory);
@@ -128,7 +139,7 @@ const InvitationView: React.FC = () => {
   };
 
   const handleShare = async () => {
-    const url = window.location.href;
+    const url = `${window.location.origin}/invite/${event.id}`;
     const shareData = {
       title: event?.title || 'Convite',
       text: 'Você foi convidado! Confira os detalhes do evento:',
@@ -566,7 +577,13 @@ const InvitationView: React.FC = () => {
       )}
 
       {/* Dynamic Layout Rendering */}
-      <div id="invitation-capture-node" className="w-full relative bg-white">
+      <motion.div 
+         id="invitation-capture-node" 
+         className="w-full relative bg-white"
+         initial={{ opacity: 0, y: 15 }}
+         animate={{ opacity: 1, y: 0 }}
+         transition={{ duration: 1, ease: [0.16, 1, 0.3, 1] }}
+      >
           {event.layoutMode === 'CLASSIC' && <ClassicLayout {...props} event={isEditing ? draftEvent : event} isEditing={isEditing} onFieldChange={handleFieldChange} />}
           {event.layoutMode === 'ESSENTIAL' && <EssentialLayout {...props} event={isEditing ? draftEvent : event} isEditing={isEditing} onFieldChange={handleFieldChange} />}
           {event.layoutMode === 'MODERN' && <ModernLayout {...props} event={isEditing ? draftEvent : event} isEditing={isEditing} onFieldChange={handleFieldChange} />}
@@ -576,11 +593,14 @@ const InvitationView: React.FC = () => {
           {event.layoutMode === 'INDUSTRIAL' && <IndustrialLayout {...props} event={isEditing ? draftEvent : event} isEditing={isEditing} onFieldChange={handleFieldChange} />}
           {event.layoutMode?.startsWith('BRIDAL_') && <BridalStandardLayout {...props} event={isEditing ? draftEvent : event} isEditing={isEditing} onFieldChange={handleFieldChange} />}
           
-          <div className="w-full bg-slate-50 py-8 px-4 z-10 relative">
+          {false && (
+              <div className="w-full bg-slate-50 py-8 px-4 z-10 relative">
              <div className="max-w-4xl mx-auto">
-                 <TravelMap event={event} />
+                 <TravelMap event={isEditing ? draftEvent : event} isEditing={isEditing} onFieldChange={handleFieldChange} />
              </div>
           </div>
+
+          )}
 
           {event.gifts && event.gifts.length > 0 && event.gifts.some((g: any) => g.type !== 'IBAN') && (
              <div className="w-full bg-slate-50 py-12 px-4 shadow-inner border-y border-slate-200 z-10 relative">
@@ -615,9 +635,7 @@ const InvitationView: React.FC = () => {
                 </button>
              </div>
           )}
-
-          <LivePhotoGuest eventId={event.id} eventName={event.title} guestName={queryObj.get('guest') || 'Convidado'} />
-      </div>
+      </motion.div>
 
       {/* Shared RSVP Modal */}
       <BottomSheet 
@@ -680,10 +698,21 @@ const CountdownTimer: React.FC<{ targetDate: string; colorClass?: string }> = ({
   }, [targetDate]);
 
   const TimeBox = ({ val, label }: { val: number, label: string }) => (
-    <div className="flex flex-col items-center min-w-[60px]">
-      <span className={`text-2xl md:text-3xl font-serif font-bold tabular-nums ${colorClass}`}>
-        {val < 10 ? `0${val}` : val}
-      </span>
+    <div className="flex flex-col items-center min-w-[60px] overflow-hidden">
+      <div className="relative h-8 md:h-10 flex items-center justify-center">
+        <motion.span 
+          key={val}
+          initial={{ y: -8, opacity: 0, scale: 0.92 }}
+          animate={{ y: 0, opacity: 1, scale: 1 }}
+          transition={{ type: "spring", stiffness: 450, damping: 22 }}
+          className={`text-2xl md:text-3xl font-serif font-bold tabular-nums block absolute ${colorClass}`}
+        >
+          {val < 10 ? `0${val}` : val}
+        </motion.span>
+        <span className="text-2xl md:text-3xl font-serif font-bold opacity-0 pointer-events-none select-none">
+          88
+        </span>
+      </div>
       <span className="text-[10px] uppercase tracking-widest opacity-60 mt-1">{label}</span>
     </div>
   );
@@ -743,49 +772,52 @@ const EssentialLayout: React.FC<LayoutProps> = ({ event, onRSVP, onLikeUpdate, i
       </div>
 
       <div className="max-w-xl mx-auto px-6 -mt-16 relative z-10 space-y-6">
-        <div className="bg-white rounded-3xl p-8 shadow-sm border border-slate-100 text-center">
-          <h1 className="text-3xl font-bold text-brand-blue mb-2">
-            <InlineText value={event.title} isEditing={isEditing} onChange={(val) => onFieldChange?.('title', val)} />
-          </h1>
-          <p className="text-sm text-slate-500 mb-6 flex items-center justify-center gap-1">
-            <InlineText value={event.date} type="date" isEditing={isEditing} onChange={(val) => onFieldChange?.('date', val)} />
-            <span>às</span>
-            <InlineText value={event.time} type="time" isEditing={isEditing} onChange={(val) => onFieldChange?.('time', val)} />
-          </p>
-        </div>
-        
-        <div className="bg-white rounded-3xl p-8 shadow-sm border border-slate-100 space-y-4">
-            <h2 className="font-bold text-brand-blue uppercase tracking-widest text-xs text-center border-b border-slate-100 pb-2">Contagem Regressiva</h2>
-            <CountdownTimer targetDate={event.isoDate} colorClass="text-brand-blue" />
-        </div>
-        
-        <div className="bg-white rounded-3xl p-8 shadow-sm border border-slate-100 space-y-4">
-            <h2 className="font-bold text-brand-blue uppercase tracking-widest text-xs text-center border-b border-slate-100 pb-2 mb-4">Apresentação</h2>
-            <ParentsSection brideParents={event.brideParents} groomParents={event.groomParents} isEditing={isEditing} onFieldChange={onFieldChange} titleClass="font-sans font-bold text-slate-500 uppercase tracking-widest text-[10px]" />
-            <h2 className="font-bold text-brand-blue pt-4 border-t border-slate-100">Informações</h2>
-            <p className="text-sm text-slate-600">
-               <InlineText type="textarea" value={event.description} isEditing={isEditing} onChange={(val) => onFieldChange?.('description', val)} />
+        <FadeInSection>
+          <div className="bg-white rounded-3xl p-8 shadow-sm border border-slate-100 text-center">
+            <h1 className="text-3xl font-bold text-brand-blue mb-2">
+              <InlineText value={event.title} isEditing={isEditing} onChange={(val) => onFieldChange?.('title', val)} />
+            </h1>
+            <p className="text-sm text-slate-500 mb-6 flex items-center justify-center gap-1">
+              <InlineText value={event.date} type="date" isEditing={isEditing} onChange={(val) => onFieldChange?.('date', val)} />
+              <span>às</span>
+              <InlineText value={event.time} type="time" isEditing={isEditing} onChange={(val) => onFieldChange?.('time', val)} />
             </p>
-            {isEditing ? (
-                <div className="space-y-3 mt-4">
-                   <div>
-                       <div className="flex justify-between items-center mb-1"><span className="text-xs font-bold text-slate-500 block">Link do Mapa (URL)</span><button type="button" onClick={(e) => { e.preventDefault(); window.open(`https://www.google.com/maps/search/?api=1&query=${encodeURIComponent(event.address || event.locationName || 'Local')}`, '_blank'); }} className="text-[10px] bg-slate-100 text-blue-600 px-2 py-0.5 rounded shadow-sm hover:bg-white transition-colors flex items-center gap-1 font-sans border border-slate-200"><span className="material-symbols-outlined text-[12px]">search</span> Pesquisar no Maps</button></div>
-                       <InlineText value={event.mapLink || ''} isEditing={isEditing} onChange={(val) => onFieldChange?.('mapLink', val)} placeholder="https://maps.google.com/..." className="text-sm bg-slate-50 border border-slate-200 p-2 rounded-lg w-full" />
-                   </div>
-                   <div>
+          </div>
+        </FadeInSection>
+        
+        <FadeInSection delay={0.15}>
+          <div className="bg-white rounded-3xl p-8 shadow-sm border border-slate-100 space-y-4">
+              <h2 className="font-bold text-brand-blue uppercase tracking-widest text-xs text-center border-b border-slate-100 pb-2">Contagem Regressiva</h2>
+              <CountdownTimer targetDate={event.isoDate} colorClass="text-brand-blue" />
+          </div>
+        </FadeInSection>
+        
+        <FadeInSection delay={0.3}>
+          <div className="bg-white rounded-3xl p-8 shadow-sm border border-slate-100 space-y-4">
+              <h2 className="font-bold text-brand-blue uppercase tracking-widest text-xs text-center border-b border-slate-100 pb-2 mb-4">Apresentação</h2>
+              <ParentsSection brideParents={event.brideParents} groomParents={event.groomParents} isEditing={isEditing} onFieldChange={onFieldChange} titleClass="font-sans font-bold text-slate-500 uppercase tracking-widest text-[10px]" />
+              <h2 className="font-bold text-brand-blue pt-4 border-t border-slate-100">Informações</h2>
+              <p className="text-sm text-slate-600">
+                 <InlineText type="textarea" value={event.description} isEditing={isEditing} onChange={(val) => onFieldChange?.('description', val)} />
+              </p>
+              {isEditing ? (
+                 <div className="pt-4 border-t border-slate-100 space-y-4">
+                    <TravelMap event={event} isEditing={isEditing} onFieldChange={onFieldChange} />
+                    <div className="bg-slate-50 p-4 rounded-2xl border border-slate-100 text-left">
                        <span className="text-xs font-bold text-slate-500 block mb-1">WhatsApp (Apenas Números)</span>
-                       <InlineText value={event.phone || ''} isEditing={isEditing} onChange={(val) => onFieldChange?.('phone', val)} placeholder="351900000000" className="text-sm bg-slate-50 border border-slate-200 p-2 rounded-lg w-full" />
-                   </div>
-                </div>
-            ) : (
-                <>
-                  <Button onClick={() => window.open(getValidMapUrl(event.mapLink, event.locationName || event.receptionAddress || event.address || 'Local'), '_blank')} variant="navy" fullWidth>Localização (Maps)</Button>
-                  {event.phone && (
-                    <Button onClick={() => window.open(`https://wa.me/${event.phone.replace(/\D/g, '')}?text=Olá!`, '_blank')} variant="outline" fullWidth className="border-green-500 text-green-700 hover:bg-green-50">Falar no WhatsApp</Button>
-                  )}
-                </>
-            )}
-        </div>
+                       <InlineText value={event.phone || ''} isEditing={isEditing} onChange={(val) => onFieldChange?.('phone', val)} placeholder="351900000000" className="text-sm bg-white border border-slate-200 p-2 rounded-lg w-full" />
+                    </div>
+                 </div>
+              ) : (
+                 <div className="pt-4 border-t border-slate-100 space-y-4">
+                    <TravelMap event={event} isEditing={isEditing} onFieldChange={onFieldChange} />
+                    {event.phone && (
+                       <Button onClick={() => window.open(`https://wa.me/${event.phone.replace(/\D/g, '')}?text=Olá!`, '_blank')} variant="outline" fullWidth className="border-green-500 text-green-700 hover:bg-green-50">Falar no WhatsApp</Button>
+                    )}
+                 </div>
+              )}
+          </div>
+        </FadeInSection>
       </div>
       
       {event.showGallery !== false && event.gallery && event.gallery.length > 0 && (
@@ -900,14 +932,11 @@ const BridalStandardLayout: React.FC<LayoutProps> = ({ event, onRSVP, isEditing 
                         <div className="w-full h-px mx-auto" style={{ backgroundColor: theme.color, opacity: 0.2 }} />
                         
                         {/* Local */}
-                        <div className="flex flex-col items-center">
-                            <p className="text-[10px] md:text-[11px] uppercase tracking-[0.2em] font-bold mb-1 opacity-80" style={{ color: theme.color, fontFamily: theme.titleFont }}>Local</p>
-                            <p className="text-sm md:text-base text-gray-800 text-center flex flex-col items-center" style={{ fontFamily: theme.bodyFont }}>
-                               <InlineText value={event.locationName || event.location} isEditing={isEditing} onChange={(val) => onFieldChange?.('locationName', val)} placeholder="Nome do Local" />
-                            </p>
-                            <p className="text-xs mt-1 text-gray-600 text-center mx-1 flex flex-col items-center" style={{ fontFamily: theme.bodyFont }}>
-                               <InlineText value={event.address} isEditing={isEditing} onChange={(val) => onFieldChange?.('address', val)} placeholder="Morada / Bairro" />
-                            </p>
+                        <div className="w-full flex flex-col items-center">
+                            <p className="text-[10px] md:text-[11px] uppercase tracking-[0.2em] font-bold mb-3 opacity-80" style={{ color: theme.color, fontFamily: theme.titleFont }}>Localização</p>
+                            <div className="w-full max-w-sm">
+                                <TravelMap event={event} isEditing={isEditing} onFieldChange={onFieldChange} />
+                            </div>
                         </div>
 
                         {(event.giftTitle || event.giftDescription || event.iban) && (
@@ -985,7 +1014,7 @@ const ClassicLayout: React.FC<LayoutProps> = ({ event, onRSVP, onLikeUpdate, isE
     <div className="min-h-screen bg-slate-50 font-serif pb-28">
       {/* Formal Header */}
       <div className="bg-white p-6 text-center shadow-sm">
-         <p className="text-xs uppercase tracking-[0.2em] text-slate-400">Save the Date</p>
+         <p className="text-xs uppercase tracking-[0.2em] text-slate-400">Reserve esta Data</p>
       </div>
 
       {/* Hero Card */}
@@ -1002,7 +1031,7 @@ const ClassicLayout: React.FC<LayoutProps> = ({ event, onRSVP, onLikeUpdate, isE
             initial={{ opacity: 0 }}
             animate={{ opacity: 1 }}
             transition={{ duration: 1.5 }}
-            className="absolute inset-0 flex flex-col justify-end items-center pb-24 text-white text-center p-6 z-10 pointer-events-none"
+            className="absolute inset-0 flex flex-col justify-end items-center pb-10 text-white text-center p-6 z-10 pointer-events-none"
           >
             <motion.h1 
               initial={{ y: 20, opacity: 0 }}
@@ -1062,7 +1091,8 @@ const ClassicLayout: React.FC<LayoutProps> = ({ event, onRSVP, onLikeUpdate, isE
          )}
 
          <FadeInSection>
-            <div className="bg-white p-6 rounded-xl shadow-lg border border-slate-100">
+            <TravelMap event={event} isEditing={isEditing} onFieldChange={onFieldChange} />
+            <div className="hidden">
                <h3 className="font-bold text-xl mb-1 text-slate-800">
                   <InlineText value={event.locationName} isEditing={isEditing} onChange={(val) => onFieldChange?.('locationName', val)} />
                </h3>
@@ -1124,7 +1154,7 @@ const ClassicLayout: React.FC<LayoutProps> = ({ event, onRSVP, onLikeUpdate, isE
                               <div className="bg-slate-50 p-4 rounded-xl border border-slate-100 text-center mt-4">
                                   {gift.bankName && <p className="text-xs text-slate-400 font-bold uppercase tracking-widest mb-1">{gift.bankName}</p>}
                                   {gift.accountName && <p className="text-sm font-bold text-slate-800 mb-2">{gift.accountName}</p>}
-                                  <span className="font-mono text-sm tracking-wider font-bold text-brand-blue block mb-4">{gift.value}</span>
+                                  <span className="font-mono text-xs sm:text-sm tracking-wider font-bold text-brand-blue block mb-4 break-all max-w-full text-center">{gift.value}</span>
                                   <Button onClick={() => {
                                       navigator.clipboard.writeText(gift.value || '');
                                       toast.success('IBAN copiado!');
@@ -1324,7 +1354,7 @@ const ModernLayout: React.FC<LayoutProps> = ({ event, onRSVP, guestName, onLikeU
                  <img src={event.heroImage} className="w-full h-full object-cover grayscale group-hover:grayscale-0 transition-all duration-700" />
                  <div className="absolute top-4 left-4 bg-white px-4 py-2 text-xs font-bold tracking-widest uppercase">Cerimônia</div>
              </div>
-             <div className="w-full md:w-1/2 text-center md:text-left space-y-4">
+             <div className="w-full md:w-1/2 text-center md:text-left shadow-none" style={{ display: 'block' }}><TravelMap event={event} isEditing={isEditing} onFieldChange={onFieldChange} /></div><div className="w-full md:w-1/2 text-center md:text-left space-y-4 hidden" style={{ display: 'none' }}>
                  <h2 className="text-4xl font-serif text-[#1a1a1a]">
                     <InlineText value={event.locationName} isEditing={isEditing} onChange={(val) => onFieldChange?.('locationName', val)} />
                  </h2>
@@ -1358,7 +1388,7 @@ const ModernLayout: React.FC<LayoutProps> = ({ event, onRSVP, guestName, onLikeU
                    <h2 className="text-4xl font-serif text-[#1a1a1a]"><InlineText value={event.receptionName} isEditing={isEditing} onChange={(val) => onFieldChange?.("receptionName", val)} /></h2>
                    <p className="text-[#C2B280] font-display uppercase tracking-widest text-sm">Após a cerimônia</p>
                    <p className="text-gray-500 leading-relaxed font-light text-lg"><InlineText type="textarea" value={event.receptionAddress} isEditing={isEditing} onChange={(val) => onFieldChange?.("receptionAddress", val)} /></p>
-                   <button onClick={() => window.open(getValidMapUrl(event.mapLink, event.receptionAddress), '_blank')} className="mt-4 inline-block border-b border-black pb-1 text-xs font-bold uppercase tracking-widest hover:text-[#C2B280] hover:border-[#C2B280] transition-colors">
+                   <button onClick={() => window.open(getValidMapUrl(undefined, event.receptionAddress || event.receptionName || 'Recepção'), '_blank')} className="mt-4 inline-block border-b border-black pb-1 text-xs font-bold uppercase tracking-widest hover:text-[#C2B280] hover:border-[#C2B280] transition-colors">
                       Ver Localização
                    </button>
                </div>
@@ -1424,7 +1454,7 @@ const ModernLayout: React.FC<LayoutProps> = ({ event, onRSVP, guestName, onLikeU
                   
                   {gift.type === 'IBAN' && gift.value && (
                     <div className="bg-[#F4F4F4] p-6 rounded-2xl border border-gray-200 shadow-inner mt-4">
-                       <p className="text-xl md:text-2xl font-mono text-gray-900 tracking-widest mb-4 break-all">{gift.value}</p>
+                       <p className="text-base sm:text-lg md:text-2xl font-mono text-gray-900 tracking-wide mb-4 break-all max-w-full text-center">{gift.value}</p>
                        <div className="space-y-4">
                          {gift.accountName && (
                            <div>
@@ -1583,7 +1613,7 @@ const GardenLayout: React.FC<LayoutProps> = ({ event, onRSVP, guestName, onLikeU
       {/* 4. LOCATIONS (Ceremony & Reception) */}
       <div className="max-w-4xl mx-auto px-6 py-16 space-y-16">
          <FadeInSection className="flex flex-col md:flex-row items-center gap-8">
-            <div className="flex-1 text-center md:text-right order-2 md:order-1">
+            <div className="flex-1 text-center md:text-right order-2 md:order-1 shadow-none" style={{ display: 'block' }}><TravelMap event={event} isEditing={isEditing} onFieldChange={onFieldChange} /></div><div className="flex-1 text-center md:text-right order-2 md:order-1 hidden" style={{ display: 'none' }}>
                <span className={`inline-block px-3 py-1 rounded-full text-[10px] font-bold text-white mb-4 ${accentBg} uppercase tracking-widest`}>Cerimônia</span>
                <h3 className="text-3xl font-serif mb-2">
                   <InlineText value={event.locationName} isEditing={isEditing} onChange={(val) => onFieldChange?.('locationName', val)} />
@@ -1624,7 +1654,7 @@ const GardenLayout: React.FC<LayoutProps> = ({ event, onRSVP, guestName, onLikeU
                  <h3 className="text-3xl font-serif mb-2"><InlineText value={event.receptionName} isEditing={isEditing} onChange={(val) => onFieldChange?.("receptionName", val)} /></h3>
                  <p className="text-[#8C8C8C] font-sans text-sm mb-1">Após a cerimônia</p>
                  <p className="text-[#5D5C61] mb-6 leading-relaxed"><InlineText type="textarea" value={event.receptionAddress} isEditing={isEditing} onChange={(val) => onFieldChange?.("receptionAddress", val)} /></p>
-                 <button onClick={() => window.open(getValidMapUrl(event.mapLink, event.receptionAddress), '_blank')} className={`text-xs font-bold border-b border-[#2C2C2C] pb-0.5 hover:opacity-50 transition-opacity uppercase tracking-widest`}>
+                 <button onClick={() => window.open(getValidMapUrl(undefined, event.receptionAddress || event.receptionName || 'Recepção'), '_blank')} className={`text-xs font-bold border-b border-[#2C2C2C] pb-0.5 hover:opacity-50 transition-opacity uppercase tracking-widest`}>
                    Ver no Mapa
                  </button>
               </div>
@@ -1693,7 +1723,7 @@ const GardenLayout: React.FC<LayoutProps> = ({ event, onRSVP, guestName, onLikeU
                     <p className="text-sm text-[#5D5C61] mb-4">{gift.description}</p>
                     {gift.type === 'IBAN' && gift.value && (
                       <div className="bg-[#F9F6F2] p-4 rounded-xl text-center space-y-2">
-                        <p className="font-mono text-[#2C2C2C] font-bold tracking-widest break-all">{gift.value}</p>
+                        <p className="font-mono text-xs sm:text-sm text-[#2C2C2C] font-bold tracking-widest break-all max-w-full">{gift.value}</p>
                         {gift.accountName && <p className="text-xs text-[#5D5C61] uppercase tracking-widest">Titular: <strong className="text-[#2C2C2C]">{gift.accountName}</strong></p>}
                         {gift.bankName && <p className="text-xs text-[#5D5C61] uppercase tracking-widest">Banco: <strong className="text-[#2C2C2C]">{gift.bankName}</strong></p>}
                         <button 
@@ -1752,7 +1782,7 @@ const RusticLayout: React.FC<LayoutProps> = ({ event, onRSVP, guestName, onLikeU
                className="absolute bottom-0 w-full p-8 md:p-16 text-center text-[#FDF5E6] z-10 pointer-events-none"
              >
                 <div className="pointer-events-auto">
-                   <p className="uppercase tracking-[0.3em] text-xs mb-2">Save the Date</p>
+                   <p className="uppercase tracking-[0.3em] text-xs mb-2">Reserve esta Data</p>
                    <h1 className="text-5xl md:text-7xl font-script mb-2">
                       <InlineText value={event.title} isEditing={isEditing} onChange={(val) => onFieldChange?.('title', val)} />
                    </h1>
@@ -1782,8 +1812,7 @@ const RusticLayout: React.FC<LayoutProps> = ({ event, onRSVP, guestName, onLikeU
  
        {/* LOCATIONS - Side by Side Cards */}
        <div className="px-4 md:px-8 space-y-4 mb-16">
-          <FadeInSection className="bg-white p-8 rounded-3xl shadow-sm border border-[#EFEBE9] flex flex-col md:flex-row items-center gap-8">
-             <div className="flex-1 text-center md:text-left">
+          <FadeInSection className="bg-white p-8 rounded-3xl shadow-sm border border-[#EFEBE9] flex flex-col md:flex-row items-center gap-8"><div className="flex-1 text-center md:text-left shadow-none" style={{ display: 'block' }}><TravelMap event={event} isEditing={isEditing} onFieldChange={onFieldChange} /></div><div className="hidden flex-1 text-center md:text-left" style={{ display: 'none' }}>
                 <span className="inline-block px-3 py-1 bg-[#EFEBE9] text-[#5D4037] text-[10px] font-bold uppercase tracking-widest rounded-full mb-4">Cerimônia</span>
                 <h3 className="text-3xl font-serif mb-2 text-[#4E342E]"><InlineText value={event.locationName} isEditing={isEditing} onChange={(val) => onFieldChange?.("locationName", val)} /></h3>
                 <p className="text-[#8D6E63] mb-4"><InlineText type="textarea" value={event.address} isEditing={isEditing} onChange={(val) => onFieldChange?.("address", val)} /></p>
@@ -1842,7 +1871,7 @@ const RusticLayout: React.FC<LayoutProps> = ({ event, onRSVP, guestName, onLikeU
                         <div className="bg-[#FFF8E1] p-4 rounded-2xl text-center space-y-2 border border-[#EFEBE9]">
                           {gift.accountName && <p className="text-xs text-[#5D4037] font-bold uppercase">{gift.accountName}</p>}
                           {gift.bankName && <p className="text-xs text-[#8D6E63]">{gift.bankName}</p>}
-                          <p className="font-mono text-[#4E342E] font-bold tracking-widest break-all">{gift.value}</p>
+                          <p className="font-mono text-xs sm:text-sm text-[#4E342E] font-bold tracking-widest break-all max-w-full">{gift.value}</p>
                           <button 
                              onClick={() => {navigator.clipboard.writeText(gift.value); toast.success('IBAN Copiado!')}}
                              className="mt-4 px-6 py-2 border border-[#5D4037] text-[#5D4037] rounded-full text-xs font-bold uppercase tracking-widest hover:bg-[#5D4037] hover:text-[#FDF5E6] transition-colors w-full"
@@ -1893,7 +1922,7 @@ const IndustrialLayout: React.FC<LayoutProps> = ({ event, onRSVP, guestName, onL
        {/* HERO: Full Typographic */}
        <div className="h-screen relative flex flex-col justify-between p-6 md:p-12 border-b border-white/20">
           <div className="flex justify-between items-start z-10 relative">
-             <span className="text-xs font-bold uppercase tracking-widest border border-white px-2 py-1">Save The Date</span>
+             <span className="text-xs font-bold uppercase tracking-widest border border-white px-2 py-1">Reserve esta Data</span>
              <span className="text-xs font-bold uppercase tracking-widest flex items-center gap-1">
                 <InlineText type="date" value={event.date} isEditing={isEditing} onChange={(val) => onFieldChange?.('date', val)} />
                 {isEditing && <InlineText type="time" value={event.time} isEditing={isEditing} onChange={(val) => onFieldChange?.('time', val)} className="text-[10px]" />}
@@ -1976,7 +2005,7 @@ const IndustrialLayout: React.FC<LayoutProps> = ({ event, onRSVP, guestName, onL
        <div className="grid grid-cols-1 md:grid-cols-2 h-[60vh]">
           <div className="relative border-r border-white/20 group overflow-hidden">
              <img src={event.heroImage} className="w-full h-full object-cover grayscale group-hover:scale-105 transition-transform duration-700" />
-             <div className="absolute bottom-0 left-0 p-8 bg-black/80 w-full backdrop-blur-sm">
+             <div className="absolute inset-0 flex items-center justify-center p-4 bg-black/50 backdrop-blur-sm flex-col overflow-y-auto"><div className="w-full max-w-xs"><TravelMap event={event} isEditing={isEditing} onFieldChange={onFieldChange} /></div></div><div className="hidden absolute bottom-0 left-0 p-8 bg-black/80 w-full backdrop-blur-sm" style={{ display: 'none' }}>
                 <p className="text-xs uppercase tracking-widest mb-1 text-gray-400">Cerimônia</p>
                 <h3 className="text-2xl font-bold uppercase"><InlineText value={event.locationName} isEditing={isEditing} onChange={(val) => onFieldChange?.("locationName", val)} /></h3>
                 <button onClick={() => window.open(getValidMapUrl(event.mapLink, event.locationName || event.receptionAddress || event.address || 'Local'), '_blank')} className="mt-4 text-xs font-bold border border-white px-4 py-2 hover:bg-white hover:text-black transition-colors uppercase">Map</button>
@@ -1987,7 +2016,7 @@ const IndustrialLayout: React.FC<LayoutProps> = ({ event, onRSVP, guestName, onL
              <div className="absolute bottom-0 left-0 p-8 bg-white/90 text-black w-full backdrop-blur-sm">
                 <p className="text-xs uppercase tracking-widest mb-1 text-gray-600">Recepção</p>
                 <h3 className="text-2xl font-bold uppercase"><InlineText value={event.receptionName} isEditing={isEditing} onChange={(val) => onFieldChange?.("receptionName", val)} /></h3>
-                <button onClick={() => window.open(getValidMapUrl(event.mapLink, event.receptionAddress), '_blank')} className="mt-4 text-xs font-bold border border-black px-4 py-2 hover:bg-black hover:text-white transition-colors uppercase">Map</button>
+                <button onClick={() => window.open(getValidMapUrl(undefined, event.receptionAddress || event.receptionName || 'Recepção'), '_blank')} className="mt-4 text-xs font-bold border border-black px-4 py-2 hover:bg-black hover:text-white transition-colors uppercase">Map</button>
              </div>
           </div>
        </div>
@@ -2130,10 +2159,10 @@ const LuxuryLayout: React.FC<LayoutProps> = ({ event, onRSVP, guestName, onLikeU
         {/* 6. CEREMONY & RECEPTION (Split Locations) */}
         <div className="w-full px-6 mb-8 space-y-8">
            <FadeInSection>
-             <SectionTitle title="Cerimônia Religiosa" />
+             <SectionTitle title="Cerimônia Religiosa" /><div className="max-w-md mx-auto mb-4"><TravelMap event={event} isEditing={isEditing} onFieldChange={onFieldChange} /></div>
              <div className="border border-[#BF9B30]/30 rounded-xl overflow-hidden bg-[#0F1419] max-w-md mx-auto">
                 <div className="h-32 relative">
-                   <div className="absolute inset-0 bg-cover bg-center opacity-60" style={{ backgroundImage: `url('${event.heroImage}')` }}></div>
+                   </div></div><div className="hidden" style={{ display: 'none' }}><div><div className="absolute inset-0 bg-cover bg-center opacity-60" style={{ backgroundImage: `url('${event.heroImage}')` }}></div>
                    <div className="absolute inset-0 bg-gradient-to-t from-[#0F1419] to-transparent"></div>
                    <div className="absolute bottom-3 left-4">
                       <p className="text-white text-lg font-serif"><InlineText value={event.locationName} isEditing={isEditing} onChange={(val) => onFieldChange?.('locationName', val)} /></p>
@@ -2168,7 +2197,7 @@ const LuxuryLayout: React.FC<LayoutProps> = ({ event, onRSVP, guestName, onLikeU
                      <p className="text-xs text-gray-500 text-center leading-relaxed"><InlineText type="textarea" value={event.receptionAddress} isEditing={isEditing} onChange={(val) => onFieldChange?.("receptionAddress", val)} /></p>
                      <Button 
                        className="w-full bg-[#BF9B30] text-[#0F1419] hover:bg-white hover:text-black text-xs font-bold uppercase tracking-widest h-10 border-none shadow-lg"
-                       onClick={() => window.open(getValidMapUrl(event.mapLink, event.receptionAddress || event.address || event.locationName), '_blank')}
+                       onClick={() => window.open(getValidMapUrl(undefined, event.receptionAddress || event.receptionName || 'Recepção'), '_blank')}
                      >
                         Ver no Mapa
                      </Button>
@@ -2196,7 +2225,7 @@ const LuxuryLayout: React.FC<LayoutProps> = ({ event, onRSVP, guestName, onLikeU
                  {gift.type === 'IBAN' && (
                     <div className="bg-black/60 p-4 rounded-lg border border-[#BF9B30]/30 shadow-inner">
                        <p className="text-[10px] text-[#BF9B30] mb-2 uppercase tracking-widest font-bold">Enviar Presentes</p>
-                       <p className="text-white font-mono text-base break-all mb-4 tracking-wider select-all">{gift.value}</p>
+                       <p className="text-white font-mono text-xs sm:text-sm md:text-base break-all mb-4 tracking-wider select-all max-w-full">{gift.value}</p>
                        <div className="space-y-4 mb-4">
                          {gift.accountName && (
                            <div>
@@ -2331,11 +2360,11 @@ const BridalBeautyLayout: React.FC<LayoutProps> = ({ event, onRSVP, guestName, o
                          {event.iban && (
                              <div className="pt-4 border-t border-[#BD8C8C]/20">
                                  <p className="text-xs uppercase tracking-widest text-[#BD8C8C] mb-2 font-bold">Chave / IBAN</p>
-                                 <p className="font-medium text-[#784646] break-all mb-4">{event.iban}</p>
+                                 <p className="font-mono text-xs sm:text-sm font-medium text-[#784646] break-all mb-4 max-w-full">{event.iban}</p>
                                  <button 
                                      onClick={() => {
                                          navigator.clipboard.writeText(event.iban || '');
-                                         alert("Copiado com sucesso!");
+                                         toast.success("IBAN copiado com sucesso!");
                                      }}
                                      className="text-xs px-5 py-2.5 bg-[#BD8C8C] text-white hover:bg-[#784646] rounded-full transition-colors uppercase tracking-widest font-bold shadow-md"
                                  >
@@ -2471,11 +2500,11 @@ const BridalRomanticLayout: React.FC<LayoutProps> = ({ event, onRSVP, guestName,
                                {event.iban && (
                                    <div className="mt-4 pt-3 border-t border-[#F48FB1]/20">
                                        <p className="text-[10px] uppercase tracking-widest text-[#E06A8B] mb-1 font-bold">Chave / IBAN</p>
-                                       <p className="text-sm font-medium text-[#6D5A5A] break-all mb-3">{event.iban}</p>
+                                       <p className="font-mono text-xs sm:text-sm font-medium text-[#6D5A5A] break-all mb-3 max-w-full">{event.iban}</p>
                                        <button 
                                            onClick={() => {
                                                navigator.clipboard.writeText(event.iban || '');
-                                               alert("Copiado com sucesso!");
+                                               toast.success("IBAN copiado com sucesso!");
                                            }}
                                            className="text-[10px] px-4 py-2 bg-[#F48FB1] text-white hover:bg-[#E06A8B] rounded-full transition-colors uppercase tracking-widest font-bold"
                                        >
@@ -2580,13 +2609,13 @@ const BridalMinimalLayout: React.FC<LayoutProps> = ({ event, onRSVP, guestName, 
                             {event.iban && (
                                 <div className="mt-4 pt-4 border-t border-[#F0ECE1]">
                                     <p className="text-[10px] uppercase tracking-widest text-[#A09383] mb-2 font-bold">Chave / IBAN</p>
-                                    <p className="text-sm font-medium text-[#333333] break-all mb-3">{event.iban}</p>
+                                    <p className="font-mono text-xs sm:text-sm font-medium text-[#333333] break-all mb-3 max-w-full">{event.iban}</p>
                                     <button 
                                         onClick={() => {
                                             const bankInfo = `Banco: ${event.bankName || ''}\nTitular: ${event.accountName || ''}\nIBAN: ${event.iban || ''}`;
                                             navigator.clipboard.writeText(event.iban || bankInfo);
                                             // Assume toast is available globally or just visual feedback on the button isn't strict here.
-                                            alert("Copiado com sucesso!");
+                                            toast.success("Dados bancários copiados!");
                                         }}
                                         className="text-xs px-4 py-2 bg-[#F0ECE1] text-[#333333] hover:bg-[#E5DFD3] rounded-full transition-colors uppercase tracking-widest font-bold"
                                     >
@@ -2692,12 +2721,12 @@ const BridalTeaPartyLayout: React.FC<LayoutProps> = ({ event, onRSVP, guestName,
                          {event.iban && (
                              <div className="mt-4 pt-4 border-t border-[#E2E8F0]">
                                  <p className="text-[10px] uppercase tracking-widest text-[#8194A5] mb-1 font-bold">Chave / IBAN</p>
-                                 <p className="text-sm font-medium text-[#5C7487] break-all mb-4">{event.iban}</p>
+                                 <p className="font-mono text-xs sm:text-sm font-medium text-[#5C7487] break-all mb-4 max-w-full">{event.iban}</p>
                                  <div className="flex justify-center">
                                      <button 
                                          onClick={() => {
                                              navigator.clipboard.writeText(event.iban || '');
-                                             alert("Copiado com sucesso!");
+                                             toast.success("IBAN copiado com sucesso!");
                                          }}
                                          className="text-xs px-6 py-2.5 bg-[#8194A5] text-white hover:bg-[#5C7487] rounded-full transition-colors uppercase tracking-[0.2em] font-bold"
                                      >

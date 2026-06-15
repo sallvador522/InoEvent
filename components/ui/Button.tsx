@@ -28,7 +28,9 @@ export const Button: React.FC<ButtonProps> = ({
 
   return (
     <motion.button
+      whileHover={{ scale: 1.02, y: -1 }}
       whileTap={{ scale: 0.97 }}
+      transition={{ type: "spring", stiffness: 450, damping: 20 }}
       className={`${baseStyle} ${selectedVariant} ${fullWidth ? 'w-full' : ''} ${className}`}
       {...props}
     >

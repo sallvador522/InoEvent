@@ -3,6 +3,7 @@ import { useParams, Link, useNavigate } from 'react-router-dom';
 import { Users, CheckCircle2, QrCode, Share2, Download, Clock, Search, MessageSquare, ArrowLeft, MoreHorizontal, Settings, Copy, Check, Edit2, Trash2, Plus, MessageCircle, UploadCloud, Gem, Camera } from 'lucide-react';
 import { motion, AnimatePresence } from 'framer-motion';
 import { doc, collection, onSnapshot, deleteDoc, updateDoc, setDoc } from 'firebase/firestore';
+import { getStorage, ref, deleteObject } from 'firebase/storage';
 import { db, handleFirestoreError, OperationType, useFirebase } from '../../components/FirebaseProvider';
 import { QRScanner } from '../../components/QRScanner';
 import { LineChart, Line, XAxis, YAxis, CartesianGrid, Tooltip as RechartsTooltip, ResponsiveContainer, PieChart, Pie, Cell } from 'recharts';
@@ -209,6 +210,56 @@ export const Dashboard = () => {
         setIsDeleting(true);
         try {
             if (!id) return;
+
+            // Delete associated storage files (audio, image urls, etc.) before deleting the database record
+            if (event) {
+                try {
+                    const storage = getStorage();
+                    const urlsToDelete: string[] = [];
+
+                    // Audio URL
+                    if (event.audioUrl && typeof event.audioUrl === 'string' && event.audioUrl.includes('firebasestorage.googleapis.com')) {
+                        urlsToDelete.push(event.audioUrl);
+                    }
+
+                    // Cover image URL
+                    if (event.coverUrl && typeof event.coverUrl === 'string' && event.coverUrl.includes('firebasestorage.googleapis.com')) {
+                        urlsToDelete.push(event.coverUrl);
+                    }
+
+                    // Background image URL
+                    if (event.backgroundImage && typeof event.backgroundImage === 'string' && event.backgroundImage.includes('firebasestorage.googleapis.com')) {
+                        urlsToDelete.push(event.backgroundImage);
+                    }
+
+                    // Gallery images
+                    if (event.gallery && Array.isArray(event.gallery)) {
+                        event.gallery.forEach((pic: any) => {
+                            if (typeof pic === 'string' && pic.includes('firebasestorage.googleapis.com')) {
+                                urlsToDelete.push(pic);
+                            } else if (pic && typeof pic === 'object' && pic.url && typeof pic.url === 'string' && pic.url.includes('firebasestorage.googleapis.com')) {
+                                urlsToDelete.push(pic.url);
+                            }
+                        });
+                    }
+
+                    // Run parallelized deletions
+                    await Promise.all(
+                        urlsToDelete.map(async (url) => {
+                            try {
+                                const fileRef = ref(storage, url);
+                                await deleteObject(fileRef);
+                                console.log("Removed storage resource:", url);
+                            } catch (e) {
+                                console.warn("Failed or skipped deleting storage resource:", url, e);
+                            }
+                        })
+                    );
+                } catch (storageErr) {
+                    console.error("Storage files cleanup failure:", storageErr);
+                }
+            }
+
             const eventRef = doc(db, 'events', id);
             await deleteDoc(eventRef);
             toast.success("Evento apagado com sucesso");
@@ -784,16 +835,7 @@ export const Dashboard = () => {
                          </div>
                         )}
 
-                        <div className="bg-rose-50 text-slate-800 rounded-3xl p-6 border border-rose-100 shadow-sm">
-                            <h3 className="text-xl font-bold mb-2 flex items-center gap-2 text-rose-900">
-                                <Camera size={20} className="text-rose-500" />
-                                Live Photo Wall
-                            </h3>
-                            <p className="text-rose-900/70 text-sm mb-4">Projete numa tela grande as fotos enviadas pelos convidados ao vivo.</p>
-                            <Link to={`/live-wall/${event.id}`} target="_blank" className="w-full bg-rose-500 text-white py-3 rounded-xl font-bold flex items-center justify-center gap-2 hover:bg-rose-600 transition-colors shadow-lg shadow-rose-500/20">
-                                Abrir Telão
-                            </Link>
-                        </div>
+
 
                          <div className="bg-white border border-slate-100 rounded-3xl p-6 shadow-sm">
                             <h3 className="font-bold text-slate-800 mb-4">Informações</h3>

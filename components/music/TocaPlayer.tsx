@@ -11,17 +11,64 @@ export const TocaPlayer: React.FC<TocaPlayerProps> = ({ trackName, isDark = fals
   const audioRef = useRef<HTMLAudioElement | null>(null);
 
   useEffect(() => {
-    // If it's a URL, we initialize the audio object
+    let audio: HTMLAudioElement | null = null;
+    let interactionListenersActive = false;
+
+    // Helper functions for gesture listener
+    const playOnGesture = () => {
+      if (audio) {
+        audio.play()
+          .then(() => {
+            setIsPlaying(true);
+            cleanupGestureListeners();
+          })
+          .catch((err) => {
+            console.log("Play on gesture failed:", err);
+          });
+      }
+    };
+
+    const cleanupGestureListeners = () => {
+      if (interactionListenersActive) {
+        document.removeEventListener('click', playOnGesture);
+        document.removeEventListener('touchstart', playOnGesture);
+        document.removeEventListener('scroll', playOnGesture);
+        document.removeEventListener('keydown', playOnGesture);
+        interactionListenersActive = false;
+      }
+    };
+
     if (trackName && (trackName.startsWith('http') || trackName.startsWith('data:audio'))) {
-      const audio = new Audio(trackName);
+      audio = new Audio(trackName);
       audio.loop = true;
       audioRef.current = audio;
+
+      // 1. Try playing immediately (Autoplay)
+      audio.play()
+        .then(() => {
+          setIsPlaying(true);
+        })
+        .catch((error) => {
+          console.log("Autoplay locked by browser policy. Falling back to gesture listeners...", error);
+          setIsPlaying(false);
+          
+          // 2. Add standard event listeners as dynamic backup fallback
+          document.addEventListener('click', playOnGesture, { once: true });
+          document.addEventListener('touchstart', playOnGesture, { once: true });
+          document.addEventListener('scroll', playOnGesture, { once: true });
+          document.addEventListener('keydown', playOnGesture, { once: true });
+          interactionListenersActive = true;
+        });
+    } else {
+      audioRef.current = null;
+      setIsPlaying(false);
     }
-    
+
     return () => {
-      if (audioRef.current) {
-        audioRef.current.pause();
-        audioRef.current.src = "";
+      cleanupGestureListeners();
+      if (audio) {
+        audio.pause();
+        audio.src = "";
       }
     };
   }, [trackName]);
@@ -33,8 +80,8 @@ export const TocaPlayer: React.FC<TocaPlayerProps> = ({ trackName, isDark = fals
       } else {
         audioRef.current.play().catch(e => console.error("Playback failed", e));
       }
+      setIsPlaying(!isPlaying);
     }
-    setIsPlaying(!isPlaying);
   };
 
   if (!trackName) return null;
@@ -61,10 +108,12 @@ export const TocaPlayer: React.FC<TocaPlayerProps> = ({ trackName, isDark = fals
           </span>
         </div>
         <div className="flex flex-col items-start leading-none">
-          <span className="text-[10px] font-semibold tracking-wide uppercase opacity-70">Convite Interativo</span>
-          {isPlaying && (
-            <span className="text-[10px] font-bold truncate max-w-[80px]">Música</span>
-          )}
+          <span className="text-[10px] font-semibold tracking-wide uppercase opacity-70">
+            Convite Interativo
+          </span>
+          <span className="text-[10px] font-bold truncate max-w-[90px]">
+            {isPlaying ? 'Tocando...' : 'Ouvir Música'}
+          </span>
         </div>
       </motion.button>
     </div>

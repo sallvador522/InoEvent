@@ -23,6 +23,43 @@ app.get('/api/health', (req, res) => {
   res.json({ status: 'ok' });
 });
 
+// Generate bespoke invitation description during onboarding
+app.post('/api/generate-description', async (req, res) => {
+  const { eventType, title, date, style } = req.body;
+  if (!eventType || !title) {
+    return res.status(400).json({ error: 'Missing eventType or title parameter' });
+  }
+
+  const key = process.env.GEMINI_API_KEY;
+  if (!key) {
+    return res.status(500).json({ error: 'Chave de API do Gemini não configurada no servidor' });
+  }
+
+  try {
+    const { GoogleGenAI } = await import('@google/genai');
+    const ai = new GoogleGenAI({ apiKey: key });
+
+    const prompt = `Crie uma mensagem curta, elegante e sofisticada de convite de boas-vindas / introdução do evento no tom adequado ao estilo "${style || 'Clássico'}".
+Tipo de Evento: ${eventType === 'BRIDAL_SHOWER' ? 'CHÁ DE PANELA (Bridal Shower)' : 'CASAMENTO (Wedding)'}.
+Título do Evento: "${title}".
+Data do Evento: "${date || 'A definir'}".
+Apenas retorne o parágrafo de introdução (máximo 3 frases), escrito em Português elegante, pronto para emocionar os convidados. Não inclua aspas extras nem marcas markdown, apenas o parágrafo corrido.`;
+
+    const response = await ai.models.generateContent({
+      model: 'gemini-2.5-flash',
+      contents: prompt,
+      config: {
+        temperature: 0.75,
+      }
+    });
+
+    res.json({ text: response.text?.trim() || '' });
+  } catch (error: any) {
+    console.error('Gemini error during description creation:', error);
+    res.status(500).json({ error: error.message });
+  }
+});
+
 // Create payment
 app.post('/api/payments/create', async (req, res) => {
   const { amount, externalId, client, items, metadata } = req.body;

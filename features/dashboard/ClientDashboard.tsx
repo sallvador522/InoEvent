@@ -4,6 +4,7 @@ import { Users, CheckCircle2, Clock, Search, ExternalLink, ShieldCheck } from 'l
 import { motion, AnimatePresence } from 'framer-motion';
 import { doc, collection, onSnapshot, getDoc } from 'firebase/firestore';
 import { db } from '../../components/FirebaseProvider';
+import { GuestsProgressBar } from './GuestsProgressBar';
 
 export const ClientDashboard = () => {
     const { id } = useParams<{ id: string }>();
@@ -188,6 +189,8 @@ export const ClientDashboard = () => {
                     <StatCard title="Pendentes" value={pendingCount} icon={Clock} color="bg-amber-50 text-amber-600" />
                     <StatCard title="Recusados" value={declinedCount} icon={Users} color="bg-red-50 text-red-600" />
                 </div>
+
+                <GuestsProgressBar guests={guests} className="mb-8" />
 
                 {/* Filters & Search */}
                 <div className="bg-white p-6 rounded-3xl border border-slate-200 shadow-sm mb-6 flex flex-col xl:flex-row gap-4 items-center">

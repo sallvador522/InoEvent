@@ -1,7 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { Navbar } from '../../components/Navbar';
 import { db } from '../../components/FirebaseProvider';
-import { collection, getDocs, query, orderBy, doc, updateDoc } from 'firebase/firestore';
+import { collection, getDocs, query, orderBy, doc, updateDoc, addDoc } from 'firebase/firestore';
 import { toast } from 'react-hot-toast';
 import { motion, AnimatePresence } from 'framer-motion';
 
@@ -16,6 +16,17 @@ export const AdminDashboard: React.FC = () => {
   
   const [searchQuery, setSearchQuery] = useState('');
   const [planFilter, setPlanFilter] = useState('all');
+
+  // Notifications & Plan Upgrades State
+  const [notificationTargetUserId, setNotificationTargetUserId] = useState<string | null>(null);
+  const [notificationTitle, setNotificationTitle] = useState('');
+  const [notificationMessage, setNotificationMessage] = useState('');
+  const [notificationType, setNotificationType] = useState<'plan_upgrade' | 'admin_alert' | 'system'>('admin_alert');
+  const [pendingPlanChange, setPendingPlanChange] = useState<{
+    userId: string,
+    currentPlan: string,
+    nextPlan: string
+  } | null>(null);
 
   useEffect(() => {
     const fetchData = async () => {
@@ -57,18 +68,44 @@ export const AdminDashboard: React.FC = () => {
     }
   };
 
-  const handleUpdatePlan = async (userId: string, newPlan: string, e?: React.MouseEvent) => {
+  const handlePlanChangeSelect = (userId: string, currentPlan: string, nextPlan: string, e?: React.MouseEvent) => {
     if (e) e.stopPropagation();
+    setPendingPlanChange({ userId, currentPlan, nextPlan });
+    setNotificationTitle('Plano Atualizado 🎉');
+    setNotificationMessage(`Parabéns! O seu plano foi atualizado de ${currentPlan} para ${nextPlan} pela equipa de administração do InoEvents. Aproveite todos os novos recursos exclusivos!`);
+    setNotificationType('plan_upgrade');
+    setNotificationTargetUserId(userId);
+  };
+
+  const handleConfirmAndSendNotification = async () => {
+    if (!notificationTargetUserId) return;
     try {
-      await updateDoc(doc(db, 'users', userId), { plan: newPlan });
-      setUsers(users.map(u => u.id === userId ? { ...u, plan: newPlan } : u));
-      if (selectedUser?.id === userId) {
-         setSelectedUser({ ...selectedUser, plan: newPlan });
+      if (pendingPlanChange) {
+        await updateDoc(doc(db, 'users', pendingPlanChange.userId), { plan: pendingPlanChange.nextPlan });
+        setUsers(users.map(u => u.id === pendingPlanChange.userId ? { ...u, plan: pendingPlanChange.nextPlan } : u));
+        if (selectedUser?.id === pendingPlanChange.userId) {
+          setSelectedUser({ ...selectedUser, plan: pendingPlanChange.nextPlan });
+        }
       }
-      toast.success('Plano atualizado!');
+
+      await addDoc(collection(db, 'users', notificationTargetUserId, 'notifications'), {
+        title: notificationTitle || 'Notificação do Administrador',
+        message: notificationMessage || '',
+        createdAt: new Date().toISOString(),
+        read: false,
+        type: notificationType
+      });
+
+      toast.success(pendingPlanChange ? 'Plano atualizado e notificação enviada!' : 'Notificação enviada com sucesso!');
+
+      // Reset state
+      setNotificationTargetUserId(null);
+      setPendingPlanChange(null);
+      setNotificationTitle('');
+      setNotificationMessage('');
     } catch (error) {
-      console.error(error);
-      toast.error('Erro ao atualizar plano');
+      console.error('Error upgrading plan/sending notification:', error);
+      toast.error('Erro ao processar alteração ou enviar notificação.');
     }
   };
 
@@ -191,8 +228,8 @@ export const AdminDashboard: React.FC = () => {
                   <span className="text-slate-500">Plano Atual:</span>
                   <select 
                     value={selectedUser.plan || 'Essencial'}
-                    onChange={(e) => handleUpdatePlan(selectedUser.id, e.target.value)}
-                    className="bg-white border text-right border-slate-200 text-slate-700 text-xs rounded focus:ring-brand-blue focus:border-brand-blue block p-1 font-bold"
+                    onChange={(e) => handlePlanChangeSelect(selectedUser.id, selectedUser.plan || 'Essencial', e.target.value)}
+                    className="bg-white border text-right border-slate-200 text-slate-700 text-sm rounded-lg focus:ring-brand-blue focus:border-brand-blue block p-1 font-bold outline-none cursor-pointer"
                   >
                     <option value="Essencial">Essencial</option>
                     <option value="Premium">Premium</option>
@@ -209,6 +246,21 @@ export const AdminDashboard: React.FC = () => {
                 <li className="flex justify-between items-center text-sm">
                   <span className="text-slate-500">Criado em:</span>
                   <span className="font-medium text-slate-900">{selectedUser.createdAt ? new Date(selectedUser.createdAt).toLocaleDateString() : 'N/A'}</span>
+                </li>
+                <li className="pt-4 border-t border-slate-100 flex justify-end">
+                  <button 
+                    onClick={() => {
+                      setNotificationTargetUserId(selectedUser.id);
+                      setNotificationTitle('Notificação InoEvents 🔔');
+                      setNotificationMessage('');
+                      setNotificationType('admin_alert');
+                      setPendingPlanChange(null);
+                    }}
+                    className="flex items-center gap-1.5 bg-brand-blue text-white text-xs font-bold px-4 py-2 rounded-xl shadow-md shadow-brand-blue/10 hover:bg-brand-blue/90 hover:scale-[1.02] active:scale-95 transition-all outline-none cursor-pointer"
+                  >
+                    <span className="material-symbols-outlined text-sm">notifications_active</span>
+                    Enviar Notificação
+                  </button>
                 </li>
               </ul>
             </div>
@@ -233,16 +285,71 @@ export const AdminDashboard: React.FC = () => {
       );
     }
 
+    const countAll = users.length;
+    const countEssencial = users.filter(u => !u.plan || u.plan === 'Essencial').length;
+    const countPremium = users.filter(u => u.plan === 'Premium').length;
+    const countBusiness = users.filter(u => u.plan === 'Business' || u.plan === 'Corporate').length;
+
     const filteredUsers = users.filter(u => {
       const matchesSearch = (u.email || '').toLowerCase().includes(searchQuery.toLowerCase()) || 
                             (u.name || '').toLowerCase().includes(searchQuery.toLowerCase()) ||
                             (u.uid || '').toLowerCase().includes(searchQuery.toLowerCase());
-      const matchesPlan = planFilter === 'all' || u.plan === planFilter || (planFilter === 'Essencial' && !u.plan);
+      const matchesPlan = planFilter === 'all' || 
+                          u.plan === planFilter || 
+                          (planFilter === 'Essencial' && !u.plan) ||
+                          (planFilter === 'Business' && u.plan === 'Corporate');
       return matchesSearch && matchesPlan;
     });
 
     return (
       <div className="bg-white rounded-2xl shadow-sm border border-slate-100 overflow-hidden">
+        {/* Tactile Plan Filter Pills */}
+        <div className="p-4 bg-slate-50/30 border-b border-slate-100 flex flex-wrap gap-2.5">
+          <button 
+            type="button"
+            onClick={() => setPlanFilter('all')}
+            className={`px-3.5 py-1.5 rounded-xl text-xs font-bold transition-all flex items-center gap-1.5 cursor-pointer outline-none ${
+              planFilter === 'all' 
+                ? 'bg-brand-blue text-white shadow-md shadow-brand-blue/15 scale-[1.02]' 
+                : 'bg-white text-slate-600 hover:bg-slate-50 border border-slate-100 shadow-sm'
+            }`}
+          >
+            Todos os Planos ({countAll})
+          </button>
+          <button 
+            type="button"
+            onClick={() => setPlanFilter('Essencial')}
+            className={`px-3.5 py-1.5 rounded-xl text-xs font-bold transition-all flex items-center gap-1.5 cursor-pointer outline-none ${
+              planFilter === 'Essencial' 
+                ? 'bg-slate-700 text-white shadow-md shadow-slate-700/15 scale-[1.02]' 
+                : 'bg-white text-slate-600 hover:bg-slate-50 border border-slate-100 shadow-sm'
+            }`}
+          >
+            ⚡ Essencial ({countEssencial})
+          </button>
+          <button 
+            type="button"
+            onClick={() => setPlanFilter('Premium')}
+            className={`px-3.5 py-1.5 rounded-xl text-xs font-bold transition-all flex items-center gap-1.5 cursor-pointer outline-none ${
+              planFilter === 'Premium' 
+                ? 'bg-amber-500 text-white shadow-md shadow-amber-500/15 scale-[1.02]' 
+                : 'bg-white text-slate-600 hover:bg-slate-50 border border-slate-100 shadow-sm'
+            }`}
+          >
+            ✨ Premium ({countPremium})
+          </button>
+          <button 
+            type="button"
+            onClick={() => setPlanFilter('Business')}
+            className={`px-3.5 py-1.5 rounded-xl text-xs font-bold transition-all flex items-center gap-1.5 cursor-pointer outline-none ${
+              planFilter === 'Business' 
+                ? 'bg-blue-600 text-white shadow-md shadow-blue-600/15 scale-[1.02]' 
+                : 'bg-white text-slate-600 hover:bg-slate-50 border border-slate-100 shadow-sm'
+            }`}
+          >
+            💼 Business / Corp ({countBusiness})
+          </button>
+        </div>
         <div className="p-4 border-b border-slate-100 flex flex-col sm:flex-row gap-4 justify-between items-center bg-slate-50/50">
            <div className="flex w-full sm:w-auto relative">
               <span className="material-symbols-outlined absolute left-3 top-1/2 -translate-y-1/2 text-slate-400 text-sm">search</span>
@@ -289,8 +396,8 @@ export const AdminDashboard: React.FC = () => {
                   <td className="px-6 py-4" onClick={e => e.stopPropagation()}>
                     <select 
                         value={user.plan || 'Essencial'}
-                        onChange={(e) => handleUpdatePlan(user.id, e.target.value, e as any)}
-                        className="bg-white border border-slate-200 text-slate-700 text-xs rounded focus:ring-brand-blue focus:border-brand-blue block p-1.5 font-bold cursor-pointer"
+                        onChange={(e) => handlePlanChangeSelect(user.id, user.plan || 'Essencial', e.target.value, e as any)}
+                        className="bg-white border border-slate-200 text-slate-700 text-xs rounded-lg focus:ring-brand-blue focus:border-brand-blue block p-1.5 font-bold cursor-pointer outline-none"
                     >
                         <option value="Essencial">Essencial</option>
                         <option value="Premium">Premium</option>
@@ -473,6 +580,107 @@ export const AdminDashboard: React.FC = () => {
             {activeTab === 'events' && renderEvents()}
             {activeTab === 'transactions' && renderTransactions()}
           </motion.div>
+        </AnimatePresence>
+
+        <AnimatePresence>
+          {notificationTargetUserId && (
+            <motion.div 
+              initial={{ opacity: 0 }}
+              animate={{ opacity: 1 }}
+              exit={{ opacity: 0 }}
+              className="fixed inset-0 bg-slate-900/60 backdrop-blur-sm z-[150] flex items-center justify-center p-4"
+              onClick={() => { setNotificationTargetUserId(null); setPendingPlanChange(null); }}
+            >
+              <motion.div 
+                initial={{ scale: 0.95, y: 20, opacity: 0 }}
+                animate={{ scale: 1, y: 0, opacity: 1 }}
+                exit={{ scale: 0.95, y: 20, opacity: 0 }}
+                transition={{ type: 'spring', duration: 0.4 }}
+                className="bg-white rounded-2xl border border-slate-100 shadow-2xl p-6 w-full max-w-lg overflow-hidden relative"
+                onClick={(e) => e.stopPropagation()}
+              >
+                <div className="flex items-center gap-3 mb-4">
+                  <div className="w-10 h-10 rounded-full bg-brand-blue/10 flex items-center justify-center text-brand-blue">
+                    <span className="material-symbols-outlined text-[20px]">
+                      {pendingPlanChange ? 'military_tech' : 'notifications_active'}
+                    </span>
+                  </div>
+                  <div>
+                    <h3 className="text-lg font-serif font-bold text-slate-900">
+                      {pendingPlanChange ? 'Atualizar Plano & Notificar' : 'Enviar Notificação Direta'}
+                    </h3>
+                    <p className="text-xs text-slate-500 font-medium mt-0.5">
+                      Para: {users.find(u => u.id === notificationTargetUserId)?.email || 'Usuário'}
+                    </p>
+                  </div>
+                </div>
+
+                {pendingPlanChange && (
+                  <div className="bg-blue-50/50 border border-blue-100 p-3.5 rounded-xl mb-4 text-xs">
+                    <p className="text-slate-600 font-medium">Você está a alterar o plano deste utilizador:</p>
+                    <div className="flex items-center gap-2 mt-1.5">
+                      <span className="font-bold text-slate-500 line-through">{pendingPlanChange.currentPlan}</span>
+                      <span className="material-symbols-outlined text-slate-400 text-sm">arrow_forward</span>
+                      <span className="font-bold text-brand-blue bg-blue-100/50 px-2.5 py-0.5 rounded-full">{pendingPlanChange.nextPlan}</span>
+                    </div>
+                  </div>
+                )}
+
+                <div className="space-y-4">
+                  <div>
+                    <label className="block text-xs font-bold text-slate-500 uppercase tracking-wider mb-2">Título da Notificação</label>
+                    <input 
+                      type="text" 
+                      value={notificationTitle}
+                      onChange={(e) => setNotificationTitle(e.target.value)}
+                      placeholder="Ex: Atualização de Plano"
+                      className="w-full px-3.5 py-2.5 text-sm border border-slate-200 rounded-xl focus:ring-brand-blue focus:border-brand-blue outline-none font-medium text-slate-800 transition-shadow bg-slate-50/50"
+                    />
+                  </div>
+
+                  <div>
+                    <label className="block text-xs font-bold text-slate-500 uppercase tracking-wider mb-2">Mensagem</label>
+                    <textarea 
+                      value={notificationMessage}
+                      onChange={(e) => setNotificationMessage(e.target.value)}
+                      placeholder="Escreva a mensagem personalizada..."
+                      rows={4}
+                      className="w-full px-3.5 py-2.5 text-sm border border-slate-200 rounded-xl focus:ring-brand-blue focus:border-brand-blue outline-none font-medium text-slate-800 transition-shadow bg-slate-50/50 resize-none"
+                    />
+                  </div>
+
+                  <div>
+                    <label className="block text-xs font-bold text-slate-500 uppercase tracking-wider mb-2">Tipo de Notificação</label>
+                    <select
+                      value={notificationType}
+                      onChange={(e: any) => setNotificationType(e.target.value)}
+                      className="w-full px-3.5 py-2.5 text-sm border border-slate-200 rounded-xl focus:ring-brand-blue focus:border-brand-blue outline-none font-bold text-slate-700 transition-shadow bg-slate-50/50 cursor-pointer"
+                    >
+                      <option value="plan_upgrade">Premium / Upgrade de Plano</option>
+                      <option value="admin_alert">Alerta Geral de Administrador</option>
+                      <option value="system">Mensagem do Sistema</option>
+                    </select>
+                  </div>
+                </div>
+
+                <div className="flex items-center gap-3 mt-6 pt-4 border-t border-slate-100 justify-end">
+                  <button 
+                    onClick={() => { setNotificationTargetUserId(null); setPendingPlanChange(null); }}
+                    className="px-4 py-2 text-xs font-bold text-slate-500 hover:text-slate-800 hover:bg-slate-50 rounded-xl transition-colors cursor-pointer"
+                  >
+                    Cancelar
+                  </button>
+                  <button 
+                    onClick={handleConfirmAndSendNotification}
+                    className="flex items-center gap-1.5 bg-brand-blue text-white text-xs font-bold px-5 py-2.5 rounded-xl shadow-lg shadow-brand-blue/20 hover:bg-brand-blue/90 hover:scale-[1.01] active:translate-y-0 active:scale-95 transition-all outline-none cursor-pointer"
+                  >
+                    <span className="material-symbols-outlined text-[16px]">send</span>
+                    Confirmar e Enviar
+                  </button>
+                </div>
+              </motion.div>
+            </motion.div>
+          )}
         </AnimatePresence>
 
       </div>

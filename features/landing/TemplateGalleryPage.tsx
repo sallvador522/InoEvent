@@ -4,6 +4,7 @@ import { Link } from 'react-router-dom';
 import { EVENTS } from '../../mockData';
 import { ThemeType } from '../../types';
 import { Navbar } from '../../components/Navbar';
+import { SEO } from '../../components/SEO';
 
 const MotionLink = motion(Link as any) as any;
 
@@ -42,6 +43,10 @@ export const TemplateGalleryPage: React.FC = () => {
 
     return (
         <div className="min-h-screen bg-slate-50 flex flex-col font-sans">
+            <SEO 
+                title="Galeria de Modelos de Convites Digitais"
+                description="Explore os nossos designs de convites e modelos premium feitos artesanalmente para casamentos, chás de panelas, aniversários, chás de bebês e reuniões corporativas."
+            />
             <Navbar />
 
             <main className="flex-1 max-w-7xl mx-auto w-full px-6 py-12">

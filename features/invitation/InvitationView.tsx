@@ -19,6 +19,7 @@ import { VirtualGiftsGuest } from './VirtualGiftsGuest';
 import { Guestbook } from './Guestbook';
 import { TravelMap } from './TravelMap';
 import { InlineText, InlineImage, formatDisplayDateForTemplate } from '../../components/InlineEdit';
+import { SEO } from '../../components/SEO';
 
 const getValidMapUrl = (link?: string, fallbackQuery?: string) => {
   if (!link || typeof link !== 'string') {
@@ -36,6 +37,18 @@ const getValidMapUrl = (link?: string, fallbackQuery?: string) => {
   }
   return `https://www.google.com/maps/search/?api=1&query=${encodeURIComponent(fallbackQuery || cleanLink)}`;
 };
+
+const WhatsAppIcon: React.FC<{ size?: number }> = ({ size = 20 }) => (
+  <svg 
+    viewBox="0 0 24 24" 
+    width={size} 
+    height={size} 
+    fill="currentColor" 
+    className="inline-block"
+  >
+    <path d="M12.012 2c-5.506 0-9.989 4.478-9.99 9.984a9.96 9.96 0 001.37 5.028L2 22l5.13-1.313a9.923 9.923 0 004.881 1.298h.005c5.505 0 9.988-4.478 9.99-9.984A9.995 9.995 0 0012.012 2zm5.78 13.567c-.24.675-1.391 1.285-1.937 1.365-.487.072-.962.333-3.08-1.55-2.617-2.327-4.234-5.1-4.856-5.918-.621-.818-1.124-2.18-.5-3.328.32-.589.921-.734 1.303-.734.24 0 .441.004.601.012.164.01.385-.06.602.473.24.59.822 2.004.892 2.15 1.05.21.36.452.48.163.674-.29.19-.504.42-.743.6-.24.18-.49.37-.21.854.28.484 1.242 2.052 2.667 3.32a9.09 9.09 0 002.396 1.48c.481.228.761.19.982-.06.241-.28.983-1.144 1.244-1.536.26-.39.522-.32.883-.185s2.286 1.077 2.678 1.272c.39.195.65.29.75.462.1.171.1.99-.14 1.665z" />
+  </svg>
+);
 
 // ============================================================================
 // COMPONENT: INVITATION CONTROLLER
@@ -156,6 +169,13 @@ const InvitationView: React.FC = () => {
       navigator.clipboard.writeText(url);
       toast.success('Link do convite copiado para a área de transferência!');
     }
+  };
+
+  const handleShareWhatsApp = () => {
+    const url = `${window.location.origin}/invite/${event.id}`;
+    const messageText = `Olá! Gostaria de partilhar contigo o convite especial para o evento "${event.title || 'InoEvents'}". Confira todos os detalhes, mapa de localização e confirme a sua presença respondendo ao RSVP diretamente na página:\n\n${url}`;
+    const whatsappUrl = `https://wa.me/?text=${encodeURIComponent(messageText)}`;
+    window.open(whatsappUrl, '_blank');
   };
 
   
@@ -355,8 +375,18 @@ const InvitationView: React.FC = () => {
     onLikeUpdate: (newGallery: any) => setEvent({ ...event, gallery: newGallery }) 
   };
 
+  const seoTitle = event?.title || 'Convite Especial';
+  const seoDesc = event?.description || `Vocês foram convidados para celebrar connosco! Data: ${event?.date || 'A definir'}. Local: ${event?.locationName || 'A definir'}. Confirme a sua presença aqui.`;
+  const seoImage = event?.heroImage || '';
+
   return (
     <>
+      <SEO 
+        title={seoTitle}
+        description={seoDesc}
+        image={seoImage}
+        type="article"
+      />
       <TocaPlayer trackName={event.musicTrack} isDark={event.layoutMode === 'LUXURY' || event.layoutMode === 'INDUSTRIAL'} />
       
       {isTemplate && (
@@ -620,6 +650,36 @@ const InvitationView: React.FC = () => {
               <Guestbook eventId={event.id} layoutMode={event.layoutMode} />
           </div>
 
+          {!isEditing && !isTemplate && (
+            <div className="w-full bg-slate-50/50 py-12 px-6 border-t border-b border-slate-100/80 z-10 relative flex flex-col items-center">
+              <div className="max-w-md w-full bg-white rounded-3xl p-6 border border-slate-200/60 shadow-xl flex flex-col items-center text-center">
+                <div className="w-12 h-12 bg-emerald-50 text-emerald-500 rounded-2xl flex items-center justify-center mb-4 shadow-sm">
+                  <WhatsAppIcon size={26} />
+                </div>
+                <h3 className="text-lg font-bold text-slate-800 mb-1">Partilhar com Outros Convidados</h3>
+                <p className="text-xs text-slate-500 leading-relaxed max-w-sm mb-6">
+                  Ajude na divulgação do evento! Partilhe este convite com a sua família e amigos via WhatsApp de forma instantânea.
+                </p>
+                <div className="flex flex-col sm:flex-row gap-3 w-full">
+                  <button
+                    onClick={handleShareWhatsApp}
+                    className="flex-1 bg-[#25D366] hover:bg-[#20ba59] text-white rounded-xl py-3 px-4 font-bold text-sm transition-all flex items-center justify-center gap-2 shadow-lg shadow-emerald-500/10 cursor-pointer active:scale-95 border border-white/10"
+                  >
+                    <WhatsAppIcon size={18} />
+                    Partilhar no WhatsApp
+                  </button>
+                  <button
+                    onClick={handleShare}
+                    className="flex-1 bg-slate-100 hover:bg-slate-200 text-slate-700 border border-slate-200 rounded-xl py-3 px-4 font-bold text-sm transition-all flex items-center justify-center gap-2 cursor-pointer active:scale-95"
+                  >
+                    <Share2 size={16} />
+                    Copiar Link
+                  </button>
+                </div>
+              </div>
+            </div>
+          )}
+
           <div className="w-full flex flex-col items-center justify-center py-10 pb-32 text-xs font-bold tracking-widest uppercase text-slate-500 gap-3 z-10 relative">
             {event.whiteLabelName && (
                <span className="opacity-70">Powered by</span>
@@ -630,12 +690,19 @@ const InvitationView: React.FC = () => {
             <span>{event.whiteLabelName ? event.whiteLabelName : 'Criado com InoEvents'}</span>
           </div>
 
-          {!isEditing && !isTemplate && isOwner && (
-             <div className="fixed bottom-6 right-6 z-50">
+          {!isEditing && !isTemplate && (
+             <div className="fixed bottom-6 right-6 z-50 flex flex-col items-end gap-3 pointer-events-auto">
+                <button
+                   onClick={handleShareWhatsApp}
+                   className="bg-[#25D366] text-white p-3.5 rounded-full shadow-2xl hover:bg-[#20ba59] hover:scale-110 active:scale-95 transition-all flex items-center justify-center border-2 border-white/20 cursor-pointer"
+                   title="Partilhar no WhatsApp"
+                >
+                   <WhatsAppIcon size={24} />
+                </button>
                 <button
                    onClick={handleShare}
-                   className="bg-brand-blue text-white p-4 rounded-full shadow-2xl hover:bg-brand-blue/90 hover:scale-105 transition-all flex items-center justify-center border-2 border-white/20"
-                   title="Partilhar Convite"
+                   className="bg-brand-blue text-white p-3.5 rounded-full shadow-2xl hover:bg-brand-blue/90 hover:scale-110 active:scale-95 transition-all flex items-center justify-center border-2 border-white/20 cursor-pointer"
+                   title="Partilhar / Copiar Link"
                 >
                    <Share2 size={24} />
                 </button>

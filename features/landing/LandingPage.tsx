@@ -1,9 +1,12 @@
 import React, { useState, useEffect } from 'react';
-import { Link, useNavigate } from 'react-router-dom';
+import { Link, useNavigate, useLocation } from 'react-router-dom';
 import { motion, AnimatePresence } from 'framer-motion';
 import { useFirebase, signOut, auth, db, handleFirestoreError, OperationType } from '../../components/FirebaseProvider';
 import { collection, query, where, getDocs, onSnapshot } from 'firebase/firestore';
 import { Navbar } from '../../components/Navbar';
+import { SEO } from '../../components/SEO';
+import { FAQSection } from './FAQSection';
+import { SupportModal } from '../../components/SupportModal';
 
 // Create a motion component from the React Router Link
 const MotionLink = motion(Link);
@@ -23,8 +26,22 @@ export const LandingPage: React.FC = () => {
   const { user, userProfile } = useFirebase();
   const [userEvents, setUserEvents] = useState<any[]>([]);
   const [currentTestimonialIndex, setCurrentTestimonialIndex] = useState(0);
+  const [supportOpen, setSupportOpen] = useState(false);
   
   const navigate = useNavigate();
+  const location = useLocation();
+
+  useEffect(() => {
+    if (location.hash) {
+      const id = location.hash.replace('#', '');
+      const element = document.getElementById(id);
+      if (element) {
+        setTimeout(() => {
+          element.scrollIntoView({ behavior: 'smooth', block: 'start' });
+        }, 150);
+      }
+    }
+  }, [location]);
 
   useEffect(() => {
     const timer = setInterval(() => {
@@ -73,6 +90,10 @@ export const LandingPage: React.FC = () => {
 
   return (
     <div className="min-h-screen relative font-display overflow-x-hidden bg-white">
+      <SEO 
+        title="Crie Convites Digitais Interativos de Casamento e Chás" 
+        description="A plataforma mais elegante para criar seus convites de casamento, chás de panela ou noivado. Design premium, confirmação RSVP instantânea, controle de presença com QR Code e mais."
+      />
       
       {/* Background Subtle Gradient */}
       <div className="fixed inset-0 z-0 pointer-events-none overflow-hidden">
@@ -172,7 +193,7 @@ export const LandingPage: React.FC = () => {
         </section>
 
         {/* Features Section */}
-        <section className="px-6 flex flex-col gap-10 max-w-5xl mx-auto w-full pt-8 pb-12">
+        <section id="features" className="px-6 flex flex-col gap-10 max-w-5xl mx-auto w-full pt-8 pb-12">
           <div className="flex flex-col gap-4 text-center max-w-2xl mx-auto">
             <span className="text-primary font-bold tracking-widest text-xs uppercase">Tecnologia & Design</span>
             <h3 className="text-3xl md:text-4xl font-serif font-bold text-brand-blue">Funcionalidades Premium</h3>
@@ -245,55 +266,14 @@ export const LandingPage: React.FC = () => {
         </section>
 
         {/* FAQ Section */}
-        <section className="py-24 px-6 max-w-4xl mx-auto" id="faq">
-          <div className="text-center mb-16">
-            <h2 className="text-3xl md:text-5xl font-extrabold tracking-tight text-slate-900 mb-6">Perguntas Frequentes</h2>
-            <p className="text-slate-500 text-lg">Tudo que você precisa saber sobre o InoEvents.</p>
-          </div>
-          <div className="space-y-4">
-            {[
-              {
-                q: "Como funciona o check-in por QR Code?",
-                a: "Cada convite gerado possui um QR Code único. No dia do evento, basta utilizar o InoEvents para escanear o código na tela do celular do convidado para confirmar a presença de forma rápida e segura."
-              },
-              {
-                q: "A plataforma funciona offline?",
-                a: "O aplicativo precisa de internet para sincronizar a lista em tempo real. No entanto, se o sinal cair durante o evento, o check-in continuará funcionando e sincronizará assim que a conexão for reestabelecida."
-              },
-              {
-                q: "Posso personalizar a aparência do convite?",
-                a: "Sim! Oferecemos templates como Classic, Modern, Luxury e mais. Nos planos pagos, você também pode adicionar banners e remover a marca d'água do InoEvents."
-              },
-              {
-                q: "Os meus convidados precisam de aplicativo?",
-                a: "Não. Os convidados recebem um link via WhatsApp, E-mail ou SMS e acessam a página do convite diretamente no navegador do seu smartphone."
-              },
-              {
-                q: "Existe um limite de convidados?",
-                a: "O plano Essencial tem limite de até 100 convidados. Dependendo da dimensão do seu evento, você pode migrar para os planos Premium (até 500), Business (até 5.000) ou Corporate (ilimitado)."
-              }
-            ].map((faq, idx) => (
-              <details key={idx} className="group bg-white border border-slate-200 rounded-2xl cursor-pointer [&_summary::-webkit-details-marker]:hidden">
-                <summary className="flex items-center justify-between p-6 font-bold text-slate-800 text-lg outline-none select-none">
-                  {faq.q}
-                  <span className="ml-4 flex-shrink-0 transition-transform duration-300 group-open:rotate-180">
-                    <span className="material-symbols-outlined text-brand-blue">expand_more</span>
-                  </span>
-                </summary>
-                <div className="p-6 pt-0 text-slate-600 leading-relaxed">
-                  {faq.a}
-                </div>
-              </details>
-            ))}
-          </div>
-        </section>
+        <FAQSection />
 
         {/* Footer */}
         <footer className="px-6 py-16 bg-slate-900 text-slate-400 text-sm border-t border-slate-800">
           <div className="max-w-7xl mx-auto grid grid-cols-1 md:grid-cols-4 gap-12 mb-12">
              <div className="col-span-1 md:col-span-2">
                 <div className="flex items-center gap-2 mb-6">
-                   <span className="material-symbols-outlined text-brand-blue text-2xl">auto_awesome</span>
+                   <span className="material-symbols-outlined text-brand-blue text-2xl" style={{display: 'none'}}>auto_awesome</span><img src="/favicon.ico" alt="InoEvents Logo" className="w-8 h-8 rounded-lg object-contain bg-white/10 p-1 border border-white/10 mr-1" referrerPolicy="no-referrer" />
                    <span className="font-extrabold text-white text-xl tracking-tight">InoEvents</span>
                 </div>
                 <p className="text-slate-400 leading-relaxed max-w-sm mb-6">
@@ -321,7 +301,7 @@ export const LandingPage: React.FC = () => {
                  <ul className="space-y-4">
                      <li><Link to="/terms" className="hover:text-white transition-colors">Termos de Serviço</Link></li>
                      <li><Link to="/privacy" className="hover:text-white transition-colors">Políticas de Privacidade</Link></li>
-                     <li><a href="https://wa.me/244952815430" target="_blank" rel="noopener noreferrer" className="hover:text-white transition-colors">Suporte</a></li>
+                     <li><a href="#" onClick={(e) => { e.preventDefault(); setSupportOpen(true); }} className="hover:text-white transition-colors cursor-pointer">Suporte</a></li>
                  </ul>
              </div>
           </div>
@@ -341,6 +321,8 @@ export const LandingPage: React.FC = () => {
           <span className="material-symbols-outlined text-sm">arrow_forward</span>
         </button>
       </div>
+
+      <SupportModal isOpen={supportOpen} onClose={() => setSupportOpen(false)} />
 
     </div>
   );

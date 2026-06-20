@@ -1,7 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { motion } from 'framer-motion';
 import { MessageSquare, Heart, Send } from 'lucide-react';
-import { collection, addDoc, query, orderBy, onSnapshot, serverTimestamp } from 'firebase/firestore';
+import { collection, addDoc, query, orderBy, onSnapshot, serverTimestamp, doc } from 'firebase/firestore';
 import { db } from '../../components/FirebaseProvider';
 import { toast } from 'react-hot-toast';
 
@@ -10,6 +10,18 @@ export const Guestbook: React.FC<{ eventId: string; layoutMode?: string }> = ({ 
     const [newMessage, setNewMessage] = useState('');
     const [authorName, setAuthorName] = useState('');
     const [loading, setLoading] = useState(false);
+    const [moderationEnabled, setModerationEnabled] = useState(false);
+
+    useEffect(() => {
+        const eventRef = doc(db, 'events', eventId);
+        const unsubscribe = onSnapshot(eventRef, (snapshot) => {
+            if (snapshot.exists()) {
+                const data = snapshot.data();
+                setModerationEnabled(data.moderationEnabled || false);
+            }
+        });
+        return () => unsubscribe();
+    }, [eventId]);
 
     useEffect(() => {
         const messagesRef = collection(db, 'events', eventId, 'messages');
@@ -20,7 +32,15 @@ export const Guestbook: React.FC<{ eventId: string; layoutMode?: string }> = ({ 
                 id: doc.id,
                 ...doc.data()
             }));
-            setMessages(msgs);
+            // Filter messages based on moderation
+            const visibleMsgs = msgs.filter(m => {
+                // If it is pending or hidden, hide it from the public view
+                if (m.status === 'PENDING' || m.status === 'HIDDEN') {
+                    return false;
+                }
+                return true; // Approved or legacy (undefined status) are visible
+            });
+            setMessages(visibleMsgs);
         });
 
         return () => unsubscribe();
@@ -38,11 +58,14 @@ export const Guestbook: React.FC<{ eventId: string; layoutMode?: string }> = ({ 
             await addDoc(collection(db, 'events', eventId, 'messages'), {
                 author: authorName,
                 text: newMessage,
+                status: moderationEnabled ? 'PENDING' : 'APPROVED',
                 createdAt: serverTimestamp(),
             });
             setNewMessage('');
-            // Toast removed to be less intrusive on success, just clears form
-            toast.success('Mensagem enviada com sucesso!');
+            toast.success(moderationEnabled 
+                ? 'Mensagem enviada com sucesso! Ela aparecerá no mural assim que os anfitriões aprovarem.' 
+                : 'Mensagem enviada com sucesso!'
+            );
         } catch (error) {
             console.error(error);
             toast.error('Erro ao enviar mensagem.');

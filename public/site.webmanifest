@@ -1,0 +1,15 @@
+{
+  "name": "InoEvents | Convites Digitais Premium",
+  "short_name": "InoEvents",
+  "icons": [
+    {
+      "src": "/favicon.ico",
+      "sizes": "192x192 512x512",
+      "type": "image/x-icon"
+    }
+  ],
+  "theme_color": "#1B365D",
+  "background_color": "#FFFFFF",
+  "display": "standalone",
+  "start_url": "/"
+}

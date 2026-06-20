@@ -4,6 +4,7 @@ import { ArrowLeft, Users, Zap, Target } from 'lucide-react';
 import { Link, useNavigate } from 'react-router-dom';
 import { useFirebase } from '../../components/FirebaseProvider';
 import { Navbar } from '../../components/Navbar';
+import { SEO } from '../../components/SEO';
 
 export const AboutPage = () => {
     const navigate = useNavigate();
@@ -23,6 +24,10 @@ export const AboutPage = () => {
 
     return (
         <div className="min-h-screen bg-slate-50 text-slate-800 font-sans selection:bg-brand-blue/20">
+            <SEO 
+                title="Sobre Nós - Conheça a Ino-Service e o InoEvents"
+                description="Conheça a história e a equipa inovadora por trás da Ino-Service e do InoEvents. Desenvolvemos soluções de tecnologia de ponta para convites inteligentes e gestão de eventos em Angola."
+            />
             <Navbar />
 
             <main className="pt-24 pb-24 px-6 max-w-5xl mx-auto">

@@ -43,8 +43,17 @@ interface FirestoreErrorInfo {
 }
 
 export function handleFirestoreError(error: unknown, operationType: OperationType, path: string | null) {
+  const errorMessage = error instanceof Error ? error.message : String(error);
+  const isNetworkOrOffline = 
+    errorMessage.includes('network-request-failed') ||
+    errorMessage.includes('Could not reach Cloud Firestore backend') ||
+    errorMessage.includes('offline') ||
+    errorMessage.includes('unavailable') ||
+    errorMessage.includes('Connection failed') ||
+    errorMessage.includes('auth/network-request-failed');
+
   const errInfo: FirestoreErrorInfo = {
-    error: error instanceof Error ? error.message : String(error),
+    error: errorMessage,
     authInfo: {
       userId: auth.currentUser?.uid,
       email: auth.currentUser?.email,
@@ -58,8 +67,15 @@ export function handleFirestoreError(error: unknown, operationType: OperationTyp
     },
     operationType,
     path
-  }
+  };
+
   console.error('Firestore Error: ', JSON.stringify(errInfo));
+
+  if (isNetworkOrOffline) {
+    console.warn(`[InoEvents Offline Sync] Operação Firestore em modo offline (${operationType} em ${path}). O aplicativo continuará a funcionar usando cache.`);
+    return;
+  }
+
   throw new Error(JSON.stringify(errInfo));
 }
 

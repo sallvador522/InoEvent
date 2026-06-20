@@ -1,6 +1,6 @@
 import React, { useState } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
-import { Check, ArrowLeft, Gem, Sparkles, Building2, X, Copy } from 'lucide-react';
+import { Check, ArrowLeft, Gem, Sparkles, Building2, X, Copy, MessageSquare, CheckCircle2 } from 'lucide-react';
 import { Link, useNavigate } from 'react-router-dom';
 import { doc, updateDoc, getDoc, setDoc } from 'firebase/firestore';
 import { useFirebase, db, handleFirestoreError, OperationType } from '../../components/FirebaseProvider';
@@ -100,11 +100,13 @@ const itemVariants = {
 export const PlansPage: React.FC = () => {
   const navigate = useNavigate();
   const { user, userProfile } = useFirebase();
-  const [loadingPlan, setLoadingPlan] = useState<string | null>(null);
-  const [isSimulateModalOpen, setIsSimulateModalOpen] = useState(false);
-  const [selectedPlanToBuy, setSelectedPlanToBuy] = useState<any>(null);
   const [billingCycle, setBillingCycle] = useState<'monthly' | 'annual'>('monthly');
-  const [paymentReferenceModal, setPaymentReferenceModal] = useState<{ entity: string, reference: string, amount: number, isPolling: boolean } | null>(null);
+  const [whatsappModal, setWhatsappModal] = useState<{
+    type: 'PLAN' | 'CREDITS';
+    name: string;
+    price: string;
+    billingCycle?: 'monthly' | 'annual';
+  } | null>(null);
 
   const handleCopy = (text: string) => {
     navigator.clipboard.writeText(text);
@@ -128,137 +130,27 @@ export const PlansPage: React.FC = () => {
       ), { duration: 5000 });
       return;
     }
-    setSelectedPlanToBuy(plan);
-    setIsSimulateModalOpen(true);
-  };
 
-  const startPolling = (externalId: string, onSuccess: (data: any) => void) => {
-    const interval = setInterval(async () => {
-       try {
-         const res = await fetch(`/api/payments/status?externalId=${externalId}`);
-         const data = await res.json();
-         if (data.status === 'SUCCESS') {
-            clearInterval(interval);
-            onSuccess(data.data);
-         } else if (data.status === 'FAILED' || data.status === 'CANCELLED') {
-            clearInterval(interval);
-            toast.error("O pagamento foi cancelado ou falhou.");
-         }
-       } catch (e) {
-         console.warn("Polling error", e);
-       }
-    }, 5000);
-    // Timeout after 10 mins (120 attempts)
-    setTimeout(() => { clearInterval(interval); }, 600000);
-  };
-
-  const handleSimulatePayment = async () => {
-    if (!user || !selectedPlanToBuy) return;
-    setLoadingPlan(selectedPlanToBuy.name);
-    try {
-      if (selectedPlanToBuy.name === 'Business') {
-          // B2B Contact fallback
-          setIsSimulateModalOpen(false);
-          toast.success("A nossa equipe entrará em contacto !");
-          return;
-      }
-      
-      const priceKzStr = billingCycle === 'annual' ? selectedPlanToBuy.prices.annual : selectedPlanToBuy.prices.monthly;
-      const amountValue = Number(priceKzStr.replace(/\D/g, ''));
-
-      const externalId = 'trx_plan_' + Math.random().toString(36).substring(2, 10);
-      
-      const response = await fetch('/api/payments/create', {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json'
-        },
-        body: JSON.stringify({
-          externalId,
-          userId: user.uid,
-          metadata: { type: 'PLAN', planTarget: selectedPlanToBuy.name },
-          client: {
-             name: user.displayName || 'No Name',
-             email: user.email || 'user@example.com',
-             phone: '+244923000000' 
-          },
-          items: [{
-             title: `Plano ${selectedPlanToBuy.name} (${billingCycle === 'annual' ? 'Anual' : 'Mensal'})`,
-             price: amountValue,
-             quantity: 1
-          }],
-          amount: amountValue
-        })
+    if (plan.name === 'Business') {
+      setWhatsappModal({
+        type: 'PLAN',
+        name: plan.name,
+        price: 'Sob Consulta',
+        billingCycle: 'monthly'
       });
-
-      const data = await response.json();
-      if (!response.ok) {
-         throw new Error(data.error || 'Erro ao processar pagamento');
-      }
-
-      setIsSimulateModalOpen(false);
-      setSelectedPlanToBuy(null);
-
-      // Save pending transaction reference to user's transactions 
-      try {
-         await setDoc(doc(db, 'transactions', externalId), {
-            ownerId: user.uid,
-            amount: amountValue,
-            type: 'PLAN',
-            planTarget: selectedPlanToBuy.name,
-            status: 'PENDING',
-            date: new Date().toISOString(),
-            description: `Pagamento de ${amountValue} Kz`,
-            ...data
-         });
-      } catch (e) {
-         console.warn("Could not save pending transaction", e);
-      }
-
-      if (data.data?.reference && data.data?.entity) {
-         setPaymentReferenceModal({
-             entity: data.data.entity,
-             reference: data.data.reference,
-             amount: amountValue,
-             isPolling: true
-         });
-         
-         // Start checking for success
-         startPolling(externalId, async (webhookData) => {
-             setPaymentReferenceModal(prev => prev ? { ...prev, isPolling: false } : null);
-             // Since polling returned SUCCESS, the user has paid!
-             // We update the user document!
-             try {
-                const userRef = doc(db, 'users', user.uid);
-                const userDoc = await getDoc(userRef);
-                if (userDoc.exists()) {
-                   // Initial credit amounts
-                   let creditsToAdd = 0;
-                   const planTarget = webhookData.metadata?.planTarget || selectedPlanToBuy.name;
-                   if (planTarget === 'Premium') creditsToAdd = 20;
-                   else if (planTarget === 'Essencial') creditsToAdd = 5;
-                   
-                   const newCredits = (userDoc.data().credits || 0) + creditsToAdd;
-                   await updateDoc(userRef, { plan: planTarget, credits: newCredits });
-                   toast.success(`Pagamento confirmado! O seu plano ${planTarget} foi ativado com sucesso.`, { duration: 8000 });
-                }
-             } catch (e) {
-                console.error("Error updating user document", e);
-             }
-         });
-         
-      } else {
-         toast.success(`Pedido criado com sucesso! Guarde o comprovativo ou pague a referência gerada. (API PlinqPay)`);
-      }
-    } catch (error) {
-      console.error(error);
-      toast.error("Erro ao alterar o plano. Tente novamente.");
-    } finally {
-      setLoadingPlan(null);
+      return;
     }
-  }
 
-  const handleBuyCredits = async (amount: number, priceKzStr: string) => {
+    const priceVal = billingCycle === 'annual' ? plan.prices.annual : plan.prices.monthly;
+    setWhatsappModal({
+      type: 'PLAN',
+      name: plan.name,
+      price: priceVal,
+      billingCycle
+    });
+  };
+
+  const handleBuyCredits = (amount: number, priceKzStr: string) => {
     if (!user) {
       toast.custom((t) => (
         <div className={`${t.visible ? 'animate-enter' : 'animate-leave'} max-w-sm w-full bg-white shadow-[0_8px_30px_rgb(0,0,0,0.12)] rounded-xl flex flex-col border border-slate-100 overflow-hidden`}>
@@ -275,92 +167,31 @@ export const PlansPage: React.FC = () => {
       ), { duration: 5000 });
       return;
     }
+
+    setWhatsappModal({
+      type: 'CREDITS',
+      name: `${amount} Crédito${amount > 1 ? 's' : ''}`,
+      price: priceKzStr
+    });
+  };
+
+  const handleOpenWhatsApp = (whatsappNumber: string) => {
+    if (!whatsappModal || !user) return;
     
-    setLoadingPlan('buy_credits');
-    try {
-      const externalId = 'trx_' + Math.random().toString(36).substring(2, 10);
-      const amountValue = Number(priceKzStr.replace(/\D/g, ''));
-      
-      const response = await fetch('/api/payments/create', {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json'
-        },
-        body: JSON.stringify({
-          externalId,
-          userId: user.uid,
-          metadata: { type: 'CREDITS', amount },
-          client: {
-             name: user.displayName || 'No Name',
-             email: user.email || 'user@example.com',
-             phone: '+244923000000'
-          },
-          items: [{
-             title: `Pacote de ${amount} Crédito(s)`,
-             price: amountValue,
-             quantity: 1
-          }],
-          amount: amountValue
-        })
-      });
+    const messageText = whatsappModal.type === 'PLAN'
+      ? `Olá! Gostaria de activar o Plano ${whatsappModal.name.toUpperCase()} (${whatsappModal.billingCycle === 'annual' ? 'Anual' : 'Mensal'}) para a minha conta.\n\n` +
+        `ID da Plataforma: ${user.uid}\n` +
+        `E-mail: ${user.email || 'Não informado'}\n\n` +
+        `Estou em contacto para concluir a compra do plano. Obrigado!`
+      : `Olá! Gostaria de adquirir o pacote de ${whatsappModal.name} (${whatsappModal.price}) para a minha conta.\n\n` +
+        `ID da Plataforma: ${user.uid}\n` +
+        `E-mail: ${user.email || 'Não informado'}\n\n` +
+        `Estou em contacto para concluir a compra do pacote de créditos. Obrigado!`;
 
-      const data = await response.json();
-      if (!response.ok) {
-         throw new Error(data.error || 'Erro ao processar pagamento');
-      }
-
-      // Save pending transaction reference to user's transactions 
-      try {
-         await setDoc(doc(db, 'transactions', externalId), {
-            ownerId: user.uid,
-            amount: amountValue,
-            type: 'CREDIT_PACK',
-            status: 'PENDING',
-            date: new Date().toISOString(),
-            description: `Pagamento de ${amountValue} Kz`,
-            ...data
-         });
-      } catch (e) {
-         console.warn("Could not save pending transaction", e);
-      }
-
-      if (data.data?.reference && data.data?.entity) {
-         setPaymentReferenceModal({
-             entity: data.data.entity,
-             reference: data.data.reference,
-             amount: amountValue,
-             isPolling: true
-         });
-         
-         // Start checking for success
-         startPolling(externalId, async (webhookData) => {
-             setPaymentReferenceModal(prev => prev ? { ...prev, isPolling: false } : null);
-             // Since polling returned SUCCESS, the user has paid!
-             // We update the user document!
-             try {
-                const userRef = doc(db, 'users', user.uid);
-                const userDoc = await getDoc(userRef);
-                if (userDoc.exists()) {
-                   // Initial credit amounts
-                   let creditsToAdd = amount;
-                   const newCredits = (userDoc.data().credits || 0) + creditsToAdd;
-                   await updateDoc(userRef, { credits: newCredits });
-                   toast.success(`Pagamento confirmado! ${creditsToAdd} créditos foram adicionados à sua conta.`, { duration: 8000 });
-                }
-             } catch (e) {
-                console.error("Error updating user document", e);
-             }
-         });
-      } else {
-         toast.success(`Pedido criado com sucesso! Guarde o comprovativo ou pague a referência gerada.`);
-      }
-      
-    } catch (error) {
-      console.error(error);
-      toast.error("Erro ao iniciar compra de créditos.");
-    } finally {
-      setLoadingPlan(null);
-    }
+    const cleanNumber = whatsappNumber.replace(/\D/g, '');
+    const url = `https://wa.me/${cleanNumber}?text=${encodeURIComponent(messageText)}`;
+    window.open(url, '_blank', 'noopener,noreferrer');
+    setWhatsappModal(null);
   };
 
   const currentPlan = userProfile?.plan || 'Essencial';
@@ -434,7 +265,6 @@ export const PlansPage: React.FC = () => {
         >
           {plans.map((plan) => {
             const isCurrentPlan = currentPlan === plan.name;
-            const isLoading = loadingPlan === plan.name;
             
             return (
               <motion.div 
@@ -516,7 +346,7 @@ export const PlansPage: React.FC = () => {
                   
                   <button 
                     onClick={() => confirmPlanSelection(plan)} 
-                    disabled={isCurrentPlan || !!loadingPlan}
+                    disabled={isCurrentPlan}
                     className={`mt-auto block text-center w-full py-4 rounded-xl font-bold text-sm tracking-wide transition-all duration-300 flex items-center justify-center gap-2 relative overflow-hidden ${
                       isCurrentPlan 
                         ? 'bg-slate-100 text-slate-400 cursor-not-allowed border border-slate-200' 
@@ -527,8 +357,6 @@ export const PlansPage: React.FC = () => {
                   >
                     {isCurrentPlan ? (
                       'SEU PLANO ATUAL'
-                    ) : isLoading ? (
-                      <span className="animate-spin border-2 border-current border-t-transparent rounded-full w-5 h-5" />
                     ) : (
                       'SELECIONAR PLANO'
                     )}
@@ -580,12 +408,11 @@ export const PlansPage: React.FC = () => {
                 )}
                 <button 
                   onClick={() => handleBuyCredits(pkg.amount, pkg.price)} 
-                  disabled={loadingPlan === 'buy_credits'}
                   className={`w-full mt-auto py-3.5 rounded-xl font-bold text-sm tracking-wide transition-all duration-300 flex items-center justify-center gap-2 ${
                     pkg.bonus ? 'bg-brand-blue text-white hover:bg-blue-700 shadow-md' : 'bg-slate-100 text-slate-700 hover:bg-slate-200 border border-slate-200'
                   }`}
                 >
-                  {loadingPlan === 'buy_credits' ? "A PROCESSAR..." : `COMPRAR PACOTE`}
+                  {`COMPRAR PACOTE`}
                 </button>
               </div>
             ))}
@@ -595,88 +422,113 @@ export const PlansPage: React.FC = () => {
       </div>
 
       <AnimatePresence>
-          {isSimulateModalOpen && selectedPlanToBuy && (
+          {whatsappModal && (
               <div className="fixed inset-0 z-50 flex items-center justify-center p-4">
-                  <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }} onClick={() => setIsSimulateModalOpen(false)} className="absolute inset-0 bg-slate-900/40 backdrop-blur-sm" />
-                  <motion.div initial={{ opacity: 0, scale: 0.95, y: 20 }} animate={{ opacity: 1, scale: 1, y: 0 }} exit={{ opacity: 0, scale: 0.95, y: 20 }} className="bg-white rounded-3xl p-8 max-w-md w-full relative z-10 shadow-2xl">
-                      <button onClick={() => setIsSimulateModalOpen(false)} className="absolute top-6 right-6 text-slate-400 hover:text-slate-600 transition-colors">
-                          <X size={24} />
-                      </button>
-                      <div className="w-12 h-12 bg-emerald-50 text-emerald-500 rounded-xl flex items-center justify-center mb-6">
-                          <Check size={24} />
-                      </div>
-                      <h3 className="text-xl font-bold text-slate-800 mb-2">Confirmar Assinatura</h3>
-                      <p className="text-slate-500 text-sm mb-6">
-                        Você está prestes a transitar para o plano <strong>{selectedPlanToBuy.displayName || selectedPlanToBuy.name}</strong>.
-                        O seu checkout será criado e a referência Multicaixa será fornecida (via PlinqPay).
-                      </p>
-                      
-                      <Button fullWidth onClick={handleSimulatePayment} disabled={!!loadingPlan}>
-                          {loadingPlan ? "Processando..." : "Confirmar e Pagar"}
-                      </Button>
-                  </motion.div>
-              </div>
-          )}
-      </AnimatePresence>
-
-      <AnimatePresence>
-          {paymentReferenceModal && (
-              <div className="fixed inset-0 z-50 flex items-center justify-center p-4">
-                  <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }} className="absolute inset-0 bg-slate-900/60 backdrop-blur-md" />
-                  <motion.div initial={{ opacity: 0, scale: 0.95, y: 20 }} animate={{ opacity: 1, scale: 1, y: 0 }} exit={{ opacity: 0, scale: 0.95, y: 20 }} className="bg-white rounded-3xl p-6 md:p-8 max-w-md w-full relative z-10 shadow-2xl flex flex-col">
+                  <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }} onClick={() => setWhatsappModal(null)} className="absolute inset-0 bg-slate-900/60 backdrop-blur-md" />
+                  <motion.div initial={{ opacity: 0, scale: 0.95, y: 20 }} animate={{ opacity: 1, scale: 1, y: 0 }} exit={{ opacity: 0, scale: 0.95, y: 20 }} className="bg-white rounded-3xl p-6 md:p-8 max-w-md w-full relative z-10 shadow-2xl flex flex-col border border-slate-100">
                       <div className="flex justify-between items-start mb-6">
                          <div>
-                            <span className="text-brand-blue font-bold tracking-widest text-[10px] uppercase mb-1 block">Pagamento por Referência</span>
-                            <h3 className="text-2xl font-bold text-slate-800 tracking-tight">Referência Multicaixa</h3>
+                            <span className="text-brand-blue font-bold tracking-widest text-[10px] uppercase mb-1 block">Concluir no WhatsApp</span>
+                            <h3 className="text-2xl font-bold text-slate-900 tracking-tight">Activar {whatsappModal.name}</h3>
                          </div>
-                         <button onClick={() => setPaymentReferenceModal(null)} className="text-slate-400 hover:text-slate-600 transition-colors bg-slate-50 hover:bg-slate-100 p-2 rounded-full">
+                         <button onClick={() => setWhatsappModal(null)} className="text-slate-400 hover:text-slate-600 transition-colors bg-slate-50 hover:bg-slate-100 p-2 rounded-full">
                            <X size={20} />
                          </button>
                       </div>
 
-                      <div className="bg-blue-50 border border-blue-100 rounded-xl p-4 mb-6">
-                         <p className="text-sm text-blue-800 font-medium leading-relaxed">
-                           ℹ️ Este pagamento pode ser feito através do <strong>Multicaixa Express</strong> ou em qualquer <strong>Caixa Automático (ATM)</strong>.
+                      <div className="bg-blue-50 border border-blue-100 rounded-2xl p-4 mb-6">
+                         <p className="text-sm text-blue-800 leading-relaxed font-medium">
+                           Para concluir o seu pedido, fale com um dos nossos agentes autorizados via WhatsApp. O seu plano/créditos serão activos de imediato.
                          </p>
                       </div>
 
-                      <div className="space-y-4 mb-8">
-                         <div className="bg-slate-50 border border-slate-200 rounded-2xl p-4 flex justify-between items-center group transition-colors hover:border-brand-blue/30">
-                            <div>
-                               <p className="text-xs text-slate-500 font-medium uppercase tracking-wider mb-1">Entidade</p>
-                               <p className="text-xl font-mono font-bold text-slate-900">{paymentReferenceModal.entity}</p>
-                            </div>
-                            <button onClick={() => handleCopy(paymentReferenceModal.entity)} className="p-3 bg-white text-slate-400 hover:text-brand-blue border border-slate-200 shadow-sm rounded-xl transition-all active:scale-95 group-hover:border-brand-blue/30 group-hover:shadow hover:bg-blue-50">
-                               <Copy size={18} />
-                            </button>
+                      <div className="bg-slate-50 border border-slate-200/80 rounded-2xl p-4 space-y-3 mb-4">
+                         <div className="flex justify-between items-center pb-2 border-b border-slate-200/50">
+                            <span className="text-xs text-slate-500 uppercase tracking-wider font-semibold">Artigo</span>
+                            <span className="text-sm font-bold text-slate-800">{whatsappModal.name}</span>
                          </div>
-                         
-                         <div className="bg-slate-50 border border-slate-200 rounded-2xl p-4 flex justify-between items-center group transition-colors hover:border-brand-blue/30">
-                            <div>
-                               <p className="text-xs text-slate-500 font-medium uppercase tracking-wider mb-1">Referência</p>
-                               <p className="text-xl font-mono font-bold text-slate-900">{paymentReferenceModal.reference.match(/.{1,3}/g)?.join(' ') || paymentReferenceModal.reference}</p>
+                         {whatsappModal.billingCycle && (
+                            <div className="flex justify-between items-center pb-2 border-b border-slate-200/50">
+                               <span className="text-xs text-slate-500 uppercase tracking-wider font-semibold">Faturação</span>
+                               <span className="text-sm font-bold text-slate-800">{whatsappModal.billingCycle === 'annual' ? 'Anual' : 'Mensal'}</span>
                             </div>
-                            <button onClick={() => handleCopy(paymentReferenceModal.reference)} className="p-3 bg-white text-slate-400 hover:text-brand-blue border border-slate-200 shadow-sm rounded-xl transition-all active:scale-95 group-hover:border-brand-blue/30 group-hover:shadow hover:bg-blue-50">
-                               <Copy size={18} />
-                            </button>
+                         )}
+                         <div className="flex justify-between items-center pb-2 border-b border-slate-200/50">
+                            <span className="text-xs text-slate-500 uppercase tracking-wider font-semibold">Valor</span>
+                            <span className="text-sm font-bold text-slate-900">{whatsappModal.price}</span>
                          </div>
-
-                         <div className="flex justify-between items-center px-4 py-2 border-t border-slate-100 mt-4">
-                            <p className="text-sm text-slate-500 font-medium">Valor a Pagar</p>
-                            <p className="text-lg font-bold text-slate-900">{Number(paymentReferenceModal?.amount || 0).toLocaleString('pt-AO')} Kz</p>
+                         <div className="flex justify-between items-center gap-4">
+                            <div className="min-w-0 flex-1">
+                               <span className="text-[10px] text-slate-400 uppercase tracking-wider block">ID da Plataforma</span>
+                               <span className="text-xs font-mono font-bold text-slate-800 truncate block">{user?.uid}</span>
+                            </div>
+                            <button onClick={() => user && handleCopy(user.uid)} className="p-1 px-2.5 bg-white text-slate-500 hover:text-brand-blue hover:bg-slate-50 border border-slate-200 shadow-sm rounded-lg text-xs font-bold transition-all flex items-center gap-1 shrink-0">
+                               <Copy size={12} /> Copiar
+                            </button>
                          </div>
                       </div>
 
-                      <div className="flex flex-col items-center justify-center gap-3">
-                         {paymentReferenceModal.isPolling ? (
-                            <div className="flex flex-col items-center animate-pulse">
-                               <div className="w-6 h-6 border-2 border-brand-blue border-t-transparent rounded-full animate-spin mb-3"></div>
-                               <p className="text-sm font-bold text-brand-blue">A aguardar pagamento...</p>
-                               <p className="text-xs text-slate-500 text-center max-w-xs mt-1">Dirija-se a um ATM ou use o Multicaixa Express para pagar a entidade acima.</p>
+                      {/* Manual Payment Information (Angola IBAN details) */}
+                      <div className="p-4 bg-slate-50 border border-slate-200 rounded-2xl text-xs space-y-3 mb-6">
+                         <h4 className="font-bold text-slate-800 flex items-center gap-1.5 uppercase tracking-wide text-[10px]">
+                            <span className="material-symbols-outlined text-[13px] text-brand-blue">account_balance</span>
+                            Nossos dados bancários (Angola)
+                         </h4>
+                         
+                         <div className="space-y-2 pt-1">
+                            <div className="bg-white p-2 rounded-lg border border-slate-100 relative">
+                               <p className="font-bold text-slate-700 text-[10px]">INDEV (BAI)</p>
+                               <p className="font-mono text-[10px] text-slate-500 mt-0.5 truncate pr-16 select-all">IBAN: AO06.0040.0000.4930.2919.1011.8</p>
+                               <button 
+                                  onClick={() => handleCopy('AO06004000004930291910118')}
+                                  className="absolute right-2 top-1/2 -translate-y-1/2 text-[10px] font-bold text-brand-blue bg-blue-50 hover:bg-blue-100 p-1 px-2 rounded cursor-pointer"
+                               >
+                                  Copiar
+                               </button>
                             </div>
-                         ) : (
-                            <p className="text-sm font-bold text-emerald-600">✅ Pagamento detetado com sucesso!</p>
-                         )}
+
+                            <div className="bg-white p-2 rounded-lg border border-slate-100 relative">
+                               <p className="font-bold text-slate-700 text-[10px]">INDEV (BFA)</p>
+                               <p className="font-mono text-[10px] text-slate-500 mt-0.5 truncate pr-16 select-all">IBAN: AO06.0006.0000.3129.8492.1012.3</p>
+                               <button 
+                                  onClick={() => handleCopy('AO06000600003129849210123')}
+                                  className="absolute right-2 top-1/2 -translate-y-1/2 text-[10px] font-bold text-brand-blue bg-blue-50 hover:bg-blue-100 p-1 px-2 rounded cursor-pointer"
+                               >
+                                  Copiar
+                               </button>
+                            </div>
+                         </div>
+                         <p className="text-[10px] text-slate-400 font-medium">Anexe o comprovativo da transferência ou depósito no chat do WhatsApp para aprovação imediata.</p>
+                      </div>
+
+                      <div className="space-y-3">
+                         <p className="text-xs text-slate-400 font-bold uppercase tracking-wider mb-2">Selecione o número de suporte:</p>
+                         
+                         <button 
+                            onClick={() => handleOpenWhatsApp('952815430')} 
+                            className="w-full bg-emerald-500 hover:bg-emerald-600 text-white rounded-xl py-3.5 px-4 font-bold text-sm transition-all duration-200 flex items-center justify-between shadow-lg shadow-emerald-500/10 hover:shadow-emerald-500/20 hover:-translate-y-0.5 active:translate-y-0 select-none cursor-pointer"
+                         >
+                            <span className="flex items-center gap-2">
+                               <MessageSquare size={18} className="animate-pulse" />
+                               WhatsApp (952 815 430)
+                            </span>
+                            <span className="bg-white/20 text-white text-[10px] font-black uppercase px-2 py-0.5 rounded-full tracking-wide">
+                               Canal 1
+                            </span>
+                         </button>
+
+                         <button 
+                            onClick={() => handleOpenWhatsApp('939384315')} 
+                            className="w-full bg-emerald-500 hover:bg-emerald-600 text-white rounded-xl py-3.5 px-4 font-bold text-sm transition-all duration-200 flex items-center justify-between shadow-lg shadow-emerald-500/10 hover:shadow-emerald-500/20 hover:-translate-y-0.5 active:translate-y-0 select-none cursor-pointer"
+                         >
+                            <span className="flex items-center gap-2">
+                               <MessageSquare size={18} className="animate-pulse" />
+                               WhatsApp (939 384 315)
+                            </span>
+                            <span className="bg-white/20 text-white text-[10px] font-black uppercase px-2 py-0.5 rounded-full tracking-wide">
+                               Canal 2
+                            </span>
+                         </button>
                       </div>
                   </motion.div>
               </div>

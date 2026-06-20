@@ -2,16 +2,62 @@ import React, { useState, useEffect } from 'react';
 import { Link, useNavigate } from 'react-router-dom';
 import { motion, AnimatePresence } from 'framer-motion';
 import { useFirebase, signOut, auth, db, handleFirestoreError, OperationType } from './FirebaseProvider';
-import { collection, query, where, getDocs, onSnapshot } from 'firebase/firestore';
+import { collection, query, where, getDocs, onSnapshot, orderBy, doc, updateDoc, deleteDoc } from 'firebase/firestore';
 
 export const Navbar: React.FC = () => {
   const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
   const [dashboardOpen, setDashboardOpen] = useState(false);
   const { user, userProfile } = useFirebase();
   const [userEvents, setUserEvents] = useState<any[]>([]);
+  const [notifications, setNotifications] = useState<any[]>([]);
+  const [notificationsOpen, setNotificationsOpen] = useState(false);
   const navigate = useNavigate();
   
   const isAdmin = user?.email?.toLowerCase() === 'antoniosalvador522@gmail.com' || user?.email === import.meta.env.VITE_ADMIN_EMAIL;
+
+  useEffect(() => {
+    if (!user) {
+      setNotifications([]);
+      return;
+    }
+    try {
+      const notificationsRef = collection(db, 'users', user.uid, 'notifications');
+      const q = query(notificationsRef, orderBy('createdAt', 'desc'));
+      
+      const unsubscribeNotifications = onSnapshot(q, (snapshot) => {
+        const notifsList = snapshot.docs.map(doc => ({
+          id: doc.id,
+          ...doc.data()
+        }));
+        setNotifications(notifsList);
+      }, (error) => {
+         console.warn("Could not listen to notifications", error);
+      });
+      return unsubscribeNotifications;
+    } catch(err) {
+      console.warn("Failed to listen notifications", err);
+    }
+  }, [user]);
+
+  const handleMarkAsRead = async (notifId: string, e: React.MouseEvent) => {
+    e.stopPropagation();
+    if (!user) return;
+    try {
+      await updateDoc(doc(db, 'users', user.uid, 'notifications', notifId), { read: true });
+    } catch(err) {
+      console.error("Failed to mark notification as read", err);
+    }
+  };
+
+  const handleDeleteNotification = async (notifId: string, e: React.MouseEvent) => {
+    e.stopPropagation();
+    if (!user) return;
+    try {
+      await deleteDoc(doc(db, 'users', user.uid, 'notifications', notifId));
+    } catch(err) {
+      console.error("Failed to delete notification", err);
+    }
+  };
 
   useEffect(() => {
     if (!user) {
@@ -55,8 +101,8 @@ export const Navbar: React.FC = () => {
     <>
       {/* Elegant Blue Navbar */}
       <nav className="sticky top-0 z-50 w-full bg-brand-blue text-white shadow-lg shadow-brand-blue/10 px-6 py-4 flex items-center justify-between transition-all">
-        <div className="flex items-center gap-2">
-          <span className="material-symbols-outlined text-primary text-3xl">diamond</span>
+        <div className="flex items-center gap-3">
+          <img src="/favicon.ico" alt="InoEvents Logo" className="w-9 h-9 rounded-xl object-contain border border-white/10 bg-white/5 p-1 shadow-md hover:scale-105 transition-all duration-300" referrerPolicy="no-referrer" />
           <h2 className="text-white text-xl font-serif font-bold tracking-wide">InoEvents</h2>
         </div>
 
@@ -108,6 +154,102 @@ export const Navbar: React.FC = () => {
                      {userProfile?.credits || 0} Créditos
                   </span>
                   <span className="px-3 py-1 bg-white/20 rounded-full text-xs font-semibold text-white shadow-sm border border-white/10 ml-2">{userProfile?.plan || 'Essencial'}</span>
+                  
+                  {/* Real-time Notifications Bell */}
+                  <div className="relative ml-2">
+                    <button 
+                      onClick={() => setNotificationsOpen(!notificationsOpen)}
+                      className="relative w-8 h-8 rounded-full bg-white/10 hover:bg-white/20 active:bg-white/15 border border-white/10 flex items-center justify-center transition-all cursor-pointer select-none outline-none focus:outline-none"
+                    >
+                      <span className="material-symbols-outlined text-[18px] text-white">notifications</span>
+                      {notifications.filter(n => !n.read).length > 0 && (
+                        <span className="absolute -top-1 -right-1 w-4.5 h-4.5 bg-red-500 text-white font-bold text-[9px] rounded-full flex items-center justify-center animate-pulse border border-brand-blue shadow-lg">
+                          {notifications.filter(n => !n.read).length}
+                        </span>
+                      )}
+                    </button>
+
+                    <AnimatePresence>
+                      {notificationsOpen && (
+                        <>
+                          <div className="fixed inset-0 z-40" onClick={() => setNotificationsOpen(false)} />
+                          
+                          <motion.div 
+                            initial={{ opacity: 0, y: 15, scale: 0.95 }}
+                            animate={{ opacity: 1, y: 0, scale: 1 }}
+                            exit={{ opacity: 0, y: 15, scale: 0.95 }}
+                            transition={{ duration: 0.15 }}
+                            className="absolute right-0 top-full mt-3 w-80 bg-white rounded-2xl shadow-xl shadow-brand-blue/10 border border-slate-100 z-50 overflow-hidden text-slate-700 flex flex-col"
+                          >
+                            <div className="p-4 border-b border-slate-50 bg-slate-50/50 flex justify-between items-center">
+                              <span className="font-bold text-xs tracking-wide text-slate-800 flex items-center gap-1.5 uppercase">
+                                <span className="material-symbols-outlined text-sm text-brand-blue">circle_notifications</span>
+                                Notificações
+                              </span>
+                              {notifications.filter(n => !n.read).length > 0 && (
+                                <button 
+                                  onClick={async (e) => {
+                                    e.stopPropagation();
+                                    for(const n of notifications.filter(notif => !notif.read)) {
+                                      await updateDoc(doc(db, 'users', user.uid, 'notifications', n.id), { read: true });
+                                    }
+                                  }}
+                                  className="text-[10px] font-bold text-brand-blue hover:underline uppercase tracking-wider cursor-pointer"
+                                >
+                                  Lidas
+                                </button>
+                              )}
+                            </div>
+
+                            <div className="max-h-64 overflow-y-auto divide-y divide-slate-100 flex flex-col">
+                              {notifications.length > 0 ? (
+                                notifications.map((n) => (
+                                  <div 
+                                    key={n.id} 
+                                    className={`p-3.5 hover:bg-slate-50/80 transition-colors flex flex-col relative group ${!n.read ? 'bg-blue-50/20' : ''}`}
+                                  >
+                                    <div className="flex justify-between items-start gap-2 pr-12">
+                                      <span className={`font-bold text-xs ${!n.read ? 'text-brand-blue' : 'text-slate-700'}`}>
+                                        {n.title}
+                                      </span>
+                                      <span className="text-[9px] text-slate-400 whitespace-nowrap font-medium mt-0.5">
+                                        {n.createdAt ? new Date(n.createdAt).toLocaleDateString() : ''}
+                                      </span>
+                                    </div>
+                                    <p className="text-slate-500 text-[11px] leading-relaxed mt-1">{n.message}</p>
+                                    
+                                    <div className="absolute right-2 top-1/2 -translate-y-1/2 opacity-0 group-hover:opacity-100 transition-all flex items-center gap-1 bg-white/90 backdrop-blur p-1 rounded-lg border border-slate-100 shadow-sm shadow-brand-blue/5">
+                                      {!n.read && (
+                                        <button 
+                                          onClick={(e) => handleMarkAsRead(n.id, e)} 
+                                          className="p-1 hover:bg-blue-50 text-brand-blue rounded flex items-center justify-center transition-colors cursor-pointer"
+                                          title="Marcar como lida"
+                                        >
+                                          <span className="material-symbols-outlined text-[13px]">done</span>
+                                        </button>
+                                      )}
+                                      <button 
+                                        onClick={(e) => handleDeleteNotification(n.id, e)} 
+                                        className="p-1 hover:bg-red-50 text-red-500 rounded flex items-center justify-center transition-colors cursor-pointer"
+                                        title="Eliminar"
+                                      >
+                                        <span className="material-symbols-outlined text-[13px]">delete</span>
+                                      </button>
+                                    </div>
+                                  </div>
+                                ))
+                              ) : (
+                                <div className="py-10 text-center text-slate-400 text-xs font-semibold flex flex-col items-center justify-center gap-1 bg-white">
+                                  <span className="material-symbols-outlined text-2xl text-slate-300">chat_bubble_outline</span>
+                                  Nenhuma notificação
+                                </div>
+                              )}
+                            </div>
+                          </motion.div>
+                        </>
+                      )}
+                    </AnimatePresence>
+                  </div>
                   
                   {isAdmin && (
                     <Link to="/admin" className="ml-4 hover:text-primary transition-colors font-semibold text-white flex items-center gap-1">

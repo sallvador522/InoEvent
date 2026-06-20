@@ -3,10 +3,15 @@ import { motion } from 'framer-motion';
 import { ArrowLeft } from 'lucide-react';
 import { Link } from 'react-router-dom';
 import { Navbar } from '../../components/Navbar';
+import { SEO } from '../../components/SEO';
 
 export const PrivacyPage = () => {
     return (
         <div className="min-h-screen bg-slate-50 text-slate-800 font-sans selection:bg-brand-blue/20">
+            <SEO 
+                title="Políticas de Privacidade"
+                description="Consulte as Políticas de Privacidade do InoEvents. Saiba como protegemos, processamos e asseguramos os dados da sua conta e dos seus convidados."
+            />
             <Navbar />
 
             <main className="pt-24 pb-24 px-6 max-w-4xl mx-auto">

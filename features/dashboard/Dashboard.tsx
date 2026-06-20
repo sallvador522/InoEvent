@@ -6,13 +6,15 @@ import { doc, collection, onSnapshot, deleteDoc, updateDoc, setDoc } from 'fireb
 import { getStorage, ref, deleteObject } from 'firebase/storage';
 import { db, handleFirestoreError, OperationType, useFirebase } from '../../components/FirebaseProvider';
 import { QRScanner } from '../../components/QRScanner';
-import { LineChart, Line, XAxis, YAxis, CartesianGrid, Tooltip as RechartsTooltip, ResponsiveContainer, PieChart, Pie, Cell } from 'recharts';
+import { LineChart, Line, XAxis, YAxis, CartesianGrid, Tooltip as RechartsTooltip, ResponsiveContainer, PieChart, Pie, Cell, BarChart, Bar, AreaChart, Area, Legend } from 'recharts';
 import { SmartAssistant } from './SmartAssistant';
 import { playScanSound } from '../../lib/sound';
 import toast from 'react-hot-toast';
+import { SupportModal } from '../../components/SupportModal';
 
 import { VirtualGiftsManager } from './VirtualGiftsManager';
 import { GuestbookManager } from './GuestbookManager';
+import { GuestsProgressBar } from './GuestsProgressBar';
 
 export const Dashboard = () => {
     const { id } = useParams<{ id: string }>();
@@ -24,6 +26,7 @@ export const Dashboard = () => {
     const [searchQuery, setSearchQuery] = useState("");
     const [copied, setCopied] = useState(false);
     const [settingsOpen, setSettingsOpen] = useState(false);
+    const [supportOpen, setSupportOpen] = useState(false);
     const [isDeleting, setIsDeleting] = useState(false);
     const [showDeleteConfirm, setShowDeleteConfirm] = useState(false);
     const [selectedGuest, setSelectedGuest] = useState<any>(null);
@@ -34,6 +37,8 @@ export const Dashboard = () => {
     const [showScanner, setShowScanner] = useState(false);
     const [scanState, setScanState] = useState<{status: 'idle' | 'processing' | 'success' | 'error' | 'already_scanned', message: string, guestName?: string}>({status: 'idle', message: ''});
     const [activeFilter, setActiveFilter] = useState<'all' | 'checkedIn' | 'confirmed' | 'pending' | 'declined'>('all');
+    const [statsPeriodFilter, setStatsPeriodFilter] = useState<'all' | '24h' | '7d' | '30d'>('all');
+    const [statsSubgroupFilter, setStatsSubgroupFilter] = useState<'all' | 'adults' | 'children'>('all');
 
     const [activeTab, setActiveTab] = useState<'guests' | 'analytics' | 'assistant' | 'gifts' | 'messages'>('guests');
 
@@ -352,6 +357,120 @@ export const Dashboard = () => {
         return acc;
     }, []);
 
+    // Reactive stats computations
+    const statsGuests = guests.filter(g => {
+        if (statsPeriodFilter !== 'all') {
+            if (!g.createdAt) return false;
+            const date = new Date(g.createdAt);
+            const now = new Date();
+            const msDiff = now.getTime() - date.getTime();
+            const daysDiff = msDiff / (1000 * 60 * 60 * 24);
+            if (statsPeriodFilter === '24h' && daysDiff > 1) return false;
+            if (statsPeriodFilter === '7d' && daysDiff > 7) return false;
+            if (statsPeriodFilter === '30d' && daysDiff > 30) return false;
+        }
+        if (statsSubgroupFilter === 'adults') {
+            const adCount = g.adults !== undefined ? g.adults : 1;
+            if (adCount <= 0) return false;
+        }
+        if (statsSubgroupFilter === 'children') {
+            const chCount = g.children !== undefined ? g.children : 0;
+            if (chCount <= 0) return false;
+        }
+        return true;
+    });
+
+    const statsConfirmedCount = statsGuests.filter(g => g.status === 'CONFIRMED').length;
+    const statsPendingCount = statsGuests.filter(g => g.status === 'PENDING').length;
+    const statsDeclinedCount = statsGuests.filter(g => g.status === 'DECLINED').length;
+    const statsCheckedInCount = statsGuests.filter(g => g.checkedIn).length;
+    const statsTotalCount = statsGuests.length;
+
+    const statsPieData = [
+        { name: 'Confirmados', value: statsConfirmedCount, color: '#10B981' },
+        { name: 'Pendentes', value: statsPendingCount, color: '#F59E0B' },
+        { name: 'Recusados', value: statsDeclinedCount, color: '#EF4444' }
+    ].filter(d => d.value > 0);
+
+    const statsCheckinTimeline: any = {};
+    statsGuests.forEach(g => {
+        if (g.checkedInAt) {
+            const date = new Date(g.checkedInAt);
+            const key = `${date.getHours().toString().padStart(2, '0')}:${date.getMinutes().toString().padStart(2, '0')}h`;
+            if(!statsCheckinTimeline[key]) statsCheckinTimeline[key] = 0;
+            statsCheckinTimeline[key]++;
+        }
+    });
+
+    const statsTimelineData = Object.keys(statsCheckinTimeline).sort().reduce((acc: any, key: string) => {
+        const lastCount = acc.length > 0 ? acc[acc.length - 1].cumulative : 0;
+        acc.push({
+            time: key,
+            count: statsCheckinTimeline[key],
+            cumulative: lastCount + statsCheckinTimeline[key]
+        });
+        return acc;
+    }, []);
+
+    // 1. Companions Distribution Chart Data setup
+    const companionCategories = {
+        alone: 0,
+        plusOne: 0,
+        plusTwo: 0
+    };
+    
+    statsGuests.forEach(g => {
+        if (g.status === 'CONFIRMED') {
+            const extra = g.adults ? (g.adults - 1) : 0;
+            if (extra === 0) companionCategories.alone++;
+            else if (extra === 1) companionCategories.plusOne++;
+            else if (extra >= 2) companionCategories.plusTwo++;
+        }
+    });
+
+    const statsCompanionsData = [
+        { name: 'Apenas Próprio', quantidade: companionCategories.alone, fill: '#6366F1' },
+        { name: 'Com +1 Extra', quantidade: companionCategories.plusOne, fill: '#3B82F6' },
+        { name: 'Com +2 Extras', quantidade: companionCategories.plusTwo, fill: '#06B6D4' }
+    ];
+
+    // 2. RSVP Cumulative Registration Day-by-day Chart Data
+    const rsvpDailyTimeline: { [key: string]: number } = {};
+    statsGuests.forEach(g => {
+        const rawDate = g.createdAt || g.updatedAt;
+        if (rawDate) {
+            try {
+                const date = new Date(rawDate);
+                const dayMonthKey = `${date.getDate().toString().padStart(2, '0')}/${(date.getMonth() + 1).toString().padStart(2, '0')}`;
+                if (!rsvpDailyTimeline[dayMonthKey]) {
+                    rsvpDailyTimeline[dayMonthKey] = 0;
+                }
+                // Count how many confirmed/declined on this day
+                rsvpDailyTimeline[dayMonthKey]++;
+            } catch (err) {
+                // Ignore invalid date strings
+            }
+        }
+    });
+
+    // Sort timeline keys lexicographically
+    const sortedRsvpDates = Object.keys(rsvpDailyTimeline).sort((a, b) => {
+        const [dayA, monthA] = a.split('/').map(Number);
+        const [dayB, monthB] = b.split('/').map(Number);
+        return monthA === monthB ? dayA - dayB : monthA - monthB;
+    });
+
+    const statsRsvpGrowthData = sortedRsvpDates.reduce((acc: any[], dateKey) => {
+        const dailyCount = rsvpDailyTimeline[dateKey];
+        const lastCumulative = acc.length > 0 ? acc[acc.length - 1].acumulado : 0;
+        acc.push({
+            data: dateKey,
+            contagem: dailyCount,
+            acumulado: lastCumulative + dailyCount
+        });
+        return acc;
+    }, []);
+
     return (
         <div className="min-h-screen w-full overflow-x-hidden bg-[#FDFDFD] pb-20 font-display text-slate-800">
             {/* Minimalist Top Navbar */}
@@ -371,15 +490,13 @@ export const Dashboard = () => {
                         {userProfile?.credits || 0} Créditos
                     </span>
                     {(event?.plan === 'Premium' || event?.plan === 'Business' || event?.plan === 'Corporate') && (
-                        <a 
-                            href="https://wa.me/244952815430?text=Olá,%20preciso%20de%20suporte%20VIP" 
-                            target="_blank" 
-                            rel="noopener noreferrer"
-                            className="hidden md:flex items-center gap-2 text-sm font-bold text-emerald-600 bg-emerald-50 px-4 py-2 rounded-full hover:bg-emerald-100 transition-colors"
+                        <button 
+                            onClick={() => setSupportOpen(true)}
+                            className="hidden md:flex items-center gap-2 text-sm font-bold text-emerald-600 bg-emerald-50 px-4 py-2 rounded-full hover:bg-emerald-100 transition-colors cursor-pointer border-none"
                         >
                             <MessageSquare size={16} />
                             Suporte VIP
-                        </a>
+                        </button>
                     )}
                     <div className="relative">
                         <button 
@@ -508,6 +625,8 @@ export const Dashboard = () => {
                     </div>
                 )}
 
+                <GuestsProgressBar guests={guests} className="mb-12" />
+
                 {/* Tabs UI */}
                 <div className="flex flex-wrap gap-1 bg-slate-100 rounded-2xl lg:rounded-full p-1 mb-8 w-full md:w-fit mx-auto md:mx-0">
                     {event?.type !== 'BRIDAL_SHOWER' && (
@@ -518,7 +637,7 @@ export const Dashboard = () => {
                             Gestão de Convidados
                         </button>
                     )}
-                    {event?.type !== 'BRIDAL_SHOWER' && (event?.plan === 'Business' || event?.plan === 'Corporate' || event?.plan === 'Premium') && (
+                    {event?.type !== 'BRIDAL_SHOWER' && (
                         <button 
                             onClick={() => setActiveTab('analytics')}
                             className={`flex-1 md:flex-none justify-center px-4 md:px-6 py-2.5 rounded-xl lg:rounded-full font-bold text-sm transition-all flex items-center gap-2 ${activeTab === 'analytics' ? 'bg-white shadow-sm text-brand-blue' : 'text-slate-500 hover:text-slate-700'}`}
@@ -719,31 +838,128 @@ export const Dashboard = () => {
                     
                     {activeTab === 'analytics' && (
                         <div className="lg:col-span-2 flex flex-col gap-6 min-w-0">
-                            <h3 className="text-xl font-bold text-slate-800">Visualização de Dados (Analytics)</h3>
-                            
-                            <div className="grid md:grid-cols-2 gap-6">
-                                <div className="bg-white p-6 rounded-3xl border border-slate-100 shadow-sm">
-                                    <h4 className="font-bold text-slate-700 mb-6">Status dos Convites</h4>
-                                    <div className="h-64">
-                                        <ResponsiveContainer width="100%" height="100%">
-                                            <PieChart>
-                                                <Pie
-                                                    data={pieData}
-                                                    innerRadius={60}
-                                                    outerRadius={80}
-                                                    paddingAngle={5}
-                                                    dataKey="value"
-                                                >
-                                                    {pieData.map((entry, index) => (
-                                                        <Cell key={`cell-${index}`} fill={entry.color} />
-                                                    ))}
-                                                </Pie>
-                                                <RechartsTooltip />
-                                            </PieChart>
-                                        </ResponsiveContainer>
+                            {/* Analytics Header & Description */}
+                            <div>
+                                <h3 className="text-2xl font-serif text-slate-800 mb-1">Estatísticas & Analytics</h3>
+                                <p className="text-slate-500 text-sm">Monitore gráficos de presença, check-ins e respostas com filtros interativos em tempo real.</p>
+                            </div>
+
+                            {/* Reactive Filters Block */}
+                            <div className="bg-slate-50 border border-slate-200/60 p-5 rounded-3xl flex flex-col md:flex-row gap-4 items-center justify-between">
+                                <div className="w-full md:w-auto">
+                                    <span className="text-xs font-bold uppercase tracking-wider text-slate-400 block mb-2">Filtrar por Período de RSVP</span>
+                                    <div className="flex gap-1 bg-slate-200/60 p-1 rounded-xl w-fit">
+                                        <button 
+                                            onClick={() => setStatsPeriodFilter('all')}
+                                            className={`px-3 py-1.5 rounded-lg text-xs font-bold transition-all ${statsPeriodFilter === 'all' ? 'bg-white text-slate-800 shadow-sm' : 'text-slate-500 hover:text-slate-700'}`}
+                                        >
+                                            Sempre
+                                        </button>
+                                        <button 
+                                            onClick={() => setStatsPeriodFilter('24h')}
+                                            className={`px-3 py-1.5 rounded-lg text-xs font-bold transition-all ${statsPeriodFilter === '24h' ? 'bg-white text-slate-800 shadow-sm' : 'text-slate-500 hover:text-slate-700'}`}
+                                        >
+                                            24 Horas
+                                        </button>
+                                        <button 
+                                            onClick={() => setStatsPeriodFilter('7d')}
+                                            className={`px-3 py-1.5 rounded-lg text-xs font-bold transition-all ${statsPeriodFilter === '7d' ? 'bg-white text-slate-800 shadow-sm' : 'text-slate-500 hover:text-slate-700'}`}
+                                        >
+                                            7 Dias
+                                        </button>
+                                        <button 
+                                            onClick={() => setStatsPeriodFilter('30d')}
+                                            className={`px-3 py-1.5 rounded-lg text-xs font-bold transition-all ${statsPeriodFilter === '30d' ? 'bg-white text-slate-800 shadow-sm' : 'text-slate-500 hover:text-slate-700'}`}
+                                        >
+                                            30 Dias
+                                        </button>
                                     </div>
-                                    <div className="flex flex-wrap justify-center gap-4 mt-4">
-                                        {pieData.map((d, i) => (
+                                </div>
+                                <div className="w-full md:w-auto">
+                                    <span className="text-xs font-bold uppercase tracking-wider text-slate-400 block mb-2">Filtrar Categoria</span>
+                                    <div className="flex gap-1 bg-slate-200/60 p-1 rounded-xl w-fit">
+                                        <button 
+                                            onClick={() => setStatsSubgroupFilter('all')}
+                                            className={`px-3 py-1.5 rounded-lg text-xs font-bold transition-all ${statsSubgroupFilter === 'all' ? 'bg-white text-slate-800 shadow-sm' : 'text-slate-500 hover:text-slate-700'}`}
+                                        >
+                                            Todos
+                                        </button>
+                                        <button 
+                                            onClick={() => setStatsSubgroupFilter('adults')}
+                                            className={`px-3 py-1.5 rounded-lg text-xs font-bold transition-all ${statsSubgroupFilter === 'adults' ? 'bg-white text-slate-800 shadow-sm' : 'text-slate-500 hover:text-slate-700'}`}
+                                        >
+                                            Só Adultos
+                                        </button>
+                                        <button 
+                                            onClick={() => setStatsSubgroupFilter('children')}
+                                            className={`px-3 py-1.5 rounded-lg text-xs font-bold transition-all ${statsSubgroupFilter === 'children' ? 'bg-white text-slate-800 shadow-sm' : 'text-slate-500 hover:text-slate-700'}`}
+                                        >
+                                            Só Crianças
+                                        </button>
+                                    </div>
+                                </div>
+                            </div>
+
+                            {/* Reactive Stat Summary Row */}
+                            <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
+                                <div className="bg-white border border-slate-100 p-4 rounded-2xl shadow-sm text-center">
+                                    <p className="text-slate-400 text-[11px] font-bold uppercase tracking-wider mb-1">Grupo Filtrado</p>
+                                    <p className="text-2xl font-serif font-bold text-slate-700">{statsTotalCount}</p>
+                                    <p className="text-xs text-slate-400 mt-0.5">convidados correspondentes</p>
+                                </div>
+                                <div className="bg-white border border-slate-100 p-4 rounded-2xl shadow-sm text-center">
+                                    <p className="text-slate-400 text-[11px] font-bold uppercase tracking-wider mb-1">Confirmados</p>
+                                    <p className="text-2xl font-serif font-bold text-emerald-500">{statsConfirmedCount}</p>
+                                    <p className="text-xs text-slate-400 mt-0.5">{statsTotalCount > 0 ? Math.round((statsConfirmedCount / statsTotalCount) * 100) : 0}% de adesão</p>
+                                </div>
+                                <div className="bg-white border border-slate-100 p-4 rounded-2xl shadow-sm text-center">
+                                    <p className="text-slate-400 text-[11px] font-bold uppercase tracking-wider mb-1">Pendentes</p>
+                                    <p className="text-2xl font-serif font-bold text-amber-500">{statsPendingCount}</p>
+                                    <p className="text-xs text-slate-400 mt-0.5">{statsTotalCount > 0 ? Math.round((statsPendingCount / statsTotalCount) * 100) : 0}% aguardando</p>
+                                </div>
+                                <div className="bg-white border border-slate-100 p-4 rounded-2xl shadow-sm text-center">
+                                    <p className="text-slate-400 text-[11px] font-bold uppercase tracking-wider mb-1">Check-in Efetuado</p>
+                                    <p className="text-2xl font-serif font-bold text-brand-blue">{statsCheckedInCount}</p>
+                                    <p className="text-xs text-slate-400 mt-0.5">{statsConfirmedCount > 0 ? Math.round((statsCheckedInCount / statsConfirmedCount) * 100) : 0}% dos confirmados</p>
+                                </div>
+                            </div>
+
+                            {/* Charts Grid */}
+                            <div className="grid md:grid-cols-2 gap-6">
+                                {/* Pie Chart */}
+                                <div className="bg-white p-6 rounded-3xl border border-slate-100 shadow-sm flex flex-col justify-between">
+                                    <div>
+                                        <h4 className="font-bold text-slate-700 mb-2">Proporção RSVP</h4>
+                                        <p className="text-xs text-slate-400 mb-6">Divisão dos status dos convites do subgrupo selecionado.</p>
+                                    </div>
+                                    <div className="h-64 relative">
+                                        {statsPieData.length > 0 ? (
+                                            <ResponsiveContainer width="100%" height="100%">
+                                                <PieChart>
+                                                    <Pie
+                                                        data={statsPieData}
+                                                        innerRadius={60}
+                                                        outerRadius={80}
+                                                        paddingAngle={5}
+                                                        dataKey="value"
+                                                    >
+                                                        {statsPieData.map((entry, index) => (
+                                                            <Cell key={`cell-${index}`} fill={entry.color} />
+                                                        ))}
+                                                    </Pie>
+                                                    <RechartsTooltip 
+                                                        contentStyle={{ borderRadius: '12px', border: 'none', boxShadow: '0 10px 15px -3px rgb(0 0 0 / 0.1)' }}
+                                                    />
+                                                </PieChart>
+                                            </ResponsiveContainer>
+                                        ) : (
+                                            <div className="w-full h-full flex flex-col items-center justify-center text-slate-400 text-xs font-semibold bg-slate-50 rounded-2xl p-4 text-center">
+                                                <span>Sem dados de RSVP para este filtro.</span>
+                                            </div>
+                                        )}
+                                    </div>
+                                    <div className="flex flex-wrap justify-center gap-4 mt-6">
+                                        {statsPieData.map((d, i) => (
                                             <div key={i} className="flex items-center gap-2 text-xs font-bold text-slate-600">
                                                 <div className="w-3 h-3 rounded-full" style={{ backgroundColor: d.color }}></div>
                                                 {d.name} ({d.value})
@@ -752,25 +968,91 @@ export const Dashboard = () => {
                                     </div>
                                 </div>
 
-                                <div className="bg-white p-6 rounded-3xl border border-slate-100 shadow-sm">
-                                    <h4 className="font-bold text-slate-700 mb-6">Fluxo de Check-in</h4>
+                                {/* Timeline Line Chart */}
+                                <div className="bg-white p-6 rounded-3xl border border-slate-100 shadow-sm flex flex-col justify-between">
+                                    <div>
+                                        <h4 className="font-bold text-slate-700 mb-2">Fluxo de Check-in Reativo</h4>
+                                        <p className="text-xs text-slate-400 mb-6">Histograma e curva acumulada do check-in automatizado.</p>
+                                    </div>
                                     <div className="h-64">
-                                        {timelineData.length > 0 ? (
+                                        {statsTimelineData.length > 0 ? (
                                             <ResponsiveContainer width="100%" height="100%">
-                                                <LineChart data={timelineData}>
+                                                <LineChart data={statsTimelineData}>
                                                     <CartesianGrid strokeDasharray="3 3" vertical={false} stroke="#E2E8F0" />
-                                                    <XAxis dataKey="time" axisLine={false} tickLine={false} tick={{ fontSize: 12, fill: '#64748B' }} />
-                                                    <YAxis axisLine={false} tickLine={false} tick={{ fontSize: 12, fill: '#64748B' }} />
+                                                    <XAxis dataKey="time" axisLine={false} tickLine={false} tick={{ fontSize: 11, fill: '#64748B' }} />
+                                                    <YAxis axisLine={false} tickLine={false} tick={{ fontSize: 11, fill: '#64748B' }} />
                                                     <RechartsTooltip 
                                                         contentStyle={{ borderRadius: '12px', border: 'none', boxShadow: '0 10px 15px -3px rgb(0 0 0 / 0.1)' }}
                                                     />
                                                     <Line type="monotone" dataKey="cumulative" stroke="#0EA5E9" strokeWidth={3} dot={{ strokeWidth: 2, r: 4 }} activeDot={{ r: 6 }} name="Total Acumulado" />
-                                                    <Line type="monotone" dataKey="count" stroke="#10B981" strokeWidth={3} dot={false} name="Entradas/Hora" />
+                                                    <Line type="monotone" dataKey="count" stroke="#10B981" strokeWidth={2} dot={false} name="Presenças" />
                                                 </LineChart>
                                             </ResponsiveContainer>
                                         ) : (
-                                            <div className="w-full h-full flex items-center justify-center text-slate-400 text-sm font-bold bg-slate-50 rounded-2xl">
-                                                Dados insuficientes (Nenhum check-in)
+                                            <div className="w-full h-full flex flex-col items-center justify-center text-slate-400 text-xs font-semibold bg-slate-50 rounded-2xl p-4 text-center">
+                                                <span>Aguardando entradas (nenhum check-in correspondente).</span>
+                                            </div>
+                                        )}
+                                    </div>
+                                </div>
+
+                                {/* RSVP Growth Area Chart */}
+                                <div className="bg-white p-6 rounded-3xl border border-slate-100 shadow-sm flex flex-col justify-between">
+                                    <div>
+                                        <h4 className="font-bold text-slate-700 mb-2">Adesão & Ritmo de RSVP</h4>
+                                        <p className="text-xs text-slate-400 mb-6 font-medium">Curva acumulada de respostas recebidas (sim ou não) por data.</p>
+                                    </div>
+                                    <div className="h-64 relative">
+                                        {statsRsvpGrowthData.length > 0 ? (
+                                            <ResponsiveContainer width="100%" height="100%">
+                                                <AreaChart data={statsRsvpGrowthData}>
+                                                    <defs>
+                                                        <linearGradient id="colorAcumulado" x1="0" y1="0" x2="0" y2="1">
+                                                            <stop offset="5%" stopColor="#4F46E5" stopOpacity={0.2}/>
+                                                            <stop offset="95%" stopColor="#4F46E5" stopOpacity={0}/>
+                                                        </linearGradient>
+                                                    </defs>
+                                                    <CartesianGrid strokeDasharray="3 3" vertical={false} stroke="#E2E8F0" />
+                                                    <XAxis dataKey="data" axisLine={false} tickLine={false} tick={{ fontSize: 11, fill: '#64748B' }} />
+                                                    <YAxis axisLine={false} tickLine={false} tick={{ fontSize: 11, fill: '#64748B' }} />
+                                                    <RechartsTooltip 
+                                                        contentStyle={{ borderRadius: '12px', border: 'none', boxShadow: '0 10px 15px -3px rgb(0 0 0 / 0.1)' }}
+                                                    />
+                                                    <Area type="monotone" dataKey="acumulado" stroke="#4F46E5" strokeWidth={3} fillOpacity={1} fill="url(#colorAcumulado)" name="Total de Respostas" />
+                                                    <Area type="monotone" dataKey="contagem" stroke="#818CF8" strokeWidth={1} fill="none" name="No Dia" />
+                                                </AreaChart>
+                                            </ResponsiveContainer>
+                                        ) : (
+                                            <div className="w-full h-full flex flex-col items-center justify-center text-slate-400 text-xs font-semibold bg-slate-50 rounded-2xl p-4 text-center">
+                                                <span>Aguardando respostas para gerar histórico de RSVP.</span>
+                                            </div>
+                                        )}
+                                    </div>
+                                </div>
+
+                                {/* Companions Distribution Bar Chart */}
+                                <div className="bg-white p-6 rounded-3xl border border-slate-100 shadow-sm flex flex-col justify-between">
+                                    <div>
+                                        <h4 className="font-bold text-slate-700 mb-2">Estrutura de Acompanhantes</h4>
+                                        <p className="text-xs text-slate-400 mb-6 font-medium">Proporção de convidados que trazem parceiros extras (+1 ou +2).</p>
+                                    </div>
+                                    <div className="h-64 relative">
+                                        {statsGuests.length > 0 ? (
+                                            <ResponsiveContainer width="100%" height="100%">
+                                                <BarChart data={statsCompanionsData}>
+                                                    <CartesianGrid strokeDasharray="3 3" vertical={false} stroke="#E2E8F0" />
+                                                    <XAxis dataKey="name" axisLine={false} tickLine={false} tick={{ fontSize: 11, fill: '#64748B' }} />
+                                                    <YAxis axisLine={false} tickLine={false} tick={{ fontSize: 11, fill: '#64748B' }} />
+                                                    <RechartsTooltip 
+                                                        contentStyle={{ borderRadius: '12px', border: 'none', boxShadow: '0 10px 15px -3px rgb(0 0 0 / 0.1)' }}
+                                                        cursor={{ fill: 'rgba(226, 232, 240, 0.4)' }}
+                                                    />
+                                                    <Bar dataKey="quantidade" fill="#3B82F6" radius={[8, 8, 0, 0]} name="Convidados" />
+                                                </BarChart>
+                                            </ResponsiveContainer>
+                                        ) : (
+                                            <div className="w-full h-full flex flex-col items-center justify-center text-slate-400 text-xs font-semibold bg-slate-50 rounded-2xl p-4 text-center">
+                                                <span>Aguardando dados de convidados confirmados.</span>
                                             </div>
                                         )}
                                     </div>
@@ -856,7 +1138,7 @@ export const Dashboard = () => {
                          </div>
 
                          <div className="bg-white border border-slate-100 rounded-3xl p-6 shadow-sm">
-                            <h3 className="font-bold text-slate-800 mb-4">Suporte</h3>
+                            <div className="flex justify-between items-center mb-4"><h3 className="font-bold text-slate-800">Suporte</h3><button onClick={() => setSupportOpen(true)} className="text-[11px] text-emerald-600 font-bold bg-emerald-50 hover:bg-emerald-100 px-2.5 py-1.5 rounded-full flex items-center gap-1 cursor-pointer border-none shadow-sm">Contacto (2 Canais)</button></div>
                             <div className="flex flex-col gap-4 text-sm font-medium">
                                 {(!event?.plan || event?.plan === 'Essencial') && (
                                    <div className="flex items-center gap-3 text-slate-600">
@@ -1046,6 +1328,7 @@ export const Dashboard = () => {
                 )}
             </AnimatePresence>
 
+            <SupportModal isOpen={supportOpen} onClose={() => setSupportOpen(false)} />
         </div>
     );
 };

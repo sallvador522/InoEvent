@@ -53,6 +53,11 @@ service cloud.firestore {
                        request.resource.data.diff(resource.data).affectedKeys().hasOnly(['plan', 'whiteLabelName', 'whiteLabelLogo', 'updatedAt', 'credits']) &&
                        request.resource.data.uid == resource.data.uid &&
                        request.resource.data.email == resource.data.email);
+
+      match /notifications/{notificationId} {
+        allow read: if isOwner(userId);
+        allow write: if isAdmin() || isOwner(userId);
+      }
     }
 
     match /events/{eventId} {

@@ -3,10 +3,15 @@ import { motion } from 'framer-motion';
 import { ArrowLeft } from 'lucide-react';
 import { Link } from 'react-router-dom';
 import { Navbar } from '../../components/Navbar';
+import { SEO } from '../../components/SEO';
 
 export const TermsPage = () => {
     return (
         <div className="min-h-screen bg-slate-50 text-slate-800 font-sans selection:bg-brand-blue/20">
+            <SEO 
+                title="Termos de Serviço"
+                description="Consulte os Termos de Serviço do InoEvents. Saiba mais sobre as nossas condições gerais de uso, limites de responsabilidade e regras da plataforma."
+            />
             <Navbar />
 
             <main className="pt-24 pb-24 px-6 max-w-4xl mx-auto">

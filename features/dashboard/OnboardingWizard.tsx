@@ -123,7 +123,7 @@ export const OnboardingWizard: React.FC<OnboardingWizardProps> = ({ onCancel, on
         try {
             // Check Credit logic safely
             if (userProfile?.plan !== 'Business' && userProfile?.plan !== 'Corporate') {
-                const creditCost = isBridalShower ? 1 : 2;
+                const creditCost = 2; // FIX: Every event costs 2 credits
                 if ((userProfile?.credits || 0) < creditCost) {
                     toast.error('Créditos insuficientes.', { id: toastId });
                     setIsCreating(false);

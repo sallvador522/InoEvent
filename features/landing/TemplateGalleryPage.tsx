@@ -44,8 +44,8 @@ export const TemplateGalleryPage: React.FC = () => {
     return (
         <div className="min-h-screen bg-slate-50 flex flex-col font-sans">
             <SEO 
-                title="Galeria de Modelos de Convites Digitais"
-                description="Explore os nossos designs de convites e modelos premium feitos artesanalmente para casamentos, chás de panelas, aniversários, chás de bebês e reuniões corporativas."
+                title="Modelos de Convites Digitais em Angola"
+                description="Explore os nossos designs de convites e modelos premium feitos artesanalmente para casamentos, chás de panelas, aniversários, chás de bebês e reuniões em Luanda, Angola."
             />
             <Navbar />
 

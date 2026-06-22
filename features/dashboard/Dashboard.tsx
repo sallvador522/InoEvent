@@ -1,6 +1,6 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 import { useParams, Link, useNavigate } from 'react-router-dom';
-import { Users, CheckCircle2, QrCode, Share2, Download, Clock, Search, MessageSquare, ArrowLeft, MoreHorizontal, Settings, Copy, Check, Edit2, Trash2, Plus, MessageCircle, UploadCloud, Gem, Camera } from 'lucide-react';
+import { Users, CheckCircle2, QrCode, Share2, Download, Clock, Search, MessageSquare, ArrowLeft, MoreHorizontal, Settings, Copy, Check, Edit2, Trash2, Plus, MessageCircle, UploadCloud, Gem, Camera, Bell, BellOff, Volume2 } from 'lucide-react';
 import { motion, AnimatePresence } from 'framer-motion';
 import { doc, collection, onSnapshot, deleteDoc, updateDoc, setDoc } from 'firebase/firestore';
 import { getStorage, ref, deleteObject } from 'firebase/storage';
@@ -15,6 +15,8 @@ import { SupportModal } from '../../components/SupportModal';
 import { VirtualGiftsManager } from './VirtualGiftsManager';
 import { GuestbookManager } from './GuestbookManager';
 import { GuestsProgressBar } from './GuestsProgressBar';
+import { TeamManager } from './TeamManager';
+import { ExecutiveReportModal } from './ExecutiveReportModal';
 
 export const Dashboard = () => {
     const { id } = useParams<{ id: string }>();
@@ -39,14 +41,125 @@ export const Dashboard = () => {
     const [activeFilter, setActiveFilter] = useState<'all' | 'checkedIn' | 'confirmed' | 'pending' | 'declined'>('all');
     const [statsPeriodFilter, setStatsPeriodFilter] = useState<'all' | '24h' | '7d' | '30d'>('all');
     const [statsSubgroupFilter, setStatsSubgroupFilter] = useState<'all' | 'adults' | 'children'>('all');
+    const [showReportModal, setShowReportModal] = useState(false);
 
-    const [activeTab, setActiveTab] = useState<'guests' | 'analytics' | 'assistant' | 'gifts' | 'messages'>('guests');
+    const [activeTab, setActiveTab] = useState<'guests' | 'analytics' | 'assistant' | 'gifts' | 'messages' | 'team'>('guests');
+
+    const [pushEnabled, setPushEnabled] = useState(() => {
+        if (typeof window !== 'undefined') {
+            return localStorage.getItem('inoevents_push_enabled') !== 'false';
+        }
+        return true;
+    });
+    const [notificationPermission, setNotificationPermission] = useState<NotificationPermission>(
+        typeof Notification !== 'undefined' ? Notification.permission : 'default'
+    );
+    const [inAppAlerts, setInAppAlerts] = useState<any[]>([]);
+    const prevGuestsRef = useRef<any[]>([]);
+
+    const playNotificationSound = () => {
+        try {
+            const AudioCtx = window.AudioContext || (window as any).webkitAudioContext;
+            if (!AudioCtx) return;
+            const ctx = new AudioCtx();
+            
+            const playTone = (freq: number, start: number, duration: number) => {
+                const osc = ctx.createOscillator();
+                const gainNode = ctx.createGain();
+                
+                osc.type = 'sine';
+                osc.frequency.setValueAtTime(freq, start);
+                
+                gainNode.gain.setValueAtTime(0, start);
+                gainNode.gain.linearRampToValueAtTime(0.12, start + 0.04);
+                gainNode.gain.exponentialRampToValueAtTime(0.001, start + duration);
+                
+                osc.connect(gainNode);
+                gainNode.connect(ctx.destination);
+                
+                osc.start(start);
+                osc.stop(start + duration);
+            };
+            
+            const now = ctx.currentTime;
+            playTone(1046.50, now, 0.4); // C6
+            playTone(1318.51, now + 0.09, 0.6); // E6
+        } catch (err) {
+            console.warn("AudioContext block or failed:", err);
+        }
+    };
+
+    const requestNotificationPermission = async () => {
+        if (typeof window !== 'undefined' && 'Notification' in window) {
+            const permission = await Notification.requestPermission();
+            setNotificationPermission(permission);
+            if (permission === 'granted') {
+                toast.success("Notificações de presença ativadas!");
+                playNotificationSound();
+            } else if (permission === 'denied') {
+                toast.error("Configuração bloqueada no navegador.");
+            }
+        } else {
+            toast.error("Notificações não suportadas neste dispositivo.");
+        }
+    };
+
+    const triggerNewConfirmationNotification = (guest: any) => {
+        const title = "Nova Confirmação! 🥂";
+        const body = `${guest.name} confirmou presença no seu evento.`;
+        
+        playNotificationSound();
+
+        if (typeof window !== 'undefined' && 'Notification' in window && Notification.permission === 'granted') {
+            try {
+                const n = new Notification(title, {
+                    body: body,
+                    icon: '/favicon.ico',
+                    tag: `rsvp-${guest.id}`,
+                });
+                n.onclick = () => {
+                    window.focus();
+                };
+            } catch (e) {
+                console.error("Erro ao mostrar notificação push:", e);
+            }
+        }
+
+        // Elegant in-app notification card creation
+        const alertId = Math.random().toString();
+        setInAppAlerts(prev => [
+            ...prev,
+            {
+                id: alertId,
+                name: guest.name,
+                phone: guest.phone,
+                companions: guest.companions || 0,
+                time: new Date().toLocaleTimeString('pt-AO', { hour: '2-digit', minute: '2-digit' })
+            }
+        ]);
+
+        setTimeout(() => {
+            setInAppAlerts(prev => prev.filter(a => a.id !== alertId));
+        }, 7000);
+    };
 
     useEffect(() => {
-        if (event?.type === 'BRIDAL_SHOWER' && activeTab === 'guests') {
-            setActiveTab('messages');
+        if (prevGuestsRef.current && prevGuestsRef.current.length > 0) {
+            guests.forEach((guest) => {
+                const prevGuest = prevGuestsRef.current.find(g => g.id === guest.id);
+                const isConfirmedNow = guest.status === 'CONFIRMED';
+                if (isConfirmedNow) {
+                    const wasConfirmedBefore = prevGuest ? prevGuest.status === 'CONFIRMED' : false;
+                    if (!wasConfirmedBefore) {
+                        if (pushEnabled) {
+                            triggerNewConfirmationNotification(guest);
+                        }
+                    }
+                }
+            });
         }
-    }, [event?.type, activeTab]);
+        prevGuestsRef.current = guests;
+    }, [guests, pushEnabled]);
 
     useEffect(() => {
 
@@ -290,6 +403,18 @@ export const Dashboard = () => {
             handleFirestoreError(error, OperationType.DELETE, `events/${id}/guests/${guestId}`);
             toast.error('Falha ao remover o convidado.');
             setIsDeleting(false);
+        }
+    };
+
+    const handleUpdateGuestStatus = async (guestId: string, newStatus: string) => {
+        try {
+            const guestRef = doc(db, 'events', id!, 'guests', guestId);
+            await updateDoc(guestRef, { status: newStatus });
+            toast.success("Status atualizado com sucesso!");
+            setSelectedGuest((prev: any) => prev ? { ...prev, status: newStatus } : null);
+        } catch (error) {
+            handleFirestoreError(error, OperationType.UPDATE, `events/${id}/guests/${guestId}`);
+            toast.error("Erro ao atualizar status.");
         }
     };
 
@@ -614,37 +739,99 @@ export const Dashboard = () => {
                     </div>
                 </div>
 
-                {/* Spatial UI Stats Cards */}
-                {event?.type !== 'BRIDAL_SHOWER' && (
-                    <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-5 gap-4 mb-12">
-                        <StatCard title="Total" value={totalCount} icon={Users} color="bg-blue-50 text-blue-600" />
-                        <StatCard title="Entraram" value={checkedInCount} icon={CheckCircle2} color="bg-emerald-50 text-emerald-600" />
-                        <StatCard title="Confirmados" value={confirmedCount} icon={CheckCircle2} color="bg-green-50 text-green-600" />
-                        <StatCard title="Pendentes" value={pendingCount} icon={Clock} color="bg-orange-50 text-orange-600" />
-                        <StatCard title="Recusados" value={declinedCount} icon={Users} color="bg-red-50 text-red-600" />
+                {/* Real-time Web Push notification indicator */}
+                <div className="bg-gradient-to-r from-slate-50 to-blue-50/10 border border-slate-200/50 p-5 rounded-3xl flex flex-col md:flex-row md:items-center justify-between gap-4 mb-8">
+                    <div className="flex items-center gap-4">
+                        <div className={`w-12 h-12 rounded-2xl flex items-center justify-center shrink-0 transition-colors ${pushEnabled && notificationPermission === 'granted' ? 'bg-emerald-50 text-emerald-600 border border-emerald-100/50' : 'bg-slate-100 text-slate-500 border border-slate-200/50'}`}>
+                            {pushEnabled && notificationPermission === 'granted' ? (
+                                <Bell className="animate-bounce" size={22} />
+                            ) : (
+                                <BellOff size={22} />
+                            )}
+                        </div>
+                        <div>
+                            <h4 className="font-bold text-slate-800 text-sm flex flex-wrap items-center gap-2">
+                                Notificações de Presença
+                                {pushEnabled && notificationPermission === 'granted' && (
+                                    <span className="inline-flex items-center gap-1 px-2.5 py-0.5 rounded-full text-[10px] font-bold bg-emerald-100 text-emerald-700 animate-pulse">
+                                        <span className="w-1.5 h-1.5 rounded-full bg-emerald-500" /> Ativo em Tempo Real
+                                    </span>
+                                )}
+                            </h4>
+                            <p className="text-xs text-slate-500 mt-0.5">Receba alertas sonoros no computador/celular assim que um convidado confirmar RSVP.</p>
+                        </div>
                     </div>
-                )}
+                    
+                    <div className="flex flex-wrap items-center gap-2.5 self-start md:self-auto">
+                        {notificationPermission === 'default' ? (
+                            <button
+                                onClick={requestNotificationPermission}
+                                className="px-4 py-2.5 bg-brand-blue text-white rounded-xl text-xs font-bold hover:bg-brand-blue/90 shadow-md shadow-brand-blue/10 transition-all flex items-center gap-1.5 cursor-pointer"
+                            >
+                                <Bell size={14} /> Ativar no Navegador
+                            </button>
+                        ) : notificationPermission === 'denied' ? (
+                            <span className="text-xs font-bold text-red-500 bg-red-50 border border-red-100/80 px-3 py-2 rounded-xl flex items-center gap-1.5">
+                                <BellOff size={14} /> Permissão Bloqueada (Habilite no navegador)
+                            </span>
+                        ) : (
+                            <div className="flex items-center gap-2 bg-white/80 p-1.5 rounded-xl border border-slate-200">
+                                <span className="text-xs font-bold text-slate-500 px-2">Notificar:</span>
+                                <button
+                                    onClick={() => {
+                                        const next = !pushEnabled;
+                                        setPushEnabled(next);
+                                        localStorage.setItem('inoevents_push_enabled', String(next));
+                                        toast.success(next ? "Notificações ativadas!" : "Notificações desativadas.");
+                                        if (next) playNotificationSound();
+                                    }}
+                                    className={`px-3.5 py-1.5 rounded-lg text-xs font-bold transition-all cursor-pointer ${
+                                        pushEnabled 
+                                            ? 'bg-emerald-500 text-white shadow-sm' 
+                                            : 'bg-slate-100 text-slate-500 hover:bg-slate-200'
+                                    }`}
+                                >
+                                    {pushEnabled ? "Ligado" : "Desligado"}
+                                </button>
+                                <button
+                                    onClick={playNotificationSound}
+                                    className="p-1.5 text-slate-400 hover:text-slate-600 rounded-lg hover:bg-slate-50 cursor-pointer"
+                                    title="Testar som de notificação"
+                                >
+                                    <Volume2 size={14} />
+                                </button>
+                            </div>
+                        )}
+                    </div>
+                </div>
+
+                {/* Spatial UI Stats Cards */}
+                <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-5 gap-4 mb-12">
+                    <StatCard title="Total" value={totalCount} icon={Users} color="bg-blue-50 text-blue-600" />
+                    {event?.type !== 'BRIDAL_SHOWER' && (
+                        <StatCard title="Entraram" value={checkedInCount} icon={CheckCircle2} color="bg-emerald-50 text-emerald-600" />
+                    )}
+                    <StatCard title="Confirmados" value={confirmedCount} icon={CheckCircle2} color="bg-green-50 text-green-600" />
+                    <StatCard title="Pendentes" value={pendingCount} icon={Clock} color="bg-orange-50 text-orange-600" />
+                    <StatCard title="Recusados" value={declinedCount} icon={Users} color="bg-red-50 text-red-600" />
+                </div>
 
                 <GuestsProgressBar guests={guests} className="mb-12" />
 
                 {/* Tabs UI */}
                 <div className="flex flex-wrap gap-1 bg-slate-100 rounded-2xl lg:rounded-full p-1 mb-8 w-full md:w-fit mx-auto md:mx-0">
-                    {event?.type !== 'BRIDAL_SHOWER' && (
-                        <button 
-                            onClick={() => setActiveTab('guests')}
-                            className={`flex-1 md:flex-none px-4 md:px-6 py-2.5 rounded-xl lg:rounded-full font-bold text-sm transition-all ${activeTab === 'guests' ? 'bg-white shadow-sm text-slate-800' : 'text-slate-500 hover:text-slate-700'}`}
-                        >
-                            Gestão de Convidados
-                        </button>
-                    )}
-                    {event?.type !== 'BRIDAL_SHOWER' && (
-                        <button 
-                            onClick={() => setActiveTab('analytics')}
-                            className={`flex-1 md:flex-none justify-center px-4 md:px-6 py-2.5 rounded-xl lg:rounded-full font-bold text-sm transition-all flex items-center gap-2 ${activeTab === 'analytics' ? 'bg-white shadow-sm text-brand-blue' : 'text-slate-500 hover:text-slate-700'}`}
-                        >
-                            Analytics
-                        </button>
-                    )}
+                    <button 
+                        onClick={() => setActiveTab('guests')}
+                        className={`flex-1 md:flex-none px-4 md:px-6 py-2.5 rounded-xl lg:rounded-full font-bold text-sm transition-all ${activeTab === 'guests' ? 'bg-white shadow-sm text-slate-800' : 'text-slate-500 hover:text-slate-700'}`}
+                    >
+                        Gestão de Convidados
+                    </button>
+                    <button 
+                        onClick={() => setActiveTab('analytics')}
+                        className={`flex-1 md:flex-none justify-center px-4 md:px-6 py-2.5 rounded-xl lg:rounded-full font-bold text-sm transition-all flex items-center gap-2 ${activeTab === 'analytics' ? 'bg-white shadow-sm text-brand-blue' : 'text-slate-500 hover:text-slate-700'}`}
+                    >
+                        Analytics
+                    </button>
                     {(event?.plan === 'Business' || event?.plan === 'Corporate' || event?.plan === 'Premium') && (
                         <button 
                             onClick={() => setActiveTab('gifts')}
@@ -665,6 +852,14 @@ export const Dashboard = () => {
                             className={`flex-1 md:flex-none justify-center px-4 md:px-6 py-2.5 rounded-xl lg:rounded-full font-bold text-sm transition-all flex items-center gap-2 ${activeTab === 'assistant' ? 'bg-white shadow-sm text-purple-600' : 'text-slate-500 hover:text-slate-700'}`}
                         >
                             Assistente IA
+                        </button>
+                    )}
+                    {(event?.plan === 'Business' || event?.plan === 'Corporate' || event?.plan === 'Premium') && (
+                        <button 
+                            onClick={() => setActiveTab('team')}
+                            className={`flex-1 md:flex-none justify-center px-4 md:px-6 py-2.5 rounded-xl lg:rounded-full font-bold text-sm transition-all flex items-center gap-2 ${activeTab === 'team' ? 'bg-white shadow-sm text-brand-blue' : 'text-slate-500 hover:text-slate-700'}`}
+                        >
+                            <Users size={16} className={activeTab === 'team' ? 'text-brand-blue' : 'text-slate-400'} /> Equipe
                         </button>
                     )}
                 </div>
@@ -733,6 +928,11 @@ export const Dashboard = () => {
                                 <button onClick={handleExportCSV} className="text-sm font-bold text-brand-blue bg-brand-blue/5 px-4 py-2 rounded-xl hover:bg-brand-blue/10 transition-colors hidden sm:flex items-center gap-2 text-center">
                                     <Download size={16} /> Exportar
                                 </button>
+                                {(event?.plan === 'Business' || event?.plan === 'Corporate' || event?.plan === 'Premium') && (
+                                    <button onClick={() => setShowReportModal(true)} className="text-sm font-bold text-slate-800 bg-slate-100 border border-slate-200 px-4 py-2 rounded-xl hover:bg-slate-200 transition-colors hidden sm:flex items-center gap-2 text-center cursor-pointer">
+                                        <Printer size={16} className="text-slate-600" /> Relatório PDF
+                                    </button>
+                                )}
                             </div>
                         </div>
 
@@ -751,12 +951,10 @@ export const Dashboard = () => {
                             <div className="flex gap-2 bg-slate-100 p-1.5 rounded-2xl overflow-x-auto no-scrollbar w-full xl:w-auto">
                                 <FilterButton label="Todos" active={activeFilter === 'all'} onClick={() => setActiveFilter('all')} />
                                 {event?.type !== 'BRIDAL_SHOWER' && (
-                                    <>
-                                        <FilterButton label="Entraram" active={activeFilter === 'checkedIn'} onClick={() => setActiveFilter('checkedIn')} />
-                                        <FilterButton label="Confirmados" active={activeFilter === 'confirmed'} onClick={() => setActiveFilter('confirmed')} />
-                                        <FilterButton label="Pendentes" active={activeFilter === 'pending'} onClick={() => setActiveFilter('pending')} />
-                                    </>
+                                    <FilterButton label="Entraram" active={activeFilter === 'checkedIn'} onClick={() => setActiveFilter('checkedIn')} />
                                 )}
+                                <FilterButton label="Confirmados" active={activeFilter === 'confirmed'} onClick={() => setActiveFilter('confirmed')} />
+                                <FilterButton label="Pendentes" active={activeFilter === 'pending'} onClick={() => setActiveFilter('pending')} />
                             </div>
                         </div>
 
@@ -806,16 +1004,12 @@ export const Dashboard = () => {
                                                     </div>
                                                 </div>
                                                 <div className="flex flex-wrap items-center justify-start sm:justify-end gap-2 sm:gap-4 ml-14 sm:ml-0">
-                                                    {event?.type !== 'BRIDAL_SHOWER' && (
-                                                        <>
-                                                            {guest.checkedIn && (
-                                                                <div className="bg-green-100 text-green-700 px-3 py-1.5 rounded-full inline-flex items-center justify-center text-xs font-bold gap-1 whitespace-nowrap" title="Check-in Realizado">
-                                                                    <CheckCircle2 size={14} /> Check-in
-                                                                </div>
-                                                            )}
-                                                            <StatusBadge status={guest.status} />
-                                                        </>
+                                                    {guest.checkedIn && event?.type !== 'BRIDAL_SHOWER' && (
+                                                        <div className="bg-green-100 text-green-700 px-3 py-1.5 rounded-full inline-flex items-center justify-center text-xs font-bold gap-1 whitespace-nowrap" title="Check-in Realizado">
+                                                            <CheckCircle2 size={14} /> Check-in
+                                                        </div>
                                                     )}
+                                                    <StatusBadge status={guest.status} />
                                                     <button 
                                                         onClick={(e) => {
                                                             e.stopPropagation();
@@ -839,9 +1033,17 @@ export const Dashboard = () => {
                     {activeTab === 'analytics' && (
                         <div className="lg:col-span-2 flex flex-col gap-6 min-w-0">
                             {/* Analytics Header & Description */}
-                            <div>
-                                <h3 className="text-2xl font-serif text-slate-800 mb-1">Estatísticas & Analytics</h3>
-                                <p className="text-slate-500 text-sm">Monitore gráficos de presença, check-ins e respostas com filtros interativos em tempo real.</p>
+                            <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
+                                <div>
+                                    <h3 className="text-2xl font-serif text-slate-800 mb-1">Estatísticas & Analytics</h3>
+                                    <p className="text-slate-500 text-sm">Monitore gráficos de presença, check-ins e respostas com filtros interativos em tempo real.</p>
+                                </div>
+                                <button 
+                                    onClick={() => setShowReportModal(true)}
+                                    className="px-4 py-2.5 bg-slate-900 border border-slate-900 hover:bg-slate-800 text-white font-bold rounded-xl text-xs flex items-center justify-center gap-1.5 shadow-md shadow-slate-900/10 cursor-pointer self-start sm:self-auto"
+                                >
+                                    <Printer size={14} /> Relatório Executivo PDF
+                                </button>
                             </div>
 
                             {/* Reactive Filters Block */}
@@ -1079,6 +1281,12 @@ export const Dashboard = () => {
                         </div>
                     )}
 
+                    {activeTab === 'team' && (
+                        <div className="lg:col-span-2 flex flex-col gap-6 min-w-0">
+                            <TeamManager eventId={event.id} eventPlan={event?.plan} />
+                        </div>
+                    )}
+
                     {/* Sidebar Actions */}
                     <div className="flex flex-col gap-6 min-w-0">
                         {event?.type !== 'BRIDAL_SHOWER' && (event?.plan === 'Premium' || event?.plan === 'Business' || event?.plan === 'Corporate') ? (
@@ -1242,9 +1450,32 @@ export const Dashboard = () => {
                         >
                             <h3 className="text-lg font-bold text-slate-800">{selectedGuest.name}</h3>
                             <p className="text-sm font-bold text-slate-500 mb-4">{selectedGuest.phone || 'Sem contato'}</p>
-                            <div className="bg-slate-50 p-4 rounded-xl mb-6 text-sm text-slate-600">
+                            <div className="bg-slate-50 p-4 rounded-xl mb-4 text-sm text-slate-600">
                                 <p className="font-bold text-xs uppercase text-slate-400 mb-1">Mensagem enviada:</p>
                                 {selectedGuest.message || 'Nenhuma mensagem enviada.'}
+                            </div>
+                            <div className="mb-6">
+                                <p className="font-bold text-xs uppercase text-slate-400 mb-2">Alterar Status:</p>
+                                <div className="grid grid-cols-3 gap-1.5 bg-slate-50 p-1.5 rounded-2xl border border-slate-100">
+                                    {['CONFIRMED', 'PENDING', 'DECLINED'].map((st) => {
+                                        const label = st === 'CONFIRMED' ? 'Confirmado' : st === 'PENDING' ? 'Pendente' : 'Recusado';
+                                        const color = st === 'CONFIRMED' ? 'text-green-600 bg-white shadow-sm' : st === 'PENDING' ? 'text-orange-600 bg-white shadow-sm' : 'text-red-500 bg-white shadow-sm';
+                                        const active = selectedGuest.status === st;
+                                        return (
+                                            <button
+                                                key={st}
+                                                onClick={() => handleUpdateGuestStatus(selectedGuest.id, st)}
+                                                className={`py-2 px-1 rounded-xl text-xs font-bold transition-all border-none cursor-pointer ${
+                                                    active
+                                                        ? `${color} shadow-sm border border-slate-200/50`
+                                                        : 'text-slate-500 hover:text-slate-800'
+                                                }`}
+                                            >
+                                                {label}
+                                            </button>
+                                        );
+                                    })}
+                                </div>
                             </div>
                             <div className="flex flex-col gap-2">
                                 <button 
@@ -1329,6 +1560,63 @@ export const Dashboard = () => {
             </AnimatePresence>
 
             <SupportModal isOpen={supportOpen} onClose={() => setSupportOpen(false)} />
+
+            <ExecutiveReportModal 
+                isOpen={showReportModal} 
+                onClose={() => setShowReportModal(false)} 
+                event={event} 
+                guests={guests} 
+                agencyName="InoEvents Enterprise" 
+                agencyLogo={null} 
+            />
+
+            {/* Floating Live RSVP Notifications Overlay */}
+            <div className="fixed bottom-6 right-6 z-[9999] flex flex-col gap-3 max-w-sm w-full pointer-events-none">
+                <AnimatePresence>
+                    {inAppAlerts.map((alert) => (
+                        <motion.div
+                            key={alert.id}
+                            initial={{ opacity: 0, y: 50, scale: 0.9 }}
+                            animate={{ opacity: 1, y: 0, scale: 1 }}
+                            exit={{ opacity: 0, transition: { duration: 0.2 } }}
+                            className="pointer-events-auto bg-white/90 backdrop-blur-xl border border-slate-200/65 p-5 rounded-3xl shadow-2xl flex flex-col gap-3 relative overflow-hidden"
+                            style={{
+                                boxShadow: '0 20px 40px -15px rgba(15, 23, 42, 0.08), inset 0 1px 0 0 rgba(255, 255, 255, 0.6)'
+                            }}
+                        >
+                            <div className="absolute -top-10 -right-10 w-24 h-24 bg-emerald-400/10 rounded-full blur-2xl animate-pulse" />
+                            
+                            <div className="flex items-start gap-3">
+                                <div className="w-12 h-12 rounded-2xl bg-emerald-50 text-emerald-600 flex items-center justify-center shrink-0 border border-emerald-100/50">
+                                    <CheckCircle2 size={24} className="animate-bounce" />
+                                </div>
+                                <div className="flex-1 min-w-0">
+                                    <div className="flex items-center justify-between gap-2">
+                                        <span className="text-xs font-mono font-bold tracking-wider text-emerald-600 uppercase">RSVP Confirmado</span>
+                                        <span className="text-xs font-mono text-slate-400">{alert.time}</span>
+                                    </div>
+                                    <h4 className="text-base font-bold text-slate-800 tracking-tight truncate mt-0.5">{alert.name}</h4>
+                                    <p className="text-xs text-slate-500 mt-0.5 truncate">{alert.phone || 'Sem celular'}</p>
+                                </div>
+                            </div>
+
+                            {alert.companions > 0 && (
+                                <div className="bg-slate-50/80 px-3 py-2 rounded-xl text-xs text-slate-600 flex items-center justify-between border border-slate-100">
+                                    <span className="font-medium text-slate-500">Acompanhantes extra:</span>
+                                    <span className="font-bold text-slate-800 bg-slate-200/60 px-2 py-0.5 rounded-full">{alert.companions}</span>
+                                </div>
+                            )}
+
+                            <motion.div 
+                                initial={{ width: '100%' }}
+                                animate={{ width: '0%' }}
+                                transition={{ duration: 7, ease: "linear" }}
+                                className="absolute bottom-0 left-0 h-1 bg-emerald-500 animate-pulse" 
+                            />
+                        </motion.div>
+                    ))}
+                </AnimatePresence>
+            </div>
         </div>
     );
 };

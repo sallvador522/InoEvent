@@ -1,10 +1,12 @@
 import React, { useState, useEffect } from 'react';
 import { useParams, useSearchParams, Link } from 'react-router-dom';
-import { Users, CheckCircle2, Clock, Search, ExternalLink, ShieldCheck } from 'lucide-react';
+import { Users, CheckCircle2, Clock, Search, ExternalLink, ShieldCheck, Printer } from 'lucide-react';
 import { motion, AnimatePresence } from 'framer-motion';
 import { doc, collection, onSnapshot, getDoc } from 'firebase/firestore';
 import { db } from '../../components/FirebaseProvider';
 import { GuestsProgressBar } from './GuestsProgressBar';
+import { ResponsiveContainer, PieChart, Pie, Cell } from 'recharts';
+import { ExecutiveReportModal } from './ExecutiveReportModal';
 
 export const ClientDashboard = () => {
     const { id } = useParams<{ id: string }>();
@@ -19,6 +21,7 @@ export const ClientDashboard = () => {
     const [authError, setAuthError] = useState<string | null>(null);
     const [agencyName, setAgencyName] = useState<string>("InoEvents Partner");
     const [agencyLogo, setAgencyLogo] = useState<string | null>(null);
+    const [showReportModal, setShowReportModal] = useState(false);
 
     useEffect(() => {
         if (!id) return;
@@ -158,9 +161,17 @@ export const ClientDashboard = () => {
                            {agencyName}
                         </span>
                     </div>
-                    <div className="text-xs font-bold bg-slate-100 text-slate-500 px-3 py-1.5 rounded-full flex items-center gap-2">
-                        <ShieldCheck size={14} className="text-brand-blue" />
-                        Visão do Cliente
+                    <div className="flex items-center gap-3">
+                        <button 
+                            onClick={() => setShowReportModal(true)}
+                            className="text-xs font-bold bg-slate-900 border border-slate-900 text-white hover:bg-slate-800 px-3.5 py-1.5 rounded-full flex items-center gap-1.5 shadow-sm transition-all cursor-pointer"
+                        >
+                            <Printer size={13} /> Relatório Executivo
+                        </button>
+                        <div className="text-xs font-bold bg-slate-100 text-slate-500 px-3 py-1.5 rounded-full flex items-center gap-2">
+                            <ShieldCheck size={14} className="text-brand-blue" />
+                            Visão do Cliente
+                        </div>
                     </div>
                 </div>
             </header>
@@ -190,7 +201,59 @@ export const ClientDashboard = () => {
                     <StatCard title="Recusados" value={declinedCount} icon={Users} color="bg-red-50 text-red-600" />
                 </div>
 
-                <GuestsProgressBar guests={guests} className="mb-8" />
+                <div className="grid md:grid-cols-3 gap-6 mb-8">
+                    {/* Progress Bar Widget */}
+                    <div className="md:col-span-2 bg-white border border-slate-200 rounded-3xl p-6 shadow-sm flex flex-col justify-between">
+                        <div>
+                            <span className="text-xs font-bold text-[#BF9B30] uppercase tracking-wider block mb-1">Ritmo de Respostas</span>
+                            <h4 className="font-bold text-slate-800 text-base">Controle de Adesão RSVP</h4>
+                            <p className="text-slate-500 text-xs mt-0.5 mb-6">Abaixo você acompanha qual a porcentagem de convidados confirmados versus o total planejado.</p>
+                        </div>
+                        <GuestsProgressBar guests={guests} className="mb-2" />
+                    </div>
+
+                    {/* Chart Widget */}
+                    <div className="bg-white border border-slate-200 rounded-3xl p-6 shadow-sm flex flex-col justify-between">
+                        <div>
+                            <span className="text-xs font-bold text-emerald-600 uppercase tracking-wider block mb-1">Status Proporcional</span>
+                            <h4 className="font-bold text-slate-800 text-sm">Distribuição das Respostas</h4>
+                        </div>
+                        <div className="h-28 relative flex items-center justify-center my-2">
+                            {confirmedCount + pendingCount + declinedCount > 0 ? (
+                                <ResponsiveContainer width="100%" height="100%">
+                                    <PieChart>
+                                        <Pie
+                                            data={[
+                                                { name: 'Confirmado', value: confirmedCount, color: '#10B981' },
+                                                { name: 'Pendente', value: pendingCount, color: '#F59E0B' },
+                                                { name: 'Recusado', value: declinedCount, color: '#EF4444' }
+                                            ].filter(d => d.value > 0)}
+                                            innerRadius={30}
+                                            outerRadius={45}
+                                            paddingAngle={4}
+                                            dataKey="value"
+                                        >
+                                            {[
+                                                { name: 'Confirmado', value: confirmedCount, color: '#10B981' },
+                                                { name: 'Pendente', value: pendingCount, color: '#F59E0B' },
+                                                { name: 'Recusado', value: declinedCount, color: '#EF4444' }
+                                            ].filter(d => d.value > 0).map((entry: any, index: number) => (
+                                                <Cell key={`cell-${index}`} fill={entry.color} />
+                                            ))}
+                                        </Pie>
+                                    </PieChart>
+                                </ResponsiveContainer>
+                            ) : (
+                                <span className="text-xs text-slate-400 font-bold">Sem respostas gravadas</span>
+                            )}
+                        </div>
+                        <div className="flex justify-center gap-3 text-[10px] font-bold text-slate-500">
+                            <span className="flex items-center gap-1"><span className="w-2.5 h-2.5 rounded-full bg-[#10B981]" /> Conf. ({confirmedCount})</span>
+                            <span className="flex items-center gap-1"><span className="w-2.5 h-2.5 rounded-full bg-[#F59E0B]" /> Pend. ({pendingCount})</span>
+                            <span className="flex items-center gap-1"><span className="w-2.5 h-2.5 rounded-full bg-[#EF4444]" /> Recus. ({declinedCount})</span>
+                        </div>
+                    </div>
+                </div>
 
                 {/* Filters & Search */}
                 <div className="bg-white p-6 rounded-3xl border border-slate-200 shadow-sm mb-6 flex flex-col xl:flex-row gap-4 items-center">
@@ -267,6 +330,15 @@ export const ClientDashboard = () => {
                     )}
                 </div>
             </main>
+
+            <ExecutiveReportModal 
+                isOpen={showReportModal} 
+                onClose={() => setShowReportModal(false)} 
+                event={event} 
+                guests={guests} 
+                agencyName={agencyName} 
+                agencyLogo={agencyLogo} 
+            />
         </div>
     );
 };

@@ -1,7 +1,7 @@
 import React, { createContext, useContext, useEffect, useState } from 'react';
 import { initializeApp } from 'firebase/app';
 import { getAuth, GoogleAuthProvider, onAuthStateChanged, User, signOut } from 'firebase/auth';
-import { getFirestore, doc, onSnapshot, getDocFromServer, initializeFirestore, setLogLevel } from 'firebase/firestore';
+import { getFirestore, doc, onSnapshot, getDocFromServer, initializeFirestore, setLogLevel, updateDoc } from 'firebase/firestore';
 import firebaseConfig from '../firebase-applet-config.json';
 
 const app = initializeApp(firebaseConfig);
@@ -111,7 +111,21 @@ export const FirebaseProvider: React.FC<{ children: React.ReactNode }> = ({ chil
     }
     const unsubscribeProfile = onSnapshot(doc(db, 'users', user.uid), (snapshot: any) => {
       if (snapshot.exists()) {
-        setUserProfile(snapshot.data());
+        
+        let uData = snapshot.data();
+        if (uData.plan && uData.plan !== 'Essencial' && uData.plan !== 'Free' && uData.planExpiresAt) {
+          const expiresAtDate = new Date(uData.planExpiresAt);
+          if (expiresAtDate < new Date()) {
+             // Plan expired
+             console.warn("Plan expired, changing to Essencial");
+             uData = { ...uData, plan: 'Essencial', planExpiresAt: null };
+             // Optional: Do we update doc? It might fail if rules don't permit plan update without credits or something, but we allowed it. 
+             // We can fire an update blindly.
+             updateDoc(doc(db, 'users', snapshot.id), { plan: 'Essencial', planExpiresAt: null }).catch(console.error);
+          }
+        }
+        setUserProfile(uData);
+
       } else {
         setUserProfile(null);
       }

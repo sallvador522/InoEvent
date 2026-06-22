@@ -91,8 +91,8 @@ export const LandingPage: React.FC = () => {
   return (
     <div className="min-h-screen relative font-display overflow-x-hidden bg-white">
       <SEO 
-        title="Crie Convites Digitais Interativos de Casamento e Chás" 
-        description="A plataforma mais elegante para criar seus convites de casamento, chás de panela ou noivado. Design premium, confirmação RSVP instantânea, controle de presença com QR Code e mais."
+        title="Convites Digitais em Angola | Casamentos e Eventos" 
+        description="A plataforma mais elegante de Angola para criar seus convites de casamento, chás de panela ou noivado. Confirmação instantânea (RSVP), UX premium e mais."
       />
       
       {/* Background Subtle Gradient */}
@@ -105,92 +105,165 @@ export const LandingPage: React.FC = () => {
 
       <main className="relative z-10 flex flex-col gap-0 pb-24">
         
-        {/* HERO BANNER SECTION (New) */}
-        <section className="relative w-full h-[65vh] md:h-[80vh] min-h-[500px] overflow-hidden">
-           {/* Background Image with slight zoom effect */}
-           <div className="absolute inset-0 bg-cover bg-center bg-no-repeat transform scale-105" 
-                style={{backgroundImage: "url('https://images.unsplash.com/photo-1583939003579-730e3918a45a?q=80&w=2670&auto=format&fit=crop')"}}>
-           </div>
+        {/* HERO BANNER SECTION (High-Conversion, Spatial UI) */}
+        <section className="relative w-full min-h-[90vh] md:min-h-[100vh] flex flex-col justify-center overflow-hidden bg-[#FDFBF7] pt-24 md:pt-16">
+           {/* Ambient Background Glows */}
+           <div className="absolute top-0 left-1/2 -translate-x-1/2 w-full max-w-4xl h-[400px] bg-brand-blue/10 blur-[120px] rounded-full pointer-events-none" />
+           <div className="absolute top-1/4 right-0 w-[500px] h-[500px] bg-[#BF9B30]/5 blur-[100px] rounded-full pointer-events-none" />
            
-           {/* Overlays */}
-           <div className="absolute inset-0 bg-black/10"></div>
-           <div className="absolute inset-0 bg-gradient-to-t from-black/50 via-transparent to-black/20"></div>
-
-           {/* Content Centered */}
+           {/* Trust Badge Top */}
            <motion.div 
-              initial={{ opacity: 0, scale: 0.95 }}
-              animate={{ opacity: 1, scale: 1 }}
-              transition={{ duration: 1, ease: "easeOut" }}
-              className="absolute inset-0 flex flex-col items-center justify-center text-center text-white px-4"
+             initial={{ opacity: 0, y: 20 }}
+             animate={{ opacity: 1, y: 0 }}
+             transition={{ duration: 0.8, ease: "easeOut", delay: 0.1 }}
+             className="relative z-20 flex justify-center w-full mb-8"
            >
-              <span className="font-display font-medium tracking-[0.3em] text-xs md:text-sm uppercase mb-2 md:mb-4 drop-shadow-md">
-                Convites & Experiências Digitais
-              </span>
+              <div className="flex items-center gap-3 bg-white/60 backdrop-blur-md border border-slate-200/60 px-4 py-2 rounded-full shadow-sm">
+                 <div className="flex -space-x-2">
+                    <img src="https://i.pravatar.cc/100?img=1" className="w-6 h-6 rounded-full border-2 border-white" alt="User" />
+                    <img src="https://i.pravatar.cc/100?img=5" className="w-6 h-6 rounded-full border-2 border-white" alt="User" />
+                    <img src="https://i.pravatar.cc/100?img=9" className="w-6 h-6 rounded-full border-2 border-white" alt="User" />
+                 </div>
+                 <div className="flex items-center gap-1 text-[#BF9B30]">
+                    <span className="material-symbols-outlined text-sm font-bold">star</span>
+                    <span className="material-symbols-outlined text-sm font-bold">star</span>
+                    <span className="material-symbols-outlined text-sm font-bold">star</span>
+                    <span className="material-symbols-outlined text-sm font-bold">star</span>
+                    <span className="material-symbols-outlined text-sm font-bold">star</span>
+                 </div>
+                 <span className="text-xs font-semibold text-slate-600 ml-1">Amado por +10.000 clientes</span>
+              </div>
+           </motion.div>
+
+           <div className="relative z-20 max-w-5xl mx-auto px-6 text-center flex flex-col items-center">
               
-              <h1 className="font-script text-7xl md:text-[9rem] leading-none mb-4 md:mb-6 drop-shadow-lg text-white">
-                Amor & Eternidade
-              </h1>
+              <motion.h1 
+                 initial={{ opacity: 0, y: 30 }}
+                 animate={{ opacity: 1, y: 0 }}
+                 transition={{ duration: 0.9, ease: [0.22, 1, 0.36, 1], delay: 0.2 }}
+                 className="text-5xl md:text-7xl lg:text-[5rem] font-serif font-bold text-slate-900 tracking-tight leading-[1.05] mb-6"
+              >
+                 Convites Digitais de <br className="hidden md:block"/>
+                 <span className="text-transparent bg-clip-text bg-gradient-to-r from-brand-blue flex-col md:flex-row to-[#BF9B30] inline-block mt-2">Nível Elite.</span>
+              </motion.h1>
               
-              <div className="flex items-center gap-4 mb-10">
-                 <div className="h-px w-8 md:w-16 bg-white/80"></div>
-                 <span className="font-serif italic text-lg md:text-2xl tracking-wide drop-shadow-md">
-                   Planeje seu evento perfeito
-                 </span>
-                 <div className="h-px w-8 md:w-16 bg-white/80"></div>
+              <motion.p 
+                 initial={{ opacity: 0, y: 20 }}
+                 animate={{ opacity: 1, y: 0 }}
+                 transition={{ duration: 0.8, ease: "easeOut", delay: 0.4 }}
+                 className="text-lg md:text-xl text-slate-600 max-w-2xl mx-auto leading-relaxed mb-10 font-light"
+              >
+                 Diga adeus ao papel. Impressione seus convidados com uma experiência interativa, confirme presenças automaticamente e receba presentes, tudo em um só lugar.
+              </motion.p>
+              
+              <motion.div 
+                 initial={{ opacity: 0, y: 20 }}
+                 animate={{ opacity: 1, y: 0 }}
+                 transition={{ duration: 0.8, ease: "easeOut", delay: 0.5 }}
+                 className="flex flex-col sm:flex-row items-center justify-center gap-4 w-full"
+              >
+                {/* Primary CTA */}
+                <button 
+                   onClick={handleCreateEvent}
+                   className="w-full sm:w-auto px-8 py-4 bg-slate-900 text-white font-bold rounded-full hover:bg-brand-blue hover:-translate-y-1 transition-all duration-300 shadow-[0_10px_30px_rgba(0,0,0,0.15)] hover:shadow-[0_15px_35px_rgba(0,0,0,0.25)] flex items-center justify-center gap-2 group"
+                >
+                   <span>Comece Grátis Agora</span>
+                   <span className="material-symbols-outlined text-[18px] group-hover:translate-x-1 transition-transform">arrow_forward</span>
+                </button>
+                
+                {/* Secondary CTA */}
+                <Link 
+                  to="/templates"
+                  className="w-full sm:w-auto px-8 py-4 bg-white border border-slate-200 text-slate-700 font-bold rounded-full hover:bg-slate-50 hover:border-slate-300 transition-all duration-300 shadow-sm flex items-center justify-center gap-2"
+                >
+                  <span className="material-symbols-outlined text-[18px] text-[#BF9B30]">view_carousel</span>
+                  <span>Ver Todos os Modelos</span>
+                </Link>
+              </motion.div>
+           </div>
+
+           {/* Hero Floating Mockups / Abstract Product Visualization */}
+           <motion.div 
+             initial={{ opacity: 0, y: 60 }}
+             animate={{ opacity: 1, y: 0 }}
+             transition={{ duration: 1.2, ease: [0.16, 1, 0.3, 1], delay: 0.6 }}
+             className="relative z-10 w-full max-w-6xl mx-auto mt-16 md:mt-24 px-4 h-[300px] md:h-[400px]"
+           >
+              {/* Center Templates Preview Mockup */}
+              <div className="absolute left-1/2 -translate-x-1/2 top-0 w-[90%] md:w-[700px] h-full bg-white rounded-t-3xl border border-slate-200 shadow-[0_-10px_50px_rgba(0,0,0,0.05)] overflow-hidden flex flex-col">
+                 <div className="h-10 bg-slate-50 border-b border-slate-100 flex items-center px-4 gap-2 shrink-0 z-10">
+                    <div className="w-3 h-3 rounded-full bg-slate-300"></div>
+                    <div className="w-3 h-3 rounded-full bg-slate-300"></div>
+                    <div className="w-3 h-3 rounded-full bg-slate-300"></div>
+                 </div>
+                 <div className="flex-1 bg-slate-50 p-4 md:p-6 overflow-hidden relative">
+                    <div className="absolute inset-0 bg-gradient-to-b from-slate-50 via-transparent to-slate-50 z-10 pointer-events-none"></div>
+                    <div className="grid grid-cols-2 md:grid-cols-3 gap-6 h-full relative z-0">
+                       <motion.div 
+                          animate={{ y: ["0%", "-50%"] }}
+                          transition={{ repeat: Infinity, duration: 40, ease: "linear" }}
+                          className="flex flex-col gap-6"
+                       >
+                          <img src="/bridal-templates/templateCha1.png" className="rounded-2xl shadow-sm object-cover w-full aspect-[3/4]" alt="Template" />
+                          <img src="https://images.unsplash.com/photo-1519225421980-715cb0215aed?q=80&w=800&auto=format&fit=crop" className="rounded-2xl shadow-sm object-cover w-full aspect-[4/5]" alt="Template" />
+                          <img src="/bridal-templates/templateCha3.png" className="rounded-2xl shadow-sm object-cover w-full aspect-[3/4]" alt="Template" />
+                          <img src="/bridal-templates/templateCha1.png" className="rounded-2xl shadow-sm object-cover w-full aspect-[3/4]" alt="Template" />
+                       </motion.div>
+                       <motion.div 
+                          animate={{ y: ["-50%", "0%"] }}
+                          transition={{ repeat: Infinity, duration: 50, ease: "linear" }}
+                          className="flex flex-col gap-6 mt-[-50%]"
+                       >
+                          <img src="https://images.unsplash.com/photo-1511285560929-80b456fea0bc?q=80&w=800&auto=format&fit=crop" className="rounded-2xl shadow-sm object-cover w-full aspect-[4/5]" alt="Template" />
+                          <img src="/bridal-templates/templateCha2.png" className="rounded-2xl shadow-sm object-cover w-full aspect-[3/4]" alt="Template" />
+                          <img src="https://images.unsplash.com/photo-1519741497674-611481863552?q=80&w=800&auto=format&fit=crop" className="rounded-2xl shadow-sm object-cover w-full aspect-[4/5]" alt="Template" />
+                          <img src="https://images.unsplash.com/photo-1511285560929-80b456fea0bc?q=80&w=800&auto=format&fit=crop" className="rounded-2xl shadow-sm object-cover w-full aspect-[4/5]" alt="Template" />
+                       </motion.div>
+                       <motion.div 
+                          animate={{ y: ["0%", "-50%"] }}
+                          transition={{ repeat: Infinity, duration: 45, ease: "linear" }}
+                          className="hidden md:flex flex-col gap-6 mt-[-20%]"
+                       >
+                          <img src="https://images.unsplash.com/photo-1515934751635-c81c6bc9a2d8?q=80&w=800&auto=format&fit=crop" className="rounded-2xl shadow-sm object-cover w-full aspect-[3/4]" alt="Template" />
+                          <img src="/bridal-templates/templateCha4.png" className="rounded-2xl shadow-sm object-cover w-full aspect-[3/4]" alt="Template" />
+                          <img src="https://images.unsplash.com/photo-1469334031218-e382a71b716b?q=80&w=800&auto=format&fit=crop" className="rounded-2xl shadow-sm object-cover w-full aspect-[4/5]" alt="Template" />
+                          <img src="https://images.unsplash.com/photo-1515934751635-c81c6bc9a2d8?q=80&w=800&auto=format&fit=crop" className="rounded-2xl shadow-sm object-cover w-full aspect-[3/4]" alt="Template" />
+                       </motion.div>
+                    </div>
+                 </div>
               </div>
 
-              <div className="flex flex-col sm:flex-row items-center gap-5 mt-4">
-                <motion.button 
-                   whileHover={{ scale: 1.05 }}
-                   whileTap={{ scale: 0.95 }}
-                   onClick={handleCreateEvent}
-                   className="px-8 py-4 bg-white/10 backdrop-blur-md border border-white/40 text-white font-bold rounded-full hover:bg-white hover:text-brand-blue transition-all duration-300 shadow-2xl"
-                >
-                   {user ? 'CRIAR EVENTOS' : 'COMEÇAR AGORA'}
-                </motion.button>
-                
-                <motion.div 
-                   whileHover={{ scale: 1.05, y: -2 }}
-                   whileTap={{ scale: 0.95 }}
-                   className="relative group"
-                >
-                   <span className="absolute -top-2 -right-2 flex h-5 w-5 z-10">
-                     <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-emerald-400 opacity-75"></span>
-                     <span className="relative inline-flex rounded-full h-5 w-5 bg-emerald-500 border border-white"></span>
-                   </span>
-                   <Link 
-                     to="/plans"
-                     className="px-8 py-4 bg-brand-blue/80 backdrop-blur-md border border-brand-blue/50 text-white font-bold rounded-full hover:bg-brand-blue transition-all duration-300 shadow-[0_0_20px_rgba(0,0,0,0.3)] group-hover:shadow-[0_0_25px_rgba(255,255,255,0.2)] flex items-center gap-2"
-                   >
-                     <span>VER PREÇOS</span>
-                     <span className="ml-2 pl-2 border-l border-white/20 text-xs text-blue-100 font-medium">A partir de 7.500 Kz</span>
-                   </Link>
-                </motion.div>
-              </div>
+              {/* Left Overlay Phone Mockup */}
+              <motion.div 
+                 animate={{ y: [0, -10, 0] }}
+                 transition={{ repeat: Infinity, duration: 6, ease: "easeInOut" }}
+                 className="absolute left-2 md:left-24 top-12 w-[160px] md:w-[220px] h-[320px] md:h-[420px] bg-white rounded-3xl border-4 md:border-8 border-slate-900 shadow-2xl flex flex-col overflow-hidden z-20"
+              >
+                 <img src="/bridal-templates/templateCha4.png" className="w-full h-full object-cover" alt="Phone Template Preview" />
+                 <div className="absolute bottom-4 left-1/2 -translate-x-1/2 w-[80%] bg-white/90 backdrop-blur text-center py-2 rounded-full text-[10px] sm:text-xs font-bold shadow-lg">
+                    Confirmar Presença
+                 </div>
+              </motion.div>
+
+              {/* Right Overlay Event Card */}
+              <motion.div 
+                 animate={{ y: [0, 8, 0] }}
+                 transition={{ repeat: Infinity, duration: 5, ease: "easeInOut", delay: 1 }}
+                 className="absolute right-0 md:right-16 top-24 w-[180px] md:w-[260px] rounded-2xl bg-white/80 backdrop-blur-xl border border-white p-4 shadow-[0_20px_40px_rgba(0,0,0,0.1)] hidden sm:block"
+              >
+                 <div className="w-12 h-12 rounded-full bg-emerald-100 flex items-center justify-center mb-4 text-emerald-600">
+                    <span className="material-symbols-outlined">check_circle</span>
+                 </div>
+                 <h4 className="font-bold text-slate-800 mb-1">Presença Confirmada</h4>
+                 <p className="text-xs text-slate-500 mb-4">Ana Clara Silva confirmou para o seu Casamento.</p>
+                 <div className="text-xs font-bold text-brand-blue bg-blue-50 py-2 px-3 rounded-lg text-center">
+                    Ver Lista (142/200)
+                 </div>
+              </motion.div>
            </motion.div>
         </section>
 
-        {/* Templates CTA Section */}
-        <section className="flex flex-col items-center justify-center mt-12 mb-12 bg-slate-50/50 rounded-3xl border border-slate-100 py-24 px-6 max-w-7xl mx-auto w-full">
-          <div className="max-w-3xl w-full text-center space-y-8">
-            <span className="material-symbols-outlined text-5xl text-brand-blue">auto_awesome</span>
-            <h3 className="text-brand-blue text-4xl md:text-5xl font-serif font-bold">Galeria de Modelos</h3>
-            <p className="text-slate-500 text-lg md:text-xl max-w-2xl mx-auto">
-              Explore nossa coleção exclusiva de modelos para casamentos, chás de panela, aniversários e muito mais. Escolha o design perfeito e personalize para o seu evento.
-            </p>
-            <div className="pt-6">
-              <MotionLink 
-                 to="/templates"
-                 className="inline-flex items-center gap-3 bg-brand-blue text-white px-10 py-5 rounded-full font-bold shadow-lg shadow-brand-blue/30 hover:shadow-xl hover:-translate-y-1 hover:shadow-brand-blue/40 transition-all"
-                 whileHover={{ scale: 1.05 }}
-                 whileTap={{ scale: 0.95 }}
-              >
-                 <span className="text-sm uppercase tracking-widest">Ver Todos os Modelos</span>
-                 <span className="material-symbols-outlined">arrow_forward</span>
-              </MotionLink>
-            </div>
-          </div>
-        </section>
+        {/* Templates CTA Section (Removed) */}
 
         {/* Features Section */}
         <section id="features" className="px-6 flex flex-col gap-10 max-w-5xl mx-auto w-full pt-8 pb-12">
@@ -316,8 +389,8 @@ export const LandingPage: React.FC = () => {
 
       {/* Mobile Sticky Bottom CTA */}
       <div className="fixed bottom-0 left-0 right-0 p-4 bg-white border-t border-slate-100 z-40 md:hidden shadow-[0_-5px_20px_rgba(0,0,0,0.05)]">
-        <button onClick={handleCreateEvent} className="w-full h-12 bg-brand-blue text-white font-bold rounded-xl shadow-lg flex items-center justify-center gap-2 active:scale-95 transition-transform">
-          <span>{user ? 'Criar Eventos' : 'Começar Agora'}</span>
+        <button onClick={handleCreateEvent} className="w-full h-12 bg-slate-900 text-white font-bold rounded-xl shadow-lg flex items-center justify-center gap-2 active:scale-95 transition-transform">
+          <span>{user ? 'Criar Eventos' : 'Comece Grátis Agora'}</span>
           <span className="material-symbols-outlined text-sm">arrow_forward</span>
         </button>
       </div>

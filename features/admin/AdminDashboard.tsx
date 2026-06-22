@@ -19,6 +19,7 @@ export const AdminDashboard: React.FC = () => {
 
   // Notifications & Plan Upgrades State
   const [notificationTargetUserId, setNotificationTargetUserId] = useState<string | null>(null);
+  const [planCycle, setPlanCycle] = useState<'mensal' | 'anual'>('mensal');
   const [notificationTitle, setNotificationTitle] = useState('');
   const [notificationMessage, setNotificationMessage] = useState('');
   const [notificationType, setNotificationType] = useState<'plan_upgrade' | 'admin_alert' | 'system'>('admin_alert');
@@ -81,8 +82,17 @@ export const AdminDashboard: React.FC = () => {
     if (!notificationTargetUserId) return;
     try {
       if (pendingPlanChange) {
-        await updateDoc(doc(db, 'users', pendingPlanChange.userId), { plan: pendingPlanChange.nextPlan });
-        setUsers(users.map(u => u.id === pendingPlanChange.userId ? { ...u, plan: pendingPlanChange.nextPlan } : u));
+        const date = new Date(Date.now());
+        if (planCycle === 'mensal') {
+          date.setMonth(date.getMonth() + 1);
+        } else {
+          date.setFullYear(date.getFullYear() + 1);
+        }
+        await updateDoc(doc(db, 'users', pendingPlanChange.userId), { 
+          plan: pendingPlanChange.nextPlan,
+          planExpiresAt: pendingPlanChange.nextPlan === 'Essencial' ? null : date.toISOString()
+        });
+        setUsers(users.map(u => u.id === pendingPlanChange.userId ? { ...u, plan: pendingPlanChange.nextPlan, planExpiresAt: pendingPlanChange.nextPlan === 'Essencial' ? null : date.toISOString() } : u));
         if (selectedUser?.id === pendingPlanChange.userId) {
           setSelectedUser({ ...selectedUser, plan: pendingPlanChange.nextPlan });
         }
@@ -614,6 +624,21 @@ export const AdminDashboard: React.FC = () => {
                     </p>
                   </div>
                 </div>
+
+                
+                {pendingPlanChange && pendingPlanChange.nextPlan !== 'Essencial' && (
+                  <div className="mb-4">
+                    <label className="block text-xs font-bold text-slate-500 uppercase tracking-wider mb-2">Ciclo do Plano</label>
+                    <select 
+                      value={planCycle}
+                      onChange={(e) => setPlanCycle(e.target.value as 'mensal' | 'anual')}
+                      className="w-full px-3.5 py-2.5 text-sm border border-slate-200 rounded-xl focus:ring-brand-blue focus:border-brand-blue outline-none font-medium text-slate-800 bg-slate-50/50"
+                    >
+                      <option value="mensal">Mensal (1 Mês)</option>
+                      <option value="anual">Anual (1 Ano)</option>
+                    </select>
+                  </div>
+                )}
 
                 {pendingPlanChange && (
                   <div className="bg-blue-50/50 border border-blue-100 p-3.5 rounded-xl mb-4 text-xs">

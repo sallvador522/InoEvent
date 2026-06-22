@@ -268,6 +268,11 @@ export const UserDashboard: React.FC = () => {
                                     }`}>
                                         Plano {userProfile?.plan || 'Essencial'}
                                     </span>
+                                    {userProfile?.planExpiresAt && (
+                                        <span className="text-[10px] font-bold uppercase tracking-widest text-brand-blue/80 hidden sm:inline">
+                                            (Expira: {new Date(userProfile.planExpiresAt).toLocaleDateString('pt-BR')})
+                                        </span>
+                                    )}
                                 </div>
                                 <h3 className={`text-lg font-serif font-bold mt-1 ${
                                     userProfile?.plan === 'Business' || userProfile?.plan === 'Corporate' ? 'text-white' : 'text-slate-800'

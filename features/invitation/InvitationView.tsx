@@ -1,64 +1,1365 @@
 
-import React, { useState, useEffect } from 'react';
-import { useParams } from 'react-router-dom';
-import { motion } from 'framer-motion';
-import { getEventById } from '../../mockData';
-import { EventDetails } from '../../types';
-import { TocaPlayer } from '../../components/music/TocaPlayer';
-import { BottomSheet } from '../../components/ui/BottomSheet';
-import { Button } from '../../components/ui/Button';
-
 // ============================================================================
 // COMPONENT: INVITATION CONTROLLER
 // Decides which layout to render based on event.layoutMode
 // ============================================================================
+import React, { useState, useEffect, useRef } from 'react';
+import { createPortal } from 'react-dom';
+import { useParams, useNavigate, Link } from 'react-router-dom';
+import { motion, AnimatePresence } from 'framer-motion';
+import { getEventById, EVENTS } from '../../mockData';
+import { EventDetails, LayoutMode, ThemeType, TimelineItem, GiftItem } from '../../types';
+import { TocaPlayer } from '../../components/music/TocaPlayer';
+import { BottomSheet } from '../../components/ui/BottomSheet';
+import { Button } from '../../components/ui/Button';
+import { db, useFirebase } from '../../components/FirebaseProvider';
+import { doc, getDoc, setDoc, updateDoc, collection } from 'firebase/firestore';
+import { signInWithEmailAndPassword, createUserWithEmailAndPassword, signInWithPopup, GoogleAuthProvider } from 'firebase/auth';
+import { auth } from '../../components/FirebaseProvider';
+import toast from 'react-hot-toast';
+
+// Helper to safely get image source URL from string or custom object
+const getImageUrl = (img: any): string => {
+  if (typeof img === 'string') return img;
+  if (img && typeof img === 'object' && img.url) return img.url;
+  return '';
+};
+
+// Beautiful Wedding Background Presets from Unsplash
+const IMAGE_PRESETS = [
+  { name: 'Arco Clássico', url: 'https://images.unsplash.com/photo-1519741497674-611481863552?q=80&w=2574&auto=format&fit=crop' },
+  { name: 'Casal Etereal', url: 'https://images.unsplash.com/photo-1520854221256-17451cc331bf?q=80&w=2670&auto=format&fit=crop' },
+  { name: 'Jardim de Rosas', url: 'https://images.unsplash.com/photo-1523438885200-e635ba2c371e?q=80&w=2574&auto=format&fit=crop' },
+  { name: 'Salão Real', url: 'https://images.unsplash.com/photo-1537633552985-df8429e8048b?q=80&w=2670&auto=format&fit=crop' },
+  { name: 'Pôr do Sol Rústico', url: 'https://images.unsplash.com/photo-1465495976277-4387d4b0b4c6?q=80&w=2698&auto=format&fit=crop' },
+  { name: 'Galeria Industrial', url: 'https://images.unsplash.com/photo-1510076857177-7470076d4098?q=80&w=2672&auto=format&fit=crop' },
+  { name: 'Maquilhagem Chá', url: 'https://images.unsplash.com/photo-1596462502278-27bfdc403348?q=80&w=2000&auto=format&fit=crop' },
+  { name: 'Chá Vintage Estilo', url: 'https://images.unsplash.com/photo-1582662057262-6718cf2ce64b?q=80&w=2000&auto=format&fit=crop' }
+];
+
+// Available romantic soundtrack files in player
+const TRACK_PRESETS = [
+  'Canon in D - Piano',
+  'A Thousand Years - Christina Perri',
+  'Turning Page - Sleeping At Last',
+  'La Vie En Rose - Instrumental',
+  'Waltz No. 2 - Shostakovich',
+  'I Won\'t Give Up - Jason Mraz',
+  'Samba Rock',
+  'Bossa Nova Cover',
+  'No Music'
+];
+
+// Available templates list for layout switcher
+const LAYOUT_PRESETS: { mode: LayoutMode; name: string }[] = [
+  { mode: 'CLASSIC', name: 'Clássico Romântico' },
+  { mode: 'MODERN', name: 'Minimalista Etéreo' },
+  { mode: 'LUXURY', name: 'Luxuoso Black Tie' },
+  { mode: 'GARDEN', name: 'Jardim Elegante' },
+  { mode: 'RUSTIC', name: 'Rústico Chic' },
+  { mode: 'INDUSTRIAL', name: 'Industrial Urbano' },
+  { mode: 'BRIDAL_BEAUTY', name: 'Chá Recatado / Beleza' },
+  { mode: 'BRIDAL_ROMANTIC', name: 'Chá Romântico Rosas' },
+  { mode: 'BRIDAL_MINIMAL', name: 'Chá Minimal de Luxo' },
+  { mode: 'BRIDAL_TEA_PARTY', name: 'Chá da Tarde Vintage' },
+  { mode: 'BRIDAL_CHEF', name: 'Chá das Noivas Chef' },
+  { mode: 'BRIDAL_TROPICAL', name: 'Chá Tropical Folhas' }
+];
+
+// ============================================================================
+// COMPONENT: INLINE EDITABLE FIELD
+// Seamlessly swaps text element with an input/textarea in-place on hover/click
+// ============================================================================
+const EditableField: React.FC<{
+  value: string;
+  onChange: (newVal: string) => void;
+  className?: string;
+  multiline?: boolean;
+  isEditing?: boolean;
+}> = ({ value, onChange, className = '', multiline = false, isEditing = false }) => {
+  const [isFieldEditing, setIsFieldEditing] = useState(false);
+  const [tempValue, setTempValue] = useState(value);
+
+  useEffect(() => {
+    setTempValue(value);
+  }, [value]);
+
+  const handleSave = () => {
+    setIsFieldEditing(false);
+    if (tempValue !== value) {
+      onChange(tempValue);
+    }
+  };
+
+  const handleCancel = () => {
+    setTempValue(value);
+    setIsFieldEditing(false);
+  };
+
+  if (!isEditing) {
+    return <span className={className}>{value}</span>;
+  }
+
+  return (
+    <>
+      <span
+        onClick={(e) => {
+          e.stopPropagation();
+          setIsFieldEditing(true);
+        }}
+        className={`group relative cursor-pointer border-2 border-dashed border-[#BF9B30]/30 hover:border-[#BF9B30]/80 bg-[#BF9B30]/[0.02] hover:bg-[#BF9B30]/10 px-3 py-1 rounded-2xl transition-all duration-300 inline-flex items-center gap-1.5 max-w-full text-center ${className}`}
+        title="Toque para editar"
+      >
+        <span>{value || '(Toque para editar)'}</span>
+        {/* Subtle edit pencil icon */}
+        <span className="opacity-0 group-hover:opacity-100 transition-all duration-300 ml-1 bg-[#1A2026] border border-[#BF9B30]/40 text-[#BF9B30] rounded-full w-5 h-5 shadow-[0_4px_10px_rgba(0,0,0,0.3)] flex items-center justify-center shrink-0 scale-[0.85] hover:scale-105 active:scale-95">
+          <span className="material-symbols-outlined text-[10px] font-bold">edit</span>
+        </span>
+      </span>
+
+      {isFieldEditing && createPortal(
+        <div className="fixed inset-0 bg-[#0F1419]/90 backdrop-blur-md flex items-center justify-center p-4 z-[120] animate-in fade-in duration-200">
+          <div 
+            className="bg-[#0F1419] border border-[#BF9B30]/30 rounded-3xl w-full max-w-sm shadow-[0_20px_50px_rgba(0,0,0,0.5)] flex flex-col overflow-hidden animate-in zoom-in-95 duration-200" 
+            onClick={(e) => e.stopPropagation()}
+          >
+            
+            {/* Modal Header */}
+            <div className="p-4 border-b border-[#BF9B30]/20 flex items-center justify-between bg-[#0F1419]/80 backdrop-blur-md">
+              <div className="flex items-center gap-2">
+                <span className="material-symbols-outlined text-[#BF9B30] text-[18px]">edit_note</span>
+                <span className="font-bold text-white text-xs uppercase tracking-widest">Editar Texto</span>
+              </div>
+              <button
+                onClick={handleCancel}
+                className="w-8 h-8 rounded-full bg-white/5 hover:bg-[#BF9B30]/20 text-gray-400 hover:text-[#BF9B30] flex items-center justify-center transition-all cursor-pointer active:scale-95"
+              >
+                <span className="material-symbols-outlined text-[16px]">close</span>
+              </button>
+            </div>
+
+            {/* Modal Body */}
+            <div className="p-6">
+              {multiline ? (
+                <textarea
+                  autoFocus
+                  value={tempValue}
+                  onChange={(e) => setTempValue(e.target.value)}
+                  className="w-full bg-[#1A2026] border border-[#BF9B30]/30 rounded-xl px-4 py-3 text-sm text-white focus:outline-none focus:border-[#BF9B30] transition-colors custom-scrollbar resize-none"
+                  rows={4}
+                  placeholder="Escreva aqui..."
+                  style={{ font: 'inherit', textAlign: 'inherit' }}
+                />
+              ) : (
+                <input
+                  autoFocus
+                  type="text"
+                  value={tempValue}
+                  onChange={(e) => setTempValue(e.target.value)}
+                  onKeyDown={(e) => {
+                    if (e.key === 'Enter') handleSave();
+                  }}
+                  className="w-full bg-[#1A2026] border border-[#BF9B30]/30 rounded-xl px-4 py-3 text-sm text-white focus:outline-none focus:border-[#BF9B30] transition-colors"
+                  placeholder="Escreva aqui..."
+                  style={{ font: 'inherit', textAlign: 'inherit' }}
+                />
+              )}
+            </div>
+
+            {/* Modal Footer */}
+            <div className="p-5 border-t border-[#BF9B30]/20 bg-[#0F1419]/90 backdrop-blur-md flex justify-end">
+              <button
+                onClick={handleSave}
+                className="px-6 py-2.5 bg-[#BF9B30] hover:bg-white text-[#0F1419] text-xs font-bold uppercase tracking-widest rounded-xl transition-all shadow-[0_5px_15px_rgba(191,155,48,0.2)] cursor-pointer active:scale-95"
+              >
+                Concluído
+              </button>
+            </div>
+          </div>
+        </div>,
+        document.body
+      )}
+    </>
+  );
+};
+
+// Image upload compression helper
+const compressImage = (file: File): Promise<string> => {
+  return new Promise((resolve, reject) => {
+    const reader = new FileReader();
+    reader.readAsDataURL(file);
+    reader.onload = (event) => {
+      const img = new Image();
+      img.src = event.target?.result as string;
+      img.onload = () => {
+        const canvas = document.createElement('canvas');
+        let { width, height } = img;
+        const MAX_WIDTH = 1200;
+        const MAX_HEIGHT = 1200;
+
+        if (width > height) {
+          if (width > MAX_WIDTH) {
+            height = Math.round((height * MAX_WIDTH) / width);
+            width = MAX_WIDTH;
+          }
+        } else {
+          if (height > MAX_HEIGHT) {
+            width = Math.round((width * MAX_HEIGHT) / height);
+            height = MAX_HEIGHT;
+          }
+        }
+
+        canvas.width = width;
+        canvas.height = height;
+        const ctx = canvas.getContext('2d');
+        ctx?.drawImage(img, 0, 0, width, height);
+        resolve(canvas.toDataURL('image/jpeg', 0.8));
+      };
+      img.onerror = (err) => reject(err);
+    };
+    reader.onerror = (err) => reject(err);
+  });
+};
+
+// Sub-component: ImageUploadField inside the same file for ease of bundler compilation
+const ImageUploadField = ({ label, value, onChange }: { label: string; value: string; onChange: (base64: string) => void }) => {
+  const [isUploading, setIsUploading] = useState(false);
+  const fileInputRef = useRef<HTMLInputElement>(null);
+
+  const handleFileChange = async (e: React.ChangeEvent<HTMLInputElement>) => {
+    if (!e.target.files?.length) return;
+    setIsUploading(true);
+    try {
+      const base64 = await compressImage(e.target.files[0]);
+      onChange(base64);
+      toast.success('Imagem processada com sucesso!');
+    } catch (err) {
+      console.error(err);
+      toast.error('Erro ao processar imagem.');
+    } finally {
+      setIsUploading(false);
+    }
+  };
+
+  return (
+    <div className="space-y-2 bg-slate-800 p-4 rounded-xl border border-slate-700/60 shadow-inner">
+      <label className="block text-[11px] font-bold uppercase tracking-wider text-slate-400">{label}</label>
+      <div className="flex items-center gap-3">
+        {value ? (
+          <img src={value} className="w-14 h-14 object-cover rounded-lg border border-slate-700" alt="" />
+        ) : (
+          <div className="w-14 h-14 bg-slate-900 rounded-lg border border-dashed border-slate-800 flex items-center justify-center text-slate-600 text-[10px] text-center px-1 font-mono">Sem Foto</div>
+        )}
+        <div className="flex-1 space-y-1">
+          <button
+            type="button"
+            onClick={() => fileInputRef.current?.click()}
+            disabled={isUploading}
+            className="px-3 py-1.5 bg-violet-600 hover:bg-violet-700 disabled:bg-violet-800 text-white rounded-lg text-xs font-bold transition-all shadow-md active:scale-95 cursor-pointer"
+          >
+            {isUploading ? 'Compactando...' : 'Fazer Upload'}
+          </button>
+          <input
+            type="file"
+            ref={fileInputRef}
+            onChange={handleFileChange}
+            accept="image/*"
+            className="hidden"
+          />
+          <div className="text-[9px] text-slate-500 font-medium">Ou cole a URL direta:</div>
+          <input
+            type="text"
+            value={value || ''}
+            onChange={(e) => onChange(e.target.value)}
+            className="w-full bg-slate-900 border border-slate-850 rounded-lg px-2 py-1 text-[11px] text-slate-300 focus:outline-none focus:border-violet-500"
+            placeholder="https://..."
+          />
+        </div>
+      </div>
+    </div>
+  );
+};
+
+// ============================================================================
+// COMPONENT: INVITATION CONTROLLER
+// Decides which layout to render and runs the master visual templates editor workspace
+// ============================================================================
 const InvitationView: React.FC = () => {
   const { id } = useParams();
-  const event = getEventById(id || '');
-  const [isRSVPOpen, setRSVPOpen] = useState(false);
+  const navigate = useNavigate();
+  const { user, userProfile } = useFirebase();
 
-  // Scroll to top on mount to ensure the user sees the Hero section first
+  // Load event either from Firestore custom URL or template static mockup
+  const [event, setEvent] = useState<EventDetails | null>(() => {
+    return getEventById(id || '') || null;
+  });
+  const [localEvent, setLocalEvent] = useState<EventDetails | null>(null);
+  const [firebaseLoading, setFirebaseLoading] = useState(true);
+  const [isRSVPOpen, setRSVPOpen] = useState(false);
+  const [isBannerCollapsed, setIsBannerCollapsed] = useState(false);
+
+  // Workspace visual management variables
+  const isEditing = new URLSearchParams(window.location.search).get('edit') === 'true';
+  const [sidebarTab, setSidebarTab] = useState<'style' | 'texts' | 'locations' | 'timeline' | 'gifts' | 'save' | 'gallery'>('style');
+  const [activeModal, setActiveModal] = useState<'style' | 'locations' | 'timeline' | 'gifts' | 'gallery' | null>(null);
+  const [showLayersPanel, setShowLayersPanel] = useState(true);
+  const [isSaving, setIsSaving] = useState(false);
+  const [mobileView, setMobileView] = useState<'editor' | 'preview'>('preview');
+  const [showGuideTip, setShowGuideTip] = useState(true);
+  
+  // Auth state modal vars
+  const [isAuthOpen, setIsAuthOpen] = useState(false);
+  const [authEmail, setAuthEmail] = useState('');
+  const [authPassword, setAuthPassword] = useState('');
+  const [authName, setAuthName] = useState('');
+  const [isSignUp, setIsSignUp] = useState(true);
+  const [authLoading, setAuthLoading] = useState(false);
+  const [isEditorBarExpanded, setIsEditorBarExpanded] = useState(false);
+
+  // Scroll to top on mount
   useEffect(() => {
     window.scrollTo(0, 0);
   }, []);
 
-  if (!event) return <div className="p-10 text-center">Evento não encontrado.</div>;
+  // Sync loaded event with our free active customizer drafts state
+  useEffect(() => {
+    const fetchEvent = async () => {
+      if (!id) return;
+      
+      const staticEvent = getEventById(id);
+      if (staticEvent) {
+        if (isEditing) {
+          // Clone mockup templates to a customizable workspace project
+          setLocalEvent({
+            ...staticEvent,
+            id: `evt_${Math.random().toString(36).substr(2, 9)}`,
+            ownerId: user?.uid || '',
+            createdAt: new Date().toISOString()
+          });
+        }
+        setEvent(staticEvent);
+        setFirebaseLoading(false);
+        return;
+      }
 
-  // Simulate Guest Name (In a real app, this comes from URL token/param)
+      // Check if temporary or query params new template initializer
+      const urlParams = new URLSearchParams(window.location.search);
+      const isNew = urlParams.get('new') === 'true' || id.startsWith('evt_new_');
+      const templateParam = (urlParams.get('template') as LayoutMode) || 'CLASSIC';
+      const themeParam = (urlParams.get('theme') as ThemeType) || ThemeType.WEDDING;
+
+      if (isNew) {
+        const baseTpl = EVENTS.find(e => e.layoutMode === templateParam) || EVENTS[0];
+        const draft = {
+          ...baseTpl,
+          id: id,
+          type: themeParam,
+          layoutMode: templateParam,
+          ownerId: user?.uid || '',
+          createdAt: new Date().toISOString()
+        };
+        setLocalEvent(draft);
+        setEvent(draft);
+        setFirebaseLoading(false);
+        return;
+      }
+
+      // Firestore dynamic load
+      setFirebaseLoading(true);
+      try {
+        const eventRef = doc(db, 'events', id);
+        const docSnap = await getDoc(eventRef);
+        if (docSnap.exists()) {
+          const customEvt = { id: docSnap.id, ...docSnap.data() } as EventDetails;
+          setEvent(customEvt);
+          if (isEditing) {
+            setLocalEvent(customEvt);
+          }
+        } else {
+          setEvent(null);
+        }
+      } catch (err) {
+        console.error("Erro ao buscar convite customizado:", err);
+      } finally {
+        setFirebaseLoading(false);
+      }
+    };
+
+    fetchEvent();
+  }, [id, isEditing, user]);
+
+  if (firebaseLoading) {
+    return (
+      <div className="min-h-screen bg-slate-900 flex flex-col items-center justify-center p-4 text-white">
+        <div className="w-10 h-10 border-4 border-violet-500 border-t-transparent rounded-full animate-spin mb-4"></div>
+        <p className="text-violet-200 text-sm font-semibold tracking-wider font-sans">Carregando Atelier Atelier...</p>
+      </div>
+    );
+  }
+
+  // Active working details is localEvent if editing, else loaded static/saving event
+  const activeEvent = isEditing ? (localEvent || event) : event;
+  if (!activeEvent) return <div className="p-10 text-center font-sans text-gray-500">Convite não encontrado.</div>;
+
   const guestName = "Família Silva";
+  const isTemplate = EVENTS.some(e => e.id === id);
 
-  // Common Props passed to all layouts
-  const props = { event, onRSVP: () => setRSVPOpen(true), guestName };
+  const handleUseTemplate = () => {
+    // Elevate templates choice directly to the free interactive builder
+    const newId = `evt_new_${Math.random().toString(36).substr(2, 9)}`;
+    navigate(`/invite/${newId}?edit=true&new=true&template=${activeEvent.layoutMode}&theme=${activeEvent.type}`);
+  };
+
+  // Helper values updates
+  const updateField = (field: string, value: any) => {
+    setLocalEvent(prev => {
+      if (!prev) return null;
+      if (field.includes('.')) {
+        const [obj, key] = field.split('.') as [string, string];
+        const nested = (prev as any)[obj] || {};
+        return {
+          ...prev,
+          [obj]: { ...nested, [key]: value }
+        };
+      }
+      return { ...prev, [field]: value };
+    });
+  };
+
+  // Timeline list manipulations
+  const updateTimelineItem = (index: number, fld: keyof TimelineItem, val: string) => {
+    if (!localEvent) return;
+    const list = [...(localEvent.timeline || [])];
+    list[index] = { ...list[index], [fld]: val };
+    updateField('timeline', list);
+  };
+
+  const deleteTimelineItem = (index: number) => {
+    if (!localEvent) return;
+    const list = (localEvent.timeline || []).filter((_, i) => i !== index);
+    updateField('timeline', list);
+  };
+
+  const addTimelineItem = () => {
+    if (!localEvent) return;
+    const items = localEvent.timeline || [];
+    const newItem: TimelineItem = { time: '18:00', title: 'Atividade Nova', description: 'Por favor, descreva essa linda etapa.' };
+    updateField('timeline', [...items, newItem]);
+    toast.success('Atividade nova adicionada!');
+  };
+
+  const moveTimelineItem = (index: number, dir: 'up' | 'down') => {
+    if (!localEvent) return;
+    const list = [...(localEvent.timeline || [])];
+    const targetIdx = dir === 'up' ? index - 1 : index + 1;
+    if (targetIdx < 0 || targetIdx >= list.length) return;
+    const temp = list[index];
+    list[index] = list[targetIdx];
+    list[targetIdx] = temp;
+    updateField('timeline', list);
+  };
+
+  // Gifts list items manipulations
+  const updateGiftItem = (index: number, fld: keyof GiftItem, val: string) => {
+    if (!localEvent) return;
+    const list = [...(localEvent.gifts || [])];
+    list[index] = { ...list[index], [fld]: val };
+    updateField('gifts', list);
+  };
+
+  const deleteGiftItem = (index: number) => {
+    if (!localEvent) return;
+    const list = (localEvent.gifts || []).filter((_, i) => i !== index);
+    updateField('gifts', list);
+  };
+
+  const addGiftItem = () => {
+    if (!localEvent) return;
+    const list = localEvent.gifts || [];
+    const item: GiftItem = { type: 'IBAN', title: 'Mimo do Casal', value: 'AO06 0000 0000...', description: 'Qualquer carinho é bem vindo!' };
+    updateField('gifts', [...list, item]);
+    toast.success('Item de lista de presentes adicionado!');
+  };
+
+  // Master billing and save operation
+  const handleSaveWorkspace = async () => {
+    if (!localEvent) return;
+
+    if (!user) {
+      toast.error('Crie uma conta ou faça login para poder salvar!');
+      setIsAuthOpen(true);
+      return;
+    }
+
+    if (!localEvent.title || localEvent.title.trim().length === 0) {
+      toast.error('Informe um título para o convite.');
+      return;
+    }
+
+    setIsSaving(true);
+    const toastId = toast.loading('Salvando alterações no servidor...');
+
+    try {
+      // Check if event already exists to see if credit is charged
+      const eventRef = doc(db, 'events', localEvent.id);
+      const snap = await getDoc(eventRef);
+      const isNewSave = !snap.exists();
+
+      if (isNewSave) {
+        const creditCost = localEvent.type === ThemeType.BRIDAL_SHOWER ? 1 : 2;
+        
+        // Deduct credits if user plan requires paying credits
+        if (userProfile?.plan !== 'Business' && userProfile?.plan !== 'Corporate') {
+          const userCredits = userProfile?.credits || 0;
+          if (userCredits < creditCost) {
+            toast.error(`Créditos insuficientes! Salvar custa ${creditCost} créditos. Seu saldo: ${userCredits}.`, { id: toastId });
+            setIsSaving(false);
+            return;
+          }
+
+          // Update user's credit balance
+          await updateDoc(doc(db, 'users', user.uid), {
+            credits: userCredits - creditCost
+          });
+
+          // Write debit debit billing register
+          const transRef = doc(collection(db, 'transactions'));
+          await setDoc(transRef, {
+            ownerId: user.uid,
+            amount: creditCost,
+            type: 'DEBIT',
+            description: `Aprovação de Layout: ${localEvent.title}`,
+            date: new Date().toISOString(),
+            eventId: localEvent.id
+          });
+        }
+      }
+
+      // Save document values
+      const savedPayload = {
+        ...localEvent,
+        ownerId: user.uid,
+        updatedAt: new Date().toISOString()
+      };
+
+      await setDoc(eventRef, savedPayload);
+      toast.success('Seu convite foi publicado com total sucesso!', { id: toastId });
+
+      // Clean routing params
+      navigate(`/invite/${localEvent.id}?edit=true`, { replace: true });
+    } catch (err) {
+      console.error(err);
+      toast.error('Ocorreu um erro ao salvar o convite.', { id: toastId });
+    } finally {
+      setIsSaving(false);
+    }
+  };
+
+  // Popup Modal Authentication handler to bypass losing user edits
+  const handleAuthSubmit = async (e: React.FormEvent) => {
+    e.preventDefault();
+    setAuthLoading(true);
+    try {
+      if (isSignUp) {
+        // Register new user on firebase client side
+        const credential = await createUserWithEmailAndPassword(auth, authEmail, authPassword);
+        // Save profile
+        await setDoc(doc(db, 'users', credential.user.uid), {
+          uid: credential.user.uid,
+          name: authName || 'Noivo(a)',
+          email: authEmail,
+          credits: 3, // Initial free demo credits!
+          plan: 'Essencial',
+          createdAt: new Date().toISOString()
+        });
+        toast.success(`Conta criada! Saldo inicial de 3 créditos.`);
+      } else {
+        await signInWithEmailAndPassword(auth, authEmail, authPassword);
+        toast.success(`Bem-vindo de volta!`);
+      }
+      setIsAuthOpen(false);
+    } catch (err: any) {
+      console.error(err);
+      toast.error(err.message || 'Credenciais inválidas.');
+    } finally {
+      setAuthLoading(false);
+    }
+  };
+
+  // Google sign in option
+  const handleGoogleAuth = async () => {
+    setAuthLoading(true);
+    try {
+      const provider = new GoogleAuthProvider();
+      const res = await signInWithPopup(auth, provider);
+      // Create user doc if not found
+      const userRef = doc(db, 'users', res.user.uid);
+      const snap = await getDoc(userRef);
+      if (!snap.exists()) {
+        await setDoc(userRef, {
+          uid: res.user.uid,
+          name: res.user.displayName || 'Parceiro(a)',
+          email: res.user.email,
+          credits: 3,
+          plan: 'Essencial',
+          createdAt: new Date().toISOString()
+        });
+      }
+      toast.success('Login com Google efetuado!');
+      setIsAuthOpen(false);
+    } catch (err: any) {
+      console.error(err);
+      toast.error(err.message || 'Erro Google.');
+    } finally {
+      setAuthLoading(false);
+    }
+  };
+
+  const proxiedEvent = activeEvent;
+
+  // Gallery modification helpers
+  const updateGalleryImage = (index: number, val: string) => {
+    setLocalEvent(prev => {
+      if (!prev) return null;
+      const list = [...(prev.gallery || [])];
+      list[index] = val;
+      return { ...prev, gallery: list };
+    });
+  };
+
+  const deleteGalleryImage = (index: number) => {
+    setLocalEvent(prev => {
+      if (!prev) return null;
+      const list = (prev.gallery || []).filter((_, i) => i !== index);
+      return { ...prev, gallery: list };
+    });
+  };
+
+  const addGalleryImage = () => {
+    setLocalEvent(prev => {
+      if (!prev) return null;
+      const list = prev.gallery || [];
+      const newImg = 'https://images.unsplash.com/photo-1519741497674-611481863552?q=80&w=2574&auto=format&fit=crop';
+      return { ...prev, gallery: [...list, newImg] };
+    });
+  };
+
+  // Helpers and sub-components moved out of body to preserve stable hook orders
+
+  // Common Props passed to layouts
+  const layoutProps = {
+    event: proxiedEvent,
+    onRSVP: () => setRSVPOpen(true),
+    guestName,
+    isEditing,
+    onEditSection: (sec: string) => {
+      if (sec === 'gallery' || sec === 'photos') setActiveModal('gallery');
+      else if (sec === 'gifts' || sec === 'contas') setActiveModal('gifts');
+      else if (sec === 'timeline' || sec === 'etapas') setActiveModal('timeline');
+      else if (sec === 'style' || sec === 'design') setActiveModal('style');
+      else if (sec === 'locations' || sec === 'locais') setActiveModal('locations');
+    },
+    updateField,
+    updateTimelineItem,
+    deleteTimelineItem,
+    addTimelineItem,
+    updateGiftItem,
+    deleteGiftItem,
+    addGiftItem,
+    updateGalleryImage,
+    deleteGalleryImage,
+    addGalleryImage
+  };
+
+  if (isEditing) {
+    return (
+      <div className="min-h-screen bg-slate-900 text-slate-100 flex flex-col font-sans relative">
+        
+        {/* TOP FLOATING HEADER / ACTIONS (RETRACTABLE LUXURY BAR) */}
+        <div className={`fixed top-4 left-1/2 -translate-x-1/2 z-[60] transition-all duration-500 ease-in-out ${isEditorBarExpanded ? 'w-[95%] md:w-fit max-w-[95vw] md:max-w-4xl translate-y-0' : 'w-auto -translate-y-2 hover:translate-y-0'}`}>
+          <div className="bg-[#0F1419]/95 backdrop-blur-xl border border-[#BF9B30]/30 rounded-full p-2 pr-3 flex items-center justify-between gap-3 shadow-[0_10px_40px_rgba(0,0,0,0.5)]">
+            
+            {/* Logo & Toggle */}
+            <div className="flex items-center gap-2 pl-1 cursor-pointer" onClick={() => setIsEditorBarExpanded(!isEditorBarExpanded)}>
+              <span className="w-8 h-8 rounded-full bg-[#BF9B30] flex items-center justify-center text-[#0F1419] font-black shadow-[0_0_15px_rgba(191,155,48,0.4)] shrink-0">
+                <span className="material-symbols-outlined text-[18px]">auto_awesome</span>
+              </span>
+              
+              <div className={`transition-all duration-300 overflow-hidden flex flex-col ${isEditorBarExpanded ? 'w-auto opacity-100 pr-2' : 'w-0 opacity-0 hidden md:flex md:w-auto md:opacity-100 md:pr-2'}`}>
+                <span className="text-[10px] md:text-xs font-black uppercase tracking-widest text-[#BF9B30] block whitespace-nowrap">Estúdio</span>
+                <span className="text-[8px] md:text-[9px] text-gray-400 font-medium block whitespace-nowrap tracking-wider">Modo Edição</span>
+              </div>
+              
+              <span className="material-symbols-outlined text-[#BF9B30] transition-all duration-300 shrink-0">
+                {isEditorBarExpanded ? 'expand_less' : 'expand_more'}
+              </span>
+            </div>
+            
+            {/* Actions */}
+            <div className={`flex items-center gap-1.5 md:gap-2 overflow-hidden transition-all duration-500 ${isEditorBarExpanded ? 'max-w-[800px] opacity-100' : 'max-w-0 opacity-0 pointer-events-none'}`}>
+              <button
+                type="button"
+                onClick={() => setRSVPOpen(true)}
+                className="px-3 md:px-4 py-2 bg-transparent border border-white/20 hover:border-[#BF9B30] rounded-full text-[9px] md:text-xs font-bold text-white transition-all cursor-pointer flex items-center gap-1 whitespace-nowrap uppercase tracking-widest hover:bg-white/5 active:scale-95 shrink-0"
+              >
+                <span className="material-symbols-outlined text-[14px]">how_to_reg</span>
+                <span className="hidden sm:inline">Testar RSVP</span>
+                <span className="sm:hidden">RSVP</span>
+              </button>
+              
+              <button
+                type="button"
+                onClick={handleSaveWorkspace}
+                disabled={isSaving}
+                className="px-3 md:px-5 py-2 bg-[#BF9B30] hover:bg-white text-[#0F1419] text-[9px] md:text-xs font-bold uppercase tracking-widest rounded-full shadow-[0_0_20px_rgba(191,155,48,0.3)] flex items-center gap-1 transition-all cursor-pointer whitespace-nowrap active:scale-95 disabled:opacity-50 shrink-0"
+              >
+                {isSaving ? (
+                  <>
+                    <span className="w-3 h-3 border-2 border-[#0F1419] border-t-transparent rounded-full animate-spin"></span>
+                    <span>Salvando</span>
+                  </>
+                ) : (
+                  <>
+                    <span className="material-symbols-outlined text-[14px]">cloud_upload</span>
+                    <span>Publicar</span>
+                  </>
+                )}
+              </button>
+
+              <button
+                type="button"
+                onClick={() => navigate(`/invite/${id}`)}
+                className="w-8 h-8 flex items-center justify-center bg-red-500/10 hover:bg-red-500/20 text-red-400 rounded-full transition-colors cursor-pointer active:scale-95 ml-0.5 shrink-0"
+                title="Sair sem salvar"
+              >
+                <span className="material-symbols-outlined text-[16px]">close</span>
+              </button>
+            </div>
+          </div>
+        </div>
+
+        {/* FULL SCREEN WYSIWYG CANVAS */}
+        <div className="flex-1 overflow-y-auto bg-slate-100/90 relative pb-36 px-2 md:px-6 bg-[radial-gradient(#cbd5e1_1px,transparent_1px)] [background-size:20px_20px]">
+          <TocaPlayer trackName={localEvent?.musicTrack || activeEvent.musicTrack} isDark={localEvent?.layoutMode === 'LUXURY' || localEvent?.layoutMode === 'INDUSTRIAL'} />
+          
+          {localEvent?.layoutMode === 'CLASSIC' && <ClassicLayout {...layoutProps} />}
+          {localEvent?.layoutMode === 'MODERN' && <ModernLayout {...layoutProps} />}
+          {localEvent?.layoutMode === 'LUXURY' && <LuxuryLayout {...layoutProps} />}
+          {localEvent?.layoutMode === 'GARDEN' && <GardenLayout {...layoutProps} />}
+          {localEvent?.layoutMode === 'RUSTIC' && <RusticLayout {...layoutProps} />}
+          {localEvent?.layoutMode === 'INDUSTRIAL' && <IndustrialLayout {...layoutProps} />}
+          {localEvent?.layoutMode && localEvent.layoutMode.startsWith('BRIDAL_') && <BridalShowerLayout {...layoutProps} />}
+        </div>
+
+        {/* FLOATING SPATIAL CONTROL COCKPIT */}
+        <FloatingDesignDock
+          localEvent={localEvent}
+          updateField={updateField}
+          addTimelineItem={addTimelineItem}
+          addGiftItem={addGiftItem}
+          addGalleryImage={addGalleryImage}
+        />
+
+        {/* DYNAMIC LAYER MODAL OVERLAYS (LUXURIOUS CENTERED DIALOGS) */}
+        {activeModal && createPortal(
+          <div className="fixed inset-0 bg-[#0F1419]/90 backdrop-blur-md flex items-center justify-center p-4 z-[100] animate-in fade-in duration-200">
+            <div className="bg-[#0F1419] border border-[#BF9B30]/30 rounded-3xl w-full max-w-lg shadow-[0_20px_50px_rgba(0,0,0,0.5)] flex flex-col max-h-[90vh] overflow-hidden select-none animate-in zoom-in-95 duration-200">
+              
+              {/* Modal Header */}
+              <div className="p-5 border-b border-[#BF9B30]/20 flex items-center justify-between bg-[#0F1419]/80 backdrop-blur-md sticky top-0 z-10">
+                <div className="flex items-center gap-2">
+                  <span className="material-symbols-outlined text-[#BF9B30]">
+                    {activeModal === 'style' ? 'palette' :
+                     activeModal === 'gallery' ? 'image' :
+                     activeModal === 'locations' ? 'pin_drop' :
+                     activeModal === 'timeline' ? 'schedule' : 'volunteer_activism'}
+                  </span>
+                  <span className="font-bold text-white text-sm uppercase tracking-widest">
+                    {activeModal === 'style' && 'Editar Música de Fundo'}
+                    {activeModal === 'gallery' && 'Editar Capa & Fotos'}
+                    {activeModal === 'locations' && 'Editar Localizações'}
+                    {activeModal === 'timeline' && 'Editar Cronograma'}
+                    {activeModal === 'gifts' && 'Editar Dress Code & Contas'}
+                  </span>
+                </div>
+                <button
+                  onClick={() => setActiveModal(null)}
+                  className="w-8 h-8 rounded-full bg-white/5 hover:bg-[#BF9B30]/20 text-gray-400 hover:text-[#BF9B30] flex items-center justify-center transition-all cursor-pointer active:scale-95"
+                >
+                  <span className="material-symbols-outlined text-[16px]">close</span>
+                </button>
+              </div>
+
+              {/* Modal Scrollable Body */}
+              <div className="p-6 overflow-y-auto space-y-6 text-slate-200 text-sm max-h-[70vh]">
+                
+                {/* 1. LAYOUT & STYLE FIELDS */}
+                {activeModal === 'style' && (
+                  <div className="space-y-4">
+                    <div>
+                      <label className="block text-xs font-semibold text-[#BF9B30] mb-2 uppercase tracking-widest">Música de Fundo</label>
+                      <select
+                        value={localEvent?.musicTrack || 'romantic_piano.mp3'}
+                        onChange={(e) => updateField('musicTrack', e.target.value)}
+                        className="w-full bg-[#1A2026] border border-[#BF9B30]/30 rounded-xl px-4 py-3 text-sm text-white focus:outline-none focus:border-[#BF9B30] transition-colors appearance-none"
+                      >
+                        <option value="romantic_piano.mp3">Piano Romântico</option>
+                        <option value="acoustic_guitar.mp3">Violão Acústico Solo</option>
+                        <option value="nature_ambient.mp3">Sinfonia da Natureza</option>
+                        <option value="chill_lounge.mp3">Lounge Moderno & Calmo</option>
+                        <option value="none">Sem música de fundo</option>
+                      </select>
+                    </div>
+                  </div>
+                )}
+
+                {/* 2. CAPA & FOTOS FIELDS */}
+                {activeModal === 'gallery' && (
+                  <div className="space-y-4">
+                    <div className="grid grid-cols-1 gap-4">
+                      <div>
+                        <label className="block text-xs font-semibold text-[#BF9B30] mb-2 uppercase tracking-widest">Nomes na Capa (Título)</label>
+                        <input
+                          type="text"
+                          value={localEvent?.title || ''}
+                          onChange={(e) => updateField('title', e.target.value)}
+                          className="w-full bg-[#1A2026] border border-[#BF9B30]/30 rounded-xl px-4 py-3 text-sm text-white focus:outline-none focus:border-[#BF9B30] transition-colors"
+                          placeholder="Ex: João & Maria"
+                        />
+                      </div>
+
+                      <div>
+                        <label className="block text-xs font-semibold text-[#BF9B30] mb-2 uppercase tracking-widest">Texto da Data</label>
+                        <input
+                          type="text"
+                          value={localEvent?.date || ''}
+                          onChange={(e) => updateField('date', e.target.value)}
+                          className="w-full bg-[#1A2026] border border-[#BF9B30]/30 rounded-xl px-4 py-3 text-sm text-white focus:outline-none focus:border-[#BF9B30] transition-colors"
+                          placeholder="Ex: Sábado, 12 de Outubro de 2026"
+                        />
+                      </div>
+
+                      <div>
+                        <label className="block text-xs font-semibold text-[#BF9B30] mb-2 uppercase tracking-widest">Data do Countdown (ISO AAAA-MM-DD)</label>
+                        <input
+                          type="text"
+                          value={localEvent?.isoDate || ''}
+                          onChange={(e) => updateField('isoDate', e.target.value)}
+                          className="w-full bg-[#1A2026] border border-[#BF9B30]/30 rounded-xl px-4 py-3 text-sm text-white focus:outline-none focus:border-[#BF9B30] transition-colors"
+                          placeholder="Ex: 2026-10-12"
+                        />
+                      </div>
+                    </div>
+
+                    <div>
+                      <label className="block text-xs font-semibold text-[#BF9B30] mb-2 uppercase tracking-widest">Mensagem de Boas-vindas</label>
+                      <textarea
+                        value={localEvent?.description || ''}
+                        onChange={(e) => updateField('description', e.target.value)}
+                        rows={3}
+                        className="w-full bg-[#1A2026] border border-[#BF9B30]/30 rounded-xl px-4 py-3 text-sm text-white focus:outline-none focus:border-[#BF9B30] transition-colors custom-scrollbar"
+                        placeholder="Uma linda mensagem para seus convidados..."
+                      />
+                    </div>
+
+                    <div>
+                      <label className="block text-xs font-semibold text-[#BF9B30] mb-2 uppercase tracking-widest">Imagem de Capa (Hero Image URL)</label>
+                      <input
+                        type="text"
+                        value={localEvent?.heroImage || ''}
+                        onChange={(e) => updateField('heroImage', e.target.value)}
+                        className="w-full bg-[#1A2026] border border-[#BF9B30]/30 rounded-xl px-4 py-3 text-sm text-white focus:outline-none focus:border-[#BF9B30] transition-colors text-xs"
+                      />
+                      <div className="flex gap-2 mt-2">
+                        <button
+                          type="button"
+                          onClick={() => updateField('heroImage', 'https://images.unsplash.com/photo-1519741497674-611481863552?q=80&w=2574')}
+                          className="px-3 py-1.5 bg-white/5 text-[10px] text-gray-300 rounded hover:bg-[#BF9B30]/20 hover:text-[#BF9B30] transition-colors"
+                        >
+                          Preset Romântico
+                        </button>
+                        <button
+                          type="button"
+                          onClick={() => updateField('heroImage', 'https://images.unsplash.com/photo-1515934751635-c81c6bc9a2d8?q=80&w=2670')}
+                          className="px-3 py-1.5 bg-white/5 text-[10px] text-gray-300 rounded hover:bg-[#BF9B30]/20 hover:text-[#BF9B30] transition-colors"
+                        >
+                          Preset Alianças
+                        </button>
+                      </div>
+                    </div>
+
+                    <div>
+                      <div className="flex items-center justify-between mb-3">
+                        <label className="block text-xs font-semibold text-[#BF9B30] uppercase tracking-widest">Galeria de Fotos do Casal</label>
+                        <button
+                          type="button"
+                          onClick={addGalleryImage}
+                          className="px-3 py-1.5 bg-[#BF9B30]/10 hover:bg-[#BF9B30]/20 border border-[#BF9B30]/30 text-[#BF9B30] text-[10px] font-bold rounded-lg transition-all"
+                        >
+                          Adicionar Foto
+                        </button>
+                      </div>
+                      
+                      <div className="grid grid-cols-3 gap-2">
+                        {(localEvent?.gallery || []).map((img, idx) => (
+                          <div key={idx} className="relative aspect-square rounded-xl overflow-hidden group bg-[#1A2026] border border-[#BF9B30]/20">
+                            <img src={img} className="w-full h-full object-cover" />
+                            <div className="absolute inset-0 bg-black/60 opacity-0 group-hover:opacity-100 transition-opacity flex items-center justify-center gap-1.5 p-1">
+                              <button
+                                type="button"
+                                onClick={() => deleteGalleryImage(idx)}
+                                className="w-8 h-8 rounded-full bg-red-600/80 text-white flex items-center justify-center hover:bg-red-500 transition-colors"
+                                title="Eliminar"
+                              >
+                                <span className="material-symbols-outlined text-[16px]">delete</span>
+                              </button>
+                            </div>
+                          </div>
+                        ))}
+                      </div>
+                    </div>
+                  </div>
+                )}
+
+                {/* 3. LOCATIONS FIELDS */}
+                {activeModal === 'locations' && (
+                  <div className="space-y-6">
+                    {/* Ceremony details */}
+                    <div className="bg-[#1A2026] p-5 rounded-2xl border border-[#BF9B30]/20 space-y-4">
+                      <span className="text-xs font-bold text-[#BF9B30] uppercase tracking-widest block">1. Local da Cerimônia</span>
+                      <div>
+                        <label className="block text-[10px] text-gray-400 mb-1.5 uppercase tracking-wider">Nome do Local</label>
+                        <input
+                          type="text"
+                          value={localEvent?.locationName || ''}
+                          onChange={(e) => updateField('locationName', e.target.value)}
+                          className="w-full bg-[#0F1419] border border-[#BF9B30]/20 rounded-xl px-4 py-2.5 text-sm text-white focus:outline-none focus:border-[#BF9B30] transition-colors"
+                        />
+                      </div>
+                      <div>
+                        <label className="block text-[10px] text-gray-400 mb-1.5 uppercase tracking-wider">Horário</label>
+                        <input
+                          type="text"
+                          value={localEvent?.time || ''}
+                          onChange={(e) => updateField('time', e.target.value)}
+                          className="w-full bg-[#0F1419] border border-[#BF9B30]/20 rounded-xl px-4 py-2.5 text-sm text-white focus:outline-none focus:border-[#BF9B30] transition-colors"
+                        />
+                      </div>
+                      <div>
+                        <label className="block text-[10px] text-gray-400 mb-1.5 uppercase tracking-wider">Endereço Completo</label>
+                        <input
+                          type="text"
+                          value={localEvent?.address || ''}
+                          onChange={(e) => updateField('address', e.target.value)}
+                          className="w-full bg-[#0F1419] border border-[#BF9B30]/20 rounded-xl px-4 py-2.5 text-sm text-white focus:outline-none focus:border-[#BF9B30] transition-colors"
+                        />
+                      </div>
+                      <div>
+                        <label className="block text-[10px] text-gray-400 mb-1.5 uppercase tracking-wider">Link Google Maps (Ver Localização)</label>
+                        <input
+                          type="text"
+                          value={localEvent?.mapLink || ''}
+                          onChange={(e) => updateField('mapLink', e.target.value)}
+                          className="w-full bg-[#0F1419] border border-[#BF9B30]/20 rounded-xl px-4 py-2.5 text-sm text-white focus:outline-none focus:border-[#BF9B30] transition-colors text-xs"
+                        />
+                      </div>
+                    </div>
+
+                    {/* Reception details (Bridal Shower instruction: optionally hide) */}
+                    {localEvent?.type !== 'BRIDAL_SHOWER' ? (
+                      <div className="bg-[#1A2026] p-5 rounded-2xl border border-[#BF9B30]/20 space-y-4">
+                        <div className="flex justify-between items-center">
+                          <span className="text-xs font-bold text-[#BF9B30] uppercase tracking-widest block">2. Recepção / Copo d'Água</span>
+                          <button
+                            type="button"
+                            onClick={() => {
+                              updateField('receptionName', '');
+                              updateField('receptionAddress', '');
+                            }}
+                            className="text-[10px] text-gray-400 hover:text-red-400"
+                          >
+                            Remover Recepção
+                          </button>
+                        </div>
+                        <div>
+                          <label className="block text-[10px] text-gray-400 mb-1.5 uppercase tracking-wider">Nome do Local da Festa</label>
+                          <input
+                            type="text"
+                            value={localEvent?.receptionName || ''}
+                            onChange={(e) => updateField('receptionName', e.target.value)}
+                            className="w-full bg-[#0F1419] border border-[#BF9B30]/20 rounded-xl px-4 py-2.5 text-sm text-white focus:outline-none focus:border-[#BF9B30] transition-colors"
+                            placeholder="Ex: Quinta Real Eventos"
+                          />
+                        </div>
+                        <div>
+                          <label className="block text-[10px] text-gray-400 mb-1.5 uppercase tracking-wider">Endereço da Festa</label>
+                          <input
+                            type="text"
+                            value={localEvent?.receptionAddress || ''}
+                            onChange={(e) => updateField('receptionAddress', e.target.value)}
+                            className="w-full bg-[#0F1419] border border-[#BF9B30]/20 rounded-xl px-4 py-2.5 text-sm text-white focus:outline-none focus:border-[#BF9B30] transition-colors"
+                          />
+                        </div>
+                        <div>
+                          <label className="block text-[10px] text-gray-400 mb-1.5 uppercase tracking-wider">Imagem do Local / Mapa (URL)</label>
+                          <input
+                            type="text"
+                            value={localEvent?.mapImage || ''}
+                            onChange={(e) => updateField('mapImage', e.target.value)}
+                            className="w-full bg-[#0F1419] border border-[#BF9B30]/20 rounded-xl px-4 py-2.5 text-sm text-white focus:outline-none focus:border-[#BF9B30] transition-colors text-xs"
+                          />
+                        </div>
+                      </div>
+                    ) : (
+                      <div className="bg-[#1A2026]/50 p-4 rounded-2xl border border-dashed border-[#BF9B30]/30 text-center text-xs text-gray-400">
+                        ✨ Recepção oculta automaticamente por ser um Chá de Panela.
+                      </div>
+                    )}
+                  </div>
+                )}
+
+                {/* 4. TIMELINE FIELDS */}
+                {activeModal === 'timeline' && (
+                  <div className="space-y-6">
+                    <div className="flex items-center justify-between">
+                      <span className="text-xs font-bold text-[#BF9B30] uppercase tracking-widest">Milestones do Cronograma</span>
+                      <button
+                        type="button"
+                        onClick={addTimelineItem}
+                        className="px-4 py-2 bg-[#BF9B30] hover:bg-white text-[#0F1419] text-[10px] font-bold rounded-xl flex items-center gap-1.5 shadow-[0_5px_15px_rgba(191,155,48,0.2)] transition-all uppercase tracking-widest"
+                      >
+                        <span className="material-symbols-outlined text-[14px]">add</span>
+                        <span>Nova Etapa</span>
+                      </button>
+                    </div>
+
+                    <div className="space-y-4">
+                      {(localEvent?.timeline || []).map((item, idx) => (
+                        <div key={idx} className="bg-[#1A2026] p-5 rounded-2xl border border-[#BF9B30]/20 space-y-4 relative group">
+                          <div className="flex items-center justify-between border-b border-[#BF9B30]/10 pb-3">
+                            <span className="text-xs font-black text-[#BF9B30] uppercase tracking-widest">Etapa #{idx + 1}</span>
+                            <div className="flex items-center gap-1.5">
+                              <button
+                                type="button"
+                                onClick={() => moveTimelineItem(idx, 'up')}
+                                disabled={idx === 0}
+                                className="w-7 h-7 rounded-lg bg-[#0F1419] text-gray-400 hover:text-[#BF9B30] flex items-center justify-center disabled:opacity-30 transition-colors"
+                              >
+                                <span className="material-symbols-outlined text-[14px]">arrow_upward</span>
+                              </button>
+                              <button
+                                type="button"
+                                onClick={() => moveTimelineItem(idx, 'down')}
+                                disabled={idx === (localEvent?.timeline || []).length - 1}
+                                className="w-7 h-7 rounded-lg bg-[#0F1419] text-gray-400 hover:text-[#BF9B30] flex items-center justify-center disabled:opacity-30 transition-colors"
+                              >
+                                <span className="material-symbols-outlined text-[14px]">arrow_downward</span>
+                              </button>
+                              <button
+                                type="button"
+                                onClick={() => deleteTimelineItem(idx)}
+                                className="w-7 h-7 rounded-lg bg-red-900/20 text-red-400 hover:bg-red-500 hover:text-white flex items-center justify-center transition-colors"
+                              >
+                                <span className="material-symbols-outlined text-[14px]">delete</span>
+                              </button>
+                            </div>
+                          </div>
+
+                          <div className="grid grid-cols-3 gap-3">
+                            <div>
+                              <label className="block text-[9px] text-gray-400 mb-1.5 uppercase tracking-wider">Horário</label>
+                              <input
+                                type="text"
+                                value={item.time}
+                                onChange={(e) => updateTimelineItem(idx, 'time', e.target.value)}
+                                className="w-full bg-[#0F1419] border border-[#BF9B30]/20 rounded-xl px-3 py-2 text-xs text-white focus:outline-none focus:border-[#BF9B30] transition-colors"
+                              />
+                            </div>
+                            <div className="col-span-2">
+                              <label className="block text-[9px] text-gray-400 mb-1.5 uppercase tracking-wider">Título da Etapa</label>
+                              <input
+                                type="text"
+                                value={item.title}
+                                onChange={(e) => updateTimelineItem(idx, 'title', e.target.value)}
+                                className="w-full bg-[#0F1419] border border-[#BF9B30]/20 rounded-xl px-3 py-2 text-xs text-white focus:outline-none focus:border-[#BF9B30] transition-colors"
+                              />
+                            </div>
+                          </div>
+
+                          <div>
+                            <label className="block text-[9px] text-gray-400 mb-1.5 uppercase tracking-wider">Descrição / Subtítulo</label>
+                            <input
+                              type="text"
+                              value={item.description}
+                              onChange={(e) => updateTimelineItem(idx, 'description', e.target.value)}
+                              className="w-full bg-[#0F1419] border border-[#BF9B30]/20 rounded-xl px-3 py-2 text-xs text-white focus:outline-none focus:border-[#BF9B30] transition-colors"
+                            />
+                          </div>
+                        </div>
+                      ))}
+                    </div>
+                  </div>
+                )}
+
+                {/* 5. DRESS CODE & GIFTS FIELDS */}
+                {activeModal === 'gifts' && (
+                  <div className="space-y-6">
+                    {/* Dress code */}
+                    {localEvent?.type !== 'BRIDAL_SHOWER' && (
+                      <div className="bg-[#1A2026] p-5 rounded-2xl border border-[#BF9B30]/20 space-y-4">
+                        <span className="text-xs font-bold text-[#BF9B30] uppercase tracking-widest block">1. Dress Code / Sugestão de Traje</span>
+                        <div>
+                          <label className="block text-[10px] text-gray-400 mb-1.5 uppercase tracking-wider">Descrição do Código de Vestimenta</label>
+                          <textarea
+                            value={localEvent?.dressCode?.description || ''}
+                            onChange={(e) => {
+                              const existing = localEvent?.dressCode || { description: '', image: '' };
+                              updateField('dressCode', { ...existing, description: e.target.value });
+                            }}
+                            rows={3}
+                            className="w-full bg-[#0F1419] border border-[#BF9B30]/20 rounded-xl px-4 py-2.5 text-sm text-white focus:outline-none focus:border-[#BF9B30] transition-colors custom-scrollbar"
+                          />
+                        </div>
+                        <div>
+                          <label className="block text-[10px] text-gray-400 mb-1.5 uppercase tracking-wider">Link de Imagem Referência (URL)</label>
+                          <input
+                            type="text"
+                            value={localEvent?.dressCode?.image || ''}
+                            onChange={(e) => {
+                              const existing = localEvent?.dressCode || { description: '', image: '' };
+                              updateField('dressCode', { ...existing, image: e.target.value });
+                            }}
+                            className="w-full bg-[#0F1419] border border-[#BF9B30]/20 rounded-xl px-4 py-2.5 text-xs text-white focus:outline-none focus:border-[#BF9B30] transition-colors"
+                          />
+                        </div>
+                      </div>
+                    )}
+
+                    {/* Gifts accounts details */}
+                    <div className="bg-[#1A2026] p-5 rounded-2xl border border-[#BF9B30]/20 space-y-4">
+                      <div className="flex justify-between items-center">
+                        <span className="text-xs font-bold text-[#BF9B30] uppercase tracking-widest block">2. Lista de Casamento / IBAN / Pix</span>
+                        <button
+                          type="button"
+                          onClick={addGiftItem}
+                          className="text-[10px] text-[#BF9B30] hover:text-white font-bold uppercase tracking-wider transition-colors"
+                        >
+                          + Adicionar Conta
+                        </button>
+                      </div>
+
+                      {(localEvent?.gifts || []).map((item, idx) => (
+                        <div key={idx} className="bg-[#0F1419] p-4 rounded-xl border border-[#BF9B30]/10 space-y-3 relative group">
+                          <button
+                            type="button"
+                            onClick={() => deleteGiftItem(idx)}
+                            className="absolute top-2 right-2 text-gray-500 hover:text-red-400 text-xs transition-colors"
+                            title="Excluir"
+                          >
+                            <span className="material-symbols-outlined text-[16px]">delete</span>
+                          </button>
+
+                          <div className="grid grid-cols-2 gap-3 pr-6">
+                            <div>
+                              <label className="block text-[9px] text-gray-400 mb-1 uppercase tracking-wider">Título (Ex: IBAN, Pix)</label>
+                              <input
+                                type="text"
+                                value={item.title}
+                                onChange={(e) => updateGiftItem(idx, 'title', e.target.value)}
+                                className="w-full bg-[#1A2026] border border-[#BF9B30]/20 rounded-lg px-3 py-1.5 text-xs text-white focus:outline-none focus:border-[#BF9B30] transition-colors"
+                              />
+                            </div>
+                            <div>
+                              <label className="block text-[9px] text-gray-400 mb-1 uppercase tracking-wider">Descrição Curta</label>
+                              <input
+                                type="text"
+                                value={item.description}
+                                onChange={(e) => updateGiftItem(idx, 'description', e.target.value)}
+                                className="w-full bg-[#1A2026] border border-[#BF9B30]/20 rounded-lg px-3 py-1.5 text-xs text-white focus:outline-none focus:border-[#BF9B30] transition-colors"
+                              />
+                            </div>
+                          </div>
+
+                          <div>
+                            <label className="block text-[9px] text-gray-400 mb-1 uppercase tracking-wider">Número da Conta / Chave Pix / Link</label>
+                            <input
+                              type="text"
+                              value={item.value}
+                              onChange={(e) => updateGiftItem(idx, 'value', e.target.value)}
+                              className="w-full bg-[#1A2026] border border-[#BF9B30]/20 rounded-lg px-3 py-1.5 text-xs text-white font-mono focus:outline-none focus:border-[#BF9B30] transition-colors"
+                            />
+                          </div>
+                        </div>
+                      ))}
+                    </div>
+                  </div>
+                )}
+
+              </div>
+
+              {/* Modal Footer */}
+              <div className="p-5 border-t border-[#BF9B30]/20 bg-[#0F1419]/90 backdrop-blur-md sticky bottom-0 z-10 flex justify-end">
+                <button
+                  type="button"
+                  onClick={() => setActiveModal(null)}
+                  className="px-6 py-2.5 bg-[#BF9B30] hover:bg-white text-[#0F1419] text-xs font-bold uppercase tracking-widest rounded-xl transition-all shadow-[0_5px_15px_rgba(191,155,48,0.2)] cursor-pointer active:scale-95"
+                >
+                  Concluir Edição
+                </button>
+              </div>
+
+            </div>
+          </div>,
+          document.body
+        )}
+
+        {/* Auth Modal / BottomSheet for secure logins */}
+        <BottomSheet 
+          isOpen={isAuthOpen} 
+          onClose={() => setIsAuthOpen(false)} 
+          title="Fazer Login ou Criar Conta"
+        >
+          <form onSubmit={handleAuthSubmit} className="space-y-4 font-sans text-slate-800 p-2">
+            <p className="text-sm text-slate-600">Para salvar seu convite com total segurança, crie uma conta ou faça login de forma rápida e segura.</p>
+            {isSignUp && (
+              <div>
+                <label className="block text-xs font-semibold text-slate-700 mb-1">Seu Nome</label>
+                <input
+                  type="text"
+                  required
+                  value={authName}
+                  onChange={(e) => setAuthName(e.target.value)}
+                  className="w-full border rounded-lg px-3 py-2 text-sm focus:outline-none focus:border-violet-500"
+                  placeholder="Ex: João e Maria"
+                />
+              </div>
+            )}
+            <div>
+              <label className="block text-xs font-semibold text-slate-700 mb-1">E-mail</label>
+              <input
+                type="email"
+                required
+                value={authEmail}
+                onChange={(e) => setAuthEmail(e.target.value)}
+                className="w-full border rounded-lg px-3 py-2 text-sm focus:outline-none focus:border-violet-500"
+                placeholder="Ex: noivos@gmail.com"
+              />
+            </div>
+            <div>
+              <label className="block text-xs font-semibold text-slate-700 mb-1">Senha (mínimo 6 caracteres)</label>
+              <input
+                type="password"
+                required
+                value={authPassword}
+                onChange={(e) => setAuthPassword(e.target.value)}
+                className="w-full border rounded-lg px-3 py-2 text-sm focus:outline-none focus:border-violet-500"
+                placeholder="••••••"
+              />
+            </div>
+            <button
+              type="submit"
+              disabled={authLoading}
+              className="w-full py-3 bg-violet-600 hover:bg-violet-700 text-white rounded-xl font-bold text-sm shadow transition-all disabled:opacity-50"
+            >
+              {authLoading ? 'Processando...' : isSignUp ? 'Criar Conta e Continuar' : 'Fazer Login e Continuar'}
+            </button>
+            <div className="flex items-center justify-between text-xs pt-2 text-slate-500 border-t">
+              <button
+                type="button"
+                onClick={() => setIsSignUp(!isSignUp)}
+                className="text-violet-600 font-semibold hover:underline"
+              >
+                {isSignUp ? 'Já tem conta? Faça login' : 'Criar nova conta grátis'}
+              </button>
+            </div>
+          </form>
+        </BottomSheet>
+
+        {/* RSVP Modal */}
+        <BottomSheet 
+          isOpen={isRSVPOpen} 
+          onClose={() => setRSVPOpen(false)} 
+          title={localEvent?.type === 'BRIDAL_SHOWER' ? 'RSVP Chá de Panela' : 'Sua Presença'}
+        >
+          <RSVPForm event={localEvent || event} onClose={() => setRSVPOpen(false)} />
+        </BottomSheet>
+
+      </div>
+    );
+  }
 
   return (
     <>
-      <TocaPlayer trackName={event.musicTrack} isDark={event.layoutMode === 'LUXURY' || event.layoutMode === 'INDUSTRIAL'} />
+      <TocaPlayer trackName={activeEvent.musicTrack} isDark={activeEvent.layoutMode === 'LUXURY' || activeEvent.layoutMode === 'INDUSTRIAL'} />
       
       {/* Dynamic Layout Rendering */}
-      {event.layoutMode === 'CLASSIC' && <ClassicLayout {...props} />}
-      {event.layoutMode === 'MODERN' && <ModernLayout {...props} />}
-      {event.layoutMode === 'LUXURY' && <LuxuryLayout {...props} />}
-      {event.layoutMode === 'GARDEN' && <GardenLayout {...props} />}
-      {event.layoutMode === 'RUSTIC' && <RusticLayout {...props} />}
-      {event.layoutMode === 'INDUSTRIAL' && <IndustrialLayout {...props} />}
-      {event.layoutMode.startsWith('BRIDAL_') && <BridalShowerLayout {...props} />}
+      {activeEvent.layoutMode === 'CLASSIC' && <ClassicLayout {...layoutProps} />}
+      {activeEvent.layoutMode === 'MODERN' && <ModernLayout {...layoutProps} />}
+      {activeEvent.layoutMode === 'LUXURY' && <LuxuryLayout {...layoutProps} />}
+      {activeEvent.layoutMode === 'GARDEN' && <GardenLayout {...layoutProps} />}
+      {activeEvent.layoutMode === 'RUSTIC' && <RusticLayout {...layoutProps} />}
+      {activeEvent.layoutMode === 'INDUSTRIAL' && <IndustrialLayout {...layoutProps} />}
+      {activeEvent.layoutMode.startsWith('BRIDAL_') && <BridalShowerLayout {...layoutProps} />}
+
+      {/* Floating Demo Template Banner (RETRACTABLE LUXURY BAR) */}
+      {isTemplate && (
+        <div className={`fixed top-4 left-1/2 -translate-x-1/2 z-[100] transition-all duration-500 ease-in-out ${isBannerCollapsed ? 'w-auto -translate-y-2 hover:translate-y-0' : 'w-[95%] md:w-fit max-w-[95vw] md:max-w-4xl translate-y-0'}`}>
+          <div className="bg-[#0F1419]/95 backdrop-blur-xl border border-[#BF9B30]/30 rounded-full p-2 pr-3 flex items-center justify-between gap-3 shadow-[0_10px_40px_rgba(0,0,0,0.5)]">
+            
+            {/* Logo & Toggle */}
+            <div className="flex items-center gap-2 pl-1 cursor-pointer" onClick={() => setIsBannerCollapsed(!isBannerCollapsed)}>
+              <span className="w-8 h-8 rounded-full bg-[#BF9B30] flex items-center justify-center text-[#0F1419] font-black shadow-[0_0_15px_rgba(191,155,48,0.4)] shrink-0">
+                <span className="material-symbols-outlined text-[18px]">celebration</span>
+              </span>
+              
+              <div className={`transition-all duration-300 overflow-hidden flex flex-col ${!isBannerCollapsed ? 'w-auto opacity-100 pr-2' : 'w-0 opacity-0 hidden md:flex md:w-auto md:opacity-100 md:pr-2'}`}>
+                <span className="text-[10px] md:text-xs font-black uppercase tracking-widest text-[#BF9B30] block whitespace-nowrap">Visualização</span>
+                <span className="text-[8px] md:text-[9px] text-gray-400 font-medium block whitespace-nowrap tracking-wider">
+                  Layout <span className="text-white">{event?.layoutMode?.replace('BRIDAL_', 'CHÁ ')?.replace('_', ' ')}</span>
+                </span>
+              </div>
+              
+              <span className="material-symbols-outlined text-[#BF9B30] transition-all duration-300 shrink-0">
+                {!isBannerCollapsed ? 'expand_less' : 'expand_more'}
+              </span>
+            </div>
+            
+            {/* Actions */}
+            <div className={`flex items-center gap-1.5 md:gap-2 overflow-hidden transition-all duration-500 ${!isBannerCollapsed ? 'max-w-[800px] opacity-100' : 'max-w-0 opacity-0 pointer-events-none'}`}>
+              <Link to="/templates" className="px-3 md:px-4 py-2 bg-transparent border border-white/20 hover:border-[#BF9B30] rounded-full text-[9px] md:text-xs font-bold text-white transition-all cursor-pointer flex items-center gap-1 whitespace-nowrap uppercase tracking-widest hover:bg-white/5 active:scale-95 shrink-0">
+                Voltar
+              </Link>
+              
+              <button 
+                onClick={handleUseTemplate} 
+                className="px-3 md:px-5 py-2 bg-[#BF9B30] hover:bg-white text-[#0F1419] text-[9px] md:text-xs font-bold uppercase tracking-widest rounded-full shadow-[0_0_20px_rgba(191,155,48,0.3)] flex items-center gap-1 transition-all cursor-pointer whitespace-nowrap active:scale-95 shrink-0"
+              >
+                <span className="material-symbols-outlined text-[14px]">magic_button</span>
+                <span className="hidden sm:inline">Usar este Modelo</span>
+                <span className="sm:hidden">Usar</span>
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
 
       {/* Shared RSVP Modal */}
       <BottomSheet 
         isOpen={isRSVPOpen} 
         onClose={() => setRSVPOpen(false)} 
-        title={event.type === 'BRIDAL_SHOWER' ? 'RSVP Chá de Panela' : 'Sua Presença'}
+        title={event?.type === 'BRIDAL_SHOWER' ? 'RSVP Chá de Panela' : 'Sua Presença'}
         themeClasses={
-          event.layoutMode === 'LUXURY' || event.layoutMode === 'INDUSTRIAL' 
+          event?.layoutMode === 'LUXURY' || event?.layoutMode === 'INDUSTRIAL' 
           ? 'bg-[#151515] text-white border-t border-gray-700' 
           : 'bg-white text-slate-900'
         }
       >
-        <RSVPForm event={event} onClose={() => setRSVPOpen(false)} />
+        <RSVPForm event={event || staticEvent} onClose={() => setRSVPOpen(false)} />
       </BottomSheet>
     </>
   );
 };
+
 
 // ============================================================================
 // HELPER: ANIMATION WRAPPER (PREMIUM SMOOTH SCROLL)
@@ -124,10 +1425,402 @@ const CountdownTimer: React.FC<{ targetDate: string; colorClass?: string }> = ({
 };
 
 
+// Helper to get dynamic RSVP text based on event type
+const getRSVPText = (eventType?: string, defaultText = "Confirmar Presença") => {
+  if (eventType === 'BRIDAL_SHOWER') {
+    if (defaultText === "Confirmar Presença") return "Confirmar Presença no Chá";
+    if (defaultText === "Vou no Chá!" || defaultText === "RESPONDER" || defaultText === "RSVP") return "Vou no Chá!";
+    return "RSVP Chá de Panela";
+  }
+  return defaultText;
+};
+
+
+// ============================================================================
+// COMPONENT: INLINE EDITABLE IMAGE WRAPPER
+// ============================================================================
+const EditableImageWrapper: React.FC<{
+  src: string;
+  onChange: (newUrl: string) => void;
+  isEditing?: boolean;
+  className?: string;
+  children: React.ReactNode;
+}> = ({ src, onChange, isEditing, className = '', children }) => {
+  const [isOpen, setIsOpen] = useState(false);
+  const [tempUrl, setTempUrl] = useState(src);
+  const [isUploading, setIsUploading] = useState(false);
+  const fileInputRef = useRef<HTMLInputElement>(null);
+
+  useEffect(() => {
+    setTempUrl(src);
+  }, [src]);
+
+  if (!isEditing) {
+    return <>{children}</>;
+  }
+
+  const handleFileChange = async (e: React.ChangeEvent<HTMLInputElement>) => {
+    if (!e.target.files?.length) return;
+    setIsUploading(true);
+    try {
+      const base64 = await compressImage(e.target.files[0]);
+      onChange(base64);
+      setTempUrl(base64);
+      toast.success('Imagem alterada com sucesso!');
+      setIsOpen(false);
+    } catch (err) {
+      console.error(err);
+      toast.error('Erro ao processar imagem.');
+    } finally {
+      setIsUploading(false);
+    }
+  };
+
+  return (
+    <div className={`relative group/image-wrap cursor-pointer ${className}`}>
+      {children}
+      
+      {/* Absolute overlay button to trigger image editing popover */}
+      <div 
+        className="absolute inset-0 bg-black/40 opacity-0 group-hover/image-wrap:opacity-100 transition-opacity flex items-center justify-center z-25 pointer-events-auto cursor-pointer"
+        onClick={(e) => {
+          e.stopPropagation();
+          setIsOpen(true);
+        }}
+      >
+        <button
+          type="button"
+          className="bg-[#1A2026] hover:bg-[#BF9B30] text-[#BF9B30] hover:text-[#0F1419] text-[10px] md:text-xs font-bold py-2.5 px-5 rounded-full shadow-[0_10px_30px_rgba(0,0,0,0.5)] hover:scale-105 active:scale-95 transition-all flex items-center gap-1.5 border border-[#BF9B30]/30 uppercase tracking-widest"
+        >
+          <span className="material-symbols-outlined text-[16px]">photo_camera</span>
+          <span>Alterar Foto</span>
+        </button>
+      </div>
+
+      {isOpen && createPortal(
+        <div className="fixed inset-0 bg-[#0F1419]/90 backdrop-blur-md flex items-center justify-center p-4 z-[120] animate-in fade-in duration-200">
+          <div 
+            className="bg-[#0F1419] border border-[#BF9B30]/30 rounded-3xl w-full max-w-sm shadow-[0_20px_50px_rgba(0,0,0,0.5)] flex flex-col overflow-hidden animate-in zoom-in-95 duration-200" 
+            onClick={(e) => e.stopPropagation()}
+          >
+            
+            {/* Modal Header */}
+            <div className="p-4 border-b border-[#BF9B30]/20 flex items-center justify-between bg-[#0F1419]/80 backdrop-blur-md">
+              <div className="flex items-center gap-2">
+                <span className="material-symbols-outlined text-[#BF9B30] text-[18px]">image</span>
+                <span className="font-bold text-white text-xs uppercase tracking-widest">Alterar Imagem</span>
+              </div>
+              <button
+                onClick={() => setIsOpen(false)}
+                className="w-8 h-8 rounded-full bg-white/5 hover:bg-[#BF9B30]/20 text-gray-400 hover:text-[#BF9B30] flex items-center justify-center transition-all cursor-pointer active:scale-95"
+              >
+                <span className="material-symbols-outlined text-[16px]">close</span>
+              </button>
+            </div>
+
+            {/* Modal Body */}
+            <div className="p-6 flex flex-col gap-6">
+              <button
+                type="button"
+                onClick={() => fileInputRef.current?.click()}
+                disabled={isUploading}
+                className="w-full py-3.5 bg-[#BF9B30] hover:bg-white disabled:opacity-50 text-[#0F1419] rounded-xl text-[10px] font-bold uppercase tracking-widest transition-all shadow-[0_5px_15px_rgba(191,155,48,0.2)] active:scale-95 cursor-pointer flex items-center justify-center gap-2"
+              >
+                <span className="material-symbols-outlined text-[16px]">{isUploading ? 'hourglass_empty' : 'upload'}</span>
+                <span>{isUploading ? 'Compactando...' : 'Upload do Dispositivo'}</span>
+              </button>
+              
+              <input
+                type="file"
+                ref={fileInputRef}
+                onChange={handleFileChange}
+                accept="image/*"
+                className="hidden"
+              />
+
+              <div className="relative flex items-center justify-center mt-2">
+                <div className="absolute inset-0 flex items-center">
+                  <div className="w-full border-t border-[#BF9B30]/20"></div>
+                </div>
+                <div className="relative bg-[#0F1419] px-4 text-[9px] uppercase tracking-widest text-gray-500 font-bold">
+                  Ou Cole o Link
+                </div>
+              </div>
+              
+              <div className="flex gap-2">
+                <input
+                  type="text"
+                  value={tempUrl}
+                  onChange={(e) => setTempUrl(e.target.value)}
+                  className="flex-1 bg-[#1A2026] border border-[#BF9B30]/30 rounded-xl px-4 py-2.5 text-xs text-white focus:outline-none focus:border-[#BF9B30] font-mono transition-colors"
+                  placeholder="https://..."
+                />
+                <button
+                  onClick={() => {
+                    onChange(tempUrl);
+                    toast.success('Link da imagem atualizado!');
+                    setIsOpen(false);
+                  }}
+                  className="w-10 h-10 rounded-xl bg-white/5 hover:bg-[#BF9B30]/20 text-[#BF9B30] flex items-center justify-center transition-all cursor-pointer border border-[#BF9B30]/30 shrink-0"
+                >
+                  <span className="material-symbols-outlined text-[16px]">check</span>
+                </button>
+              </div>
+            </div>
+          </div>
+        </div>,
+        document.body
+      )}
+    </div>
+  );
+};
+
+
+// ============================================================================
+// COMPONENT: FLOATING COCKPIT DOCK FOR GLOBAL SETTINGS
+// ============================================================================
+const FloatingDesignDock: React.FC<{
+  localEvent: EventDetails | null;
+  updateField: (field: string, value: any) => void;
+  addTimelineItem: () => void;
+  addGiftItem: () => void;
+  addGalleryImage: () => void;
+}> = ({ localEvent, updateField, addTimelineItem, addGiftItem, addGalleryImage }) => {
+  const [isExpanded, setIsExpanded] = useState(false);
+  const [activeTab, setActiveTab] = useState<'style' | 'lists'>('style');
+
+  if (!isExpanded) {
+    return (
+      <div className="fixed bottom-6 right-6 z-50 animate-bounce">
+        <button
+          onClick={() => setIsExpanded(true)}
+          className="bg-gradient-to-r from-violet-600 to-indigo-600 hover:from-violet-500 hover:to-indigo-500 text-white rounded-full py-3 px-5 shadow-2xl flex items-center gap-2 border border-white/20 text-xs font-black uppercase tracking-widest transition-all hover:scale-105 active:scale-95 cursor-pointer"
+        >
+          <span className="material-symbols-outlined text-[18px]">palette</span>
+          <span>Painel de Estilos & Música</span>
+        </button>
+      </div>
+    );
+  }
+
+  return (
+    <div className="fixed bottom-6 inset-x-4 max-w-lg mx-auto z-50 bg-slate-900/95 backdrop-blur-xl border border-slate-800 rounded-3xl shadow-2xl p-5 flex flex-col gap-4 animate-in slide-in-from-bottom-6 duration-300 select-none">
+      <div className="flex items-center justify-between border-b border-slate-800 pb-2.5">
+        <div className="flex items-center gap-3">
+          <button
+            onClick={() => setActiveTab('style')}
+            className={`text-xs font-bold uppercase tracking-wider pb-1.5 border-b-2 transition-all cursor-pointer ${
+              activeTab === 'style' ? 'text-violet-400 border-violet-500' : 'text-slate-400 border-transparent hover:text-slate-200'
+            }`}
+          >
+            Design & Música
+          </button>
+          <button
+            onClick={() => setActiveTab('lists')}
+            className={`text-xs font-bold uppercase tracking-wider pb-1.5 border-b-2 transition-all cursor-pointer ${
+              activeTab === 'lists' ? 'text-violet-400 border-violet-500' : 'text-slate-400 border-transparent hover:text-slate-200'
+            }`}
+          >
+            Gerenciar Seções
+          </button>
+        </div>
+        <button
+          onClick={() => setIsExpanded(false)}
+          className="text-slate-400 hover:text-white transition-colors cursor-pointer flex items-center justify-center p-1 hover:bg-slate-800 rounded-full"
+        >
+          <span className="material-symbols-outlined text-lg">close</span>
+        </button>
+      </div>
+
+      {activeTab === 'style' ? (
+        <div className="grid grid-cols-1 gap-3.5 text-xs text-slate-300">
+          <div>
+            <label className="block text-[10px] font-bold text-slate-400 mb-1.5 uppercase tracking-wider">Finalidade do Evento</label>
+            <div className="grid grid-cols-2 gap-2">
+              {[
+                { id: 'WEDDING', name: 'Casamento' },
+                { id: 'BRIDAL_SHOWER', name: 'Chá de Panela' }
+              ].map(typeOpt => (
+                <button
+                  key={typeOpt.id}
+                  type="button"
+                  onClick={() => {
+                    updateField('type', typeOpt.id);
+                    if (typeOpt.id === 'BRIDAL_SHOWER' && !localEvent?.layoutMode.startsWith('BRIDAL_')) {
+                      updateField('layoutMode', 'BRIDAL_MINIMAL');
+                    } else if (typeOpt.id === 'WEDDING' && localEvent?.layoutMode.startsWith('BRIDAL_')) {
+                      updateField('layoutMode', 'CLASSIC');
+                    }
+                  }}
+                  className={`p-2 rounded-xl border text-[10px] font-bold transition-all text-center cursor-pointer ${
+                    localEvent?.type === typeOpt.id
+                      ? 'bg-violet-600 border-violet-500 text-white shadow-lg'
+                      : 'bg-slate-950 border-slate-800 text-slate-400 hover:bg-slate-800'
+                  }`}
+                >
+                  {typeOpt.name}
+                </button>
+              ))}
+            </div>
+          </div>
+
+          <div>
+            <label className="block text-[10px] font-bold text-slate-400 mb-1.5 uppercase tracking-wider">Modelo do Convite (Template Layout)</label>
+            <div className="grid grid-cols-3 gap-1.5">
+              {localEvent?.type === 'BRIDAL_SHOWER' ? (
+                [
+                  { id: 'BRIDAL_MINIMAL', name: 'Delicado Minimal' },
+                  { id: 'BRIDAL_TROPICAL', name: 'Tropical Folhas' },
+                  { id: 'BRIDAL_BEAUTY', name: 'Beauty Floral' }
+                ].map(lay => (
+                  <button
+                    key={lay.id}
+                    type="button"
+                    onClick={() => updateField('layoutMode', lay.id)}
+                    className={`p-1.5 py-2.5 rounded-lg border text-[9px] font-bold transition-all text-center leading-tight cursor-pointer ${
+                      localEvent?.layoutMode === lay.id
+                        ? 'bg-violet-600 border-violet-500 text-white shadow-lg'
+                        : 'bg-slate-950 border-slate-800 text-slate-400 hover:bg-slate-800'
+                    }`}
+                  >
+                    {lay.name}
+                  </button>
+                ))
+              ) : (
+                [
+                  { id: 'CLASSIC', name: 'Clássico' },
+                  { id: 'MODERN', name: 'Minimalista' },
+                  { id: 'LUXURY', name: 'Imperial' },
+                  { id: 'GARDEN', name: 'Jardim' },
+                  { id: 'RUSTIC', name: 'Rústico' },
+                  { id: 'INDUSTRIAL', name: 'Industrial' }
+                ].map(lay => (
+                  <button
+                    key={lay.id}
+                    type="button"
+                    onClick={() => updateField('layoutMode', lay.id)}
+                    className={`p-1.5 py-2 rounded-lg border text-[9px] font-bold transition-all text-center leading-tight cursor-pointer ${
+                      localEvent?.layoutMode === lay.id
+                        ? 'bg-violet-600 border-violet-500 text-white shadow-lg'
+                        : 'bg-slate-950 border-slate-800 text-slate-400 hover:bg-slate-800'
+                    }`}
+                  >
+                    {lay.name}
+                  </button>
+                ))
+              )}
+            </div>
+          </div>
+
+          <div>
+            <label className="block text-[10px] font-bold text-slate-400 mb-1.5 uppercase tracking-wider">Música de Fundo</label>
+            <select
+              value={localEvent?.musicTrack || 'romantic_piano.mp3'}
+              onChange={(e) => updateField('musicTrack', e.target.value)}
+              className="w-full bg-slate-950 border border-slate-800 rounded-xl px-3 py-2 text-xs text-slate-200 focus:outline-none focus:border-violet-500 cursor-pointer"
+            >
+              <option value="romantic_piano.mp3">Piano Romântico</option>
+              <option value="acoustic_guitar.mp3">Violão Acústico Solo</option>
+              <option value="nature_ambient.mp3">Sinfonia da Natureza</option>
+              <option value="chill_lounge.mp3">Lounge Moderno & Calmo</option>
+              <option value="none">Sem música de fundo</option>
+            </select>
+          </div>
+        </div>
+      ) : (
+        <div className="space-y-3.5 text-xs text-slate-300">
+          <p className="text-[10px] text-slate-400 uppercase tracking-wider font-bold">Adicionar itens às listas do modelo:</p>
+          <div className="grid grid-cols-1 md:grid-cols-3 gap-2">
+            <button
+              onClick={addTimelineItem}
+              className="p-3 bg-slate-950 border border-slate-800 hover:border-violet-500/50 hover:bg-slate-800 rounded-xl flex items-center gap-2 justify-center font-bold text-slate-200 transition-all cursor-pointer"
+            >
+              <span className="material-symbols-outlined text-sm text-violet-400">add_circle</span>
+              <span>+ Cronograma</span>
+            </button>
+            <button
+              onClick={addGiftItem}
+              className="p-3 bg-slate-950 border border-slate-800 hover:border-violet-500/50 hover:bg-slate-800 rounded-xl flex items-center gap-2 justify-center font-bold text-slate-200 transition-all cursor-pointer"
+            >
+              <span className="material-symbols-outlined text-sm text-violet-400">add_circle</span>
+              <span>+ Presente/Pix</span>
+            </button>
+            <button
+              onClick={addGalleryImage}
+              className="p-3 bg-slate-950 border border-slate-800 hover:border-violet-500/50 hover:bg-slate-800 rounded-xl flex items-center gap-2 justify-center font-bold text-slate-200 transition-all cursor-pointer"
+            >
+              <span className="material-symbols-outlined text-sm text-violet-400">add_photo_alternate</span>
+              <span>+ Foto Galeria</span>
+            </button>
+          </div>
+          <p className="text-[9px] text-slate-500 text-center">
+            Nota: Para editar o conteúdo dos itens, basta tocar/clicar neles diretamente no convite!
+          </p>
+        </div>
+      )}
+      
+      <div className="text-[9px] text-slate-500 text-center leading-normal pt-1.5 border-t border-slate-800/50">
+        💡 <span className="font-semibold text-slate-400">Visualização de Elite:</span> Clique em qualquer texto ou foto diretamente no convite para editar na hora!
+      </div>
+    </div>
+  );
+};
+
+
+// ============================================================================
+// EDITABLE SECTION WRAPPER (Direct Visual Layer Click-to-Edit)
+// ============================================================================
+const EditableSectionWrapper: React.FC<{
+  isEditing?: boolean;
+  section: 'locations' | 'timeline' | 'gifts' | 'gallery' | 'style';
+  label: string;
+  onEditSection?: (section: any) => void;
+  children: React.ReactNode;
+  className?: string;
+}> = ({ isEditing, section, label, onEditSection, children, className = '' }) => {
+  if (!isEditing) {
+    return <div className={className}>{children}</div>;
+  }
+
+  return (
+    <div 
+      onClick={(e) => {
+        // Only trigger edit modal if user didn't click inside another stopPropagation element
+        onEditSection?.(section);
+      }}
+      className={`relative group/section-layer cursor-pointer border-2 border-dashed border-violet-500/20 hover:border-violet-500/70 bg-white/[0.01] hover:bg-violet-500/[0.03] transition-all duration-300 rounded-[2rem] p-4 md:p-6 my-6 shadow-[0_4px_24px_rgba(139,92,246,0.02)] hover:shadow-[0_12px_36px_rgba(139,92,246,0.1)] active:scale-[0.995] ${className}`}
+    >
+      {/* Floating Spatial Section Badge */}
+      <div className="absolute top-4 right-4 bg-violet-600/90 backdrop-blur-md text-white text-[9px] font-black uppercase tracking-widest px-3 py-1 rounded-full shadow-lg opacity-40 group-hover/section-layer:opacity-100 transition-all duration-300 flex items-center gap-1.5 border border-white/15 z-30 select-none pointer-events-none">
+        <span className="material-symbols-outlined text-[12px] font-bold">edit_note</span>
+        <span>Editar {label}</span>
+      </div>
+
+      {/* Glassmorphic visual outline/glow on hover */}
+      <div className="absolute inset-0 bg-gradient-to-tr from-violet-500/[0.01] to-indigo-500/[0.01] group-hover/section-layer:from-violet-500/[0.02] group-hover/section-layer:to-indigo-500/[0.02] transition-all rounded-[2rem] pointer-events-none z-10" />
+
+      {/* Content wrapper */}
+      <div className="relative z-20">
+        {children}
+      </div>
+    </div>
+  );
+};
+
+
 // ============================================================================
 // LAYOUT 1: CLASSIC ROMANTIC (Refined)
 // ============================================================================
-const ClassicLayout: React.FC<{ event: EventDetails; onRSVP: () => void; guestName: string }> = ({ event, onRSVP }) => {
+const ClassicLayout: React.FC<{
+  event: EventDetails;
+  onRSVP: () => void;
+  guestName: string;
+  isEditing?: boolean;
+  onEditSection?: (section: any) => void;
+  updateField?: (field: string, value: any) => void;
+  deleteTimelineItem?: (index: number) => void;
+  updateTimelineItem?: (index: number, field: 'time' | 'title' | 'description', value: string) => void;
+}> = ({ event, onRSVP, isEditing, onEditSection, updateField, deleteTimelineItem, updateTimelineItem }) => {
   return (
     <div className="min-h-screen bg-slate-50 font-serif pb-28">
       {/* Formal Header */}
@@ -136,10 +1829,12 @@ const ClassicLayout: React.FC<{ event: EventDetails; onRSVP: () => void; guestNa
       </div>
 
       {/* Hero Card */}
-      <div className="p-4">
+      <EditableSectionWrapper isEditing={isEditing} section="gallery" label="Capa & Imagem" onEditSection={onEditSection} className="p-4">
         <div className="relative h-[65vh] rounded-t-full rounded-b-[200px] overflow-hidden border-8 border-white shadow-2xl mx-auto max-w-lg">
-          <div className="absolute inset-0 bg-cover bg-center transition-transform duration-[10s] hover:scale-110" style={{ backgroundImage: `url('${event.heroImage}')` }} />
-          <div className="absolute inset-0 bg-black/30" />
+          <EditableImageWrapper src={event.heroImage} onChange={(newVal) => updateField?.('heroImage', newVal)} isEditing={isEditing} className="absolute inset-0">
+            <div className="absolute inset-0 bg-cover bg-center transition-transform duration-[10s] hover:scale-110" style={{ backgroundImage: `url('${event.heroImage}')` }} />
+          </EditableImageWrapper>
+          <div className="absolute inset-0 bg-black/30 pointer-events-none" />
           <motion.div 
             initial={{ opacity: 0 }}
             animate={{ opacity: 1 }}
@@ -152,7 +1847,12 @@ const ClassicLayout: React.FC<{ event: EventDetails; onRSVP: () => void; guestNa
               transition={{ delay: 0.3, duration: 1 }}
               className="text-5xl font-script mb-2"
             >
-              {event.title}
+              <EditableField
+                value={event.title}
+                onChange={(newVal) => updateField?.('title', newVal)}
+                isEditing={isEditing}
+                className="text-white text-5xl font-script text-center"
+              />
             </motion.h1>
             <div className="w-12 h-px bg-white/60 my-4"></div>
             <motion.p 
@@ -161,45 +1861,112 @@ const ClassicLayout: React.FC<{ event: EventDetails; onRSVP: () => void; guestNa
               transition={{ delay: 0.5, duration: 1 }}
               className="text-xl tracking-widest uppercase"
             >
-              {event.date}
+              <EditableField
+                value={event.date}
+                onChange={(newVal) => updateField?.('date', newVal)}
+                isEditing={isEditing}
+                className="text-white text-xl tracking-widest uppercase text-center"
+              />
             </motion.p>
           </motion.div>
         </div>
-      </div>
+      </EditableSectionWrapper>
 
       {/* Content */}
       <div className="max-w-lg mx-auto px-6 mt-8 text-center space-y-12">
          <FadeInSection>
-            <p className="text-slate-600 italic text-lg leading-relaxed px-4">"{event.description}"</p>
+            <p className="text-slate-600 italic text-lg leading-relaxed px-4">
+              <EditableField
+                value={event.description}
+                onChange={(newVal) => updateField?.('description', newVal)}
+                isEditing={isEditing}
+                className="text-slate-600 italic text-lg leading-relaxed px-4 text-center"
+                multiline
+              />
+            </p>
          </FadeInSection>
 
-         <FadeInSection>
-           <h3 className="text-xs font-bold uppercase tracking-[0.2em] text-slate-400 mb-6">Programação</h3>
-           <div className="space-y-8 relative before:absolute before:inset-y-0 before:left-1/2 before:w-px before:bg-slate-200">
-              {event.timeline.map((item, idx) => (
-                <div key={idx} className="relative flex flex-col items-center bg-white p-4 rounded-lg shadow-sm z-10 w-[80%] mx-auto border border-slate-100">
-                   <span className="text-brand-blue font-bold text-lg mb-1">{item.time}</span>
-                   <span className="font-bold text-slate-800">{item.title}</span>
-                   <span className="text-xs text-slate-500">{item.description}</span>
-                </div>
-              ))}
-           </div>
-         </FadeInSection>
+         <EditableSectionWrapper isEditing={isEditing} section="timeline" label="Cronograma" onEditSection={onEditSection}>
+           <FadeInSection>
+             <h3 className="text-xs font-bold uppercase tracking-[0.2em] text-slate-400 mb-6">Programação</h3>
+             <div className="space-y-8 relative before:absolute before:inset-y-0 before:left-1/2 before:w-px before:bg-slate-200">
+                {(event.timeline || []).map((item, idx) => (
+                  <div key={idx} className="relative group/timeline-item flex flex-col items-center bg-white p-4 rounded-lg shadow-sm z-10 w-[80%] mx-auto border border-slate-100">
+                     {isEditing && (
+                       <button
+                         type="button"
+                         onClick={(e) => {
+                           e.stopPropagation();
+                           deleteTimelineItem?.(idx);
+                         }}
+                         className="absolute -top-2 -right-2 bg-rose-500 hover:bg-rose-600 text-white rounded-full w-6 h-6 flex items-center justify-center shadow-lg hover:scale-105 active:scale-95 transition-all cursor-pointer z-30 opacity-0 group-hover/timeline-item:opacity-100 animate-in fade-in animate-out fade-out"
+                         title="Excluir Etapa"
+                       >
+                         <span className="material-symbols-outlined text-[14px]">delete</span>
+                       </button>
+                     )}
+                     <span className="text-brand-blue font-bold text-lg mb-1">
+                       <EditableField
+                         value={item.time}
+                         onChange={(newVal) => updateTimelineItem?.(idx, 'time', newVal)}
+                         isEditing={isEditing}
+                         className="text-brand-blue font-bold text-lg mb-1 text-center"
+                       />
+                     </span>
+                     <span className="font-bold text-slate-800">
+                       <EditableField
+                         value={item.title}
+                         onChange={(newVal) => updateTimelineItem?.(idx, 'title', newVal)}
+                         isEditing={isEditing}
+                         className="font-bold text-slate-800 text-center"
+                       />
+                     </span>
+                     <span className="text-xs text-slate-500">
+                       <EditableField
+                         value={item.description}
+                         onChange={(newVal) => updateTimelineItem?.(idx, 'description', newVal)}
+                         isEditing={isEditing}
+                         className="text-xs text-slate-500 text-center"
+                         multiline
+                       />
+                     </span>
+                  </div>
+                ))}
+             </div>
+           </FadeInSection>
+         </EditableSectionWrapper>
 
-         <FadeInSection>
-            <div className="bg-white p-6 rounded-xl shadow-lg border border-slate-100">
-               <h3 className="font-bold text-xl mb-1 text-slate-800">{event.locationName}</h3>
-               <p className="text-slate-500 text-sm mb-4">{event.address}</p>
-               <Button onClick={() => window.open(event.mapLink || '#', '_blank')} variant="navy" fullWidth className="text-xs uppercase tracking-widest h-10">
-                 Ver Mapa
-               </Button>
-            </div>
-         </FadeInSection>
+         <EditableSectionWrapper isEditing={isEditing} section="locations" label="Localização" onEditSection={onEditSection}>
+           <FadeInSection>
+              <div className="bg-white p-6 rounded-xl shadow-lg border border-slate-100">
+                 <h3 className="font-bold text-xl mb-1 text-slate-800">
+                   <EditableField
+                     value={event.locationName}
+                     onChange={(newVal) => updateField?.('locationName', newVal)}
+                     isEditing={isEditing}
+                     className="font-bold text-xl mb-1 text-slate-800 text-center"
+                   />
+                 </h3>
+                 <p className="text-slate-500 text-sm mb-4">
+                   <EditableField
+                     value={event.address}
+                     onChange={(newVal) => updateField?.('address', newVal)}
+                     isEditing={isEditing}
+                     className="text-slate-500 text-sm mb-4 text-center"
+                     multiline
+                   />
+                 </p>
+                 <Button onClick={() => window.open(event.mapLink || '#', '_blank')} variant="navy" fullWidth className="text-xs uppercase tracking-widest h-10">
+                   Ver Mapa
+                 </Button>
+              </div>
+           </FadeInSection>
+         </EditableSectionWrapper>
       </div>
 
       <div className="fixed bottom-6 left-1/2 -translate-x-1/2 z-50">
         <button onClick={onRSVP} className="bg-brand-blue text-white px-10 py-4 rounded-full font-sans font-bold shadow-2xl shadow-brand-blue/40 uppercase tracking-widest text-xs hover:scale-105 transition-transform">
-           Confirmar Presença
+           {getRSVPText(event.type)}
         </button>
       </div>
     </div>
@@ -211,7 +1978,19 @@ const ClassicLayout: React.FC<{ event: EventDetails; onRSVP: () => void; guestNa
 // LAYOUT 2: MINIMALIST ETHEREAL (Redesigned Modern)
 // High-End, Clean, Airy, with Bible Verse, Gallery, Gifts, etc.
 // ============================================================================
-const ModernLayout: React.FC<{ event: EventDetails; onRSVP: () => void; guestName: string }> = ({ event, onRSVP, guestName }) => {
+const ModernLayout: React.FC<{
+  event: EventDetails;
+  onRSVP: () => void;
+  guestName: string;
+  isEditing?: boolean;
+  onEditSection?: (section: any) => void;
+  updateField?: (field: string, value: any) => void;
+  deleteTimelineItem?: (index: number) => void;
+  deleteGiftItem?: (index: number) => void;
+  updateGalleryImage?: (index: number, val: string) => void;
+  deleteGalleryImage?: (index: number) => void;
+  updateTimelineItem?: (index: number, field: 'time' | 'title' | 'description', value: string) => void;
+}> = ({ event, onRSVP, guestName, isEditing, onEditSection, updateField, deleteTimelineItem, deleteGiftItem, updateGalleryImage, deleteGalleryImage, updateTimelineItem }) => {
   // Ethereal Color Palette
   const accentText = "text-[#8A817C]"; // Taupe gray
   const darkText = "text-[#2C2C2C]";
@@ -221,40 +2000,62 @@ const ModernLayout: React.FC<{ event: EventDetails; onRSVP: () => void; guestNam
     <div className="min-h-screen bg-[#FDFDFD] font-serif text-[#333] pb-32">
       
       {/* 1. HERO - Minimalist Split or Overlay */}
-      <div className="h-screen relative w-full overflow-hidden">
-         <motion.div 
-            initial={{ scale: 1.1, opacity: 0 }}
-            animate={{ scale: 1, opacity: 1 }}
-            transition={{ duration: 1.5 }}
-            className="absolute inset-0 bg-cover bg-center"
-            style={{ backgroundImage: `url('${event.heroImage}')` }}
-         />
-         <div className="absolute inset-0 bg-white/30 mix-blend-screen" />
-         <div className="absolute inset-0 bg-gradient-to-b from-transparent via-transparent to-[#FDFDFD]" />
+      <EditableSectionWrapper isEditing={isEditing} section="gallery" label="Capa & Imagem" onEditSection={onEditSection} className="h-screen w-full p-0">
+        <div className="h-full relative w-full overflow-hidden">
+           <EditableImageWrapper src={event.heroImage} onChange={(newVal) => updateField?.('heroImage', newVal)} isEditing={isEditing} className="absolute inset-0">
+             <motion.div 
+                initial={{ scale: 1.1, opacity: 0 }}
+                animate={{ scale: 1, opacity: 1 }}
+                transition={{ duration: 1.5 }}
+                className="absolute inset-0 bg-cover bg-center"
+                style={{ backgroundImage: `url('${event.heroImage}')` }}
+             />
+           </EditableImageWrapper>
+           <div className="absolute inset-0 bg-white/30 mix-blend-screen pointer-events-none" />
+           <div className="absolute inset-0 bg-gradient-to-b from-transparent via-transparent to-[#FDFDFD] pointer-events-none" />
 
-         <motion.div 
-           initial={{ opacity: 0, y: 40, filter: 'blur(5px)' }}
-           animate={{ opacity: 1, y: 0, filter: 'blur(0px)' }}
-           transition={{ delay: 0.5, duration: 1.2, ease: [0.22, 1, 0.36, 1] }}
-           className="absolute inset-0 flex flex-col items-center justify-center text-center p-8"
-         >
-            <div className="border border-[#8A817C]/30 bg-white/80 backdrop-blur-sm p-10 md:p-16 max-w-lg w-full shadow-2xl shadow-gray-200/50">
-               <span className="font-display text-[10px] uppercase tracking-[0.4em] text-gray-500 mb-6 block">Convite de Casamento</span>
-               <h1 className="text-5xl md:text-7xl font-serif text-[#1a1a1a] mb-4 leading-tight">
-                  {event.title.split(' & ')[0]} <br/> <span className="text-3xl italic text-[#C2B280]">&</span> <br/> {event.title.split(' & ')[1]}
-               </h1>
-               <div className="w-10 h-px bg-[#C2B280] mx-auto my-6"></div>
-               <p className="text-sm font-display uppercase tracking-widest text-gray-600">{event.date}</p>
-            </div>
-         </motion.div>
-      </div>
+           <motion.div 
+             initial={{ opacity: 0, y: 40, filter: 'blur(5px)' }}
+             animate={{ opacity: 1, y: 0, filter: 'blur(0px)' }}
+             transition={{ delay: 0.5, duration: 1.2, ease: [0.22, 1, 0.36, 1] }}
+             className="absolute inset-0 flex flex-col items-center justify-center text-center p-8"
+           >
+              <div className="border border-[#8A817C]/30 bg-white/80 backdrop-blur-sm p-10 md:p-16 max-w-lg w-full shadow-2xl shadow-gray-200/50">
+                 <span className="font-display text-[10px] uppercase tracking-[0.4em] text-gray-500 mb-6 block">Convite de Casamento</span>
+                 <h1 className="text-5xl md:text-7xl font-serif text-[#1a1a1a] mb-4 leading-tight">
+                    <EditableField
+                      value={event.title}
+                      onChange={(newVal) => updateField?.('title', newVal)}
+                      isEditing={isEditing}
+                      className="text-5xl md:text-7xl font-serif text-[#1a1a1a] leading-tight text-center"
+                    />
+                 </h1>
+                 <div className="w-10 h-px bg-[#C2B280] mx-auto my-6"></div>
+                 <p className="text-sm font-display uppercase tracking-widest text-gray-600">
+                    <EditableField
+                      value={event.date}
+                      onChange={(newVal) => updateField?.('date', newVal)}
+                      isEditing={isEditing}
+                      className="text-sm font-display uppercase tracking-widest text-gray-600 text-center"
+                    />
+                 </p>
+              </div>
+           </motion.div>
+        </div>
+      </EditableSectionWrapper>
 
       {/* 2. BIBLE QUOTE & WELCOME */}
       <div className="max-w-2xl mx-auto px-8 -mt-20 relative z-10">
          <FadeInSection className="bg-white p-10 shadow-[0_10px_40px_-10px_rgba(0,0,0,0.05)] text-center">
             <span className="font-script text-4xl text-[#C2B280] mb-4 block">Bem-vindos</span>
             <p className="text-xl italic font-light leading-relaxed text-gray-600 mb-6">
-               {event.description}
+               <EditableField
+                 value={event.description}
+                 onChange={(newVal) => updateField?.('description', newVal)}
+                 isEditing={isEditing}
+                 className="text-xl italic font-light leading-relaxed text-gray-600 text-center"
+                 multiline
+               />
             </p>
             <div className="py-4 border-t border-gray-100">
                <p className="text-[10px] uppercase tracking-[0.2em] text-gray-400 mb-2">Especialmente para</p>
@@ -270,101 +2071,210 @@ const ModernLayout: React.FC<{ event: EventDetails; onRSVP: () => void; guestNam
       </FadeInSection>
 
       {/* 4. DETAILS SECTION (Ceremony & Party) */}
-      <div className="max-w-5xl mx-auto px-6 mb-24 space-y-24">
-         {/* Ceremony */}
-         <FadeInSection className="flex flex-col md:flex-row items-center gap-12">
-             <div className="w-full md:w-1/2 aspect-[4/5] bg-gray-100 relative overflow-hidden group">
-                 <img src="https://images.unsplash.com/photo-1544070274-1b48b1111003?q=80&w=2670&auto=format&fit=crop" className="w-full h-full object-cover grayscale group-hover:grayscale-0 transition-all duration-700" />
-                 <div className="absolute top-4 left-4 bg-white px-4 py-2 text-xs font-bold tracking-widest uppercase">Cerimônia</div>
-             </div>
-             <div className="w-full md:w-1/2 text-center md:text-left space-y-4">
-                 <h2 className="text-4xl font-serif text-[#1a1a1a]">{event.locationName}</h2>
-                 <p className="text-[#C2B280] font-display uppercase tracking-widest text-sm">{event.time} Horas</p>
-                 <p className="text-gray-500 leading-relaxed font-light text-lg">{event.address}</p>
-                 <button onClick={() => window.open(event.mapLink || '#', '_blank')} className="mt-4 inline-block border-b border-black pb-1 text-xs font-bold uppercase tracking-widest hover:text-[#C2B280] hover:border-[#C2B280] transition-colors">
-                    Ver Localização
-                 </button>
-             </div>
-         </FadeInSection>
-
-         {/* Reception */}
-         {event.receptionName && (
-            <FadeInSection className="flex flex-col md:flex-row-reverse items-center gap-12">
+      <EditableSectionWrapper isEditing={isEditing} section="locations" label="Localização" onEditSection={onEditSection} className="max-w-5xl mx-auto px-6 mb-24">
+        <div className="space-y-24">
+           {/* Ceremony */}
+           <FadeInSection className="flex flex-col md:flex-row items-center gap-12">
                <div className="w-full md:w-1/2 aspect-[4/5] bg-gray-100 relative overflow-hidden group">
-                   <img src={event.mapImage} className="w-full h-full object-cover grayscale group-hover:grayscale-0 transition-all duration-700" />
-                   <div className="absolute top-4 right-4 bg-white px-4 py-2 text-xs font-bold tracking-widest uppercase">Recepção</div>
+                   <img src="https://images.unsplash.com/photo-1544070274-1b48b1111003?q=80&w=2670&auto=format&fit=crop" className="w-full h-full object-cover grayscale group-hover:grayscale-0 transition-all duration-700" />
+                   <div className="absolute top-4 left-4 bg-white px-4 py-2 text-xs font-bold tracking-widest uppercase">Cerimônia</div>
                </div>
-               <div className="w-full md:w-1/2 text-center md:text-right space-y-4">
-                   <h2 className="text-4xl font-serif text-[#1a1a1a]">{event.receptionName}</h2>
-                   <p className="text-[#C2B280] font-display uppercase tracking-widest text-sm">Após a cerimônia</p>
-                   <p className="text-gray-500 leading-relaxed font-light text-lg">{event.receptionAddress}</p>
-                   <button onClick={() => window.open(`https://maps.google.com/?q=${event.receptionAddress}`, '_blank')} className="mt-4 inline-block border-b border-black pb-1 text-xs font-bold uppercase tracking-widest hover:text-[#C2B280] hover:border-[#C2B280] transition-colors">
+               <div className="w-full md:w-1/2 text-center md:text-left space-y-4">
+                  <h2 className="text-4xl font-serif text-[#1a1a1a]">
+                    <EditableField
+                      value={event.locationName}
+                      onChange={(newVal) => updateField?.('locationName', newVal)}
+                      isEditing={isEditing}
+                      className="text-4xl font-serif text-[#1a1a1a] text-center md:text-left"
+                    />
+                  </h2>
+                   <p className="text-[#C2B280] font-display uppercase tracking-widest text-sm">
+                     <EditableField
+                       value={event.time}
+                       onChange={(newVal) => updateField?.('time', newVal)}
+                       isEditing={isEditing}
+                       className="text-[#C2B280] font-display uppercase tracking-widest text-sm text-center md:text-left"
+                     />
+                   </p>
+                   <p className="text-gray-500 leading-relaxed font-light text-lg">
+                     <EditableField
+                       value={event.address}
+                       onChange={(newVal) => updateField?.('address', newVal)}
+                       isEditing={isEditing}
+                       className="text-gray-500 leading-relaxed font-light text-lg text-center md:text-left"
+                       multiline
+                     />
+                   </p>
+                   <button onClick={() => window.open(event.mapLink || '#', '_blank')} className="mt-4 inline-block border-b border-black pb-1 text-xs font-bold uppercase tracking-widest hover:text-[#C2B280] hover:border-[#C2B280] transition-colors">
                       Ver Localização
                    </button>
                </div>
-            </FadeInSection>
-         )}
-      </div>
+           </FadeInSection>
+
+           {/* Reception */}
+           {event.receptionName && (
+              <FadeInSection className="flex flex-col md:flex-row-reverse items-center gap-12">
+                 <div className="w-full md:w-1/2 aspect-[4/5] bg-gray-100 relative overflow-hidden group">
+                     <img src={event.mapImage} className="w-full h-full object-cover grayscale group-hover:grayscale-0 transition-all duration-700" />
+                     <div className="absolute top-4 right-4 bg-white px-4 py-2 text-xs font-bold tracking-widest uppercase">Recepção</div>
+                 </div>
+                 <div className="w-full md:w-1/2 text-center md:text-right space-y-4">
+                     <h2 className="text-4xl font-serif text-[#1a1a1a]">
+                       <EditableField
+                         value={event.receptionName}
+                         onChange={(newVal) => updateField?.('receptionName', newVal)}
+                         isEditing={isEditing}
+                         className="text-4xl font-serif text-[#1a1a1a] text-center md:text-right"
+                       />
+                     </h2>
+                     <p className="text-[#C2B280] font-display uppercase tracking-widest text-sm">Após a cerimônia</p>
+                     <p className="text-gray-500 leading-relaxed font-light text-lg">
+                       <EditableField
+                         value={event.receptionAddress}
+                         onChange={(newVal) => updateField?.('receptionAddress', newVal)}
+                         isEditing={isEditing}
+                         className="text-gray-500 leading-relaxed font-light text-lg text-center md:text-right"
+                         multiline
+                       />
+                     </p>
+                     <button onClick={() => window.open(`https://maps.google.com/?q=${event.receptionAddress}`, '_blank')} className="mt-4 inline-block border-b border-black pb-1 text-xs font-bold uppercase tracking-widest hover:text-[#C2B280] hover:border-[#C2B280] transition-colors">
+                        Ver Localização
+                     </button>
+                 </div>
+              </FadeInSection>
+           )}
+        </div>
+      </EditableSectionWrapper>
 
       {/* 5. TIMELINE (Clean Vertical) */}
-      <FadeInSection className="bg-[#F4F4F4] py-24 px-6">
-         <div className="max-w-xl mx-auto text-center mb-12">
-            <h3 className="text-3xl font-serif italic text-[#1a1a1a]">Nosso Dia</h3>
-         </div>
-         <div className="max-w-md mx-auto space-y-12 relative before:absolute before:inset-y-0 before:left-1/2 before:w-px before:bg-gray-300">
-            {event.timeline.map((item, i) => (
-               <div key={i} className="relative flex items-center justify-between">
-                  <div className={`w-[45%] ${i % 2 === 0 ? 'text-right' : 'order-last text-left'}`}>
-                     <h4 className="font-serif text-xl">{item.title}</h4>
-                     <p className="text-xs text-gray-500 mt-1 font-display uppercase tracking-wider">{item.description}</p>
+      <EditableSectionWrapper isEditing={isEditing} section="timeline" label="Cronograma" onEditSection={onEditSection} className="bg-[#F4F4F4] py-24 px-6 my-10">
+         <div>
+            <div className="max-w-xl mx-auto text-center mb-12">
+               <h3 className="text-3xl font-serif italic text-[#1a1a1a]">Nosso Dia</h3>
+            </div>
+            <div className="max-w-md mx-auto space-y-12 relative before:absolute before:inset-y-0 before:left-1/2 before:w-px before:bg-gray-300">
+               {(event.timeline || []).map((item, i) => (
+                  <div key={i} className="relative flex items-center justify-between">
+                     <div className={`w-[45%] ${i % 2 === 0 ? 'text-right' : 'order-last text-left'}`}>
+                        <h4 className="font-serif text-xl">
+                          <EditableField
+                            value={item.title}
+                            onChange={(newVal) => updateTimelineItem?.(i, 'title', newVal)}
+                            isEditing={isEditing}
+                            className={`font-serif text-xl text-center ${i % 2 === 0 ? 'md:text-right' : 'md:text-left'}`}
+                          />
+                        </h4>
+                        <p className="text-xs text-gray-500 mt-1 font-display uppercase tracking-wider">
+                          <EditableField
+                            value={item.description}
+                            onChange={(newVal) => updateTimelineItem?.(i, 'description', newVal)}
+                            isEditing={isEditing}
+                            className={`text-xs text-gray-500 mt-1 font-display uppercase tracking-wider text-center ${i % 2 === 0 ? 'md:text-right' : 'md:text-left'}`}
+                            multiline
+                          />
+                        </p>
+                     </div>
+                     <div className="absolute left-1/2 -translate-x-1/2 w-3 h-3 bg-[#C2B280] rounded-full border-4 border-[#F4F4F4]"></div>
+                     <div className={`w-[45%] ${i % 2 === 0 ? 'text-left' : 'text-right'}`}>
+                        <span className="font-display font-bold text-[#C2B280]">
+                          <EditableField
+                            value={item.time}
+                            onChange={(newVal) => updateTimelineItem?.(i, 'time', newVal)}
+                            isEditing={isEditing}
+                            className={`font-display font-bold text-[#C2B280] text-center ${i % 2 === 0 ? 'md:text-left' : 'md:text-right'}`}
+                          />
+                        </span>
+                     </div>
                   </div>
-                  <div className="absolute left-1/2 -translate-x-1/2 w-3 h-3 bg-[#C2B280] rounded-full border-4 border-[#F4F4F4]"></div>
-                  <div className={`w-[45%] ${i % 2 === 0 ? 'text-left' : 'text-right'}`}>
-                     <span className="font-display font-bold text-[#C2B280]">{item.time}</span>
-                  </div>
-               </div>
-            ))}
+               ))}
+            </div>
          </div>
-      </FadeInSection>
+      </EditableSectionWrapper>
 
       {/* 6. DRESS CODE & TIPS */}
-      <div className="grid md:grid-cols-2 max-w-6xl mx-auto w-full">
-         <FadeInSection className="bg-white p-16 md:p-24 flex flex-col items-center justify-center text-center border-b md:border-b-0 md:border-r border-gray-100">
-             <span className="material-symbols-outlined text-4xl text-[#C2B280] mb-6">checkroom</span>
-             <h3 className="text-2xl font-serif mb-4">Dress Code</h3>
-             <p className="text-gray-500 leading-relaxed max-w-sm mb-6">{event.dressCode?.description || 'Traje Passeio Completo'}</p>
-             {event.dressCode?.image && (
-                <div className="w-24 h-24 rounded-full overflow-hidden mb-4 grayscale opacity-80">
-                   <img src={event.dressCode.image} className="w-full h-full object-cover" />
-                </div>
-             )}
-         </FadeInSection>
-         
-         <FadeInSection className="bg-white p-16 md:p-24 flex flex-col items-center justify-center text-center">
-             <span className="material-symbols-outlined text-4xl text-[#C2B280] mb-6">featured_seasonal_and_gifts</span>
-             <h3 className="text-2xl font-serif mb-4">Lista de Presentes</h3>
-             <p className="text-gray-500 leading-relaxed max-w-sm mb-8">
-               {event.gifts?.[0].description || 'Sua presença é nosso maior presente.'}
-             </p>
-             {event.gifts && (
-               <button 
-                  onClick={() => {navigator.clipboard.writeText(event.gifts![0].value); alert('IBAN Copiado!')}}
-                  className="px-8 py-3 bg-[#2C2C2C] text-white text-xs font-bold uppercase tracking-widest hover:bg-[#C2B280] transition-colors"
-               >
-                  Copiar IBAN
-               </button>
-             )}
-         </FadeInSection>
-      </div>
+      <EditableSectionWrapper isEditing={isEditing} section="gifts" label="Dress Code & Contas" onEditSection={onEditSection} className="grid md:grid-cols-2 max-w-6xl mx-auto w-full py-12">
+         <div className="contents">
+            <FadeInSection className="bg-white p-16 md:p-24 flex flex-col items-center justify-center text-center border-b md:border-b-0 md:border-r border-gray-100 w-full">
+                <span className="material-symbols-outlined text-4xl text-[#C2B280] mb-6">checkroom</span>
+                <h3 className="text-2xl font-serif mb-4">Dress Code</h3>
+                <p className="text-gray-500 leading-relaxed max-w-sm mb-6">
+                  <EditableField
+                    value={event.dressCode?.description || 'Traje Passeio Completo'}
+                    onChange={(newVal) => updateField?.('dressCode', { ...event.dressCode, description: newVal })}
+                    isEditing={isEditing}
+                    className="text-gray-500 leading-relaxed max-w-sm mb-6 text-center"
+                    multiline
+                  />
+                </p>
+                {event.dressCode?.image && (
+                   <div className="w-24 h-24 rounded-full overflow-hidden mb-4 grayscale opacity-80">
+                      <img src={event.dressCode.image} className="w-full h-full object-cover" />
+                   </div>
+                )}
+            </FadeInSection>
+            
+            <FadeInSection className="bg-white p-16 md:p-24 flex flex-col items-center justify-center text-center w-full">
+                <span className="material-symbols-outlined text-4xl text-[#C2B280] mb-6">featured_seasonal_and_gifts</span>
+                <h3 className="text-2xl font-serif mb-4">Lista de Presentes</h3>
+                <p className="text-gray-500 leading-relaxed max-w-sm mb-8">
+                  <EditableField
+                    value={event.gifts?.[0]?.description || 'Sua presença é nosso maior presente.'}
+                    onChange={(newVal) => {
+                      const list = [...(event.gifts || [])];
+                      if (list[0]) {
+                        list[0] = { ...list[0], description: newVal };
+                      } else {
+                        list[0] = { title: 'Presente', description: newVal, value: '' };
+                      }
+                      updateField?.('gifts', list);
+                    }}
+                    isEditing={isEditing}
+                    className="text-gray-500 leading-relaxed max-w-sm text-center"
+                    multiline
+                  />
+                </p>
+                {event.gifts && event.gifts.length > 0 && (
+                  <div className="flex flex-col items-center gap-4">
+                    {event.gifts?.[0]?.value && (
+                      <p className="text-xs font-mono text-gray-700 bg-gray-50 border border-dashed border-gray-200 p-2.5 rounded-xl select-all max-w-[280px] break-all">
+                        {event.gifts[0].value}
+                      </p>
+                    )}
+                    <button 
+                       onClick={() => {navigator.clipboard.writeText(event.gifts?.[0]?.value || ''); alert('IBAN Copiado!')}}
+                       className="px-8 py-3 bg-[#2C2C2C] text-white text-xs font-bold uppercase tracking-widest hover:bg-[#C2B280] transition-colors"
+                    >
+                       Copiar IBAN
+                    </button>
+                  </div>
+                )}
+            </FadeInSection>
+         </div>
+      </EditableSectionWrapper>
 
       {/* 7. GALLERY (Masonry-ish) */}
       {event.gallery && (
          <FadeInSection className="w-full">
             <div className="grid grid-cols-1 md:grid-cols-3">
-               {event.gallery.map((img, i) => (
-                  <div key={i} className="aspect-square relative group overflow-hidden">
-                     <img src={img} className="w-full h-full object-cover transition-transform duration-1000 group-hover:scale-110" />
-                     <div className="absolute inset-0 bg-black/20 opacity-0 group-hover:opacity-100 transition-opacity duration-500"></div>
+               {(event.gallery || []).map((img, i) => (
+                  <div key={i} className="aspect-square relative group/gallery-item overflow-hidden">
+                     <EditableImageWrapper src={img} onChange={(newVal) => updateGalleryImage?.(i, newVal)} isEditing={isEditing} className="w-full h-full">
+                       <img src={getImageUrl(img)} className="w-full h-full object-cover transition-transform duration-1000 group-hover:scale-110" />
+                     </EditableImageWrapper>
+                     {isEditing && (
+                       <button
+                         type="button"
+                         onClick={(e) => {
+                           e.stopPropagation();
+                           deleteGalleryImage?.(i);
+                         }}
+                         className="absolute top-2 right-2 bg-rose-500 hover:bg-rose-600 text-white rounded-full w-6 h-6 flex items-center justify-center shadow-lg hover:scale-105 active:scale-95 transition-all cursor-pointer z-30 opacity-0 group-hover/gallery-item:opacity-100 animate-in fade-in"
+                         title="Excluir Foto"
+                       >
+                         <span className="material-symbols-outlined text-[14px]">delete</span>
+                       </button>
+                     )}
+                     <div className="absolute inset-0 bg-black/20 opacity-0 group-hover:opacity-100 transition-opacity duration-500 pointer-events-none"></div>
                   </div>
                ))}
             </div>
@@ -377,7 +2287,7 @@ const ModernLayout: React.FC<{ event: EventDetails; onRSVP: () => void; guestNam
             onClick={onRSVP}
             className="bg-white text-[#1a1a1a] px-10 py-4 rounded-full font-display font-bold text-xs uppercase tracking-widest shadow-2xl hover:bg-[#1a1a1a] hover:text-white transition-colors duration-300 flex items-center gap-2 border border-gray-100"
          >
-            <span>Confirmar Presença</span>
+            <span>{getRSVPText(event.type)}</span>
          </button>
       </div>
 
@@ -390,7 +2300,19 @@ const ModernLayout: React.FC<{ event: EventDetails; onRSVP: () => void; guestNam
 // LAYOUT 3: GARDEN ELEGANCE (New Model)
 // Soft, Floral, Serif, Comprehensive features (Bible, Gallery, etc.)
 // ============================================================================
-const GardenLayout: React.FC<{ event: EventDetails; onRSVP: () => void; guestName: string }> = ({ event, onRSVP, guestName }) => {
+const GardenLayout: React.FC<{
+  event: EventDetails;
+  onRSVP: () => void;
+  guestName: string;
+  isEditing?: boolean;
+  onEditSection?: (section: any) => void;
+  updateField?: (field: string, value: any) => void;
+  deleteTimelineItem?: (index: number) => void;
+  deleteGiftItem?: (index: number) => void;
+  updateGalleryImage?: (index: number, val: string) => void;
+  deleteGalleryImage?: (index: number) => void;
+  updateTimelineItem?: (index: number, field: 'time' | 'title' | 'description', value: string) => void;
+}> = ({ event, onRSVP, guestName, isEditing, onEditSection, updateField, deleteTimelineItem, deleteGiftItem, updateGalleryImage, deleteGalleryImage, updateTimelineItem }) => {
   const accentColor = "text-[#5D6D55]"; // Sage green
   const accentBg = "bg-[#5D6D55]";
   
@@ -398,56 +2320,78 @@ const GardenLayout: React.FC<{ event: EventDetails; onRSVP: () => void; guestNam
     <div className="min-h-screen bg-[#F9F6F2] font-serif text-[#4A4A4A] pb-28 overflow-x-hidden selection:bg-[#D6CFC7]">
       
       {/* 1. HERO WITH OVERLAY */}
-      <div className="relative h-[85vh] w-full overflow-hidden">
-         <motion.div 
-           initial={{ scale: 1.1 }}
-           animate={{ scale: 1 }}
-           transition={{ duration: 10, ease: "linear" }}
-           className="absolute inset-0 bg-cover bg-center" 
-           style={{ backgroundImage: `url('${event.heroImage}')` }} 
-         />
-         <div className="absolute inset-0 bg-white/20 mix-blend-overlay" />
-         <div className="absolute inset-0 bg-gradient-to-t from-[#F9F6F2] via-transparent to-transparent h-40 bottom-0 top-auto" />
-         
-         <motion.div 
-            initial={{ opacity: 0, y: 30, filter: 'blur(5px)' }}
-            animate={{ opacity: 1, y: 0, filter: 'blur(0px)' }}
-            transition={{ delay: 0.5, duration: 1.2, ease: [0.22, 1, 0.36, 1] }}
-            className="absolute inset-0 flex flex-col items-center justify-center text-center p-6 drop-shadow-sm"
-         >
-            <div className="bg-white/70 backdrop-blur-sm p-8 px-10 rounded-t-[100px] rounded-b-[100px] shadow-xl border border-white">
-                <p className={`text-xs uppercase tracking-[0.3em] mb-4 ${accentColor} font-sans`}>O Casamento de</p>
-                <h1 className="text-5xl md:text-6xl font-script text-[#2C2C2C] mb-2 leading-tight">
-                  {event.title.split(' & ')[0]} <br/> <span className="text-3xl font-serif italic text-[#8A8A8A]">&</span> <br/> {event.title.split(' & ')[1]}
-                </h1>
-                <p className="mt-4 font-sans text-sm uppercase tracking-widest text-gray-500">{event.date}</p>
-            </div>
-         </motion.div>
-      </div>
+      <EditableSectionWrapper isEditing={isEditing} section="style" label="Design & Informações" onEditSection={onEditSection}>
+        <div className="relative h-[85vh] w-full overflow-hidden">
+           <EditableImageWrapper src={event.heroImage} onChange={(newVal) => updateField?.('heroImage', newVal)} isEditing={isEditing} className="absolute inset-0">
+             <motion.div 
+               initial={{ scale: 1.1 }}
+               animate={{ scale: 1 }}
+               transition={{ duration: 10, ease: "linear" }}
+               className="absolute inset-0 bg-cover bg-center" 
+               style={{ backgroundImage: `url('${event.heroImage}')` }} 
+             />
+           </EditableImageWrapper>
+           <div className="absolute inset-0 bg-white/20 mix-blend-overlay pointer-events-none" />
+           <div className="absolute inset-0 bg-gradient-to-t from-[#F9F6F2] via-transparent to-transparent h-40 bottom-0 top-auto pointer-events-none" />
+           
+           <motion.div 
+              initial={{ opacity: 0, y: 30, filter: 'blur(5px)' }}
+              animate={{ opacity: 1, y: 0, filter: 'blur(0px)' }}
+              transition={{ delay: 0.5, duration: 1.2, ease: [0.22, 1, 0.36, 1] }}
+              className="absolute inset-0 flex flex-col items-center justify-center text-center p-6 drop-shadow-sm"
+           >
+              <div className="bg-white/70 backdrop-blur-sm p-8 px-10 rounded-t-[100px] rounded-b-[100px] shadow-xl border border-white">
+                  <p className={`text-xs uppercase tracking-[0.3em] mb-4 ${accentColor} font-sans`}>O Casamento de</p>
+                  <h1 className="text-5xl md:text-6xl font-script text-[#2C2C2C] mb-2 leading-tight">
+                    <EditableField
+                      value={event.title}
+                      onChange={(newVal) => updateField?.('title', newVal)}
+                      isEditing={isEditing}
+                      className="text-5xl md:text-6xl font-script text-[#2C2C2C] leading-tight text-center"
+                    />
+                  </h1>
+                  <p className="mt-4 font-sans text-sm uppercase tracking-widest text-gray-500">
+                    <EditableField
+                      value={event.date}
+                      onChange={(newVal) => updateField?.('date', newVal)}
+                      isEditing={isEditing}
+                      className="mt-4 font-sans text-sm uppercase tracking-widest text-gray-500 text-center"
+                    />
+                  </p>
+              </div>
+           </motion.div>
+        </div>
 
-      {/* 2. BIBLE QUOTE & WELCOME */}
-      <div className="max-w-2xl mx-auto px-6 -mt-10 relative z-10 text-center">
-         <FadeInSection>
-            <div className="mb-8">
-               <span className="material-symbols-outlined text-4xl text-[#D6CFC7]">format_quote</span>
-               <p className="text-xl md:text-2xl italic font-medium leading-relaxed mt-2 text-[#5D5C61]">
-                 {event.description.split('(')[0].replace(/"/g, '')}
-               </p>
-               {event.description.includes('(') && (
-                 <p className="text-sm font-sans uppercase tracking-widest mt-4 text-[#8C8C8C]">
-                   {event.description.split('(')[1].replace(')', '')}
+        {/* 2. BIBLE QUOTE & WELCOME */}
+        <div className="max-w-2xl mx-auto px-6 -mt-10 relative z-10 text-center">
+           <FadeInSection>
+              <div className="mb-8">
+                 <span className="material-symbols-outlined text-4xl text-[#D6CFC7]">format_quote</span>
+                 <p className="text-xl md:text-2xl italic font-medium leading-relaxed mt-2 text-[#5D5C61]">
+                   <EditableField
+                     value={event.description}
+                     onChange={(newVal) => updateField?.('description', newVal)}
+                     isEditing={isEditing}
+                     className="text-xl md:text-2xl italic font-medium leading-relaxed mt-2 text-[#5D5C61] text-center"
+                     multiline
+                   />
                  </p>
-               )}
-            </div>
-            
-            <div className="w-px h-16 bg-[#D6CFC7] mx-auto mb-8"></div>
+                 {!isEditing && event.description.includes('(') && (
+                   <p className="text-sm font-sans uppercase tracking-widest mt-4 text-[#8C8C8C]">
+                     {event.description.split('(')[1].replace(')', '')}
+                   </p>
+                 )}
+              </div>
+              
+              <div className="w-px h-16 bg-[#D6CFC7] mx-auto mb-8"></div>
 
-            <div className="font-sans">
-               <p className="uppercase tracking-[0.2em] text-xs text-[#8C8C8C] mb-2">Convidado Especial</p>
-               <p className="text-2xl font-serif text-[#2C2C2C]">{guestName}</p>
-            </div>
-         </FadeInSection>
-      </div>
+              <div className="font-sans">
+                 <p className="uppercase tracking-[0.2em] text-xs text-[#8C8C8C] mb-2">Convidado Especial</p>
+                 <p className="text-2xl font-serif text-[#2C2C2C]">{guestName}</p>
+              </div>
+           </FadeInSection>
+        </div>
+      </EditableSectionWrapper>
 
       {/* 3. COUNTDOWN */}
       <FadeInSection className="mt-16 bg-white py-12 px-4 shadow-[0_4px_20px_-10px_rgba(0,0,0,0.05)] border-y border-[#EAE5DF]">
@@ -456,77 +2400,142 @@ const GardenLayout: React.FC<{ event: EventDetails; onRSVP: () => void; guestNam
       </FadeInSection>
 
       {/* 4. LOCATIONS (Ceremony & Reception) */}
-      <div className="max-w-4xl mx-auto px-6 py-16 space-y-16">
-         <FadeInSection className="flex flex-col md:flex-row items-center gap-8">
-            <div className="flex-1 text-center md:text-right order-2 md:order-1">
-               <span className={`inline-block px-3 py-1 rounded-full text-[10px] font-bold text-white mb-4 ${accentBg} uppercase tracking-widest`}>Cerimônia</span>
-               <h3 className="text-3xl font-serif mb-2">{event.locationName}</h3>
-               <p className="text-[#8C8C8C] font-sans text-sm mb-1">{event.time} Horas</p>
-               <p className="text-[#5D5C61] mb-6 leading-relaxed">{event.address}</p>
-               <button onClick={() => window.open(event.mapLink || '#', '_blank')} className={`text-xs font-bold border-b border-[#2C2C2C] pb-0.5 hover:opacity-50 transition-opacity uppercase tracking-widest`}>
-                 Ver no Mapa
-               </button>
-            </div>
-            <div className="flex-1 order-1 md:order-2">
-               <div className="aspect-[3/4] rounded-t-[100px] overflow-hidden shadow-lg">
-                  <img src="https://images.unsplash.com/photo-1544070274-1b48b1111003?q=80&w=2670&auto=format&fit=crop" className="w-full h-full object-cover" />
-               </div>
-            </div>
-         </FadeInSection>
-
-         {event.receptionName && (
+      <EditableSectionWrapper isEditing={isEditing} section="locations" label="Locais" onEditSection={onEditSection} className="max-w-4xl mx-auto px-6 py-16 block">
+        <div className="space-y-16">
            <FadeInSection className="flex flex-col md:flex-row items-center gap-8">
-              <div className="flex-1">
-                 <div className="aspect-[3/4] rounded-t-[100px] overflow-hidden shadow-lg">
-                    <img src={event.mapImage} className="w-full h-full object-cover" />
-                 </div>
-              </div>
-              <div className="flex-1 text-center md:text-left">
-                 <span className={`inline-block px-3 py-1 rounded-full text-[10px] font-bold text-white mb-4 ${accentBg} uppercase tracking-widest`}>Recepção</span>
-                 <h3 className="text-3xl font-serif mb-2">{event.receptionName}</h3>
-                 <p className="text-[#8C8C8C] font-sans text-sm mb-1">Após a cerimônia</p>
-                 <p className="text-[#5D5C61] mb-6 leading-relaxed">{event.receptionAddress}</p>
-                 <button onClick={() => window.open(`https://maps.google.com/?q=${event.receptionAddress}`, '_blank')} className={`text-xs font-bold border-b border-[#2C2C2C] pb-0.5 hover:opacity-50 transition-opacity uppercase tracking-widest`}>
+              <div className="flex-1 text-center md:text-right order-2 md:order-1">
+                 <span className={`inline-block px-3 py-1 rounded-full text-[10px] font-bold text-white mb-4 ${accentBg} uppercase tracking-widest`}>Cerimônia</span>
+                 <h3 className="text-3xl font-serif mb-2">
+                   <EditableField
+                     value={event.locationName}
+                     onChange={(newVal) => updateField?.('locationName', newVal)}
+                     isEditing={isEditing}
+                     className="text-3xl font-serif mb-2 text-center md:text-right"
+                   />
+                 </h3>
+                 <p className="text-[#8C8C8C] font-sans text-sm mb-1">
+                   <EditableField
+                     value={event.time}
+                     onChange={(newVal) => updateField?.('time', newVal)}
+                     isEditing={isEditing}
+                     className="text-[#8C8C8C] font-sans text-sm mb-1 text-center md:text-right"
+                   />
+                 </p>
+                 <p className="text-[#5D5C61] mb-6 leading-relaxed">
+                   <EditableField
+                     value={event.address}
+                     onChange={(newVal) => updateField?.('address', newVal)}
+                     isEditing={isEditing}
+                     className="text-[#5D5C61] mb-6 leading-relaxed text-center md:text-right"
+                     multiline
+                   />
+                 </p>
+                 <button onClick={() => window.open(event.mapLink || '#', '_blank')} className={`text-xs font-bold border-b border-[#2C2C2C] pb-0.5 hover:opacity-50 transition-opacity uppercase tracking-widest`}>
                    Ver no Mapa
                  </button>
               </div>
+              <div className="flex-1 order-1 md:order-2">
+                 <div className="aspect-[3/4] rounded-t-[100px] overflow-hidden shadow-lg">
+                    <img src="https://images.unsplash.com/photo-1544070274-1b48b1111003?q=80&w=2670&auto=format&fit=crop" className="w-full h-full object-cover" />
+                 </div>
+              </div>
            </FadeInSection>
-         )}
-      </div>
+
+           {event.receptionName && (
+             <FadeInSection className="flex flex-col md:flex-row items-center gap-8">
+                <div className="flex-1">
+                   <div className="aspect-[3/4] rounded-t-[100px] overflow-hidden shadow-lg">
+                      <img src={event.mapImage} className="w-full h-full object-cover" />
+                   </div>
+                </div>
+                <div className="flex-1 text-center md:text-left">
+                   <span className={`inline-block px-3 py-1 rounded-full text-[10px] font-bold text-white mb-4 ${accentBg} uppercase tracking-widest`}>Recepção</span>
+                   <h3 className="text-3xl font-serif mb-2">
+                    <EditableField
+                      value={event.receptionName}
+                      onChange={(newVal) => updateField?.('receptionName', newVal)}
+                      isEditing={isEditing}
+                      className="text-3xl font-serif mb-2 text-center md:text-left"
+                    />
+                  </h3>
+                   <p className="text-[#8C8C8C] font-sans text-sm mb-1">Após a cerimônia</p>
+                   <p className="text-[#5D5C61] mb-6 leading-relaxed">
+                     <EditableField
+                       value={event.receptionAddress}
+                       onChange={(newVal) => updateField?.('receptionAddress', newVal)}
+                       isEditing={isEditing}
+                       className="text-[#5D5C61] mb-6 leading-relaxed text-center md:text-left"
+                       multiline
+                     />
+                   </p>
+                   <button onClick={() => window.open(`https://maps.google.com/?q=${event.receptionAddress}`, '_blank')} className={`text-xs font-bold border-b border-[#2C2C2C] pb-0.5 hover:opacity-50 transition-opacity uppercase tracking-widest`}>
+                     Ver no Mapa
+                   </button>
+                </div>
+             </FadeInSection>
+           )}
+        </div>
+      </EditableSectionWrapper>
 
       {/* 5. TIMELINE (Elegant Vertical) */}
-      <FadeInSection className="bg-white py-20 px-6 border-y border-[#EAE5DF]">
-         <div className="max-w-lg mx-auto">
-            <h3 className="text-center font-serif text-3xl mb-12 italic">Cronograma</h3>
-            <div className="space-y-10 relative pl-8 border-l border-[#EAE5DF]">
-               {event.timeline.map((item, i) => (
-                 <div key={i} className="relative">
-                    <div className={`absolute -left-[37px] top-1 w-4 h-4 rounded-full border-4 border-white ${accentBg} shadow-sm`}></div>
-                    <span className="text-xs font-bold font-sans text-[#8C8C8C] block mb-1">{item.time}</span>
-                    <h4 className="text-xl font-serif text-[#2C2C2C] mb-1">{item.title}</h4>
-                    <p className="text-sm text-[#5D5C61] font-light">{item.description}</p>
-                 </div>
-               ))}
-            </div>
-         </div>
-      </FadeInSection>
+      <EditableSectionWrapper isEditing={isEditing} section="timeline" label="Cronograma" onEditSection={onEditSection}>
+        <FadeInSection className="bg-white py-20 px-6 border-y border-[#EAE5DF]">
+           <div className="max-w-lg mx-auto">
+              <h3 className="text-center font-serif text-3xl mb-12 italic">Cronograma</h3>
+              <div className="space-y-10 relative pl-8 border-l border-[#EAE5DF]">
+                 {(event.timeline || []).map((item, i) => (
+                   <div key={i} className="relative">
+                      <div className={`absolute -left-[37px] top-1 w-4 h-4 rounded-full border-4 border-white ${accentBg} shadow-sm`}></div>
+                      <span className="text-xs font-bold font-sans text-[#8C8C8C] block mb-1">
+                        <EditableField
+                          value={item.time}
+                          onChange={(newVal) => updateTimelineItem?.(i, 'time', newVal)}
+                          isEditing={isEditing}
+                          className="text-xs font-bold font-sans text-[#8C8C8C] text-left"
+                        />
+                      </span>
+                      <h4 className="text-xl font-serif text-[#2C2C2C] mb-1">
+                        <EditableField
+                          value={item.title}
+                          onChange={(newVal) => updateTimelineItem?.(i, 'title', newVal)}
+                          isEditing={isEditing}
+                          className="text-xl font-serif text-[#2C2C2C] text-left"
+                        />
+                      </h4>
+                      <p className="text-sm text-[#5D5C61] font-light">
+                        <EditableField
+                          value={item.description}
+                          onChange={(newVal) => updateTimelineItem?.(i, 'description', newVal)}
+                          isEditing={isEditing}
+                          className="text-sm text-[#5D5C61] font-light text-left"
+                          multiline
+                        />
+                      </p>
+                   </div>
+                 ))}
+              </div>
+           </div>
+        </FadeInSection>
+      </EditableSectionWrapper>
 
       {/* 6. GALLERY (Grid Layout) */}
       {event.gallery && (
-        <FadeInSection className="py-20 px-4 max-w-5xl mx-auto">
-           <h3 className="text-center font-sans text-xs uppercase tracking-[0.2em] mb-8 text-[#8C8C8C]">Momentos Especiais</h3>
-           <div className="grid grid-cols-2 md:grid-cols-3 gap-2 md:gap-4">
-              {event.gallery.map((img, i) => (
-                <div key={i} className={`rounded-lg overflow-hidden shadow-sm ${i === 0 ? 'col-span-2 row-span-2' : ''}`}>
-                   <img src={img} className="w-full h-full object-cover hover:scale-105 transition-transform duration-700" />
-                </div>
-              ))}
-           </div>
-        </FadeInSection>
+        <EditableSectionWrapper isEditing={isEditing} section="gallery" label="Galeria" onEditSection={onEditSection}>
+          <FadeInSection className="py-20 px-4 max-w-5xl mx-auto">
+             <h3 className="text-center font-sans text-xs uppercase tracking-[0.2em] mb-8 text-[#8C8C8C]">Momentos Especiais</h3>
+             <div className="grid grid-cols-2 md:grid-cols-3 gap-2 md:gap-4">
+                {(event.gallery || []).map((img, i) => (
+                  <div key={i} className={`rounded-lg overflow-hidden shadow-sm ${i === 0 ? 'col-span-2 row-span-2' : ''}`}>
+                     <img src={getImageUrl(img)} className="w-full h-full object-cover hover:scale-105 transition-transform duration-700" />
+                  </div>
+                ))}
+             </div>
+          </FadeInSection>
+        </EditableSectionWrapper>
       )}
 
       {/* 7. GIFTS & DRESS CODE */}
-      <div className="grid md:grid-cols-2 gap-8 max-w-4xl mx-auto px-6 mb-24">
+      <EditableSectionWrapper isEditing={isEditing} section="gifts" label="Lista de Presentes & Trajes" onEditSection={onEditSection} className="grid md:grid-cols-2 gap-8 max-w-4xl mx-auto px-6 mb-24 block">
          {event.dressCode && (
            <FadeInSection className="bg-white p-8 rounded-2xl shadow-sm border border-[#EAE5DF] text-center">
               <span className="material-symbols-outlined text-3xl mb-4 text-[#8C8C8C]">styler</span>
@@ -539,16 +2548,21 @@ const GardenLayout: React.FC<{ event: EventDetails; onRSVP: () => void; guestNam
            <FadeInSection className="bg-white p-8 rounded-2xl shadow-sm border border-[#EAE5DF] text-center">
               <span className="material-symbols-outlined text-3xl mb-4 text-[#8C8C8C]">card_giftcard</span>
               <h4 className="text-lg font-serif font-bold mb-2">Lista de Presentes</h4>
-              <p className="text-sm text-[#5D5C61] mb-4">{event.gifts[0].description}</p>
+              <p className="text-sm text-[#5D5C61] mb-4">{event.gifts?.[0]?.description}</p>
               <button 
-                 onClick={() => {navigator.clipboard.writeText(event.gifts![0].value); alert('IBAN Copiado!')}}
+                 onClick={() => {navigator.clipboard.writeText(event.gifts?.[0]?.value || ''); alert('IBAN Copiado!')}}
                  className={`px-6 py-2 rounded-full border border-[#D6CFC7] text-xs font-bold uppercase tracking-widest hover:bg-[#F9F6F2] transition-colors`}
               >
                  Copiar IBAN
               </button>
+              {event.gifts?.[0]?.value && (
+                <p className="text-xs font-mono text-gray-600 bg-gray-50 p-2 rounded-xl mt-4 select-all max-w-[280px] mx-auto break-all">
+                  {event.gifts[0].value}
+                </p>
+              )}
            </FadeInSection>
          )}
-      </div>
+      </EditableSectionWrapper>
 
       {/* FIXED BOTTOM BAR */}
       <div className="fixed bottom-0 left-0 w-full bg-white/90 backdrop-blur-md border-t border-[#EAE5DF] p-4 z-50 flex items-center justify-center">
@@ -556,7 +2570,7 @@ const GardenLayout: React.FC<{ event: EventDetails; onRSVP: () => void; guestNam
            onClick={onRSVP}
            className={`w-full max-w-md ${accentBg} text-white font-sans font-bold uppercase tracking-widest text-xs py-4 shadow-lg flex items-center justify-center gap-2 hover:opacity-90`}
          >
-           <span>Confirmar Presença</span>
+           <span>{getRSVPText(event.type)}</span>
          </Button>
       </div>
     </div>
@@ -566,7 +2580,14 @@ const GardenLayout: React.FC<{ event: EventDetails; onRSVP: () => void; guestNam
 // ============================================================================
 // LAYOUT 4: RUSTIC CHIC (Warm, Texture, Nature)
 // ============================================================================
-const RusticLayout: React.FC<{ event: EventDetails; onRSVP: () => void; guestName: string }> = ({ event, onRSVP, guestName }) => {
+const RusticLayout: React.FC<{
+  event: EventDetails;
+  onRSVP: () => void;
+  guestName: string;
+  isEditing?: boolean;
+  onEditSection?: (section: any) => void;
+  updateField?: (field: string, value: any) => void;
+}> = ({ event, onRSVP, guestName, isEditing, onEditSection, updateField }) => {
    const warmText = "text-[#5D4037]"; // Dark warm brown
    const lightText = "text-[#8D6E63]"; // Lighter brown
    const bgPaper = "bg-[#FDF5E6]"; // Old Lace / Paper
@@ -574,36 +2595,41 @@ const RusticLayout: React.FC<{ event: EventDetails; onRSVP: () => void; guestNam
    return (
      <div className={`min-h-screen ${bgPaper} font-serif text-[#4E342E] pb-28 overflow-x-hidden`}>
        
-       {/* HERO: Framed Image */}
-       <div className="p-4 md:p-8">
-          <div className="relative h-[75vh] w-full rounded-[40px] overflow-hidden border-8 border-white shadow-xl">
-             <div className="absolute inset-0 bg-cover bg-center" style={{ backgroundImage: `url('${event.heroImage}')` }} />
-             <div className="absolute inset-0 bg-gradient-to-t from-[#4E342E]/80 via-transparent to-transparent" />
-             
-             <motion.div 
-               initial={{ opacity: 0, y: 20 }}
-               animate={{ opacity: 1, y: 0 }}
-               transition={{ delay: 0.5, duration: 1 }}
-               className="absolute bottom-0 w-full p-8 md:p-16 text-center text-[#FDF5E6]"
-             >
-                <p className="uppercase tracking-[0.3em] text-xs mb-2">Save the Date</p>
-                <h1 className="text-5xl md:text-7xl font-script mb-2">{event.title}</h1>
-                <p className="text-lg">{event.date}</p>
-             </motion.div>
-          </div>
-       </div>
- 
-       {/* INTRO & BIBLE */}
-       <FadeInSection className="max-w-2xl mx-auto text-center px-6 py-12">
-          <span className="material-symbols-outlined text-4xl text-[#A1887F] mb-4">forest</span>
-          <p className="text-xl md:text-2xl font-script leading-relaxed text-[#5D4037] mb-6">"{event.description}"</p>
-          <div className="w-24 h-px bg-[#D7CCC8] mx-auto my-6"></div>
-          <p className="uppercase tracking-widest text-xs text-[#8D6E63]">Convidado Especial</p>
-          <p className="text-xl font-bold mt-2">{guestName}</p>
-       </FadeInSection>
- 
+       {/* HERO & INTRO */}
+       <EditableSectionWrapper isEditing={isEditing} section="style" label="Design & Informações" onEditSection={onEditSection}>
+         {/* HERO: Framed Image */}
+         <div className="p-4 md:p-8">
+            <div className="relative h-[75vh] w-full rounded-[40px] overflow-hidden border-8 border-white shadow-xl">
+               <EditableImageWrapper src={event.heroImage} onChange={(newVal) => updateField?.('heroImage', newVal)} isEditing={isEditing} className="absolute inset-0">
+                  <div className="absolute inset-0 bg-cover bg-center" style={{ backgroundImage: `url('${event.heroImage}')` }} />
+               </EditableImageWrapper>
+               <div className="absolute inset-0 bg-gradient-to-t from-[#4E342E]/80 via-transparent to-transparent pointer-events-none" />
+               
+               <motion.div 
+                 initial={{ opacity: 0, y: 20 }}
+                 animate={{ opacity: 1, y: 0 }}
+                 transition={{ delay: 0.5, duration: 1 }}
+                 className="absolute bottom-0 w-full p-8 md:p-16 text-center text-[#FDF5E6]"
+               >
+                  <p className="uppercase tracking-[0.3em] text-xs mb-2">Save the Date</p>
+                  <h1 className="text-5xl md:text-7xl font-script mb-2">{event.title}</h1>
+                  <p className="text-lg">{event.date}</p>
+               </motion.div>
+            </div>
+         </div>
+   
+         {/* INTRO & BIBLE */}
+         <FadeInSection className="max-w-2xl mx-auto text-center px-6 py-12">
+            <span className="material-symbols-outlined text-4xl text-[#A1887F] mb-4">forest</span>
+            <p className="text-xl md:text-2xl font-script leading-relaxed text-[#5D4037] mb-6">"{event.description}"</p>
+            <div className="w-24 h-px bg-[#D7CCC8] mx-auto my-6"></div>
+            <p className="uppercase tracking-widest text-xs text-[#8D6E63]">Convidado Especial</p>
+            <p className="text-xl font-bold mt-2">{guestName}</p>
+         </FadeInSection>
+       </EditableSectionWrapper>
+  
        {/* LOCATIONS - Side by Side Cards */}
-       <div className="px-4 md:px-8 space-y-4 mb-16">
+       <EditableSectionWrapper isEditing={isEditing} section="locations" label="Locais" onEditSection={onEditSection} className="px-4 md:px-8 space-y-4 mb-16 block">
           <FadeInSection className="bg-white p-8 rounded-3xl shadow-sm border border-[#EFEBE9] flex flex-col md:flex-row items-center gap-8">
              <div className="flex-1 text-center md:text-left">
                 <span className="inline-block px-3 py-1 bg-[#EFEBE9] text-[#5D4037] text-[10px] font-bold uppercase tracking-widest rounded-full mb-4">Cerimônia</span>
@@ -615,25 +2641,27 @@ const RusticLayout: React.FC<{ event: EventDetails; onRSVP: () => void; guestNam
                 <img src="https://images.unsplash.com/photo-1515934751635-c81c6bc9a2d8?q=80&w=2670&auto=format&fit=crop" className="w-full h-full object-cover" />
              </div>
           </FadeInSection>
-       </div>
- 
+       </EditableSectionWrapper>
+  
        {/* TIMELINE - Rustic Path */}
-       <FadeInSection className="bg-[#FFF8E1] py-16 px-6 relative overflow-hidden">
-          <div className="absolute top-0 left-1/2 -translate-x-1/2 w-full max-w-3xl h-full border-l-2 border-dashed border-[#D7CCC8] opacity-50"></div>
-          <div className="relative z-10 max-w-xl mx-auto space-y-12">
-             <h3 className="text-center font-script text-4xl text-[#5D4037] mb-12">Nosso Grande Dia</h3>
-             {event.timeline.map((item, i) => (
-                <div key={i} className="bg-white p-6 rounded-xl shadow-sm border border-[#EFEBE9] text-center relative">
-                   <div className="absolute top-1/2 -left-[45px] md:-left-[calc(50vw-50%+20px)] w-4 h-4 bg-[#8D6E63] rounded-full border-4 border-[#FFF8E1]"></div>
-                   <span className="text-[#8D6E63] font-bold block mb-1">{item.time}</span>
-                   <h4 className="text-xl font-serif text-[#4E342E]">{item.title}</h4>
-                </div>
-             ))}
-          </div>
-       </FadeInSection>
-
+       <EditableSectionWrapper isEditing={isEditing} section="timeline" label="Cronograma" onEditSection={onEditSection}>
+         <FadeInSection className="bg-[#FFF8E1] py-16 px-6 relative overflow-hidden">
+            <div className="absolute top-0 left-1/2 -translate-x-1/2 w-full max-w-3xl h-full border-l-2 border-dashed border-[#D7CCC8] opacity-50"></div>
+            <div className="relative z-10 max-w-xl mx-auto space-y-12">
+               <h3 className="text-center font-script text-4xl text-[#5D4037] mb-12">Nosso Grande Dia</h3>
+               {(event.timeline || []).map((item, i) => (
+                  <div key={i} className="bg-white p-6 rounded-xl shadow-sm border border-[#EFEBE9] text-center relative">
+                     <div className="absolute top-1/2 -left-[45px] md:-left-[calc(50vw-50%+20px)] w-4 h-4 bg-[#8D6E63] rounded-full border-4 border-[#FFF8E1]"></div>
+                     <span className="text-[#8D6E63] font-bold block mb-1">{item.time}</span>
+                     <h4 className="text-xl font-serif text-[#4E342E]">{item.title}</h4>
+                  </div>
+               ))}
+            </div>
+         </FadeInSection>
+       </EditableSectionWrapper>
+ 
        {/* GIFTS & DRESS CODE */}
-       <div className="grid md:grid-cols-2 gap-4 px-4 mt-16 mb-24">
+       <EditableSectionWrapper isEditing={isEditing} section="gifts" label="Lista de Presentes & Trajes" onEditSection={onEditSection} className="grid md:grid-cols-2 gap-4 px-4 mt-16 mb-24 block">
           <FadeInSection className="bg-[#5D4037] text-[#FDF5E6] p-10 rounded-3xl text-center flex flex-col items-center justify-center">
              <span className="material-symbols-outlined text-4xl mb-4">checkroom</span>
              <h3 className="text-2xl font-serif mb-2">Dress Code</h3>
@@ -643,21 +2671,26 @@ const RusticLayout: React.FC<{ event: EventDetails; onRSVP: () => void; guestNam
              <span className="material-symbols-outlined text-4xl text-[#5D4037] mb-4">card_giftcard</span>
              <h3 className="text-2xl font-serif text-[#4E342E] mb-2">Presentes</h3>
              <button 
-                onClick={() => {navigator.clipboard.writeText(event.gifts![0].value); alert('IBAN Copiado!')}}
+                onClick={() => {navigator.clipboard.writeText(event.gifts?.[0]?.value || ''); alert('IBAN Copiado!')}}
                 className="mt-4 px-6 py-2 border border-[#5D4037] text-[#5D4037] rounded-full text-xs font-bold uppercase tracking-widest hover:bg-[#5D4037] hover:text-white transition-colors"
              >
                 Copiar IBAN
              </button>
+             {event.gifts?.[0]?.value && (
+               <p className="text-xs font-mono text-[#5D4037] bg-[#FDFBF7] p-2 rounded-xl border border-dashed border-[#EFEBE9] mt-4 select-all max-w-[280px] mx-auto break-all">
+                 {event.gifts[0].value}
+               </p>
+             )}
           </FadeInSection>
-       </div>
- 
+       </EditableSectionWrapper>
+  
        {/* FIXED ACTION */}
        <div className="fixed bottom-6 left-1/2 -translate-x-1/2 z-50 w-full max-w-sm px-4">
           <button 
              onClick={onRSVP}
              className="w-full bg-[#5D4037] text-[#FDF5E6] py-4 rounded-full font-bold shadow-2xl shadow-[#5D4037]/40 text-sm uppercase tracking-widest hover:scale-105 transition-transform"
           >
-             Confirmar Presença
+             {getRSVPText(event.type)}
           </button>
        </div>
      </div>
@@ -668,75 +2701,102 @@ const RusticLayout: React.FC<{ event: EventDetails; onRSVP: () => void; guestNam
 // ============================================================================
 // LAYOUT 5: INDUSTRIAL (Modern, Edgy, High Contrast)
 // ============================================================================
-const IndustrialLayout: React.FC<{ event: EventDetails; onRSVP: () => void; guestName: string }> = ({ event, onRSVP, guestName }) => {
+const IndustrialLayout: React.FC<{
+  event: EventDetails;
+  onRSVP: () => void;
+  guestName: string;
+  isEditing?: boolean;
+  onEditSection?: (section: any) => void;
+  updateField?: (field: string, value: any) => void;
+  deleteTimelineItem?: (index: number) => void;
+}> = ({ event, onRSVP, guestName, isEditing, onEditSection, updateField, deleteTimelineItem }) => {
    
    return (
      <div className="min-h-screen bg-[#111] text-white font-display pb-32 selection:bg-white selection:text-black">
        
        {/* HERO: Full Typographic */}
-       <div className="h-screen relative flex flex-col justify-between p-6 md:p-12 border-b border-white/20">
-          <div className="flex justify-between items-start">
-             <span className="text-xs font-bold uppercase tracking-widest border border-white px-2 py-1">Save The Date</span>
-             <span className="text-xs font-bold uppercase tracking-widest">{event.date}</span>
-          </div>
-          
-          <div className="relative z-10">
-             <motion.h1 
-               initial={{ y: 50, opacity: 0 }}
-               animate={{ y: 0, opacity: 1 }}
-               transition={{ duration: 0.8 }}
-               className="text-6xl md:text-9xl font-black uppercase leading-[0.85] tracking-tighter mix-blend-difference"
-             >
-                {event.title.replace(' & ', '\n&\n')}
-             </motion.h1>
-          </div>
+       <EditableSectionWrapper isEditing={isEditing} section="style" label="Design & Informações" onEditSection={onEditSection}>
+         <div className="h-screen relative flex flex-col justify-between p-6 md:p-12 border-b border-white/20">
+            <div className="flex justify-between items-start">
+               <span className="text-xs font-bold uppercase tracking-widest border border-white px-2 py-1">Save The Date</span>
+               <span className="text-xs font-bold uppercase tracking-widest">{event.date}</span>
+            </div>
+            
+            <div className="relative z-10">
+               <motion.h1 
+                 initial={{ y: 50, opacity: 0 }}
+                 animate={{ y: 0, opacity: 1 }}
+                 transition={{ duration: 0.8 }}
+                 className="text-6xl md:text-9xl font-black uppercase leading-[0.85] tracking-tighter mix-blend-difference"
+               >
+                  {event.title.replace(' & ', '\n&\n')}
+               </motion.h1>
+            </div>
 
-          <div className="absolute inset-0 z-0 opacity-40">
-             <div className="absolute inset-0 bg-gradient-to-t from-[#111] via-transparent to-transparent" />
-             <img src={event.heroImage} className="w-full h-full object-cover grayscale" />
-          </div>
-       </div>
+            <div className="absolute inset-0 z-0 opacity-40">
+               <div className="absolute inset-0 bg-gradient-to-t from-[#111] via-transparent to-transparent pointer-events-none" />
+               <EditableImageWrapper src={event.heroImage} onChange={(newVal) => updateField?.('heroImage', newVal)} isEditing={isEditing} className="w-full h-full">
+                 <img src={event.heroImage} className="w-full h-full object-cover grayscale" />
+               </EditableImageWrapper>
+            </div>
+         </div>
 
-       {/* GRID LAYOUT FOR DETAILS */}
-       <div className="grid grid-cols-1 md:grid-cols-2 border-b border-white/20">
-          <div className="p-8 md:p-16 border-b md:border-b-0 md:border-r border-white/20 flex flex-col justify-center">
-             <FadeInSection>
-               <span className="text-xs text-gray-400 uppercase tracking-widest mb-4 block">O Conceito</span>
-               <p className="text-xl md:text-2xl font-light leading-relaxed">
-                  {event.description}
-               </p>
-             </FadeInSection>
-          </div>
-          <div className="p-8 md:p-16 flex flex-col justify-center bg-white text-black">
-             <FadeInSection>
-                <span className="text-xs font-bold uppercase tracking-widest mb-4 block border-b border-black pb-2">Guest Access</span>
-                <p className="text-4xl font-bold uppercase mb-2">{guestName}</p>
-                <div className="flex gap-2 mt-4">
-                   <div className="h-2 w-2 bg-black rounded-full animate-pulse"></div>
-                   <p className="text-xs font-mono uppercase">VIP ACCESS GRANTED</p>
-                </div>
-             </FadeInSection>
-          </div>
-       </div>
+         {/* GRID LAYOUT FOR DETAILS */}
+         <div className="grid grid-cols-1 md:grid-cols-2 border-b border-white/20">
+            <div className="p-8 md:p-16 border-b md:border-b-0 md:border-r border-white/20 flex flex-col justify-center">
+               <FadeInSection>
+                  <span className="text-xs text-gray-400 uppercase tracking-widest mb-4 block">O Conceito</span>
+                  <p className="text-xl md:text-2xl font-light leading-relaxed">
+                     {event.description}
+                  </p>
+               </FadeInSection>
+            </div>
+            <div className="p-8 md:p-16 flex flex-col justify-center bg-white text-black">
+               <FadeInSection>
+                  <span className="text-xs font-bold uppercase tracking-widest mb-4 block border-b border-black pb-2">Guest Access</span>
+                  <p className="text-4xl font-bold uppercase mb-2">{guestName}</p>
+                  <div className="flex gap-2 mt-4">
+                     <div className="h-2 w-2 bg-black rounded-full animate-pulse"></div>
+                     <p className="text-xs font-mono uppercase">VIP ACCESS GRANTED</p>
+                  </div>
+               </FadeInSection>
+            </div>
+         </div>
+       </EditableSectionWrapper>
 
        {/* TIMELINE - Raw List */}
-       <div className="p-8 md:p-16">
-          <h3 className="text-4xl md:text-6xl font-black uppercase mb-12 text-transparent stroke-white" style={{ WebkitTextStroke: '1px white' }}>Timeline</h3>
-          <div className="space-y-6">
-             {event.timeline.map((item, i) => (
-                <FadeInSection key={i} className="group flex items-baseline border-b border-white/10 pb-6 hover:border-white transition-colors cursor-default">
-                   <span className="w-24 font-mono text-sm text-gray-500 group-hover:text-white transition-colors">{item.time}</span>
-                   <div>
-                      <h4 className="text-2xl font-bold uppercase group-hover:translate-x-2 transition-transform">{item.title}</h4>
-                      <p className="text-sm text-gray-500 mt-1">{item.description}</p>
-                   </div>
-                </FadeInSection>
-             ))}
-          </div>
-       </div>
+       <EditableSectionWrapper isEditing={isEditing} section="timeline" label="Cronograma" onEditSection={onEditSection}>
+         <div className="p-8 md:p-16">
+            <h3 className="text-4xl md:text-6xl font-black uppercase mb-12 text-transparent stroke-white" style={{ WebkitTextStroke: '1px white' }}>Timeline</h3>
+            <div className="space-y-6">
+               {(event.timeline || []).map((item, i) => (
+                  <FadeInSection key={i} className="group/timeline-item flex items-baseline border-b border-white/10 pb-6 hover:border-white transition-colors cursor-default relative">
+                     {isEditing && (
+                       <button
+                         type="button"
+                         onClick={(e) => {
+                           e.stopPropagation();
+                           deleteTimelineItem?.(i);
+                         }}
+                         className="absolute right-2 top-2 bg-rose-500 hover:bg-rose-600 text-white rounded-full w-6 h-6 flex items-center justify-center shadow-lg hover:scale-105 active:scale-95 transition-all cursor-pointer z-30 opacity-0 group-hover/timeline-item:opacity-100 animate-in fade-in"
+                         title="Excluir Etapa"
+                       >
+                         <span className="material-symbols-outlined text-[14px]">delete</span>
+                       </button>
+                     )}
+                     <span className="w-24 font-mono text-sm text-gray-500 group-hover:text-white transition-colors">{item.time}</span>
+                     <div>
+                        <h4 className="text-2xl font-bold uppercase group-hover:translate-x-2 transition-transform">{item.title}</h4>
+                        <p className="text-sm text-gray-500 mt-1">{item.description}</p>
+                     </div>
+                  </FadeInSection>
+               ))}
+            </div>
+         </div>
+       </EditableSectionWrapper>
 
        {/* LOCATIONS */}
-       <div className="grid grid-cols-1 md:grid-cols-2 h-[60vh]">
+       <EditableSectionWrapper isEditing={isEditing} section="locations" label="Locais" onEditSection={onEditSection} className="grid grid-cols-1 md:grid-cols-2 h-[60vh] block">
           <div className="relative border-r border-white/20 group overflow-hidden">
              <img src="https://images.unsplash.com/photo-1544070274-1b48b1111003?q=80&w=2670&auto=format&fit=crop" className="w-full h-full object-cover grayscale group-hover:scale-105 transition-transform duration-700" />
              <div className="absolute bottom-0 left-0 p-8 bg-black/80 w-full backdrop-blur-sm">
@@ -753,15 +2813,15 @@ const IndustrialLayout: React.FC<{ event: EventDetails; onRSVP: () => void; gues
                 <button onClick={() => window.open(`https://maps.google.com/?q=${event.receptionAddress}`, '_blank')} className="mt-4 text-xs font-bold border border-black px-4 py-2 hover:bg-black hover:text-white transition-colors uppercase">Map</button>
              </div>
           </div>
-       </div>
+       </EditableSectionWrapper>
 
        {/* RSVP BUTTON */}
        <div className="fixed bottom-8 right-8 z-50">
           <button 
              onClick={onRSVP}
-             className="h-20 w-20 md:h-24 md:w-24 rounded-full bg-white text-black font-black text-xs md:text-sm uppercase tracking-widest flex items-center justify-center shadow-[0_0_30px_rgba(255,255,255,0.3)] hover:scale-110 transition-transform animate-spin-slow"
+             className="h-20 w-20 md:h-24 md:w-24 rounded-full bg-white text-black font-black text-xs md:text-sm uppercase tracking-widest flex items-center justify-center shadow-[0_0_30px_rgba(255,255,255,0.3)] hover:scale-110 transition-transform"
           >
-             RSVP
+             {getRSVPText(event.type, 'RSVP')}
           </button>
        </div>
 
@@ -792,7 +2852,14 @@ const SectionTitle: React.FC<{ title: string }> = ({ title }) => (
 // ============================================================================
 // LUXURY LAYOUT (Existing - kept for reference, no changes needed here)
 // ============================================================================
-const LuxuryLayout: React.FC<{ event: EventDetails; onRSVP: () => void; guestName: string }> = ({ event, onRSVP, guestName }) => {
+const LuxuryLayout: React.FC<{
+  event: EventDetails;
+  onRSVP: () => void;
+  guestName: string;
+  isEditing?: boolean;
+  onEditSection?: (section: any) => void;
+  updateField?: (field: string, value: any) => void;
+}> = ({ event, onRSVP, guestName, isEditing, onEditSection, updateField }) => {
   const [copiedKey, setCopiedKey] = useState<string | null>(null);
 
   const handleCopy = (val: string) => {
@@ -813,165 +2880,170 @@ const LuxuryLayout: React.FC<{ event: EventDetails; onRSVP: () => void; guestNam
       {/* Gold Frame Container */}
       <div className="border border-[#BF9B30]/30 min-h-[calc(100vh-24px)] relative flex flex-col items-center z-10 backdrop-blur-[1px]">
         
-        {/* 1. HERO SECTION */}
-        <motion.div 
-          initial={{ opacity: 0, y: 50, filter: 'blur(10px)' }}
-          animate={{ opacity: 1, y: 0, filter: 'blur(0px)' }}
-          transition={{ duration: 1.2, ease: [0.22, 1, 0.36, 1] }}
-          className="pt-12 pb-2 px-8 text-center w-full relative z-10"
-        >
-          <div className="w-16 h-16 mx-auto mb-6 border border-[#BF9B30] rounded-full flex items-center justify-center">
-             <span className="font-script text-3xl text-[#BF9B30] pt-2">{event.title.charAt(0)}</span>
+        {/* 1. HERO & DESIGN STYLE */}
+        <EditableSectionWrapper isEditing={isEditing} section="style" label="Design & Informações" onEditSection={onEditSection} className="w-full">
+          <div className="pt-12 pb-2 px-8 text-center w-full relative z-10">
+            <div className="w-16 h-16 mx-auto mb-6 border border-[#BF9B30] rounded-full flex items-center justify-center">
+               <span className="font-script text-3xl text-[#BF9B30] pt-2">{event.title.charAt(0)}</span>
+            </div>
+            <p className="text-[#BF9B30] text-[10px] uppercase tracking-[0.3em] mb-4">Convite Formal</p>
+            <motion.h1 
+              initial={{ opacity: 0, scale: 0.9, filter: 'blur(5px)' }}
+              animate={{ opacity: 1, scale: 1, filter: 'blur(0px)' }}
+              transition={{ duration: 1.5, ease: [0.22, 1, 0.36, 1], delay: 0.4 }}
+              className="text-4xl text-white mb-2"
+            >
+              {event.title}
+            </motion.h1>
+            <p className="text-xs text-gray-500 uppercase tracking-widest">{event.hosts}</p>
           </div>
-          <p className="text-[#BF9B30] text-[10px] uppercase tracking-[0.3em] mb-4">Convite Formal</p>
-          <motion.h1 
-            initial={{ opacity: 0, scale: 0.9, filter: 'blur(5px)' }}
-            animate={{ opacity: 1, scale: 1, filter: 'blur(0px)' }}
-            transition={{ duration: 1.5, ease: [0.22, 1, 0.36, 1], delay: 0.4 }}
-            className="text-4xl text-white mb-2"
-          >
-            {event.title}
-          </motion.h1>
-          <p className="text-xs text-gray-500 uppercase tracking-widest">{event.hosts}</p>
-        </motion.div>
 
-        {/* 2. GUEST PERSONALIZATION */}
-        <FadeInSection delay={0.2} className="my-6 text-center w-full px-6">
-           <div className="bg-[#BF9B30]/10 border-y border-[#BF9B30]/20 py-3">
-             <p className="text-[10px] uppercase tracking-widest text-gray-400 mb-1">Convidado de Honra</p>
-             <p className="text-xl text-[#BF9B30] font-script">{guestName}</p>
-           </div>
-        </FadeInSection>
+          {/* 2. GUEST PERSONALIZATION */}
+          <FadeInSection delay={0.2} className="my-6 text-center w-full px-6">
+             <div className="bg-[#BF9B30]/10 border-y border-[#BF9B30]/20 py-3">
+               <p className="text-[10px] uppercase tracking-widest text-gray-400 mb-1">Convidado de Honra</p>
+               <p className="text-xl text-[#BF9B30] font-script">{guestName}</p>
+             </div>
+          </FadeInSection>
 
-        {/* 3. HERO IMAGE & DATE */}
-        <FadeInSection delay={0.3} className="w-full px-6 mb-4">
-           <div className="w-full aspect-[4/5] rounded-t-[10rem] rounded-b-xl overflow-hidden relative border border-[#BF9B30]/20 mx-auto max-w-sm">
-              <div className="absolute inset-0 bg-cover bg-center grayscale contrast-125" style={{ backgroundImage: `url('${event.heroImage}')` }} />
-              <div className="absolute inset-0 bg-[#0F1419]/30 mix-blend-color"></div>
-              
-              <div className="absolute bottom-0 w-full bg-gradient-to-t from-[#0F1419] to-transparent pt-20 pb-6 text-center">
-                 <p className="text-2xl text-white font-italic">{event.date}</p>
-                 <p className="text-[#BF9B30] text-sm">{event.time} Horas</p>
-              </div>
-           </div>
-        </FadeInSection>
+          {/* 3. HERO IMAGE & DATE */}
+          <FadeInSection delay={0.3} className="w-full px-6 mb-4">
+             <div className="w-full aspect-[4/5] rounded-t-[10rem] rounded-b-xl overflow-hidden relative border border-[#BF9B30]/20 mx-auto max-w-sm">
+                <EditableImageWrapper src={event.heroImage} onChange={(newVal) => updateField?.('heroImage', newVal)} isEditing={isEditing} className="absolute inset-0">
+                   <div className="absolute inset-0 bg-cover bg-center grayscale contrast-125" style={{ backgroundImage: `url('${event.heroImage}')` }} />
+                </EditableImageWrapper>
+                <div className="absolute inset-0 bg-[#0F1419]/30 mix-blend-color pointer-events-none"></div>
+                
+                <div className="absolute bottom-0 w-full bg-gradient-to-t from-[#0F1419] to-transparent pt-20 pb-6 text-center">
+                   <p className="text-2xl text-white font-italic">{event.date}</p>
+                   <p className="text-[#BF9B30] text-sm">{event.time} Horas</p>
+                </div>
+             </div>
+          </FadeInSection>
 
-        {/* 4. COUNTDOWN */}
-        <FadeInSection className="w-full mb-8">
-           <p className="text-center text-[10px] uppercase tracking-widest text-gray-500 mb-0">Contagem Regressiva</p>
-           <CountdownTimer targetDate={event.isoDate} />
-        </FadeInSection>
+          {/* 4. COUNTDOWN */}
+          <FadeInSection className="w-full mb-8">
+             <p className="text-center text-[10px] uppercase tracking-widest text-gray-500 mb-0">Contagem Regressiva</p>
+             <CountdownTimer targetDate={event.isoDate} />
+          </FadeInSection>
 
-        {/* 5. COUPLE MESSAGE */}
-        <FadeInSection className="px-8 text-center max-w-md mx-auto pb-4">
-           <p className="text-lg leading-relaxed font-light text-gray-400 border-t border-b border-[#BF9B30]/20 py-8">
-             {event.description}
-           </p>
-        </FadeInSection>
+          {/* 5. COUPLE MESSAGE */}
+          <FadeInSection className="px-8 text-center max-w-md mx-auto pb-4">
+             <p className="text-lg leading-relaxed font-light text-gray-400 border-t border-b border-[#BF9B30]/20 py-8">
+               {event.description}
+             </p>
+          </FadeInSection>
+        </EditableSectionWrapper>
 
         <GoldDivider />
 
         {/* 6. CEREMONY & RECEPTION (Split Locations) */}
-        <div className="w-full px-6 mb-8 space-y-8">
-           <FadeInSection>
-             <SectionTitle title="Cerimônia Religiosa" />
-             <div className="border border-[#BF9B30]/30 rounded-xl overflow-hidden bg-[#0F1419] max-w-md mx-auto">
-                <div className="h-32 relative">
-                   <div className="absolute inset-0 bg-cover bg-center opacity-60" style={{ backgroundImage: `url('https://images.unsplash.com/photo-1544070274-1b48b1111003?q=80&w=2670&auto=format&fit=crop')` }}></div>
-                   <div className="absolute inset-0 bg-gradient-to-t from-[#0F1419] to-transparent"></div>
-                   <div className="absolute bottom-3 left-4">
-                      <p className="text-white text-lg font-serif">{event.locationName}</p>
-                      <p className="text-gray-400 text-xs">{event.time}</p>
-                   </div>
-                </div>
-                <div className="p-4 flex flex-col gap-3">
-                   <p className="text-xs text-gray-500 text-center leading-relaxed">{event.address}</p>
-                   <Button 
-                     className="w-full bg-[#BF9B30] text-[#0F1419] hover:bg-white hover:text-black text-xs font-bold uppercase tracking-widest h-10 border-none shadow-lg"
-                     onClick={() => window.open(event.mapLink || `https://maps.google.com/?q=${event.address}`, '_blank')}
-                   >
-                      Ver no Mapa
-                   </Button>
-                </div>
-             </div>
-           </FadeInSection>
-
-           {event.receptionName && (
+        <EditableSectionWrapper isEditing={isEditing} section="locations" label="Locais" onEditSection={onEditSection} className="w-full block">
+          <div className="w-full px-6 mb-8 space-y-8">
              <FadeInSection>
-               <SectionTitle title="Recepção & Festa" />
+               <SectionTitle title="Cerimônia Religiosa" />
                <div className="border border-[#BF9B30]/30 rounded-xl overflow-hidden bg-[#0F1419] max-w-md mx-auto">
                   <div className="h-32 relative">
-                     <div className="absolute inset-0 bg-cover bg-center opacity-60" style={{ backgroundImage: `url('${event.mapImage}')` }}></div>
+                     <div className="absolute inset-0 bg-cover bg-center opacity-60" style={{ backgroundImage: `url('https://images.unsplash.com/photo-1544070274-1b48b1111003?q=80&w=2670&auto=format&fit=crop')` }}></div>
                      <div className="absolute inset-0 bg-gradient-to-t from-[#0F1419] to-transparent"></div>
                      <div className="absolute bottom-3 left-4">
-                        <p className="text-white text-lg font-serif">{event.receptionName}</p>
-                        <p className="text-gray-400 text-xs">Logo após a cerimônia</p>
+                        <p className="text-white text-lg font-serif">{event.locationName}</p>
+                        <p className="text-gray-400 text-xs">{event.time}</p>
                      </div>
                   </div>
                   <div className="p-4 flex flex-col gap-3">
-                     <p className="text-xs text-gray-500 text-center leading-relaxed">{event.receptionAddress}</p>
+                     <p className="text-xs text-gray-500 text-center leading-relaxed">{event.address}</p>
                      <Button 
                        className="w-full bg-[#BF9B30] text-[#0F1419] hover:bg-white hover:text-black text-xs font-bold uppercase tracking-widest h-10 border-none shadow-lg"
-                       onClick={() => window.open(`https://maps.google.com/?q=${event.receptionAddress}`, '_blank')}
+                       onClick={() => window.open(event.mapLink || `https://maps.google.com/?q=${event.address}`, '_blank')}
                      >
                         Ver no Mapa
                      </Button>
                   </div>
                </div>
              </FadeInSection>
-           )}
-        </div>
+
+             {event.receptionName && (
+               <FadeInSection>
+                 <SectionTitle title="Recepção & Festa" />
+                 <div className="border border-[#BF9B30]/30 rounded-xl overflow-hidden bg-[#0F1419] max-w-md mx-auto">
+                    <div className="h-32 relative">
+                       <div className="absolute inset-0 bg-cover bg-center opacity-60" style={{ backgroundImage: `url('${event.mapImage}')` }}></div>
+                       <div className="absolute inset-0 bg-gradient-to-t from-[#0F1419] to-transparent"></div>
+                       <div className="absolute bottom-3 left-4">
+                          <p className="text-white text-lg font-serif">{event.receptionName}</p>
+                          <p className="text-gray-400 text-xs">Logo após a cerimônia</p>
+                       </div>
+                    </div>
+                    <div className="p-4 flex flex-col gap-3">
+                       <p className="text-xs text-gray-500 text-center leading-relaxed">{event.receptionAddress}</p>
+                       <Button 
+                         className="w-full bg-[#BF9B30] text-[#0F1419] hover:bg-white hover:text-black text-xs font-bold uppercase tracking-widest h-10 border-none shadow-lg"
+                         onClick={() => window.open(`https://maps.google.com/?q=${event.receptionAddress}`, '_blank')}
+                       >
+                          Ver no Mapa
+                       </Button>
+                    </div>
+                 </div>
+               </FadeInSection>
+             )}
+          </div>
+        </EditableSectionWrapper>
 
         <GoldDivider />
 
         {/* 8. GIFTS (Lista de Presentes) */}
-        {event.gifts && (
-          <FadeInSection className="w-full px-6 mb-24 max-w-md mx-auto">
-            <SectionTitle title="Lista de Presentes" />
-            {event.gifts.map((gift, i) => (
-              <div key={i} className="bg-[#1A1F26] p-6 rounded-xl border border-[#BF9B30]/20 text-center space-y-4">
-                 <span className="material-symbols-outlined text-3xl text-[#BF9B30]">featured_seasonal_and_gifts</span>
-                 <div>
-                    <h4 className="text-white font-bold">{gift.title}</h4>
-                    <p className="text-xs text-gray-400 mt-2 leading-relaxed">{gift.description}</p>
-                 </div>
-                 
-                 {/* IBAN DISPLAY */}
-                 {gift.type === 'IBAN' && (
-                    <div className="bg-black/60 p-4 rounded-lg border border-[#BF9B30]/30 shadow-inner">
-                       <p className="text-[10px] text-[#BF9B30] mb-2 uppercase tracking-widest font-bold">Enviar Presentes</p>
-                       <p className="text-white font-mono text-base break-all mb-4 tracking-wider select-all">{gift.value}</p>
-                       <button 
-                          onClick={() => handleCopy(gift.value)}
-                          className={`
-                            w-full py-3 px-4 rounded-lg font-bold text-xs uppercase tracking-widest transition-all duration-300 flex items-center justify-center gap-2
-                            ${copiedKey === gift.value 
-                              ? 'bg-[#BF9B30] text-[#0F1419] shadow-[0_0_15px_rgba(191,155,48,0.4)] scale-105' 
-                              : 'bg-transparent border border-[#BF9B30] text-[#BF9B30] hover:bg-[#BF9B30]/10'}
-                          `}
-                       >
-                          <span className="material-symbols-outlined text-sm">
-                            {copiedKey === gift.value ? 'check_circle' : 'content_copy'}
-                          </span>
-                          <span>{copiedKey === gift.value ? 'IBAN Copiado' : 'Copiar IBAN'}</span>
-                       </button>
-                    </div>
-                 )}
-              </div>
-            ))}
-          </FadeInSection>
+        {event.gifts && event.gifts.length > 0 && (
+          <EditableSectionWrapper isEditing={isEditing} section="gifts" label="Lista de Presentes" onEditSection={onEditSection} className="w-full block">
+            <FadeInSection className="w-full px-6 mb-24 max-w-md mx-auto">
+              <SectionTitle title="Lista de Presentes" />
+              {(event.gifts || []).map((gift, i) => (
+                <div key={i} className="bg-[#1A1F26] p-6 rounded-xl border border-[#BF9B30]/20 text-center space-y-4">
+                   <span className="material-symbols-outlined text-3xl text-[#BF9B30]">featured_seasonal_and_gifts</span>
+                   <div>
+                      <h4 className="text-white font-bold">{gift.title}</h4>
+                      <p className="text-xs text-gray-400 mt-2 leading-relaxed">{gift.description}</p>
+                   </div>
+                   
+                   {/* IBAN DISPLAY */}
+                   {gift.type === 'IBAN' && (
+                      <div className="bg-black/60 p-4 rounded-lg border border-[#BF9B30]/30 shadow-inner">
+                         <p className="text-[10px] text-[#BF9B30] mb-2 uppercase tracking-widest font-bold">Enviar Presentes</p>
+                         <p className="text-white font-mono text-base break-all mb-4 tracking-wider select-all">{gift.value}</p>
+                         <button 
+                            onClick={() => handleCopy(gift.value)}
+                            className={`
+                              w-full py-3 px-4 rounded-lg font-bold text-xs uppercase tracking-widest transition-all duration-300 flex items-center justify-center gap-2
+                              ${copiedKey === gift.value 
+                                ? 'bg-[#BF9B30] text-[#0F1419] shadow-[0_0_15px_rgba(191,155,48,0.4)] scale-105' 
+                                : 'bg-transparent border border-[#BF9B30] text-[#BF9B30] hover:bg-[#BF9B30]/10'}
+                            `}
+                         >
+                            <span className="material-symbols-outlined text-sm">
+                              {copiedKey === gift.value ? 'check_circle' : 'content_copy'}
+                            </span>
+                            <span>{copiedKey === gift.value ? 'IBAN Copiado' : 'Copiar IBAN'}</span>
+                         </button>
+                      </div>
+                   )}
+                </div>
+              ))}
+            </FadeInSection>
+          </EditableSectionWrapper>
         )}
 
         {/* 10. GALLERY (Horizontal Scroll) */}
         {event.gallery && (
-          <FadeInSection className="w-full mb-24 pl-6">
-            <h3 className="text-[#BF9B30] font-bold uppercase tracking-widest text-xs mb-4 text-left">Nossa Galeria</h3>
-            <div className="flex overflow-x-auto gap-4 pb-4 no-scrollbar">
-               {event.gallery.map((img, i) => (
-                 <img key={i} src={img} className="h-48 w-36 object-cover rounded-lg border border-[#BF9B30]/20 grayscale hover:grayscale-0 transition-all duration-500" />
-               ))}
-            </div>
-          </FadeInSection>
+          <EditableSectionWrapper isEditing={isEditing} section="gallery" label="Galeria" onEditSection={onEditSection} className="w-full block">
+            <FadeInSection className="w-full mb-24 pl-6">
+              <h3 className="text-[#BF9B30] font-bold uppercase tracking-widest text-xs mb-4 text-left">Nossa Galeria</h3>
+              <div className="flex overflow-x-auto gap-4 pb-4 no-scrollbar">
+                 {(event.gallery || []).map((img, i) => (
+                   <img key={i} src={getImageUrl(img)} className="h-48 w-36 object-cover rounded-lg border border-[#BF9B30]/20 grayscale hover:grayscale-0 transition-all duration-500" />
+                 ))}
+              </div>
+            </FadeInSection>
+          </EditableSectionWrapper>
         )}
 
         {/* Gold Action Button (Fixed Bottom Bar) */}
@@ -980,7 +3052,7 @@ const LuxuryLayout: React.FC<{ event: EventDetails; onRSVP: () => void; guestNam
              onClick={onRSVP}
              className="w-full max-w-md bg-[#BF9B30] text-[#0F1419] font-bold uppercase tracking-widest text-xs hover:bg-white transition-colors py-4 shadow-[0_0_20px_rgba(191,155,48,0.3)] flex items-center justify-center gap-2"
            >
-             <span>RESPONDER</span>
+             <span>{getRSVPText(event.type, 'RESPONDER')}</span>
              <span className="material-symbols-outlined text-sm">mail</span>
            </Button>
         </div>
@@ -995,7 +3067,14 @@ const LuxuryLayout: React.FC<{ event: EventDetails; onRSVP: () => void; guestNam
 // ============================================================================
 // BRIDAL SHOWER LAYOUT (Apple-Level Spatial UI, Glassmorphism)
 // ============================================================================
-const BridalShowerLayout: React.FC<{ event: EventDetails; onRSVP: () => void; guestName: string }> = ({ event, onRSVP, guestName }) => {
+const BridalShowerLayout: React.FC<{
+  event: EventDetails;
+  onRSVP: () => void;
+  guestName: string;
+  isEditing?: boolean;
+  onEditSection?: (section: any) => void;
+  updateField?: (field: string, value: any) => void;
+}> = ({ event, onRSVP, guestName, isEditing, onEditSection, updateField }) => {
   const isMinimal = event.layoutMode === 'BRIDAL_MINIMAL';
   const isTropical = event.layoutMode === 'BRIDAL_TROPICAL';
   const isBeauty = event.layoutMode === 'BRIDAL_BEAUTY';
@@ -1009,100 +3088,115 @@ const BridalShowerLayout: React.FC<{ event: EventDetails; onRSVP: () => void; gu
     <div className={`min-h-screen ${bgClass} ${primaryText} font-sans pb-32 selection:bg-pink-100`}>
       
       {/* SPATIAL HERO */}
-      <div className="relative h-[85vh] w-full overflow-hidden rounded-b-[40px] md:rounded-b-[80px] shadow-sm">
-         <motion.div 
-           initial={{ scale: 1.05 }}
-           animate={{ scale: 1 }}
-           transition={{ duration: 1.5, ease: "easeOut" }}
-           className="absolute inset-0 bg-cover bg-center" 
-           style={{ backgroundImage: `url('${event.heroImage}')` }} 
-         />
-         <div className="absolute inset-0 bg-gradient-to-t from-black/40 via-transparent to-black/10" />
-         
-         <motion.div 
-            initial={{ opacity: 0, y: 30 }}
-            animate={{ opacity: 1, y: 0 }}
-            transition={{ delay: 0.3, duration: 1.2, ease: [0.22, 1, 0.36, 1] }}
-            className="absolute inset-0 flex flex-col items-center justify-end text-center p-8 pb-16"
-         >
-            <div className={`${accentCard} backdrop-blur-xl p-8 md:p-12 rounded-[2rem] shadow-2xl border border-white/40 max-w-lg w-full transform perspective-1000`}>
-                <p className="text-xs font-bold uppercase tracking-[0.2em] opacity-60 mb-4">CHÁ DE PANELA</p>
-                <h1 className="text-4xl md:text-5xl font-serif mb-4 leading-tight">
-                  {event.title}
-                </h1>
-                <div className="h-px w-12 bg-current opacity-20 mx-auto my-4"></div>
-                <p className="text-sm font-medium uppercase tracking-widest opacity-80">{event.date}</p>
-            </div>
-         </motion.div>
-      </div>
+      <EditableSectionWrapper isEditing={isEditing} section="style" label="Design & Informações" onEditSection={onEditSection}>
+        <div className="relative h-[85vh] w-full overflow-hidden rounded-b-[40px] md:rounded-b-[80px] shadow-sm">
+           <EditableImageWrapper src={event.heroImage} onChange={(newVal) => updateField?.('heroImage', newVal)} isEditing={isEditing} className="absolute inset-0">
+              <motion.div 
+                initial={{ scale: 1.05 }}
+                animate={{ scale: 1 }}
+                transition={{ duration: 1.5, ease: "easeOut" }}
+                className="absolute inset-0 bg-cover bg-center" 
+                style={{ backgroundImage: `url('${event.heroImage}')` }} 
+              />
+           </EditableImageWrapper>
+           <div className="absolute inset-0 bg-gradient-to-t from-black/40 via-transparent to-black/10 pointer-events-none" />
+           
+           <motion.div 
+              initial={{ opacity: 0, y: 30 }}
+              animate={{ opacity: 1, y: 0 }}
+              transition={{ delay: 0.3, duration: 1.2, ease: [0.22, 1, 0.36, 1] }}
+              className="absolute inset-0 flex flex-col items-center justify-end text-center p-8 pb-16"
+           >
+              <div className={`${accentCard} backdrop-blur-xl p-8 md:p-12 rounded-[2rem] shadow-2xl border border-white/40 max-w-lg w-full transform perspective-1000`}>
+                  <p className="text-xs font-bold uppercase tracking-[0.2em] opacity-60 mb-4">CHÁ DE PANELA</p>
+                  <h1 className="text-4xl md:text-5xl font-serif mb-4 leading-tight">
+                    {event.title}
+                  </h1>
+                  <div className="h-px w-12 bg-current opacity-20 mx-auto my-4"></div>
+                  <p className="text-sm font-medium uppercase tracking-widest opacity-80">{event.date}</p>
+              </div>
+           </motion.div>
+        </div>
 
-      {/* WELCOME NOTE */}
-      <div className="max-w-3xl mx-auto px-6 mt-16 md:mt-24 text-center">
-         <FadeInSection>
-            <span className="material-symbols-outlined text-4xl mb-6 opacity-40">favorite</span>
-            <p className="text-xl md:text-2xl font-serif italic leading-relaxed opacity-90 max-w-2xl mx-auto">
-              "{event.description}"
-            </p>
-            <div className="mt-12 p-6 rounded-[2rem] bg-white/50 backdrop-blur-lg border border-white max-w-sm mx-auto shadow-sm">
-               <p className="uppercase tracking-[0.2em] text-[10px] font-bold opacity-50 mb-2">Convidada Especial</p>
-               <p className="text-2xl font-serif">{guestName}</p>
-            </div>
-         </FadeInSection>
-      </div>
+        {/* WELCOME NOTE */}
+        <div className="max-w-3xl mx-auto px-6 mt-16 md:mt-24 text-center">
+           <FadeInSection>
+              <span className="material-symbols-outlined text-4xl mb-6 opacity-40">favorite</span>
+              <p className="text-xl md:text-2xl font-serif italic leading-relaxed opacity-90 max-w-2xl mx-auto">
+                "{event.description}"
+              </p>
+              <div className="mt-12 p-6 rounded-[2rem] bg-white/50 backdrop-blur-lg border border-white max-w-sm mx-auto shadow-sm">
+                 <p className="uppercase tracking-[0.2em] text-[10px] font-bold opacity-50 mb-2">Convidada Especial</p>
+                 <p className="text-2xl font-serif">{guestName}</p>
+              </div>
+           </FadeInSection>
+        </div>
+      </EditableSectionWrapper>
 
       {/* EVENT DETAILS (Clean Cards) */}
       <div className="max-w-5xl mx-auto px-6 mt-24">
          <div className="grid md:grid-cols-2 gap-6">
             
             {/* LOCATION */}
-            <FadeInSection className={`${accentCard} backdrop-blur-xl p-10 rounded-[2.5rem] border border-white/50 shadow-sm flex flex-col items-start`}>
-               <div className="w-12 h-12 rounded-full bg-white flex items-center justify-center shadow-sm mb-6">
-                  <span className="material-symbols-outlined opacity-60">location_on</span>
-               </div>
-               <h3 className="text-2xl font-serif mb-2">{event.locationName}</h3>
-               <p className="font-bold opacity-80 uppercase tracking-widest text-xs mb-4">{event.time} Hrs</p>
-               <p className={`${secondaryText} leading-relaxed mb-8`}>{event.address}</p>
-               <button onClick={() => window.open(event.mapLink || '#', '_blank')} className="mt-auto text-xs font-bold uppercase tracking-widest border-b border-current pb-1 hover:opacity-50 transition-opacity">
-                 Ver no Mapa
-               </button>
-            </FadeInSection>
+            <EditableSectionWrapper isEditing={isEditing} section="locations" label="Locais" onEditSection={onEditSection} className="block">
+              <FadeInSection className={`${accentCard} backdrop-blur-xl p-10 rounded-[2.5rem] border border-white/50 shadow-sm flex flex-col items-start min-h-[380px]`}>
+                 <div className="w-12 h-12 rounded-full bg-white flex items-center justify-center shadow-sm mb-6">
+                    <span className="material-symbols-outlined opacity-60">location_on</span>
+                 </div>
+                 <h3 className="text-2xl font-serif mb-2">{event.locationName}</h3>
+                 <p className="font-bold opacity-80 uppercase tracking-widest text-xs mb-4">{event.time} Hrs</p>
+                 <p className={`${secondaryText} leading-relaxed mb-8`}>{event.address}</p>
+                 <button onClick={() => window.open(event.mapLink || '#', '_blank')} className="mt-auto text-xs font-bold uppercase tracking-widest border-b border-current pb-1 hover:opacity-50 transition-opacity">
+                   Ver no Mapa
+                 </button>
+              </FadeInSection>
+            </EditableSectionWrapper>
 
             {/* GIFTS */}
-            {event.gifts && (
-               <FadeInSection className={`${accentCard} backdrop-blur-xl p-10 rounded-[2.5rem] border border-white/50 shadow-sm flex flex-col items-start`}>
-                  <div className="w-12 h-12 rounded-full bg-white flex items-center justify-center shadow-sm mb-6">
-                     <span className="material-symbols-outlined opacity-60">card_giftcard</span>
-                  </div>
-                  <h3 className="text-2xl font-serif mb-2">Lista de Presentes</h3>
-                  <p className={`${secondaryText} leading-relaxed mb-8 max-w-[250px]`}>
-                    {event.gifts[0].description || 'Sua presença é o maior presente. Mas se quiser nos mimar:'}
-                  </p>
-                  <button 
-                     onClick={() => {navigator.clipboard.writeText(event.gifts![0].value); alert('IBAN Copiado!')}}
-                     className="mt-auto bg-white px-6 py-3 rounded-full text-xs font-bold uppercase tracking-widest shadow-sm hover:shadow-md transition-all active:scale-95"
-                  >
-                     Copiar IBAN
-                  </button>
-               </FadeInSection>
+            {event.gifts && event.gifts.length > 0 && (
+               <EditableSectionWrapper isEditing={isEditing} section="gifts" label="Lista de Presentes" onEditSection={onEditSection} className="block">
+                 <FadeInSection className={`${accentCard} backdrop-blur-xl p-10 rounded-[2.5rem] border border-white/50 shadow-sm flex flex-col items-start min-h-[380px]`}>
+                    <div className="w-12 h-12 rounded-full bg-white flex items-center justify-center shadow-sm mb-6">
+                       <span className="material-symbols-outlined opacity-60">card_giftcard</span>
+                    </div>
+                    <h3 className="text-2xl font-serif mb-2">Lista de Presentes</h3>
+                    <p className={`${secondaryText} leading-relaxed mb-8 max-w-[250px]`}>
+                      {event.gifts?.[0]?.description || 'Sua presença é o maior presente. Mas se quiser nos mimar:'}
+                    </p>
+                    <button 
+                       onClick={() => {navigator.clipboard.writeText(event.gifts?.[0]?.value || ''); alert('IBAN Copiado!')}}
+                       className="mt-auto bg-white px-6 py-3 rounded-full text-xs font-bold uppercase tracking-widest shadow-sm hover:shadow-md transition-all active:scale-95"
+                    >
+                       Copiar IBAN
+                    </button>
+                    {event.gifts?.[0]?.value && (
+                      <p className="text-xs font-mono opacity-80 mt-4 bg-white/40 border border-dashed border-white/60 p-2.5 rounded-xl w-full select-all max-w-[280px] mx-auto break-all">
+                        {event.gifts[0].value}
+                      </p>
+                    )}
+                 </FadeInSection>
+               </EditableSectionWrapper>
             )}
          </div>
       </div>
 
       {/* GALLERY (Spatial Layout) */}
       {event.gallery && event.gallery.length > 0 && (
-         <div className="max-w-6xl mx-auto px-6 mt-24">
-            <FadeInSection>
-               <h3 className="text-center font-serif text-3xl mb-12">Momentos</h3>
-               <div className="flex gap-4 overflow-x-auto pb-8 snap-x snap-mandatory scrollbar-hide" style={{ scrollbarWidth: 'none' }}>
-                  {event.gallery.map((img, i) => (
-                     <div key={i} className="min-w-[70vw] md:min-w-[400px] aspect-[4/5] rounded-[2rem] overflow-hidden snap-center flex-shrink-0 shadow-lg relative group">
-                        <img src={img} className="w-full h-full object-cover transition-transform duration-1000 group-hover:scale-110" />
-                        <div className="absolute inset-0 bg-black/10 group-hover:bg-transparent transition-colors duration-500"></div>
-                     </div>
-                  ))}
-               </div>
-            </FadeInSection>
-         </div>
+         <EditableSectionWrapper isEditing={isEditing} section="gallery" label="Galeria" onEditSection={onEditSection} className="block mt-24">
+           <div className="max-w-6xl mx-auto px-6">
+              <FadeInSection>
+                 <h3 className="text-center font-serif text-3xl mb-12">Momentos</h3>
+                 <div className="flex gap-4 overflow-x-auto pb-8 snap-x snap-mandatory scrollbar-hide" style={{ scrollbarWidth: 'none' }}>
+                    {(event.gallery || []).map((img, i) => (
+                       <div key={i} className="min-w-[70vw] md:min-w-[400px] aspect-[4/5] rounded-[2rem] overflow-hidden snap-center flex-shrink-0 shadow-lg relative group">
+                          <img src={getImageUrl(img)} className="w-full h-full object-cover transition-transform duration-1000 group-hover:scale-110" />
+                          <div className="absolute inset-0 bg-black/10 group-hover:bg-transparent transition-colors duration-500"></div>
+                       </div>
+                    ))}
+                 </div>
+              </FadeInSection>
+           </div>
+         </EditableSectionWrapper>
       )}
 
       {/* FLOATING ACTION BAR */}
@@ -1117,7 +3211,7 @@ const BridalShowerLayout: React.FC<{ event: EventDetails; onRSVP: () => void; gu
                onClick={onRSVP}
                className="w-full bg-white/90 backdrop-blur-xl text-black py-4 rounded-full font-bold shadow-2xl text-xs uppercase tracking-[0.2em] hover:bg-white transition-colors border border-white/20 active:scale-95"
             >
-               Vou no Chá!
+               {getRSVPText(event.type, 'Vou no Chá!')}
             </button>
          </motion.div>
       </div>

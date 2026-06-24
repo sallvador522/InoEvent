@@ -12,6 +12,25 @@ export const Navbar: React.FC = () => {
   const [notifications, setNotifications] = useState<any[]>([]);
   const [notificationsOpen, setNotificationsOpen] = useState(false);
   const navigate = useNavigate();
+  const mobileMenuRef = React.useRef<HTMLDivElement>(null);
+
+  // Lock body scroll and force scroll position of mobile drawer to the top on open
+  useEffect(() => {
+    if (mobileMenuOpen) {
+      document.body.style.overflow = 'hidden';
+      const timer = setTimeout(() => {
+        if (mobileMenuRef.current) {
+          mobileMenuRef.current.scrollTop = 0;
+        }
+      }, 50);
+      return () => {
+        clearTimeout(timer);
+        document.body.style.overflow = '';
+      };
+    } else {
+      document.body.style.overflow = '';
+    }
+  }, [mobileMenuOpen]);
   
   const isAdmin = user?.email?.toLowerCase() === 'antoniosalvador522@gmail.com' || user?.email === import.meta.env.VITE_ADMIN_EMAIL;
 
@@ -99,11 +118,30 @@ export const Navbar: React.FC = () => {
 
   return (
     <>
-      {/* Elegant Blue Navbar */}
-      <nav className="sticky top-0 z-50 w-full bg-brand-blue text-white shadow-lg shadow-brand-blue/10 px-6 py-4 flex items-center justify-between transition-all">
-        <div className="flex items-center gap-3">
-          <img src="/favicon.ico" alt="InoEvents Logo" className="w-9 h-9 rounded-xl object-contain border border-white/10 bg-white/5 p-1 shadow-md hover:scale-105 transition-all duration-300" referrerPolicy="no-referrer" />
-          <h2 className="text-white text-xl font-serif font-bold tracking-wide">InoEvents</h2>
+      {/* Elegant Translucent Blue Navbar */}
+      <nav className="sticky top-0 z-50 w-full bg-brand-blue/95 backdrop-blur-md text-white shadow-lg shadow-brand-blue/10 px-4 md:px-6 py-3.5 flex items-center justify-between transition-all border-b border-white/5">
+        <div className="flex items-center gap-2 md:gap-3 flex-shrink-0">
+          <Link to="/" className="flex items-center gap-2 md:gap-3 group">
+            <img src="/favicon.ico" alt="InoEvents" className="w-8 h-8 md:w-9 md:h-9 rounded-xl object-contain border border-white/10 bg-white/5 p-1 shadow-md group-hover:scale-105 transition-all duration-300" referrerPolicy="no-referrer" />
+            <span className="text-white text-base md:text-lg font-sans font-extrabold tracking-tight hidden sm:block bg-gradient-to-r from-white via-blue-50 to-white/95 bg-clip-text text-transparent">
+              InoEvents
+            </span>
+          </Link>
+
+          {/* User Plan Badge and Credits directly in header */}
+          {user && (
+            <div className="flex items-center gap-1.5 ml-1 sm:ml-2">
+              <span className="px-2 py-0.5 md:px-2.5 md:py-1 rounded-full text-[10px] md:text-xs font-bold leading-none bg-gradient-to-r from-amber-500/20 to-amber-600/30 text-amber-300 border border-amber-500/20 shadow-sm uppercase tracking-wider flex items-center gap-1 scale-95 md:scale-100">
+                <span className="material-symbols-outlined text-[10px] md:text-[12px] text-amber-400">verified</span>
+                <span>{userProfile?.plan || 'Essencial'}</span>
+              </span>
+              
+              <span className="px-2 py-0.5 md:px-2.5 md:py-1 rounded-full text-[10px] md:text-xs font-bold leading-none bg-white/10 hover:bg-white/15 text-blue-50 border border-white/10 shadow-sm flex items-center gap-1 transition-all scale-95 md:scale-100">
+                <span className="material-symbols-outlined text-[10px] md:text-[12px] text-yellow-400">payments</span>
+                <span>{userProfile?.credits || 0} <span className="hidden xs:inline">Créditos</span><span className="xs:hidden">Cr.</span></span>
+              </span>
+            </div>
+          )}
         </div>
 
         {/* Desktop Navigation */}
@@ -148,12 +186,6 @@ export const Navbar: React.FC = () => {
                         </Link>
                      )}
                   </div>
-               
-                  <span className="px-3 py-1 bg-white/20 rounded-full text-xs font-semibold text-white shadow-sm border border-white/10 ml-2 flex items-center gap-1">
-                     <span className="material-symbols-outlined text-[14px]">loyalty</span>
-                     {userProfile?.credits || 0} Créditos
-                  </span>
-                  <span className="px-3 py-1 bg-white/20 rounded-full text-xs font-semibold text-white shadow-sm border border-white/10 ml-2">{userProfile?.plan || 'Essencial'}</span>
                   
                   {/* Real-time Notifications Bell */}
                   <div className="relative ml-2">
@@ -267,11 +299,62 @@ export const Navbar: React.FC = () => {
         </div>
 
         {/* Mobile Actions */}
-        <div className="flex items-center gap-4 md:hidden">
+        <div className="flex items-center gap-2 sm:gap-4 md:hidden">
           <Link to="/plans" className="text-sm font-semibold text-blue-100 hover:text-white transition-colors">Preços</Link>
           {!user && (
             <Link to="/auth" className="text-sm font-semibold text-blue-100 hover:text-white transition-colors">Entrar</Link>
           )}
+          
+          {/* Mobile Notifications Bell when logged in */}
+          {user && (
+            <div className="relative">
+              <button 
+                onClick={() => setNotificationsOpen(!notificationsOpen)}
+                className="relative w-8 h-8 rounded-full bg-white/10 hover:bg-white/20 active:bg-white/15 flex items-center justify-center transition-all cursor-pointer outline-none"
+              >
+                <span className="material-symbols-outlined text-[18px] text-white">notifications</span>
+                {notifications.filter(n => !n.read).length > 0 && (
+                  <span className="absolute -top-0.5 -right-0.5 w-4 h-4 bg-red-500 text-white font-bold text-[8px] rounded-full flex items-center justify-center animate-pulse">
+                    {notifications.filter(n => !n.read).length}
+                  </span>
+                )}
+              </button>
+              
+              <AnimatePresence>
+                {notificationsOpen && (
+                  <>
+                    <div className="fixed inset-0 z-40" onClick={() => setNotificationsOpen(false)} />
+                    <motion.div 
+                      initial={{ opacity: 0, y: 10, scale: 0.95 }}
+                      animate={{ opacity: 1, y: 0, scale: 1 }}
+                      exit={{ opacity: 0, y: 10, scale: 0.95 }}
+                      transition={{ duration: 0.15 }}
+                      className="absolute right-[-2.5rem] top-full mt-3 w-72 xs:w-80 bg-white rounded-2xl shadow-xl border border-slate-100 z-50 overflow-hidden text-slate-700 flex flex-col"
+                    >
+                      <div className="p-3.5 border-b border-slate-50 bg-slate-50/50 flex justify-between items-center">
+                        <span className="font-bold text-xs text-slate-800 flex items-center gap-1">
+                          Notificações
+                        </span>
+                      </div>
+                      <div className="max-h-56 overflow-y-auto divide-y divide-slate-100">
+                        {notifications.length > 0 ? (
+                          notifications.map((n) => (
+                            <div key={n.id} className="p-3 hover:bg-slate-50 relative group flex flex-col">
+                              <span className="font-bold text-xs text-brand-blue">{n.title}</span>
+                              <p className="text-slate-500 text-[10px] mt-0.5">{n.message}</p>
+                            </div>
+                          ))
+                        ) : (
+                          <div className="py-6 text-center text-slate-400 text-xs">Nenhuma notificação</div>
+                        )}
+                      </div>
+                    </motion.div>
+                  </>
+                )}
+              </AnimatePresence>
+            </div>
+          )}
+
           <button 
            onClick={() => setMobileMenuOpen(!mobileMenuOpen)}
            className="bg-white/10 hover:bg-white/20 text-white p-2 rounded-full flex items-center justify-center transition-colors">
@@ -299,6 +382,7 @@ export const Navbar: React.FC = () => {
       <AnimatePresence>
         {mobileMenuOpen && (
           <motion.div 
+            ref={mobileMenuRef}
             initial={{ x: '100%' }}
             animate={{ x: 0 }}
             exit={{ x: '100%' }}

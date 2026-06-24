@@ -8,6 +8,7 @@ import { Button } from '../../components/ui/Button';
 import { Calendar, Plus, Building2, Ticket, Settings, ArrowRight, ExternalLink, X, Users, Briefcase, Leaf, CheckCircle2 } from 'lucide-react';
 import { motion, AnimatePresence } from 'framer-motion';
 import toast from 'react-hot-toast';
+import { Skeleton } from '../../components/ui/Skeleton';
 
 export const BusinessDashboard: React.FC = () => {
     const { user, userProfile } = useFirebase();
@@ -110,9 +111,37 @@ export const BusinessDashboard: React.FC = () => {
     };
 
     if (loading) {
-        return <div className="min-h-screen flex items-center justify-center bg-slate-50">
-            <div className="w-8 h-8 border-4 border-brand-blue border-t-transparent rounded-full animate-spin"></div>
-        </div>;
+        return (
+            <div className="min-h-screen bg-slate-50 flex flex-col p-6 w-full max-w-7xl mx-auto space-y-8">
+                {/* Navbar Skeleton */}
+                <div className="flex items-center justify-between mb-8">
+                    <div className="flex items-center gap-4">
+                         <Skeleton className="w-12 h-12 rounded-xl" />
+                         <div className="space-y-2">
+                             <Skeleton className="h-4 w-32 rounded" />
+                             <Skeleton className="h-6 w-48 rounded" />
+                         </div>
+                    </div>
+                </div>
+
+                <div className="flex flex-col md:flex-row justify-between md:items-end gap-6 mb-10">
+                    <div className="space-y-3">
+                        <Skeleton className="h-10 w-64 rounded-xl" />
+                        <Skeleton className="h-4 w-40 rounded" />
+                    </div>
+                    <div className="flex gap-4">
+                        <Skeleton className="h-12 w-40 rounded-xl" />
+                        <Skeleton className="h-12 w-32 rounded-xl" />
+                    </div>
+                </div>
+
+                <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+                     {[1, 2, 3].map((i) => (
+                         <Skeleton key={i} className="h-48 rounded-2xl" />
+                     ))}
+                </div>
+            </div>
+        );
     }
 
     return (

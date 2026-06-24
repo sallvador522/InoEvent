@@ -10,6 +10,7 @@ import { Calendar, Plus, Building2, Ticket, Settings, ArrowRight, ExternalLink, 
 import toast from 'react-hot-toast';
 import { Navbar } from '../../components/Navbar';
 import { SupportModal } from '../../components/SupportModal';
+import { Skeleton } from '../../components/ui/Skeleton';
 import { OnboardingWizard } from './OnboardingWizard';
 
 import { getEventByLayoutMode } from '../../mockData';
@@ -190,9 +191,29 @@ export const UserDashboard: React.FC = () => {
     const isPartner = userProfile?.plan === 'Business' || userProfile?.plan === 'Corporate';
 
     if (loading) {
-        return <div className="min-h-screen flex items-center justify-center bg-slate-50">
-            <div className="w-8 h-8 border-4 border-brand-blue border-t-transparent rounded-full animate-spin"></div>
-        </div>;
+        return (
+            <div className="min-h-screen bg-slate-50 font-sans pb-20">
+                {/* Navbar Skeleton */}
+                <div className="h-16 bg-white border-b border-slate-200" />
+                <main className="max-w-7xl mx-auto px-6 py-12">
+                    <div className="mb-10 flex flex-col md:flex-row justify-between md:items-end gap-6">
+                        <div className="space-y-3">
+                            <Skeleton className="h-10 w-64 rounded-xl" />
+                            <Skeleton className="h-4 w-40 rounded" />
+                        </div>
+                        <div className="flex gap-4">
+                            <Skeleton className="h-12 w-40 rounded-xl" />
+                            <Skeleton className="h-12 w-32 rounded-xl" />
+                        </div>
+                    </div>
+                    <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+                        {[1, 2, 3].map((i) => (
+                            <Skeleton key={i} className="h-48 rounded-2xl" />
+                        ))}
+                    </div>
+                </main>
+            </div>
+        );
     }
 
     const handleCreateEvent = () => {

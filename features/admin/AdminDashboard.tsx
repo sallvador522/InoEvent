@@ -4,6 +4,7 @@ import { db } from '../../components/FirebaseProvider';
 import { collection, getDocs, query, orderBy, doc, updateDoc, addDoc } from 'firebase/firestore';
 import { toast } from 'react-hot-toast';
 import { motion, AnimatePresence } from 'framer-motion';
+import { Skeleton } from '../../components/ui/Skeleton';
 
 export const AdminDashboard: React.FC = () => {
   const [users, setUsers] = useState<any[]>([]);
@@ -120,7 +121,29 @@ export const AdminDashboard: React.FC = () => {
   };
 
   if (loading) {
-    return <div className="min-h-screen bg-slate-50 flex items-center justify-center">Carregando painel de administração...</div>;
+    return (
+      <div className="min-h-screen bg-slate-50 flex flex-col font-sans pb-20">
+         <div className="h-16 bg-white border-b border-slate-200" />
+         <main className="max-w-7xl mx-auto px-6 py-12 w-full space-y-8">
+            <div className="flex justify-between items-center mb-8">
+                <div className="space-y-3">
+                   <Skeleton className="h-10 w-64 rounded" />
+                   <Skeleton className="h-4 w-96 rounded" />
+                </div>
+            </div>
+
+            <div className="grid grid-cols-1 md:grid-cols-4 gap-6 mb-8">
+               {[1, 2, 3, 4].map((i) => (
+                  <Skeleton key={i} className="h-32 rounded-2xl" />
+               ))}
+            </div>
+
+            <div className="space-y-6">
+                <Skeleton className="h-[400px] rounded-3xl" />
+            </div>
+         </main>
+      </div>
+    );
   }
 
   const activePlansCount = users.filter(u => u.plan && u.plan !== 'Free' && u.plan !== 'Essencial').length;

@@ -32,14 +32,8 @@ export const LandingPage: React.FC = () => {
   const location = useLocation();
 
   useEffect(() => {
-    if (location.hash) {
-      const id = location.hash.replace('#', '');
-      const element = document.getElementById(id);
-      if (element) {
-        setTimeout(() => {
-          element.scrollIntoView({ behavior: 'smooth', block: 'start' });
-        }, 150);
-      }
+    if (!location.hash) {
+      window.scrollTo(0, 0);
     }
   }, [location]);
 
@@ -106,7 +100,7 @@ export const LandingPage: React.FC = () => {
       <main className="relative z-10 flex flex-col gap-0 pb-24">
         
         {/* HERO BANNER SECTION (High-Conversion, Spatial UI) */}
-        <section className="relative w-full min-h-[90vh] md:min-h-[100vh] flex flex-col justify-center overflow-hidden bg-[#FDFBF7] pt-24 md:pt-16">
+        <section className="relative w-full flex flex-col justify-center overflow-hidden bg-[#FDFBF7] pt-24 md:pt-32 pb-20">
            {/* Ambient Background Glows */}
            <div className="absolute top-0 left-1/2 -translate-x-1/2 w-full max-w-4xl h-[400px] bg-brand-blue/10 blur-[120px] rounded-full pointer-events-none" />
            <div className="absolute top-1/4 right-0 w-[500px] h-[500px] bg-[#BF9B30]/5 blur-[100px] rounded-full pointer-events-none" />
@@ -187,10 +181,10 @@ export const LandingPage: React.FC = () => {
              initial={{ opacity: 0, y: 60 }}
              animate={{ opacity: 1, y: 0 }}
              transition={{ duration: 1.2, ease: [0.16, 1, 0.3, 1], delay: 0.6 }}
-             className="relative z-10 w-full max-w-6xl mx-auto mt-16 md:mt-24 px-4 h-[300px] md:h-[400px]"
+             className="relative z-10 w-full max-w-5xl mx-auto mt-16 md:mt-24 px-4 h-[350px] md:h-[450px]"
            >
               {/* Center Templates Preview Mockup */}
-              <div className="absolute left-1/2 -translate-x-1/2 top-0 w-[90%] md:w-[700px] h-full bg-white rounded-t-3xl border border-slate-200 shadow-[0_-10px_50px_rgba(0,0,0,0.05)] overflow-hidden flex flex-col">
+              <div className="absolute left-1/2 -translate-x-1/2 top-0 w-[90%] md:w-[650px] h-[300px] md:h-[400px] bg-white rounded-t-3xl border border-slate-200 shadow-[0_-10px_50px_rgba(0,0,0,0.05)] overflow-hidden flex flex-col">
                  <div className="h-10 bg-slate-50 border-b border-slate-100 flex items-center px-4 gap-2 shrink-0 z-10">
                     <div className="w-3 h-3 rounded-full bg-slate-300"></div>
                     <div className="w-3 h-3 rounded-full bg-slate-300"></div>
@@ -198,14 +192,13 @@ export const LandingPage: React.FC = () => {
                  </div>
                  <div className="flex-1 bg-slate-50 p-4 md:p-6 overflow-hidden relative">
                     <div className="absolute inset-0 bg-gradient-to-b from-slate-50 via-transparent to-slate-50 z-10 pointer-events-none"></div>
-                    <div className="grid grid-cols-2 md:grid-cols-3 gap-6 h-full relative z-0">
+                    <div className="grid grid-cols-2 gap-6 h-full relative z-0">
                        <motion.div 
                           animate={{ y: ["0%", "-50%"] }}
                           transition={{ repeat: Infinity, duration: 40, ease: "linear" }}
                           className="flex flex-col gap-6"
                        >
                           <img src="/bridal-templates/templateCha1.png" className="rounded-2xl shadow-sm object-cover w-full aspect-[3/4]" alt="Template" />
-                          <img src="https://images.unsplash.com/photo-1519225421980-715cb0215aed?q=80&w=800&auto=format&fit=crop" className="rounded-2xl shadow-sm object-cover w-full aspect-[4/5]" alt="Template" />
                           <img src="/bridal-templates/templateCha3.png" className="rounded-2xl shadow-sm object-cover w-full aspect-[3/4]" alt="Template" />
                           <img src="/bridal-templates/templateCha1.png" className="rounded-2xl shadow-sm object-cover w-full aspect-[3/4]" alt="Template" />
                        </motion.div>
@@ -214,20 +207,9 @@ export const LandingPage: React.FC = () => {
                           transition={{ repeat: Infinity, duration: 50, ease: "linear" }}
                           className="flex flex-col gap-6 mt-[-50%]"
                        >
-                          <img src="https://images.unsplash.com/photo-1511285560929-80b456fea0bc?q=80&w=800&auto=format&fit=crop" className="rounded-2xl shadow-sm object-cover w-full aspect-[4/5]" alt="Template" />
                           <img src="/bridal-templates/templateCha2.png" className="rounded-2xl shadow-sm object-cover w-full aspect-[3/4]" alt="Template" />
-                          <img src="https://images.unsplash.com/photo-1519741497674-611481863552?q=80&w=800&auto=format&fit=crop" className="rounded-2xl shadow-sm object-cover w-full aspect-[4/5]" alt="Template" />
-                          <img src="https://images.unsplash.com/photo-1511285560929-80b456fea0bc?q=80&w=800&auto=format&fit=crop" className="rounded-2xl shadow-sm object-cover w-full aspect-[4/5]" alt="Template" />
-                       </motion.div>
-                       <motion.div 
-                          animate={{ y: ["0%", "-50%"] }}
-                          transition={{ repeat: Infinity, duration: 45, ease: "linear" }}
-                          className="hidden md:flex flex-col gap-6 mt-[-20%]"
-                       >
-                          <img src="https://images.unsplash.com/photo-1515934751635-c81c6bc9a2d8?q=80&w=800&auto=format&fit=crop" className="rounded-2xl shadow-sm object-cover w-full aspect-[3/4]" alt="Template" />
                           <img src="/bridal-templates/templateCha4.png" className="rounded-2xl shadow-sm object-cover w-full aspect-[3/4]" alt="Template" />
-                          <img src="https://images.unsplash.com/photo-1469334031218-e382a71b716b?q=80&w=800&auto=format&fit=crop" className="rounded-2xl shadow-sm object-cover w-full aspect-[4/5]" alt="Template" />
-                          <img src="https://images.unsplash.com/photo-1515934751635-c81c6bc9a2d8?q=80&w=800&auto=format&fit=crop" className="rounded-2xl shadow-sm object-cover w-full aspect-[3/4]" alt="Template" />
+                          <img src="/bridal-templates/templateCha2.png" className="rounded-2xl shadow-sm object-cover w-full aspect-[3/4]" alt="Template" />
                        </motion.div>
                     </div>
                  </div>

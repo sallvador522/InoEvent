@@ -1,10 +1,11 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { motion } from 'framer-motion';
 import { Link } from 'react-router-dom';
 import { EVENTS } from '../../mockData';
 import { ThemeType } from '../../types';
 import { Navbar } from '../../components/Navbar';
 import { SEO } from '../../components/SEO';
+import { Skeleton } from '../../components/ui/Skeleton';
 
 const MotionLink = motion(Link as any) as any;
 
@@ -19,6 +20,13 @@ const CATEGORIES = [
 
 export const TemplateGalleryPage: React.FC = () => {
     const [selectedCategory, setSelectedCategory] = useState('all');
+    const [isLoading, setIsLoading] = useState(true);
+
+    useEffect(() => {
+        setIsLoading(true);
+        const timer = setTimeout(() => setIsLoading(false), 500);
+        return () => clearTimeout(timer);
+    }, [selectedCategory]);
 
     const filteredEvents = EVENTS.filter(event => {
         if (selectedCategory === 'all') return true;
@@ -74,7 +82,20 @@ export const TemplateGalleryPage: React.FC = () => {
                 </div>
 
                 {/* Grid */}
-                {filteredEvents.length > 0 && ['all', 'wedding', 'bridal'].includes(selectedCategory) ? (
+                {isLoading ? (
+                    <div className="grid grid-cols-3 gap-3 md:gap-6 pb-20 max-w-5xl mx-auto">
+                        {[1, 2, 3, 4, 5, 6].map((i) => (
+                            <div key={i} className="flex flex-col gap-2 md:gap-4">
+                                <Skeleton className="w-full aspect-[3/4] rounded-xl md:rounded-2xl" />
+                                <div className="px-1 md:px-2 space-y-2">
+                                    <Skeleton className="h-5 w-3/4 rounded" />
+                                    <Skeleton className="h-3 w-1/2 rounded" />
+                                    <Skeleton className="h-3 w-5/6 rounded" />
+                                </div>
+                            </div>
+                        ))}
+                    </div>
+                ) : filteredEvents.length > 0 && ['all', 'wedding', 'bridal'].includes(selectedCategory) ? (
                     <div className="grid grid-cols-3 gap-3 md:gap-6 pb-20 max-w-5xl mx-auto">
                         {filteredEvents.map((event, index) => {
                             const badge = getBadgeConfig(event.type);

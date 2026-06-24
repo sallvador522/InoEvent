@@ -1,6 +1,6 @@
 import React, { useState, useEffect, useRef } from 'react';
 import { useParams, Link, useNavigate } from 'react-router-dom';
-import { Users, CheckCircle2, QrCode, Share2, Download, Clock, Search, MessageSquare, ArrowLeft, MoreHorizontal, Settings, Copy, Check, Edit2, Trash2, Plus, MessageCircle, UploadCloud, Gem, Camera, Bell, BellOff, Volume2 } from 'lucide-react';
+import { Users, CheckCircle2, QrCode, Share2, Download, Clock, Search, MessageSquare, ArrowLeft, MoreHorizontal, Settings, Copy, Check, Edit2, Trash2, Plus, MessageCircle, UploadCloud, Gem, Camera, Bell, BellOff, Volume2, Printer } from 'lucide-react';
 import { motion, AnimatePresence } from 'framer-motion';
 import { doc, collection, onSnapshot, deleteDoc, updateDoc, setDoc } from 'firebase/firestore';
 import { getStorage, ref, deleteObject } from 'firebase/storage';
@@ -11,6 +11,7 @@ import { SmartAssistant } from './SmartAssistant';
 import { playScanSound } from '../../lib/sound';
 import toast from 'react-hot-toast';
 import { SupportModal } from '../../components/SupportModal';
+import { Skeleton } from '../../components/ui/Skeleton';
 
 import { VirtualGiftsManager } from './VirtualGiftsManager';
 import { GuestbookManager } from './GuestbookManager';
@@ -420,8 +421,61 @@ export const Dashboard = () => {
 
     if(loading) {
         return (
-            <div className="min-h-screen bg-[#FDFDFD] flex items-center justify-center">
-                <div className="w-8 h-8 border-2 border-brand-blue border-t-transparent rounded-full animate-spin"></div>
+            <div className="min-h-screen w-full bg-[#FDFDFD] p-6 space-y-8">
+                {/* Navbar Skeleton */}
+                <div className="flex items-center justify-between mb-12">
+                    <div className="flex items-center gap-4">
+                        <Skeleton className="w-10 h-10 rounded-full" />
+                        <div className="space-y-2">
+                            <Skeleton className="h-3 w-24 rounded" />
+                            <Skeleton className="h-6 w-48 rounded" />
+                        </div>
+                    </div>
+                    <div className="flex items-center gap-4">
+                        <Skeleton className="h-10 w-24 rounded-full" />
+                        <Skeleton className="h-10 w-10 rounded-full" />
+                        <Skeleton className="h-10 w-32 rounded-full" />
+                    </div>
+                </div>
+
+                <div className="max-w-6xl mx-auto space-y-8">
+                    {/* Header Details */}
+                    <div className="flex flex-col md:flex-row justify-between gap-6">
+                        <div className="space-y-4">
+                            <Skeleton className="h-10 w-64 rounded" />
+                            <Skeleton className="h-4 w-96 rounded" />
+                        </div>
+                        <div className="flex gap-2">
+                            <Skeleton className="h-14 w-64 rounded-xl" />
+                            <Skeleton className="h-14 w-40 rounded-xl" />
+                        </div>
+                    </div>
+
+                    {/* Stats */}
+                    <div className="grid grid-cols-2 md:grid-cols-5 gap-4">
+                        {[1, 2, 3, 4, 5].map((i) => (
+                            <Skeleton key={i} className="h-32 rounded-3xl" />
+                        ))}
+                    </div>
+
+                    {/* Tabs */}
+                    <div className="flex gap-2">
+                        <Skeleton className="h-12 w-32 rounded-full" />
+                        <Skeleton className="h-12 w-32 rounded-full" />
+                        <Skeleton className="h-12 w-32 rounded-full" />
+                    </div>
+
+                    {/* Main Content Area */}
+                    <div className="flex flex-col md:flex-row gap-8">
+                        <div className="flex-[2] space-y-4">
+                            <Skeleton className="h-96 rounded-3xl" />
+                        </div>
+                        <div className="flex-1 space-y-4">
+                            <Skeleton className="h-64 rounded-3xl" />
+                            <Skeleton className="h-32 rounded-3xl" />
+                        </div>
+                    </div>
+                </div>
             </div>
         );
     }

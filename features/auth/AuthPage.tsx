@@ -1,7 +1,7 @@
 import React, { useState } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
 import { ArrowLeft, Mail, Lock, User, Eye, EyeOff } from 'lucide-react';
-import { Link, useNavigate } from 'react-router-dom';
+import { Link, useNavigate, useLocation } from 'react-router-dom';
 import { GoogleAuthProvider, signInWithPopup, signInWithEmailAndPassword, createUserWithEmailAndPassword, updateProfile } from 'firebase/auth';
 import { auth, db } from '../../components/FirebaseProvider';
 
@@ -16,6 +16,8 @@ export const AuthPage: React.FC = () => {
   const [error, setError] = useState('');
 
   const navigate = useNavigate();
+  const location = useLocation();
+  const from = (location.state as any)?.from || '/dashboard';
 
   const handleGoogleSignIn = async () => {
     setLoading(true);
@@ -35,7 +37,7 @@ export const AuthPage: React.FC = () => {
               plan: 'Essencial'
           });
       }
-      navigate('/dashboard');
+      navigate(from, { replace: true });
     } catch (err: any) {
       if (err.code !== 'auth/popup-closed-by-user' && err.code !== 'auth/cancelled-popup-request') {
         console.error('Google Sign-in error:', err);
@@ -54,7 +56,7 @@ export const AuthPage: React.FC = () => {
     try {
       if (isLogin) {
         await signInWithEmailAndPassword(auth, email, password);
-        navigate('/dashboard');
+        navigate(from, { replace: true });
       } else {
         if (!name.trim()) {
            setError('Por favor, informe seu nome.');
@@ -76,7 +78,7 @@ export const AuthPage: React.FC = () => {
             plan: 'Essencial'
         });
         
-        navigate('/dashboard');
+        navigate(from, { replace: true });
       }
     } catch (err: any) {
       if (err.code === 'auth/email-already-in-use') {

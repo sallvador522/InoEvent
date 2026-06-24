@@ -7,6 +7,7 @@ import { db } from '../../components/FirebaseProvider';
 import { GuestsProgressBar } from './GuestsProgressBar';
 import { ResponsiveContainer, PieChart, Pie, Cell } from 'recharts';
 import { ExecutiveReportModal } from './ExecutiveReportModal';
+import { Skeleton } from '../../components/ui/Skeleton';
 
 export const ClientDashboard = () => {
     const { id } = useParams<{ id: string }>();
@@ -103,9 +104,38 @@ export const ClientDashboard = () => {
 
     if (loading) {
         return (
-            <div className="min-h-screen bg-slate-50 flex flex-col items-center justify-center p-6 text-center">
-                <div className="w-12 h-12 border-4 border-brand-blue border-t-transparent rounded-full animate-spin mb-4"></div>
-                <p className="text-slate-500 font-medium">Buscando informações do seu evento...</p>
+            <div className="min-h-screen bg-slate-50 flex flex-col p-6 w-full max-w-6xl mx-auto space-y-8">
+                {/* Navbar Skeleton */}
+                <div className="flex items-center justify-between mb-8">
+                    <div className="flex items-center gap-4">
+                        <Skeleton className="w-12 h-12 rounded-xl" />
+                        <div className="space-y-2">
+                            <Skeleton className="h-4 w-32 rounded" />
+                            <Skeleton className="h-6 w-48 rounded" />
+                        </div>
+                    </div>
+                </div>
+
+                <div className="space-y-4">
+                    <Skeleton className="h-10 w-64 rounded" />
+                    <Skeleton className="h-4 w-96 rounded" />
+                </div>
+
+                {/* Stats */}
+                <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
+                    {[1, 2, 3, 4].map((i) => (
+                        <Skeleton key={i} className="h-32 rounded-3xl" />
+                    ))}
+                </div>
+
+                <div className="flex flex-col md:flex-row gap-8 mt-12">
+                     <div className="flex-[2] space-y-4">
+                         <Skeleton className="h-[400px] rounded-3xl" />
+                     </div>
+                     <div className="flex-1 space-y-4">
+                         <Skeleton className="h-64 rounded-3xl" />
+                     </div>
+                </div>
             </div>
         );
     }

@@ -1,7 +1,7 @@
 import React, { createContext, useContext, useEffect, useState } from 'react';
 import { initializeApp } from 'firebase/app';
 import { getAuth, GoogleAuthProvider, onAuthStateChanged, User, signOut } from 'firebase/auth';
-import { getFirestore, doc, onSnapshot, getDocFromServer, initializeFirestore, setLogLevel, updateDoc } from 'firebase/firestore';
+import { getFirestore, doc, onSnapshot, getDocFromServer, initializeFirestore, setLogLevel, updateDoc, enableIndexedDbPersistence } from 'firebase/firestore';
 import firebaseConfig from '../firebase-applet-config.json';
 
 const app = initializeApp(firebaseConfig);
@@ -9,6 +9,23 @@ export const auth = getAuth(app);
 export const db = initializeFirestore(app, {
   experimentalForceLongPolling: true,
 }, firebaseConfig.firestoreDatabaseId);
+
+// Enable Firestore Local Cache Offline Persistence
+if (typeof window !== 'undefined') {
+  enableIndexedDbPersistence(db)
+    .then(() => {
+      console.log('[InoEvents Offline Sync] Persistência do cache local do Firestore ativada.');
+    })
+    .catch((err) => {
+      if (err.code === 'failed-precondition') {
+        console.warn('[InoEvents Offline Sync] Múltiplas abas abertas, persistência ativada em apenas uma delas.');
+      } else if (err.code === 'unimplemented') {
+        console.warn('[InoEvents Offline Sync] Navegador sem suporte para persistência do Firestore.');
+      } else {
+        console.error('[InoEvents Offline Sync] Falha ao configurar persistência offline do Firestore:', err);
+      }
+    });
+}
 
 setLogLevel('error');
 

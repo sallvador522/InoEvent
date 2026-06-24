@@ -323,6 +323,8 @@ const InvitationView: React.FC = () => {
 
   // Sync loaded event with our free active customizer drafts state
   useEffect(() => {
+    let unsubscribe: (() => void) | undefined;
+
     const fetchEvent = async () => {
       if (!id) return;
       
@@ -364,28 +366,58 @@ const InvitationView: React.FC = () => {
         return;
       }
 
-      // Firestore dynamic load
+      // Firestore dynamic load with real-time sync and cache-first support
       setFirebaseLoading(true);
       try {
         const eventRef = doc(db, 'events', id);
-        const docSnap = await getDoc(eventRef);
-        if (docSnap.exists()) {
-          const customEvt = { id: docSnap.id, ...docSnap.data() } as EventDetails;
-          setEvent(customEvt);
-          if (isEditing) {
-            setLocalEvent(customEvt);
+        unsubscribe = onSnapshot(eventRef, { includeMetadataChanges: true }, (docSnap) => {
+          if (docSnap.exists()) {
+            const customEvt = { id: docSnap.id, ...docSnap.data() } as EventDetails;
+            setEvent(customEvt);
+            if (isEditing) {
+              setLocalEvent(prev => {
+                if (prev && JSON.stringify(prev) !== JSON.stringify(customEvt)) {
+                  return prev; // Preserve user's current unsaved edits in the editor
+                }
+                return customEvt;
+              });
+            }
+            console.log(`[InoEvents Cache Sync] Evento ${id} carregado. Fonte: ${docSnap.metadata.fromCache ? 'Cache Local (Offline-first)' : 'Servidor Real-time'}`);
+          } else {
+            // Check if there is local static mock as a last resort
+            const staticEv = getEventById(id);
+            if (staticEv) {
+              setEvent(staticEv);
+              if (isEditing) setLocalEvent(staticEv);
+            } else {
+              setEvent(null);
+            }
           }
-        } else {
-          setEvent(null);
-        }
+          setFirebaseLoading(false);
+        }, (err) => {
+          console.warn("[InoEvents Offline Sync] Falha de rede/permissão, carregando dos dados estáticos:", err);
+          const staticEv = getEventById(id);
+          if (staticEv) {
+            setEvent(staticEv);
+            if (isEditing) setLocalEvent(staticEv);
+          } else {
+            setEvent(null);
+          }
+          setFirebaseLoading(false);
+        });
       } catch (err) {
         console.error("Erro ao buscar convite customizado:", err);
-      } finally {
         setFirebaseLoading(false);
       }
     };
 
     fetchEvent();
+
+    return () => {
+      if (unsubscribe) {
+        unsubscribe();
+      }
+    };
   }, [id, isEditing, user]);
 
   if (firebaseLoading) {

@@ -20,6 +20,8 @@ const getValidMapUrl = (link?: string, fallbackQuery?: string) => {
   return `https://www.google.com/maps/search/?api=1&query=${encodeURIComponent(fallbackQuery || cleanLink)}`;
 };
 
+import { copyToClipboard } from '../../lib/clipboard';
+
 export const TravelMap: React.FC<{ 
     event: any;
     isEditing?: boolean;
@@ -30,7 +32,7 @@ export const TravelMap: React.FC<{
     const mapLink = getValidMapUrl(event.mapLink, address);
 
     const handleCopy = () => {
-        navigator.clipboard.writeText(mapLink);
+        copyToClipboard(mapLink);
         setCopied(true);
         setTimeout(() => setCopied(false), 2000);
     };

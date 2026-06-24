@@ -12,6 +12,8 @@ interface GiftItem {
   emoji: string;
 }
 
+import { copyToClipboard } from '../../lib/clipboard';
+
 export const VirtualGiftsGuest: React.FC<{ event: any, guestId?: string | null }> = ({ event, guestId }) => {
    const gifts: GiftItem[] = event.gifts || [];
    const [selectedGift, setSelectedGift] = useState<GiftItem | null>(null);
@@ -23,7 +25,7 @@ export const VirtualGiftsGuest: React.FC<{ event: any, guestId?: string | null }
    if (!gifts || gifts.length === 0) return null;
 
    const handleCopy = (text: string) => {
-       navigator.clipboard.writeText(text);
+       copyToClipboard(text);
        toast.success('Copiado!');
    };
 

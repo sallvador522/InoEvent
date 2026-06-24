@@ -18,6 +18,9 @@ import { GuestbookManager } from './GuestbookManager';
 import { GuestsProgressBar } from './GuestsProgressBar';
 import { TeamManager } from './TeamManager';
 import { ExecutiveReportModal } from './ExecutiveReportModal';
+import { GuestDetailsModal } from './GuestDetailsModal';
+
+import { copyToClipboard } from '../../lib/clipboard';
 
 export const Dashboard = () => {
     const { id } = useParams<{ id: string }>();
@@ -43,6 +46,7 @@ export const Dashboard = () => {
     const [showDeleteConfirm, setShowDeleteConfirm] = useState(false);
     const [selectedGuest, setSelectedGuest] = useState<any>(null);
     const [showGuestMenu, setShowGuestMenu] = useState(false);
+    const [showGuestDetails, setShowGuestDetails] = useState(false);
     const [showAddGuestModal, setShowAddGuestModal] = useState(false);
     const [newGuestName, setNewGuestName] = useState("");
     const [newGuestPhone, setNewGuestPhone] = useState("");
@@ -217,7 +221,7 @@ export const Dashboard = () => {
 
     const handleCopyLink = () => {
         const link = `${getPublicOrigin()}/invite/${event?.id}`;
-        navigator.clipboard.writeText(link);
+        copyToClipboard(link);
         setCopied(true);
         toast.success("Link do evento copiado!");
         setTimeout(() => setCopied(false), 2000);
@@ -782,23 +786,21 @@ export const Dashboard = () => {
                                 {copied ? 'Copiado!' : 'Convite'}
                             </button>
                         </div>
-                        {(event?.plan === 'Business' || event?.plan === 'Corporate') && (
-                            <button 
-                                onClick={async () => {
-                                    let token = event.clientToken;
-                                    if (!token) {
-                                        token = Math.random().toString(36).substring(2, 8).toUpperCase();
-                                        await updateDoc(doc(db, 'events', event.id), { clientToken: token });
-                                    }
-                                    const link = `${getPublicOrigin()}/client-dashboard/${event.id}?token=${token}`;
-                                    navigator.clipboard.writeText(link);
-                                    toast.success("Link do cliente copiado para a área de transferência!");
-                                }}
-                                className="h-14 px-6 bg-[#BF9B30] text-slate-900 rounded-2xl font-bold text-sm hover:bg-[#BF9B30]/90 shadow-md transition-all flex items-center justify-center gap-2 whitespace-nowrap"
-                            >
-                                <Share2 size={16} /> Link do Cliente
-                            </button>
-                        )}
+                        <button 
+                            onClick={async () => {
+                                let token = event.clientToken;
+                                if (!token) {
+                                    token = Math.random().toString(36).substring(2, 8).toUpperCase();
+                                    await updateDoc(doc(db, 'events', event.id), { clientToken: token });
+                                }
+                                const link = `${getPublicOrigin()}/client-dashboard/${event.id}?token=${token}`;
+                                copyToClipboard(link);
+                                toast.success("Link do cliente copiado para a área de transferência!");
+                            }}
+                            className="h-14 px-6 bg-[#BF9B30] text-slate-900 rounded-2xl font-bold text-sm hover:bg-[#BF9B30]/90 shadow-md transition-all flex items-center justify-center gap-2 whitespace-nowrap"
+                        >
+                            <Share2 size={16} /> Link do Cliente
+                        </button>
                     </div>
                 </div>
 
@@ -1047,7 +1049,11 @@ export const Dashboard = () => {
                                                 animate={{ opacity: 1, y: 0 }}
                                                 transition={{ delay: idx * 0.05 }}
                                                 key={guest.id} 
-                                                className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 p-5 hover:bg-slate-50 transition-colors min-w-0"
+                                                onClick={() => {
+                                                    setSelectedGuest(guest);
+                                                    setShowGuestDetails(true);
+                                                }}
+                                                className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 p-5 hover:bg-slate-50 transition-colors min-w-0 cursor-pointer"
                                             >
                                                 <div className="flex gap-4 items-center min-w-0">
                                                     <div className="w-10 h-10 rounded-full bg-slate-100 flex items-center justify-center text-slate-600 font-bold shrink-0">
@@ -1369,7 +1375,7 @@ export const Dashboard = () => {
                                             await updateDoc(doc(db, 'events', event.id), { clientToken: token });
                                         }
                                         const link = `${getPublicOrigin()}/checkin/${event.id}?token=${token}&mode=reception`;
-                                        navigator.clipboard.writeText(link);
+                                        copyToClipboard(link);
                                         toast.success("Link de Recepcionista copiado para a área de transferência!");
                                     }}
                                     className="w-full bg-[#BF9B30] text-slate-900 py-3 rounded-xl font-bold flex items-center justify-center gap-2 hover:bg-[#BF9B30]/90 transition-colors shadow-lg"
@@ -1631,6 +1637,12 @@ export const Dashboard = () => {
                 guests={guests} 
                 agencyName="InoEvents Enterprise" 
                 agencyLogo={null} 
+            />
+
+            <GuestDetailsModal
+                isOpen={showGuestDetails}
+                onClose={() => setShowGuestDetails(false)}
+                guest={selectedGuest}
             />
 
             {/* Floating Live RSVP Notifications Overlay */}

@@ -97,6 +97,8 @@ const itemVariants = {
   },
 };
 
+import { copyToClipboard } from '../../lib/clipboard';
+
 export const PlansPage: React.FC = () => {
   const navigate = useNavigate();
   const { user, userProfile } = useFirebase();
@@ -109,7 +111,7 @@ export const PlansPage: React.FC = () => {
   } | null>(null);
 
   const handleCopy = (text: string) => {
-    navigator.clipboard.writeText(text);
+    copyToClipboard(text);
     toast.success('Copiado!');
   };
 

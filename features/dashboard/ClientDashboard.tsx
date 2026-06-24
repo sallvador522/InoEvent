@@ -8,6 +8,7 @@ import { GuestsProgressBar } from './GuestsProgressBar';
 import { ResponsiveContainer, PieChart, Pie, Cell } from 'recharts';
 import { ExecutiveReportModal } from './ExecutiveReportModal';
 import { Skeleton } from '../../components/ui/Skeleton';
+import { GuestDetailsModal } from './GuestDetailsModal';
 
 export const ClientDashboard = () => {
     const { id } = useParams<{ id: string }>();
@@ -23,6 +24,7 @@ export const ClientDashboard = () => {
     const [agencyName, setAgencyName] = useState<string>("InoEvents Partner");
     const [agencyLogo, setAgencyLogo] = useState<string | null>(null);
     const [showReportModal, setShowReportModal] = useState(false);
+    const [selectedGuest, setSelectedGuest] = useState<any>(null);
 
     useEffect(() => {
         if (!id) return;
@@ -327,7 +329,8 @@ export const ClientDashboard = () => {
                                         initial={{ opacity: 0 }}
                                         animate={{ opacity: 1 }}
                                         key={guest.id} 
-                                        className="flex flex-col md:flex-row md:items-center justify-between p-4 px-6 hover:bg-slate-50 transition-colors gap-4"
+                                        onClick={() => setSelectedGuest(guest)}
+                                        className="flex flex-col md:flex-row md:items-center justify-between p-4 px-6 hover:bg-slate-50 transition-colors gap-4 cursor-pointer"
                                     >
                                         <div className="flex gap-4 items-center">
                                             <div className="w-10 h-10 rounded-full bg-slate-100 flex items-center justify-center text-slate-800 font-bold border border-slate-200">
@@ -368,6 +371,12 @@ export const ClientDashboard = () => {
                 guests={guests} 
                 agencyName={agencyName} 
                 agencyLogo={agencyLogo} 
+            />
+
+            <GuestDetailsModal
+                isOpen={!!selectedGuest}
+                onClose={() => setSelectedGuest(null)}
+                guest={selectedGuest}
             />
         </div>
     );

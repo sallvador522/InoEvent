@@ -29,6 +29,8 @@ interface BoosterReport {
     nextSteps: string[];
 }
 
+import { copyToClipboard } from '../../lib/clipboard';
+
 export const SmartAssistant: React.FC<SmartAssistantProps> = ({ event, guests }) => {
     const { user } = useFirebase();
     const [activeTab, setActiveTab] = useState<'chat' | 'booster'>('chat');
@@ -297,8 +299,8 @@ Equipe InoEvents IA.`
         }, 2000);
     };
 
-    const copyToClipboard = (text: string, index: number) => {
-        navigator.clipboard.writeText(text);
+    const handleCopyToClipboard = (text: string, index: number) => {
+        copyToClipboard(text);
         setCopiedIndex(index);
         toast.success("Mensagem copiada para a área de transferência!");
         setTimeout(() => setCopiedIndex(null), 2000);
@@ -641,7 +643,7 @@ Equipe InoEvents IA.`
                                                             
                                                             <div className="absolute right-3 top-3 flex flex-col gap-2">
                                                                 <button
-                                                                    onClick={() => copyToClipboard(guest.draftMessage, idx)}
+                                                                    onClick={() => handleCopyToClipboard(guest.draftMessage, idx)}
                                                                     className="w-8 h-8 rounded-lg bg-white border border-slate-200 text-slate-600 hover:text-purple-600 flex items-center justify-center shadow-sm cursor-pointer hover:border-purple-200 transition-all"
                                                                     title="Copiar Mensagem"
                                                                 >

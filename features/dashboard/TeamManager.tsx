@@ -20,6 +20,8 @@ interface TeamMember {
     createdAt: string;
 }
 
+import { copyToClipboard } from '../../lib/clipboard';
+
 export const TeamManager: React.FC<TeamManagerProps> = ({ eventId, eventPlan }) => {
     const [team, setTeam] = useState<TeamMember[]>([]);
     const [loading, setLoading] = useState(true);
@@ -139,7 +141,7 @@ export const TeamManager: React.FC<TeamManagerProps> = ({ eventId, eventPlan }) 
                 ? `${getPublicOrigin()}/checkin/${eventId}`
                 : `${getPublicOrigin()}/dashboard/${eventId}`;
 
-        navigator.clipboard.writeText(path);
+        copyToClipboard(path);
         setCopiedId(member.id);
         toast.success("Link específico copiado!");
         setTimeout(() => setCopiedId(null), 3000);

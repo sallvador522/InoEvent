@@ -13,10 +13,12 @@ import { TocaPlayer } from '../../components/music/TocaPlayer';
 import { BottomSheet } from '../../components/ui/BottomSheet';
 import { Button } from '../../components/ui/Button';
 import { db, useFirebase } from '../../components/FirebaseProvider';
-import { doc, getDoc, setDoc, updateDoc, collection } from 'firebase/firestore';
+import { doc, getDoc, setDoc, updateDoc, collection, query, where, getDocs, onSnapshot } from 'firebase/firestore';
 import { signInWithEmailAndPassword, createUserWithEmailAndPassword, signInWithPopup, GoogleAuthProvider } from 'firebase/auth';
 import { auth } from '../../components/FirebaseProvider';
 import toast from 'react-hot-toast';
+import { copyToClipboard } from '../../lib/clipboard';
+import { QRCodeSVG } from 'qrcode.react';
 
 // Helper to safely get image source URL from string or custom object
 const getImageUrl = (img: any): string => {
@@ -280,6 +282,94 @@ const ImageUploadField = ({ label, value, onChange }: { label: string; value: st
   );
 };
 
+const PERSUASIVE_LOADER_MESSAGES = [
+  "Preparando uma experiência digital sublime...",
+  "InoEvents: Crie convites interativos que encantam desde o primeiro toque.",
+  "Rastreador inteligente de presença, mapas integrados e contagem regressiva em tempo real.",
+  "Diga adeus aos convites de papel. Adote a alta costura digital com designs exclusivos.",
+  "Lista de presentes elegante, dress code interativo e galeria de fotos integradas.",
+  "Sua história de amor merece um design impecável. Crie e publique o seu em poucos minutos!"
+];
+
+const PremiumLoader: React.FC = () => {
+  const [index, setIndex] = React.useState(0);
+
+  React.useEffect(() => {
+    const interval = setInterval(() => {
+      setIndex((prev) => (prev + 1) % PERSUASIVE_LOADER_MESSAGES.length);
+    }, 3200);
+    return () => clearInterval(interval);
+  }, []);
+
+  return (
+    <div className="min-h-screen bg-slate-950 flex flex-col items-center justify-center p-6 text-white font-sans overflow-hidden relative">
+      {/* Decorative ambient blobs */}
+      <div className="absolute top-1/4 left-1/4 w-96 h-96 bg-violet-600/10 rounded-full blur-[120px] pointer-events-none animate-pulse duration-[8000ms]" />
+      <div className="absolute bottom-1/4 right-1/4 w-96 h-96 bg-rose-500/10 rounded-full blur-[120px] pointer-events-none animate-pulse duration-[12000ms]" />
+
+      <div className="z-10 flex flex-col items-center max-w-lg text-center px-4">
+        {/* Glowing breathing & rotating outer ring */}
+        <div className="relative w-24 h-24 mb-10 flex items-center justify-center">
+          <motion.div
+            className="absolute inset-0 rounded-full border border-violet-500/20"
+            animate={{ scale: [1, 1.15, 1], opacity: [0.3, 0.6, 0.3] }}
+            transition={{ repeat: Infinity, duration: 4, ease: "easeInOut" }}
+          />
+          <motion.div
+            className="absolute inset-2 rounded-full border-t-2 border-r-2 border-violet-400"
+            animate={{ rotate: 360 }}
+            transition={{ repeat: Infinity, duration: 1.5, ease: "linear" }}
+          />
+          <motion.div
+            className="absolute inset-4 rounded-full border border-rose-400/30"
+            animate={{ rotate: -360 }}
+            transition={{ repeat: Infinity, duration: 3, ease: "linear" }}
+          />
+          {/* Inner sparkling center */}
+          <div className="w-8 h-8 rounded-full bg-gradient-to-tr from-violet-600 to-rose-400 opacity-80 blur-[4px] animate-pulse" />
+        </div>
+
+        {/* Premium Badge */}
+        <span className="inline-flex items-center px-3 py-1 rounded-full text-[10px] font-bold tracking-[0.25em] uppercase bg-violet-500/10 text-violet-300 border border-violet-500/20 mb-6 backdrop-blur-md">
+          InoEvents Premium
+        </span>
+
+        {/* Persuasive message carousel */}
+        <div className="h-24 flex items-center justify-center">
+          <AnimatePresence mode="wait">
+            <motion.p
+              key={index}
+              initial={{ opacity: 0, y: 15 }}
+              animate={{ opacity: 1, y: 0 }}
+              exit={{ opacity: 0, y: -15 }}
+              transition={{ duration: 0.5, ease: "easeOut" }}
+              className="text-lg md:text-xl font-light text-slate-100 leading-relaxed font-sans max-w-md antialiased"
+            >
+              {PERSUASIVE_LOADER_MESSAGES[index]}
+            </motion.p>
+          </AnimatePresence>
+        </div>
+
+        {/* Subtitle helper */}
+        <motion.p 
+          initial={{ opacity: 0 }}
+          animate={{ opacity: 0.4 }}
+          transition={{ delay: 1 }}
+          className="text-[11px] uppercase tracking-wider text-slate-400 mt-12 animate-pulse"
+        >
+          Carregando convite interativo...
+        </motion.p>
+
+        {/* Brand foot credit */}
+        <div className="absolute bottom-10 left-1/2 -translate-x-1/2 flex items-center gap-1.5 opacity-60 hover:opacity-100 transition-opacity">
+          <span className="text-xs text-slate-400">Criado com</span>
+          <span className="text-xs font-semibold bg-gradient-to-r from-violet-400 to-rose-400 bg-clip-text text-transparent tracking-wider">InoEvents</span>
+        </div>
+      </div>
+    </div>
+  );
+};
+
 // ============================================================================
 // COMPONENT: INVITATION CONTROLLER
 // Decides which layout to render and runs the master visual templates editor workspace
@@ -460,12 +550,7 @@ const InvitationView: React.FC = () => {
   }, [id, isEditing, user]);
 
   if (firebaseLoading) {
-    return (
-      <div className="min-h-screen bg-slate-900 flex flex-col items-center justify-center p-4 text-white">
-        <div className="w-10 h-10 border-4 border-violet-500 border-t-transparent rounded-full animate-spin mb-4"></div>
-        <p className="text-violet-200 text-sm font-semibold tracking-wider font-sans">Carregando Atelier Atelier...</p>
-      </div>
-    );
+    return <PremiumLoader />;
   }
 
   // Active working details is localEvent if editing, else loaded static/saving event
@@ -2337,7 +2422,7 @@ const ModernLayout: React.FC<{
                       </p>
                     )}
                     <button 
-                       onClick={() => {navigator.clipboard.writeText(event.gifts?.[0]?.value || ''); alert('IBAN Copiado!')}}
+                       onClick={() => {copyToClipboard(event.gifts?.[0]?.value || ''); alert('IBAN Copiado!')}}
                        className="px-8 py-3 bg-[#2C2C2C] text-white text-xs font-bold uppercase tracking-widest hover:bg-[#C2B280] transition-colors"
                     >
                        Copiar IBAN
@@ -2646,7 +2731,7 @@ const GardenLayout: React.FC<{
               <h4 className="text-lg font-serif font-bold mb-2">Lista de Presentes</h4>
               <p className="text-sm text-[#5D5C61] mb-4">{event.gifts?.[0]?.description}</p>
               <button 
-                 onClick={() => {navigator.clipboard.writeText(event.gifts?.[0]?.value || ''); alert('IBAN Copiado!')}}
+                 onClick={() => {copyToClipboard(event.gifts?.[0]?.value || ''); alert('IBAN Copiado!')}}
                  className={`px-6 py-2 rounded-full border border-[#D6CFC7] text-xs font-bold uppercase tracking-widest hover:bg-[#F9F6F2] transition-colors`}
               >
                  Copiar IBAN
@@ -2853,7 +2938,7 @@ const RusticLayout: React.FC<{
              <span className="material-symbols-outlined text-4xl text-[#5D4037] mb-4">card_giftcard</span>
              <h3 className="text-2xl font-serif text-[#4E342E] mb-2">Presentes</h3>
              <button 
-                onClick={() => {navigator.clipboard.writeText(event.gifts?.[0]?.value || ''); alert('IBAN Copiado!')}}
+                onClick={() => {copyToClipboard(event.gifts?.[0]?.value || ''); alert('IBAN Copiado!')}}
                 className="mt-4 px-6 py-2 border border-[#5D4037] text-[#5D4037] rounded-full text-xs font-bold uppercase tracking-widest hover:bg-[#5D4037] hover:text-white transition-colors"
              >
                 Copiar IBAN
@@ -3115,7 +3200,7 @@ const LuxuryLayout: React.FC<{
   const [copiedKey, setCopiedKey] = useState<string | null>(null);
 
   const handleCopy = (val: string) => {
-    navigator.clipboard.writeText(val);
+    copyToClipboard(val);
     setCopiedKey(val);
     setTimeout(() => setCopiedKey(null), 2000);
   };
@@ -3542,7 +3627,7 @@ const BridalShowerLayout: React.FC<{
                         />
                     </p>
                     <button 
-                       onClick={() => {navigator.clipboard.writeText(event.gifts?.[0]?.value || ''); alert('IBAN Copiado!')}}
+                       onClick={() => {copyToClipboard(event.gifts?.[0]?.value || ''); alert('IBAN Copiado!')}}
                        className="mt-auto bg-white px-6 py-3 rounded-full text-xs font-bold uppercase tracking-widest shadow-sm hover:shadow-md transition-all active:scale-95"
                     >
                        Copiar IBAN
@@ -3607,6 +3692,7 @@ const RSVPForm: React.FC<{ event: EventDetails; onClose: () => void }> = ({ even
    const [companions, setCompanions] = useState(0);
    const [message, setMessage] = useState('');
    const [loading, setLoading] = useState(false);
+   const [successData, setSuccessData] = useState<{ id: string, name: string } | null>(null);
    
    const handleSubmit = async (e: React.FormEvent) => {
      e.preventDefault();
@@ -3620,15 +3706,34 @@ const RSVPForm: React.FC<{ event: EventDetails; onClose: () => void }> = ({ even
      }
 
      setLoading(true);
-     const toastId = toast.loading('Enviando sua confirmação...');
+     const toastId = toast.loading('Verificando...');
      try {
        const guestsCollection = collection(db, 'events', event.id, 'guests');
+       
+       // Normalize phone to remove spaces, dashes, etc for comparison (keeps + if provided)
+       const normalizedPhone = phone.trim().replace(/[\s\-()]/g, '');
+       
+       // First query by the normalized phone (in case we save it normalized later)
+       const q = query(guestsCollection, where('phone', '==', normalizedPhone));
+       const querySnapshot = await getDocs(q);
+       
+       // Fallback: also check against the raw input just in case old data wasn't normalized
+       const qRaw = query(guestsCollection, where('phone', '==', phone.trim()));
+       const querySnapshotRaw = await getDocs(qRaw);
+       
+       if (!querySnapshot.empty || !querySnapshotRaw.empty) {
+         toast.error('Este número de WhatsApp já confirmou presença neste evento.', { id: toastId });
+         setLoading(false);
+         return;
+       }
+
+       toast.loading('Enviando sua confirmação...', { id: toastId });
        const guestRef = doc(guestsCollection);
 
        await setDoc(guestRef, {
          id: guestRef.id,
          name: name.trim(),
-         phone: phone.trim(),
+         phone: normalizedPhone, // save normalized to ensure future queries match
          status: status === 'yes' ? 'CONFIRMED' : 'DECLINED',
          adults: status === 'yes' ? (companions + 1) : 0,
          children: 0,
@@ -3642,7 +3747,11 @@ const RSVPForm: React.FC<{ event: EventDetails; onClose: () => void }> = ({ even
          ? 'Sua presença foi confirmada com sucesso!' 
          : 'Sua justificativa foi enviada com sucesso.', { id: toastId });
        
-       onClose();
+       if (status === 'yes') {
+           setSuccessData({ id: guestRef.id, name: name.trim() });
+       } else {
+           onClose();
+       }
      } catch (err) {
        console.error('Erro ao salvar RSVP:', err);
        toast.error('Erro ao enviar sua resposta. Tente novamente.', { id: toastId });
@@ -3650,6 +3759,72 @@ const RSVPForm: React.FC<{ event: EventDetails; onClose: () => void }> = ({ even
        setLoading(false);
      }
    };
+
+   const handleDownloadQR = () => {
+     const svg = document.getElementById("qr-code-svg");
+     if (!svg) return;
+     const svgData = new XMLSerializer().serializeToString(svg);
+     const canvas = document.createElement("canvas");
+     const ctx = canvas.getContext("2d");
+     const img = new Image();
+     img.onload = () => {
+       canvas.width = img.width;
+       canvas.height = img.height;
+       if (ctx) {
+         ctx.fillStyle = "white";
+         ctx.fillRect(0, 0, canvas.width, canvas.height);
+         ctx.drawImage(img, 0, 0);
+         const pngFile = canvas.toDataURL("image/png");
+         const downloadLink = document.createElement("a");
+         downloadLink.download = `QR_Code_${successData?.name || 'Convite'}.png`;
+         downloadLink.href = `${pngFile}`;
+         downloadLink.click();
+       }
+     };
+     img.src = "data:image/svg+xml;base64," + btoa(unescape(encodeURIComponent(svgData)));
+   };
+
+   if (successData) {
+     return (
+       <div className={`flex flex-col items-center justify-center space-y-6 py-6 ${isLuxury ? 'text-white' : 'text-slate-800'}`}>
+         <div className="w-16 h-16 bg-green-100 text-green-600 rounded-full flex items-center justify-center mb-2">
+           <span className="material-symbols-outlined text-3xl">check</span>
+         </div>
+         <h3 className="text-xl font-bold text-center">Presença Confirmada!</h3>
+         <p className={`text-sm text-center max-w-xs ${isLuxury ? 'text-gray-400' : 'text-slate-500'}`}>
+           Muito obrigado, {successData.name}! Guarde este QR Code, ele será seu passe de entrada no dia do evento.
+         </p>
+         <div className="p-4 bg-white border border-slate-200 rounded-2xl shadow-sm">
+           <QRCodeSVG 
+             id="qr-code-svg"
+             value={`guest=${successData.id}`} 
+             size={180} 
+             level="H" 
+             includeMargin={true}
+           />
+         </div>
+         <div className="flex gap-3 w-full mt-4">
+           <button 
+             onClick={handleDownloadQR}
+             className={`flex-1 py-3 rounded-xl font-bold text-sm transition-colors flex items-center justify-center gap-2 ${
+               isLuxury ? 'bg-transparent border border-[#BF9B30] text-[#BF9B30] hover:bg-[#BF9B30]/10' : 'bg-white border border-slate-200 text-brand-blue hover:bg-slate-50'
+             }`}
+           >
+             <span className="material-symbols-outlined text-sm">download</span>
+             Baixar QR
+           </button>
+           <button 
+             onClick={onClose}
+             className={`flex-1 py-3 rounded-xl font-bold text-sm transition-colors ${
+               isLuxury ? 'bg-[#BF9B30] text-black hover:bg-[#BF9B30]/90' : 'bg-slate-900 text-white hover:bg-slate-800'
+             }`}
+           >
+             Fechar
+           </button>
+         </div>
+       </div>
+     );
+   }
 
    return (
     <form className="space-y-6" onSubmit={handleSubmit}>

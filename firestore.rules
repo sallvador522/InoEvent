@@ -65,7 +65,7 @@ service cloud.firestore {
       allow list: if (isSignedIn() && resource.data.ownerId == request.auth.uid) || isAdmin();
       
       // --- Get ---
-      allow get: if isValidId(eventId);
+      allow get: if true;
       
       // --- Create ---
       allow create: if isSignedIn() && isValidId(eventId) && isValidEvent(incoming()) && incoming().ownerId == request.auth.uid;

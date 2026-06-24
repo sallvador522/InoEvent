@@ -2587,7 +2587,12 @@ const RusticLayout: React.FC<{
   isEditing?: boolean;
   onEditSection?: (section: any) => void;
   updateField?: (field: string, value: any) => void;
-}> = ({ event, onRSVP, guestName, isEditing, onEditSection, updateField }) => {
+  deleteTimelineItem?: (index: number) => void;
+  deleteGiftItem?: (index: number) => void;
+  updateGalleryImage?: (index: number, val: string) => void;
+  deleteGalleryImage?: (index: number) => void;
+  updateTimelineItem?: (index: number, field: 'time' | 'title' | 'description', value: string) => void;
+}> = ({ event, onRSVP, guestName, isEditing, onEditSection, updateField, deleteTimelineItem, deleteGiftItem, updateGalleryImage, deleteGalleryImage, updateTimelineItem }) => {
    const warmText = "text-[#5D4037]"; // Dark warm brown
    const lightText = "text-[#8D6E63]"; // Lighter brown
    const bgPaper = "bg-[#FDF5E6]"; // Old Lace / Paper
@@ -2612,8 +2617,22 @@ const RusticLayout: React.FC<{
                  className="absolute bottom-0 w-full p-8 md:p-16 text-center text-[#FDF5E6]"
                >
                   <p className="uppercase tracking-[0.3em] text-xs mb-2">Save the Date</p>
-                  <h1 className="text-5xl md:text-7xl font-script mb-2">{event.title}</h1>
-                  <p className="text-lg">{event.date}</p>
+                  <h1 className="text-5xl md:text-7xl font-script mb-2">
+                    <EditableField
+                      value={event.title}
+                      onChange={(newVal) => updateField?.('title', newVal)}
+                      isEditing={isEditing}
+                      className="text-5xl md:text-7xl font-script text-white text-center"
+                    />
+                  </h1>
+                  <p className="text-lg">
+                    <EditableField
+                      value={event.date}
+                      onChange={(newVal) => updateField?.('date', newVal)}
+                      isEditing={isEditing}
+                      className="text-lg text-white text-center"
+                    />
+                  </p>
                </motion.div>
             </div>
          </div>
@@ -2621,7 +2640,19 @@ const RusticLayout: React.FC<{
          {/* INTRO & BIBLE */}
          <FadeInSection className="max-w-2xl mx-auto text-center px-6 py-12">
             <span className="material-symbols-outlined text-4xl text-[#A1887F] mb-4">forest</span>
-            <p className="text-xl md:text-2xl font-script leading-relaxed text-[#5D4037] mb-6">"{event.description}"</p>
+            <p className="text-xl md:text-2xl font-script leading-relaxed text-[#5D4037] mb-6">
+              {isEditing ? (
+                <EditableField
+                  value={event.description}
+                  onChange={(newVal) => updateField?.('description', newVal)}
+                  isEditing={isEditing}
+                  className="text-xl md:text-2xl font-script leading-relaxed text-[#5D4037] text-center"
+                  multiline
+                />
+              ) : (
+                `"${event.description}"`
+              )}
+            </p>
             <div className="w-24 h-px bg-[#D7CCC8] mx-auto my-6"></div>
             <p className="uppercase tracking-widest text-xs text-[#8D6E63]">Convidado Especial</p>
             <p className="text-xl font-bold mt-2">{guestName}</p>
@@ -2633,8 +2664,23 @@ const RusticLayout: React.FC<{
           <FadeInSection className="bg-white p-8 rounded-3xl shadow-sm border border-[#EFEBE9] flex flex-col md:flex-row items-center gap-8">
              <div className="flex-1 text-center md:text-left">
                 <span className="inline-block px-3 py-1 bg-[#EFEBE9] text-[#5D4037] text-[10px] font-bold uppercase tracking-widest rounded-full mb-4">Cerimônia</span>
-                <h3 className="text-3xl font-serif mb-2 text-[#4E342E]">{event.locationName}</h3>
-                <p className="text-[#8D6E63] mb-4">{event.address}</p>
+                <h3 className="text-3xl font-serif mb-2 text-[#4E342E]">
+                   <EditableField
+                     value={event.locationName}
+                     onChange={(newVal) => updateField?.('locationName', newVal)}
+                     isEditing={isEditing}
+                     className="text-3xl font-serif text-[#4E342E] text-center md:text-left"
+                   />
+                 </h3>
+                <p className="text-[#8D6E63] mb-4">
+                   <EditableField
+                     value={event.address}
+                     onChange={(newVal) => updateField?.('address', newVal)}
+                     isEditing={isEditing}
+                     className="text-[#8D6E63] text-center md:text-left"
+                     multiline
+                   />
+                 </p>
                 <button onClick={() => window.open(event.mapLink || '#', '_blank')} className="text-xs font-bold border-b border-[#5D4037] pb-1 uppercase tracking-widest">Ver Mapa</button>
              </div>
              <div className="w-full md:w-1/3 aspect-square rounded-2xl overflow-hidden">
@@ -2650,10 +2696,37 @@ const RusticLayout: React.FC<{
             <div className="relative z-10 max-w-xl mx-auto space-y-12">
                <h3 className="text-center font-script text-4xl text-[#5D4037] mb-12">Nosso Grande Dia</h3>
                {(event.timeline || []).map((item, i) => (
-                  <div key={i} className="bg-white p-6 rounded-xl shadow-sm border border-[#EFEBE9] text-center relative">
+                  <div key={i} className="bg-white p-6 rounded-xl shadow-sm border border-[#EFEBE9] text-center relative group/timeline-item">
+                      {isEditing && (
+                        <button
+                          type="button"
+                          onClick={(e) => {
+                            e.stopPropagation();
+                            deleteTimelineItem?.(i);
+                          }}
+                          className="absolute right-2 top-2 bg-rose-500 hover:bg-rose-600 text-white rounded-full w-6 h-6 flex items-center justify-center shadow-lg hover:scale-105 active:scale-95 transition-all cursor-pointer z-30 opacity-0 group-hover/timeline-item:opacity-100 animate-in fade-in"
+                          title="Excluir Etapa"
+                        >
+                          <span className="material-symbols-outlined text-[14px]">delete</span>
+                        </button>
+                      )}
                      <div className="absolute top-1/2 -left-[45px] md:-left-[calc(50vw-50%+20px)] w-4 h-4 bg-[#8D6E63] rounded-full border-4 border-[#FFF8E1]"></div>
-                     <span className="text-[#8D6E63] font-bold block mb-1">{item.time}</span>
-                     <h4 className="text-xl font-serif text-[#4E342E]">{item.title}</h4>
+                     <span className="text-[#8D6E63] font-bold block mb-1">
+                        <EditableField
+                          value={item.time}
+                          onChange={(newVal) => updateTimelineItem?.(i, 'time', newVal)}
+                          isEditing={isEditing}
+                          className="text-[#8D6E63] font-bold text-center"
+                        />
+                      </span>
+                     <h4 className="text-xl font-serif text-[#4E342E]">
+                        <EditableField
+                          value={item.title}
+                          onChange={(newVal) => updateTimelineItem?.(i, 'title', newVal)}
+                          isEditing={isEditing}
+                          className="text-xl font-serif text-[#4E342E] text-center"
+                        />
+                      </h4>
                   </div>
                ))}
             </div>
@@ -2665,7 +2738,20 @@ const RusticLayout: React.FC<{
           <FadeInSection className="bg-[#5D4037] text-[#FDF5E6] p-10 rounded-3xl text-center flex flex-col items-center justify-center">
              <span className="material-symbols-outlined text-4xl mb-4">checkroom</span>
              <h3 className="text-2xl font-serif mb-2">Dress Code</h3>
-             <p className="opacity-80 text-sm max-w-xs">{event.dressCode?.description}</p>
+             <p className="opacity-80 text-sm max-w-xs">
+                <EditableField
+                  value={event.dressCode?.description || ''}
+                  onChange={(newVal) => {
+                    updateField?.('dressCode', {
+                      ...event.dressCode,
+                      description: newVal,
+                    });
+                  }}
+                  isEditing={isEditing}
+                  className="opacity-80 text-sm max-w-xs text-center text-white"
+                  multiline
+                />
+              </p>
           </FadeInSection>
           <FadeInSection className="bg-white border border-[#EFEBE9] p-10 rounded-3xl text-center flex flex-col items-center justify-center">
              <span className="material-symbols-outlined text-4xl text-[#5D4037] mb-4">card_giftcard</span>
@@ -2709,7 +2795,11 @@ const IndustrialLayout: React.FC<{
   onEditSection?: (section: any) => void;
   updateField?: (field: string, value: any) => void;
   deleteTimelineItem?: (index: number) => void;
-}> = ({ event, onRSVP, guestName, isEditing, onEditSection, updateField, deleteTimelineItem }) => {
+  deleteGiftItem?: (index: number) => void;
+  updateGalleryImage?: (index: number, val: string) => void;
+  deleteGalleryImage?: (index: number) => void;
+  updateTimelineItem?: (index: number, field: 'time' | 'title' | 'description', value: string) => void;
+}> = ({ event, onRSVP, guestName, isEditing, onEditSection, updateField, deleteTimelineItem, deleteGiftItem, updateGalleryImage, deleteGalleryImage, updateTimelineItem }) => {
    
    return (
      <div className="min-h-screen bg-[#111] text-white font-display pb-32 selection:bg-white selection:text-black">
@@ -2719,7 +2809,14 @@ const IndustrialLayout: React.FC<{
          <div className="h-screen relative flex flex-col justify-between p-6 md:p-12 border-b border-white/20">
             <div className="flex justify-between items-start">
                <span className="text-xs font-bold uppercase tracking-widest border border-white px-2 py-1">Save The Date</span>
-               <span className="text-xs font-bold uppercase tracking-widest">{event.date}</span>
+               <span className="text-xs font-bold uppercase tracking-widest">
+                  <EditableField
+                    value={event.date}
+                    onChange={(newVal) => updateField?.('date', newVal)}
+                    isEditing={isEditing}
+                    className="text-xs font-bold uppercase tracking-widest text-white"
+                  />
+               </span>
             </div>
             
             <div className="relative z-10">
@@ -2729,7 +2826,19 @@ const IndustrialLayout: React.FC<{
                  transition={{ duration: 0.8 }}
                  className="text-6xl md:text-9xl font-black uppercase leading-[0.85] tracking-tighter mix-blend-difference"
                >
-                  {event.title.replace(' & ', '\n&\n')}
+                  {isEditing ? (
+                     <EditableField
+                       value={event.title}
+                       onChange={(newVal) => updateField?.('title', newVal)}
+                       isEditing={isEditing}
+                       className="text-6xl md:text-9xl font-black uppercase leading-[0.85] tracking-tighter mix-blend-difference text-left w-full"
+                       multiline
+                     />
+                   ) : (
+                     <span className="whitespace-pre-line">
+                       {event.title.replace(' & ', '\n&\n')}
+                     </span>
+                   )}
                </motion.h1>
             </div>
 
@@ -2747,7 +2856,13 @@ const IndustrialLayout: React.FC<{
                <FadeInSection>
                   <span className="text-xs text-gray-400 uppercase tracking-widest mb-4 block">O Conceito</span>
                   <p className="text-xl md:text-2xl font-light leading-relaxed">
-                     {event.description}
+                     <EditableField
+                       value={event.description}
+                       onChange={(newVal) => updateField?.('description', newVal)}
+                       isEditing={isEditing}
+                       className="text-xl md:text-2xl font-light leading-relaxed text-white text-left"
+                       multiline
+                     />
                   </p>
                </FadeInSection>
             </div>
@@ -2784,10 +2899,32 @@ const IndustrialLayout: React.FC<{
                          <span className="material-symbols-outlined text-[14px]">delete</span>
                        </button>
                      )}
-                     <span className="w-24 font-mono text-sm text-gray-500 group-hover:text-white transition-colors">{item.time}</span>
+                     <span className="w-24 font-mono text-sm text-gray-500 group-hover:text-white transition-colors">
+                        <EditableField
+                          value={item.time}
+                          onChange={(newVal) => updateTimelineItem?.(i, 'time', newVal)}
+                          isEditing={isEditing}
+                          className="font-mono text-sm text-gray-400 group-hover:text-white text-left"
+                        />
+                     </span>
                      <div>
-                        <h4 className="text-2xl font-bold uppercase group-hover:translate-x-2 transition-transform">{item.title}</h4>
-                        <p className="text-sm text-gray-500 mt-1">{item.description}</p>
+                        <h4 className="text-2xl font-bold uppercase group-hover:translate-x-2 transition-transform">
+                           <EditableField
+                             value={item.title}
+                             onChange={(newVal) => updateTimelineItem?.(i, 'title', newVal)}
+                             isEditing={isEditing}
+                             className="text-2xl font-bold uppercase text-white text-left"
+                           />
+                        </h4>
+                        <p className="text-sm text-gray-500 mt-1">
+                           <EditableField
+                             value={item.description}
+                             onChange={(newVal) => updateTimelineItem?.(i, 'description', newVal)}
+                             isEditing={isEditing}
+                             className="text-sm text-gray-500 text-left"
+                             multiline
+                           />
+                        </p>
                      </div>
                   </FadeInSection>
                ))}
@@ -2801,7 +2938,14 @@ const IndustrialLayout: React.FC<{
              <img src="https://images.unsplash.com/photo-1544070274-1b48b1111003?q=80&w=2670&auto=format&fit=crop" className="w-full h-full object-cover grayscale group-hover:scale-105 transition-transform duration-700" />
              <div className="absolute bottom-0 left-0 p-8 bg-black/80 w-full backdrop-blur-sm">
                 <p className="text-xs uppercase tracking-widest mb-1 text-gray-400">Cerimônia</p>
-                <h3 className="text-2xl font-bold uppercase">{event.locationName}</h3>
+                <h3 className="text-2xl font-bold uppercase">
+                    <EditableField
+                      value={event.locationName}
+                      onChange={(newVal) => updateField?.('locationName', newVal)}
+                      isEditing={isEditing}
+                      className="text-2xl font-bold uppercase text-white"
+                    />
+                 </h3>
                 <button onClick={() => window.open(event.mapLink || '#', '_blank')} className="mt-4 text-xs font-bold border border-white px-4 py-2 hover:bg-white hover:text-black transition-colors uppercase">Map</button>
              </div>
           </div>
@@ -2809,7 +2953,14 @@ const IndustrialLayout: React.FC<{
              <img src={event.mapImage} className="w-full h-full object-cover grayscale group-hover:scale-105 transition-transform duration-700" />
              <div className="absolute bottom-0 left-0 p-8 bg-white/90 text-black w-full backdrop-blur-sm">
                 <p className="text-xs uppercase tracking-widest mb-1 text-gray-600">Recepção</p>
-                <h3 className="text-2xl font-bold uppercase">{event.receptionName}</h3>
+                <h3 className="text-2xl font-bold uppercase">
+                    <EditableField
+                      value={event.receptionName}
+                      onChange={(newVal) => updateField?.('receptionName', newVal)}
+                      isEditing={isEditing}
+                      className="text-2xl font-bold uppercase text-black"
+                    />
+                 </h3>
                 <button onClick={() => window.open(`https://maps.google.com/?q=${event.receptionAddress}`, '_blank')} className="mt-4 text-xs font-bold border border-black px-4 py-2 hover:bg-black hover:text-white transition-colors uppercase">Map</button>
              </div>
           </div>
@@ -2859,7 +3010,12 @@ const LuxuryLayout: React.FC<{
   isEditing?: boolean;
   onEditSection?: (section: any) => void;
   updateField?: (field: string, value: any) => void;
-}> = ({ event, onRSVP, guestName, isEditing, onEditSection, updateField }) => {
+  deleteTimelineItem?: (index: number) => void;
+  deleteGiftItem?: (index: number) => void;
+  updateGalleryImage?: (index: number, val: string) => void;
+  deleteGalleryImage?: (index: number) => void;
+  updateTimelineItem?: (index: number, field: 'time' | 'title' | 'description', value: string) => void;
+}> = ({ event, onRSVP, guestName, isEditing, onEditSection, updateField, deleteTimelineItem, deleteGiftItem, updateGalleryImage, deleteGalleryImage, updateTimelineItem }) => {
   const [copiedKey, setCopiedKey] = useState<string | null>(null);
 
   const handleCopy = (val: string) => {
@@ -2891,9 +3047,14 @@ const LuxuryLayout: React.FC<{
               initial={{ opacity: 0, scale: 0.9, filter: 'blur(5px)' }}
               animate={{ opacity: 1, scale: 1, filter: 'blur(0px)' }}
               transition={{ duration: 1.5, ease: [0.22, 1, 0.36, 1], delay: 0.4 }}
-              className="text-4xl text-white mb-2"
+              className="text-4xl text-white mb-2 flex justify-center"
             >
-              {event.title}
+              <EditableField
+                value={event.title}
+                onChange={(newVal) => updateField?.('title', newVal)}
+                isEditing={isEditing}
+                className="text-4xl text-white text-center font-serif"
+              />
             </motion.h1>
             <p className="text-xs text-gray-500 uppercase tracking-widest">{event.hosts}</p>
           </div>
@@ -2915,8 +3076,26 @@ const LuxuryLayout: React.FC<{
                 <div className="absolute inset-0 bg-[#0F1419]/30 mix-blend-color pointer-events-none"></div>
                 
                 <div className="absolute bottom-0 w-full bg-gradient-to-t from-[#0F1419] to-transparent pt-20 pb-6 text-center">
-                   <p className="text-2xl text-white font-italic">{event.date}</p>
-                   <p className="text-[#BF9B30] text-sm">{event.time} Horas</p>
+                   <p className="text-2xl text-white font-italic">
+                       <EditableField
+                         value={event.date}
+                         onChange={(newVal) => updateField?.('date', newVal)}
+                         isEditing={isEditing}
+                         className="text-2xl text-white text-center"
+                       />
+                    </p>
+                   <p className="text-[#BF9B30] text-sm">
+                       {isEditing ? (
+                         <EditableField
+                           value={event.time}
+                           onChange={(newVal) => updateField?.('time', newVal)}
+                           isEditing={isEditing}
+                           className="text-[#BF9B30] text-sm text-center"
+                         />
+                       ) : (
+                         `${event.time} Horas`
+                       )}
+                    </p>
                 </div>
              </div>
           </FadeInSection>
@@ -2930,7 +3109,13 @@ const LuxuryLayout: React.FC<{
           {/* 5. COUPLE MESSAGE */}
           <FadeInSection className="px-8 text-center max-w-md mx-auto pb-4">
              <p className="text-lg leading-relaxed font-light text-gray-400 border-t border-b border-[#BF9B30]/20 py-8">
-               {event.description}
+               <EditableField
+                 value={event.description}
+                 onChange={(newVal) => updateField?.('description', newVal)}
+                 isEditing={isEditing}
+                 className="text-lg leading-relaxed font-light text-gray-400 text-center"
+                 multiline
+               />
              </p>
           </FadeInSection>
         </EditableSectionWrapper>
@@ -2947,12 +3132,27 @@ const LuxuryLayout: React.FC<{
                      <div className="absolute inset-0 bg-cover bg-center opacity-60" style={{ backgroundImage: `url('https://images.unsplash.com/photo-1544070274-1b48b1111003?q=80&w=2670&auto=format&fit=crop')` }}></div>
                      <div className="absolute inset-0 bg-gradient-to-t from-[#0F1419] to-transparent"></div>
                      <div className="absolute bottom-3 left-4">
-                        <p className="text-white text-lg font-serif">{event.locationName}</p>
+                        <p className="text-white text-lg font-serif">
+                            <EditableField
+                              value={event.locationName}
+                              onChange={(newVal) => updateField?.('locationName', newVal)}
+                              isEditing={isEditing}
+                              className="text-white text-lg font-serif text-left"
+                            />
+                         </p>
                         <p className="text-gray-400 text-xs">{event.time}</p>
                      </div>
                   </div>
                   <div className="p-4 flex flex-col gap-3">
-                     <p className="text-xs text-gray-500 text-center leading-relaxed">{event.address}</p>
+                     <p className="text-xs text-gray-500 text-center leading-relaxed">
+                         <EditableField
+                           value={event.address}
+                           onChange={(newVal) => updateField?.('address', newVal)}
+                           isEditing={isEditing}
+                           className="text-xs text-gray-500 text-center leading-relaxed"
+                           multiline
+                         />
+                      </p>
                      <Button 
                        className="w-full bg-[#BF9B30] text-[#0F1419] hover:bg-white hover:text-black text-xs font-bold uppercase tracking-widest h-10 border-none shadow-lg"
                        onClick={() => window.open(event.mapLink || `https://maps.google.com/?q=${event.address}`, '_blank')}
@@ -2971,12 +3171,27 @@ const LuxuryLayout: React.FC<{
                        <div className="absolute inset-0 bg-cover bg-center opacity-60" style={{ backgroundImage: `url('${event.mapImage}')` }}></div>
                        <div className="absolute inset-0 bg-gradient-to-t from-[#0F1419] to-transparent"></div>
                        <div className="absolute bottom-3 left-4">
-                          <p className="text-white text-lg font-serif">{event.receptionName}</p>
+                          <p className="text-white text-lg font-serif">
+                             <EditableField
+                               value={event.receptionName}
+                               onChange={(newVal) => updateField?.('receptionName', newVal)}
+                               isEditing={isEditing}
+                               className="text-white text-lg font-serif text-left"
+                             />
+                          </p>
                           <p className="text-gray-400 text-xs">Logo após a cerimônia</p>
                        </div>
                     </div>
                     <div className="p-4 flex flex-col gap-3">
-                       <p className="text-xs text-gray-500 text-center leading-relaxed">{event.receptionAddress}</p>
+                       <p className="text-xs text-gray-500 text-center leading-relaxed">
+                          <EditableField
+                            value={event.receptionAddress}
+                            onChange={(newVal) => updateField?.('receptionAddress', newVal)}
+                            isEditing={isEditing}
+                            className="text-xs text-gray-500 text-center leading-relaxed"
+                            multiline
+                          />
+                       </p>
                        <Button 
                          className="w-full bg-[#BF9B30] text-[#0F1419] hover:bg-white hover:text-black text-xs font-bold uppercase tracking-widest h-10 border-none shadow-lg"
                          onClick={() => window.open(`https://maps.google.com/?q=${event.receptionAddress}`, '_blank')}
@@ -3074,7 +3289,12 @@ const BridalShowerLayout: React.FC<{
   isEditing?: boolean;
   onEditSection?: (section: any) => void;
   updateField?: (field: string, value: any) => void;
-}> = ({ event, onRSVP, guestName, isEditing, onEditSection, updateField }) => {
+  deleteTimelineItem?: (index: number) => void;
+  deleteGiftItem?: (index: number) => void;
+  updateGalleryImage?: (index: number, val: string) => void;
+  deleteGalleryImage?: (index: number) => void;
+  updateTimelineItem?: (index: number, field: 'time' | 'title' | 'description', value: string) => void;
+}> = ({ event, onRSVP, guestName, isEditing, onEditSection, updateField, deleteTimelineItem, deleteGiftItem, updateGalleryImage, deleteGalleryImage, updateTimelineItem }) => {
   const isMinimal = event.layoutMode === 'BRIDAL_MINIMAL';
   const isTropical = event.layoutMode === 'BRIDAL_TROPICAL';
   const isBeauty = event.layoutMode === 'BRIDAL_BEAUTY';
@@ -3109,11 +3329,23 @@ const BridalShowerLayout: React.FC<{
            >
               <div className={`${accentCard} backdrop-blur-xl p-8 md:p-12 rounded-[2rem] shadow-2xl border border-white/40 max-w-lg w-full transform perspective-1000`}>
                   <p className="text-xs font-bold uppercase tracking-[0.2em] opacity-60 mb-4">CHÁ DE PANELA</p>
-                  <h1 className="text-4xl md:text-5xl font-serif mb-4 leading-tight">
-                    {event.title}
+                  <h1 className="text-4xl md:text-5xl font-serif mb-4 leading-tight flex justify-center">
+                    <EditableField
+                      value={event.title}
+                      onChange={(newVal) => updateField?.('title', newVal)}
+                      isEditing={isEditing}
+                      className="text-4xl md:text-5xl font-serif text-center"
+                    />
                   </h1>
                   <div className="h-px w-12 bg-current opacity-20 mx-auto my-4"></div>
-                  <p className="text-sm font-medium uppercase tracking-widest opacity-80">{event.date}</p>
+                  <p className="text-sm font-medium uppercase tracking-widest opacity-80">
+                      <EditableField
+                        value={event.date}
+                        onChange={(newVal) => updateField?.('date', newVal)}
+                        isEditing={isEditing}
+                        className="text-sm font-medium uppercase tracking-widest opacity-80 text-center"
+                      />
+                  </p>
               </div>
            </motion.div>
         </div>
@@ -3123,7 +3355,17 @@ const BridalShowerLayout: React.FC<{
            <FadeInSection>
               <span className="material-symbols-outlined text-4xl mb-6 opacity-40">favorite</span>
               <p className="text-xl md:text-2xl font-serif italic leading-relaxed opacity-90 max-w-2xl mx-auto">
-                "{event.description}"
+                {isEditing ? (
+                  <EditableField
+                    value={event.description}
+                    onChange={(newVal) => updateField?.('description', newVal)}
+                    isEditing={isEditing}
+                    className="text-xl md:text-2xl font-serif italic leading-relaxed text-center"
+                    multiline
+                  />
+                ) : (
+                  `"${event.description}"`
+                )}
               </p>
               <div className="mt-12 p-6 rounded-[2rem] bg-white/50 backdrop-blur-lg border border-white max-w-sm mx-auto shadow-sm">
                  <p className="uppercase tracking-[0.2em] text-[10px] font-bold opacity-50 mb-2">Convidada Especial</p>
@@ -3143,9 +3385,35 @@ const BridalShowerLayout: React.FC<{
                  <div className="w-12 h-12 rounded-full bg-white flex items-center justify-center shadow-sm mb-6">
                     <span className="material-symbols-outlined opacity-60">location_on</span>
                  </div>
-                 <h3 className="text-2xl font-serif mb-2">{event.locationName}</h3>
-                 <p className="font-bold opacity-80 uppercase tracking-widest text-xs mb-4">{event.time} Hrs</p>
-                 <p className={`${secondaryText} leading-relaxed mb-8`}>{event.address}</p>
+                 <h3 className="text-2xl font-serif mb-2">
+                     <EditableField
+                       value={event.locationName}
+                       onChange={(newVal) => updateField?.('locationName', newVal)}
+                       isEditing={isEditing}
+                       className="text-2xl font-serif text-left"
+                     />
+                  </h3>
+                 <p className="font-bold opacity-80 uppercase tracking-widest text-xs mb-4">
+                     {isEditing ? (
+                       <EditableField
+                         value={event.time}
+                         onChange={(newVal) => updateField?.('time', newVal)}
+                         isEditing={isEditing}
+                         className="font-bold opacity-80 uppercase tracking-widest text-xs text-left"
+                       />
+                     ) : (
+                       `${event.time} Hrs`
+                     )}
+                  </p>
+                 <p className={`${secondaryText} leading-relaxed mb-8`}>
+                     <EditableField
+                       value={event.address}
+                       onChange={(newVal) => updateField?.('address', newVal)}
+                       isEditing={isEditing}
+                       className={`${secondaryText} leading-relaxed text-left`}
+                       multiline
+                     />
+                  </p>
                  <button onClick={() => window.open(event.mapLink || '#', '_blank')} className="mt-auto text-xs font-bold uppercase tracking-widest border-b border-current pb-1 hover:opacity-50 transition-opacity">
                    Ver no Mapa
                  </button>
@@ -3161,7 +3429,21 @@ const BridalShowerLayout: React.FC<{
                     </div>
                     <h3 className="text-2xl font-serif mb-2">Lista de Presentes</h3>
                     <p className={`${secondaryText} leading-relaxed mb-8 max-w-[250px]`}>
-                      {event.gifts?.[0]?.description || 'Sua presença é o maior presente. Mas se quiser nos mimar:'}
+                      <EditableField
+                          value={event.gifts?.[0]?.description || 'Sua presença é o maior presente. Mas se quiser nos mimar:'}
+                          onChange={(newVal) => {
+                            const updatedGifts = [...(event.gifts || [])];
+                            if (updatedGifts[0]) {
+                              updatedGifts[0] = { ...updatedGifts[0], description: newVal };
+                            } else {
+                              updatedGifts[0] = { title: 'Lista de Presentes', description: newVal, value: '' };
+                            }
+                            updateField?.('gifts', updatedGifts);
+                          }}
+                          isEditing={isEditing}
+                          className={`${secondaryText} leading-relaxed text-left`}
+                          multiline
+                        />
                     </p>
                     <button 
                        onClick={() => {navigator.clipboard.writeText(event.gifts?.[0]?.value || ''); alert('IBAN Copiado!')}}
@@ -3224,17 +3506,66 @@ const RSVPForm: React.FC<{ event: EventDetails; onClose: () => void }> = ({ even
    const isLuxury = event.layoutMode === 'LUXURY' || event.layoutMode === 'INDUSTRIAL';
    const isBridal = event.type === 'BRIDAL_SHOWER';
    const [status, setStatus] = useState<'yes' | 'no'>('yes');
+   const [name, setName] = useState('');
+   const [phone, setPhone] = useState('');
+   const [companions, setCompanions] = useState(0);
+   const [message, setMessage] = useState('');
+   const [loading, setLoading] = useState(false);
    
+   const handleSubmit = async (e: React.FormEvent) => {
+     e.preventDefault();
+     if (!name.trim()) {
+       toast.error('Por favor, informe seu nome completo.');
+       return;
+     }
+     if (!phone.trim()) {
+       toast.error('Por favor, informe seu número de telefone.');
+       return;
+     }
+
+     setLoading(true);
+     const toastId = toast.loading('Enviando sua confirmação...');
+     try {
+       const guestsCollection = collection(db, 'events', event.id, 'guests');
+       const guestRef = doc(guestsCollection);
+
+       await setDoc(guestRef, {
+         id: guestRef.id,
+         name: name.trim(),
+         phone: phone.trim(),
+         status: status === 'yes' ? 'CONFIRMED' : 'DECLINED',
+         adults: status === 'yes' ? (companions + 1) : 0,
+         children: 0,
+         message: message.trim(),
+         checkedIn: false,
+         createdAt: new Date().toISOString(),
+         updatedAt: new Date().toISOString()
+       });
+
+       toast.success(status === 'yes' 
+         ? 'Sua presença foi confirmada com sucesso!' 
+         : 'Sua justificativa foi enviada com sucesso.', { id: toastId });
+       
+       onClose();
+     } catch (err) {
+       console.error('Erro ao salvar RSVP:', err);
+       toast.error('Erro ao enviar sua resposta. Tente novamente.', { id: toastId });
+     } finally {
+       setLoading(false);
+     }
+   };
+
    return (
-    <form className="space-y-6" onSubmit={(e) => { e.preventDefault(); onClose(); }}>
+    <form className="space-y-6" onSubmit={handleSubmit}>
       <p className={`text-sm ${isLuxury ? 'text-gray-400' : 'opacity-70'}`}>
-        {isBridal ? "Por favor, confirme sua presença no chá." : `Por favor, confirme sua presença para o evento de ${event.title}.`}
+        {isBridal ? "Por favor, confirme sua presença no chá de panela." : `Por favor, confirme sua presença para o evento de ${event.title}.`}
       </p>
       
       <div className="flex gap-4">
          <button 
            type="button"
            onClick={() => setStatus('yes')}
+           disabled={loading}
            className={`flex-1 py-3 border rounded-lg text-sm font-bold transition-all ${status === 'yes' 
              ? (isLuxury ? 'bg-[#BF9B30] text-black border-[#BF9B30]' : 'bg-brand-blue text-white border-brand-blue') 
              : (isLuxury ? 'border-gray-600 text-gray-300 hover:border-gray-500' : 'border-gray-200 text-gray-400')}`}
@@ -3244,6 +3575,7 @@ const RSVPForm: React.FC<{ event: EventDetails; onClose: () => void }> = ({ even
          <button 
            type="button"
            onClick={() => setStatus('no')}
+           disabled={loading}
            className={`flex-1 py-3 border rounded-lg text-sm font-bold transition-all ${status === 'no' 
              ? (isLuxury ? 'bg-red-900/80 text-white border-red-800' : 'bg-red-50 text-red-600 border-red-200') 
              : (isLuxury ? 'border-gray-600 text-gray-300 hover:border-gray-500' : 'border-gray-200 text-gray-400')}`}
@@ -3255,13 +3587,39 @@ const RSVPForm: React.FC<{ event: EventDetails; onClose: () => void }> = ({ even
       <div className="space-y-4">
         <div>
           <label className={`text-xs font-bold uppercase tracking-wider mb-1 block ${isLuxury ? 'text-[#BF9B30]' : 'opacity-50'}`}>Nome Completo</label>
-          <input type="text" className={`w-full bg-transparent border-b py-2 focus:outline-none ${isLuxury ? 'border-gray-600 text-white focus:border-[#BF9B30]' : 'border-gray-300 text-black focus:border-black'}`} placeholder="Seu nome" required />
+          <input 
+            type="text" 
+            value={name}
+            onChange={(e) => setName(e.target.value)}
+            className={`w-full bg-transparent border-b py-2 focus:outline-none ${isLuxury ? 'border-gray-600 text-white focus:border-[#BF9B30]' : 'border-gray-300 text-black focus:border-black'}`} 
+            placeholder="Seu nome completo" 
+            required 
+            disabled={loading}
+          />
+        </div>
+
+        <div>
+          <label className={`text-xs font-bold uppercase tracking-wider mb-1 block ${isLuxury ? 'text-[#BF9B30]' : 'opacity-50'}`}>Telefone / Contacto</label>
+          <input 
+            type="tel" 
+            value={phone}
+            onChange={(e) => setPhone(e.target.value)}
+            className={`w-full bg-transparent border-b py-2 focus:outline-none ${isLuxury ? 'border-gray-600 text-white focus:border-[#BF9B30]' : 'border-gray-300 text-black focus:border-black'}`} 
+            placeholder="Ex: 923 000 000" 
+            required 
+            disabled={loading}
+          />
         </div>
         
         {status === 'yes' && !isBridal && (
           <div>
             <label className={`text-xs font-bold uppercase tracking-wider mb-1 block ${isLuxury ? 'text-[#BF9B30]' : 'opacity-50'}`}>Acompanhantes</label>
-            <select className={`w-full bg-transparent border-b py-2 focus:outline-none ${isLuxury ? 'border-gray-600 text-white focus:border-[#BF9B30] [&>option]:text-black' : 'border-gray-300 text-black focus:border-black'}`}>
+            <select 
+              value={companions}
+              onChange={(e) => setCompanions(parseInt(e.target.value))}
+              className={`w-full bg-transparent border-b py-2 focus:outline-none ${isLuxury ? 'border-gray-600 text-white focus:border-[#BF9B30] [&>option]:text-black' : 'border-gray-300 text-black focus:border-black'}`}
+              disabled={loading}
+            >
               <option value="0">Apenas eu</option>
               <option value="1">+1 Acompanhante</option>
               <option value="2">+2 Acompanhantes</option>
@@ -3275,14 +3633,17 @@ const RSVPForm: React.FC<{ event: EventDetails; onClose: () => void }> = ({ even
            </label>
            <textarea 
              rows={3}
+             value={message}
+             onChange={(e) => setMessage(e.target.value)}
              className={`w-full bg-transparent border rounded-lg p-3 focus:outline-none text-sm ${isLuxury ? 'border-gray-600 text-white focus:border-[#BF9B30]' : 'border-gray-200 text-black focus:border-black'}`}
              placeholder={status === 'yes' ? "Mal posso esperar..." : "Desejo muitas felicidades..."} 
+             disabled={loading}
            />
         </div>
       </div>
 
-      <Button type="submit" fullWidth variant={isLuxury ? 'outline' : 'primary'} className={isLuxury ? 'border-[#BF9B30] text-[#BF9B30] hover:bg-[#BF9B30] hover:text-black font-bold uppercase tracking-widest' : ''}>
-         {status === 'yes' ? 'ENVIAR RESPOSTA' : 'ENVIAR JUSTIFICATIVA'}
+      <Button type="submit" fullWidth variant={isLuxury ? 'outline' : 'primary'} disabled={loading} className={isLuxury ? 'border-[#BF9B30] text-[#BF9B30] hover:bg-[#BF9B30] hover:text-black font-bold uppercase tracking-widest' : ''}>
+         {loading ? 'ENVIANDO...' : (status === 'yes' ? 'ENVIAR RESPOSTA' : 'ENVIAR JUSTIFICATIVA')}
       </Button>
     </form>
    );

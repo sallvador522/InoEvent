@@ -295,6 +295,7 @@ const InvitationView: React.FC = () => {
   });
   const [localEvent, setLocalEvent] = useState<EventDetails | null>(null);
   const [firebaseLoading, setFirebaseLoading] = useState(true);
+  const [networkError, setNetworkError] = useState<string | null>(null);
   const [isRSVPOpen, setRSVPOpen] = useState(false);
   const [isBannerCollapsed, setIsBannerCollapsed] = useState(false);
 
@@ -366,47 +367,85 @@ const InvitationView: React.FC = () => {
         return;
       }
 
-      // Firestore dynamic load with real-time sync and cache-first support
+      // Firestore dynamic load with cache-then-network dual strategy for absolute resilience
       setFirebaseLoading(true);
+      setNetworkError(null);
+      
       try {
         const eventRef = doc(db, 'events', id);
-        unsubscribe = onSnapshot(eventRef, { includeMetadataChanges: true }, (docSnap) => {
-          if (docSnap.exists()) {
-            const customEvt = { id: docSnap.id, ...docSnap.data() } as EventDetails;
+        
+        // 1. Initial attempt using getDoc (which resolves instantly from cache if available)
+        try {
+          const cachedSnap = await getDoc(eventRef);
+          if (cachedSnap.exists()) {
+            const customEvt = { id: cachedSnap.id, ...cachedSnap.data() } as EventDetails;
             setEvent(customEvt);
+            setNetworkError(null);
             if (isEditing) {
               setLocalEvent(prev => {
                 if (prev && JSON.stringify(prev) !== JSON.stringify(customEvt)) {
-                  return prev; // Preserve user's current unsaved edits in the editor
+                  return prev;
                 }
                 return customEvt;
               });
             }
-            console.log(`[InoEvents Cache Sync] Evento ${id} carregado. Fonte: ${docSnap.metadata.fromCache ? 'Cache Local (Offline-first)' : 'Servidor Real-time'}`);
+            console.log(`[InoEvents GetDoc] Evento ${id} carregado com sucesso.`);
+            setFirebaseLoading(false);
           } else {
             // Check if there is local static mock as a last resort
             const staticEv = getEventById(id);
             if (staticEv) {
               setEvent(staticEv);
               if (isEditing) setLocalEvent(staticEv);
+              setFirebaseLoading(false);
             } else {
+              setEvent(null);
+              setFirebaseLoading(false);
+            }
+          }
+        } catch (getErr: any) {
+          console.warn("[InoEvents Initial GetDoc Failed] Tentando recuperar de listeners ou dados estáticos:", getErr);
+          // Set network error state so that we know we had connection issues
+          setNetworkError(getErr.message || String(getErr));
+          
+          // Static mockup fallback
+          const staticEv = getEventById(id);
+          if (staticEv) {
+            setEvent(staticEv);
+            if (isEditing) setLocalEvent(staticEv);
+            setFirebaseLoading(false);
+          }
+        }
+
+        // 2. Continuous real-time listener for seamless synchronization (without resetting state on network errors)
+        unsubscribe = onSnapshot(eventRef, { includeMetadataChanges: true }, (docSnap) => {
+          if (docSnap.exists()) {
+            const customEvt = { id: docSnap.id, ...docSnap.data() } as EventDetails;
+            setEvent(customEvt);
+            setNetworkError(null); // Clear errors once we have a fresh snapshot
+            if (isEditing) {
+              setLocalEvent(prev => {
+                if (prev && JSON.stringify(prev) !== JSON.stringify(customEvt)) {
+                  return prev;
+                }
+                return customEvt;
+              });
+            }
+          } else {
+            const staticEv = getEventById(id);
+            if (!staticEv) {
               setEvent(null);
             }
           }
           setFirebaseLoading(false);
         }, (err) => {
-          console.warn("[InoEvents Offline Sync] Falha de rede/permissão, carregando dos dados estáticos:", err);
-          const staticEv = getEventById(id);
-          if (staticEv) {
-            setEvent(staticEv);
-            if (isEditing) setLocalEvent(staticEv);
-          } else {
-            setEvent(null);
-          }
+          console.warn("[InoEvents Realtime Listener Warning] Conexão real-time temporariamente indisponível:", err);
+          // Crucial: DO NOT nullify loaded event on subscription network error! 
+          // This ensures that any guest who successfully loaded the page doesn't suddenly see a "Not Found" screen
           setFirebaseLoading(false);
         });
       } catch (err) {
-        console.error("Erro ao buscar convite customizado:", err);
+        console.error("Erro ao registrar listeners de convite:", err);
         setFirebaseLoading(false);
       }
     };
@@ -431,7 +470,32 @@ const InvitationView: React.FC = () => {
 
   // Active working details is localEvent if editing, else loaded static/saving event
   const activeEvent = isEditing ? (localEvent || event) : event;
-  if (!activeEvent) return <div className="p-10 text-center font-sans text-gray-500">Convite não encontrado.</div>;
+  if (!activeEvent) {
+    if (networkError) {
+      return (
+        <div className="min-h-screen bg-slate-950 flex flex-col items-center justify-center p-6 text-white font-sans text-center">
+          <div className="bg-slate-900/60 backdrop-blur-xl border border-slate-800 p-8 rounded-3xl max-w-md shadow-2xl">
+            <div className="w-16 h-16 bg-red-500/10 text-red-400 rounded-full flex items-center justify-center mx-auto mb-6">
+              <svg xmlns="http://www.w3.org/2000/svg" className="h-8 w-8" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z" />
+              </svg>
+            </div>
+            <h2 className="text-xl font-bold mb-2">Instabilidade na Conexão</h2>
+            <p className="text-slate-400 text-sm mb-6">
+              Não conseguimos estabelecer uma conexão estável para carregar os detalhes do convite. Por favor, verifique se a sua internet está ativa ou tente novamente.
+            </p>
+            <button 
+              onClick={() => window.location.reload()} 
+              className="w-full bg-violet-600 hover:bg-violet-500 text-white font-semibold py-3 px-6 rounded-2xl transition duration-200 shadow-lg shadow-violet-600/30"
+            >
+              Tentar Novamente
+            </button>
+          </div>
+        </div>
+      );
+    }
+    return <div className="p-10 text-center font-sans text-gray-500">Convite não encontrado.</div>;
+  }
 
   const guestName = "Família Silva";
   const isTemplate = EVENTS.some(e => e.id === id);

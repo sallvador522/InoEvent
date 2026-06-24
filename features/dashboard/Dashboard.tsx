@@ -23,6 +23,15 @@ export const Dashboard = () => {
     const { id } = useParams<{ id: string }>();
     const navigate = useNavigate();
     const { userProfile } = useFirebase();
+
+    const getPublicOrigin = () => {
+        let origin = window.location.origin;
+        if (origin.includes('ais-dev-')) {
+            return origin.replace('ais-dev-', 'ais-pre-');
+        }
+        return origin;
+    };
+
     const [event, setEvent] = useState<any>(null);
     const [guests, setGuests] = useState<any[]>([]);
     const [loading, setLoading] = useState(true);
@@ -207,7 +216,7 @@ export const Dashboard = () => {
     }, [id]);
 
     const handleCopyLink = () => {
-        const link = `${window.location.origin}/invite/${event?.id}`;
+        const link = `${getPublicOrigin()}/invite/${event?.id}`;
         navigator.clipboard.writeText(link);
         setCopied(true);
         toast.success("Link do evento copiado!");
@@ -273,7 +282,7 @@ export const Dashboard = () => {
 
     const handleWhatsAppShare = (guest: any) => {
         if (!id || !event) return;
-        const msg = `Olá ${guest.name}! Segue o link do convite para "${event.title}": ${window.location.origin}/invite/${id}`;
+        const msg = `Olá ${guest.name}! Segue o link do convite para "${event.title}": ${getPublicOrigin()}/invite/${id}`;
         const phone = (guest.phone || "").replace(/\D/g, '');
         if (phone) {
             window.open(`https://wa.me/${phone}?text=${encodeURIComponent(msg)}`, '_blank');
@@ -761,7 +770,7 @@ export const Dashboard = () => {
                     <div className="flex flex-col sm:flex-row gap-2 w-full md:w-auto">
                         <div className="flex bg-slate-50 p-2 rounded-2xl border border-slate-200 flex-1 md:flex-initial h-14">
                             <div className="px-4 flex items-center text-slate-500 text-sm truncate max-w-[150px]">
-                                {`${window.location.origin}/invite/${event.id}`}
+                                {`${getPublicOrigin()}/invite/${event.id}`}
                             </div>
                             <button 
                                 onClick={handleCopyLink}
@@ -781,7 +790,7 @@ export const Dashboard = () => {
                                         token = Math.random().toString(36).substring(2, 8).toUpperCase();
                                         await updateDoc(doc(db, 'events', event.id), { clientToken: token });
                                     }
-                                    const link = `${window.location.origin}/client-dashboard/${event.id}?token=${token}`;
+                                    const link = `${getPublicOrigin()}/client-dashboard/${event.id}?token=${token}`;
                                     navigator.clipboard.writeText(link);
                                     toast.success("Link do cliente copiado para a área de transferência!");
                                 }}
@@ -1359,7 +1368,7 @@ export const Dashboard = () => {
                                             token = Math.random().toString(36).substring(2, 8).toUpperCase();
                                             await updateDoc(doc(db, 'events', event.id), { clientToken: token });
                                         }
-                                        const link = `${window.location.origin}/checkin/${event.id}?token=${token}&mode=reception`;
+                                        const link = `${getPublicOrigin()}/checkin/${event.id}?token=${token}&mode=reception`;
                                         navigator.clipboard.writeText(link);
                                         toast.success("Link de Recepcionista copiado para a área de transferência!");
                                     }}

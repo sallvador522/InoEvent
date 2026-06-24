@@ -124,12 +124,20 @@ export const TeamManager: React.FC<TeamManagerProps> = ({ eventId, eventPlan }) 
         }
     };
 
+    const getPublicOrigin = () => {
+        let origin = window.location.origin;
+        if (origin.includes('ais-dev-')) {
+            return origin.replace('ais-dev-', 'ais-pre-');
+        }
+        return origin;
+    };
+
     const handleCopyLink = (member: TeamMember) => {
         const path = member.role === 'viewer'
-            ? `${window.location.origin}/client-dashboard/${eventId}?token=B2B_PARTNER`
+            ? `${getPublicOrigin()}/client-dashboard/${eventId}?token=B2B_PARTNER`
             : member.role === 'scanner'
-                ? `${window.location.origin}/checkin/${eventId}`
-                : `${window.location.origin}/dashboard/${eventId}`;
+                ? `${getPublicOrigin()}/checkin/${eventId}`
+                : `${getPublicOrigin()}/dashboard/${eventId}`;
 
         navigator.clipboard.writeText(path);
         setCopiedId(member.id);

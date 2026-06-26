@@ -23,7 +23,7 @@ export const CheckinScanner: React.FC = () => {
     const [guestName, setGuestName] = useState<string>('');
 
     // Reception Mode State
-    const [scanState, setScanState] = useState<{status: 'idle' | 'processing' | 'success' | 'error' | 'already_scanned', message: string, guestName?: string}>({status: 'idle', message: ''});
+    const [scanState, setScanState] = useState<{status: 'idle' | 'processing' | 'success' | 'error' | 'already_scanned', message: string, guestName?: string, companions?: number}>({status: 'idle', message: ''});
 
     useEffect(() => {
         const processCheckin = async () => {
@@ -140,10 +140,10 @@ export const CheckinScanner: React.FC = () => {
                 if (guestSnap.exists()) {
                     const g = guestSnap.data();
                     if (g.checkedIn || g.status === 'CHECKED_IN') {
-                        setScanState({ status: 'already_scanned', message: 'Já realizou o check-in!', guestName: g.name });
+                        setScanState({ status: 'already_scanned', message: 'Já realizou o check-in!', guestName: g.name, companions: g.companions || 0 });
                         playScanSound('already_scanned');
                     } else if (g.status === 'DECLINED') {
-                        setScanState({ status: 'error', message: 'Convidado RECUSOU o convite.', guestName: g.name });
+                        setScanState({ status: 'error', message: 'Convidado RECUSOU o convite.', guestName: g.name, companions: g.companions || 0 });
                         playScanSound('error');
                     } else {
                         await updateDoc(guestRef, {
@@ -152,7 +152,7 @@ export const CheckinScanner: React.FC = () => {
                             name: g.name,
                             checkedInAt: new Date().toISOString()
                         });
-                        setScanState({ status: 'success', message: 'Check-in confirmado!', guestName: g.name });
+                        setScanState({ status: 'success', message: 'Check-in confirmado!', guestName: g.name, companions: g.companions || 0 });
                         playScanSound('success');
                     }
                 } else {
@@ -217,7 +217,16 @@ export const CheckinScanner: React.FC = () => {
                                         {scanState.status === 'error' && <XCircle size={56} className="mx-auto drop-shadow-md" />}
                                     </div>
                                     <p className="drop-shadow-md">{scanState.message}</p>
-                                    {scanState.guestName && <p className="text-sm font-medium mt-2 opacity-90">{scanState.guestName}</p>}
+                                    {scanState.guestName && (
+                                        <div className="mt-4">
+                                            <p className="text-xl font-bold opacity-100 drop-shadow-md">{scanState.guestName}</p>
+                                            {scanState.companions !== undefined && (
+                                                <p className="text-sm font-medium opacity-90 drop-shadow-sm bg-black/20 rounded-full px-4 py-1 mt-2 inline-block">
+                                                    Total de pessoas: {1 + scanState.companions}
+                                                </p>
+                                            )}
+                                        </div>
+                                    )}
                                 </motion.div>
                             )}
                         </AnimatePresence>

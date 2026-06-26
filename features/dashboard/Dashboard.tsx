@@ -51,7 +51,7 @@ export const Dashboard = () => {
     const [newGuestName, setNewGuestName] = useState("");
     const [newGuestPhone, setNewGuestPhone] = useState("");
     const [showScanner, setShowScanner] = useState(false);
-    const [scanState, setScanState] = useState<{status: 'idle' | 'processing' | 'success' | 'error' | 'already_scanned', message: string, guestName?: string}>({status: 'idle', message: ''});
+    const [scanState, setScanState] = useState<{status: 'idle' | 'processing' | 'success' | 'error' | 'already_scanned', message: string, guestName?: string, companions?: number}>({status: 'idle', message: ''});
     const [activeFilter, setActiveFilter] = useState<'all' | 'checkedIn' | 'confirmed' | 'pending' | 'declined'>('all');
     const [statsPeriodFilter, setStatsPeriodFilter] = useState<'all' | '24h' | '7d' | '30d'>('all');
     const [statsSubgroupFilter, setStatsSubgroupFilter] = useState<'all' | 'adults' | 'children'>('all');
@@ -312,7 +312,7 @@ export const Dashboard = () => {
                 const g = guests.find(guest => guest.id === guestUrlId);
                 if (g) {
                     if (g.checkedIn) {
-                        setScanState({ status: 'already_scanned', message: 'Já realizou o check-in!', guestName: g.name });
+                        setScanState({ status: 'already_scanned', message: 'Já realizou o check-in!', guestName: g.name, companions: g.companions || 0 });
                         playScanSound('already_scanned');
                     } else {
                         const guestRef = doc(db, 'events', id!, 'guests', guestUrlId);
@@ -320,7 +320,7 @@ export const Dashboard = () => {
                             checkedIn: true,
                             checkedInAt: new Date().toISOString()
                         });
-                        setScanState({ status: 'success', message: 'Check-in confirmado!', guestName: g.name });
+                        setScanState({ status: 'success', message: 'Check-in confirmado!', guestName: g.name, companions: g.companions || 0 });
                         playScanSound('success');
                    }
                 } else {
@@ -1491,7 +1491,16 @@ export const Dashboard = () => {
                                             {scanState.status === 'processing' && <div className="w-14 h-14 border-4 border-white border-t-transparent rounded-full animate-spin mx-auto drop-shadow-md" />}
                                         </div>
                                         <p className="drop-shadow-md">{scanState.message}</p>
-                                        {scanState.guestName && <p className="text-sm font-medium mt-2 opacity-90 drop-shadow-sm">{scanState.guestName}</p>}
+                                        {scanState.guestName && (
+                                            <div className="mt-4">
+                                                <p className="text-xl font-bold opacity-100 drop-shadow-md">{scanState.guestName}</p>
+                                                {scanState.companions !== undefined && (
+                                                    <p className="text-sm font-medium opacity-90 drop-shadow-sm bg-black/20 rounded-full px-4 py-1 mt-2 inline-block">
+                                                        Total de pessoas: {1 + scanState.companions}
+                                                    </p>
+                                                )}
+                                            </div>
+                                        )}
                                     </motion.div>
                                 )}
                                 </AnimatePresence>

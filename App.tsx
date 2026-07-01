@@ -20,6 +20,7 @@ import { PlansPage } from './features/plans/PlansPage';
 import { TermsPage } from './features/landing/TermsPage';
 import { PrivacyPage } from './features/landing/PrivacyPage';
 import { AboutPage } from './features/landing/AboutPage';
+import { WhatsAppSupport } from './components/WhatsAppSupport';
 
 const PageWrapper = ({ children }: { children: React.ReactNode }) => (
   <motion.div
@@ -95,6 +96,7 @@ const App: React.FC = () => {
       <Toaster position="top-center" />
       <Router>
         <AnimatedRoutes />
+        <WhatsAppSupport />
       </Router>
     </>
   );

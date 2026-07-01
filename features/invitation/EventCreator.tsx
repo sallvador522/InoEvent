@@ -7,7 +7,8 @@ import toast from 'react-hot-toast';
 import { 
   Sparkles, Plus, Trash, Music, Calendar, MapPin, Clock, 
   User, Checkroom, Gift, Save, FileText, ChevronRight, 
-  Heart, ArrowLeft, AlignLeft, Eye, Layout, Sliders, Globe
+  Heart, ArrowLeft, AlignLeft, Eye, Layout, Sliders, Globe,
+  Gem, X, Check
 } from 'lucide-react';
 import { LayoutMode } from '../../types';
 
@@ -43,6 +44,8 @@ export const EventCreator: React.FC = () => {
   const [activeTab, setActiveTab] = useState<'content' | 'timeline' | 'gifts' | 'design'>('content');
   const [isLoading, setIsLoading] = useState(false);
   const [isAiGenerating, setIsAiGenerating] = useState(false);
+  const [showUpgradeModal, setShowUpgradeModal] = useState(false);
+  const [attemptedPremiumLayout, setAttemptedPremiumLayout] = useState<string>('');
 
   // Event State Variables
   const [selectedLayout, setSelectedLayout] = useState<LayoutMode>(
@@ -252,7 +255,7 @@ export const EventCreator: React.FC = () => {
     toast.success('Mimo excluído.');
   };
 
-  // Primary save handler which charge credits ONLY upon clicking "Salvar" for a new event
+  // Primary save handler which checks limits ONLY upon clicking "Salvar" for a new event
   const handleSaveEvent = async () => {
     if (!title || !date) {
       toast.error('Preencha o título do evento e a data antes de prosseguir.');
@@ -267,31 +270,32 @@ export const EventCreator: React.FC = () => {
     const toastId = toast.loading(isEditingExisting ? 'Atualizando convite...' : 'Lavrando convite real no Banco de Dados...');
 
     try {
-      // BILLING RULE: Only charge credit when creating a NEW invitation
+      // PREMIUM LAYOUT RULE: Check if selecting a premium layout on an Essencial plan
+      const isPremiumLayout = ['LUXURY', 'GARDEN', 'RUSTIC', 'INDUSTRIAL'].includes(selectedLayout);
+      const isUserEssencial = userProfile?.plan === 'Essencial' || !userProfile?.plan;
+      if (isPremiumLayout && isUserEssencial) {
+        toast.dismiss(toastId);
+        setAttemptedPremiumLayout(selectedLayout === 'LUXURY' ? 'Luxo de Realeza' : selectedLayout === 'GARDEN' ? 'Jardim Encantado' : selectedLayout === 'RUSTIC' ? 'Rústico / Natural' : 'Industrial Loft');
+        setShowUpgradeModal(true);
+        setIsLoading(false);
+        return;
+      }
+
+      // BILLING RULE: Check plan limit when creating a NEW invitation
       if (!isEditingExisting && userProfile?.plan !== 'Business' && userProfile?.plan !== 'Corporate') {
-        const creditCost = 2; // Fixed: creation costs 2 credits
-        const currentCredits = userProfile?.credits || 0;
+        const plan = userProfile?.plan || 'Essencial';
+        let limit = 2;
+        if (plan === 'Premium') limit = 5;
+
+        const eventsRef = collection(db, 'events');
+        const q = query(eventsRef, where("ownerId", "==", user.uid));
+        const snap = await getDocs(q);
         
-        if (currentCredits < creditCost) {
-          toast.error('Créditos insuficientes! Você precisa de 2 créditos.', { id: toastId });
+        if (snap.size >= limit) {
+          toast.error(`Você atingiu o limite de ${limit} eventos do seu plano. Faça upgrade para criar mais!`, { id: toastId });
           setIsLoading(false);
           return;
         }
-
-        // Deduct from profile
-        const newCredits = currentCredits - creditCost;
-        await updateDoc(doc(db, 'users', user.uid), { credits: newCredits });
-
-        // Record transaction
-        const newTransRef = doc(collection(db, 'transactions'));
-        await setDoc(newTransRef, {
-          ownerId: user.uid,
-          amount: creditCost,
-          type: 'DEBIT',
-          description: `Criação (Editor): ${title}`,
-          date: new Date().toISOString(),
-          eventId: newTransRef.id
-        });
       }
 
       const activeEventId = eventIdParam || "evt_" + Math.random().toString(36).substr(2, 9);
@@ -378,14 +382,10 @@ export const EventCreator: React.FC = () => {
         </div>
 
         <div className="flex items-center gap-3">
-          {/* Credit balance badge or Plan indication */}
-          {userProfile?.plan === 'Business' || userProfile?.plan === 'Corporate' ? (
+          {/* Plan indication */}
+          {(userProfile?.plan === 'Business' || userProfile?.plan === 'Corporate') && (
             <span className="hidden sm:inline-flex items-center gap-1 text-[11px] font-bold text-emerald-700 bg-emerald-50 border border-emerald-200 rounded-full py-1 px-3">
               <Globe size={12} /> Canal ilimitado [{userProfile.plan}]
-            </span>
-          ) : (
-            <span className="hidden sm:inline-flex items-center gap-1.5 text-[11px] font-bold text-blue-700 bg-blue-50 border border-blue-200 rounded-full py-1 px-3">
-              <Sparkles size={12} className="text-yellow-600 animate-pulse" /> Seus créditos: {userProfile?.credits || 0}
             </span>
           )}
 
@@ -680,25 +680,44 @@ export const EventCreator: React.FC = () => {
                               { id: 'ESSENTIAL', label: 'Essencial Moderno', desc: 'Aparência límpida e polida' },
                               { id: 'CLASSIC', label: 'Clássico Romântico', desc: 'Elegância de contos de reis' },
                               { id: 'MODERN', label: 'Cosmopolita / Moderno', desc: 'Aparência ousada espacial' },
-                              { id: 'LUXURY', label: 'Luxo de Realeza', desc: 'Elegância formal e aristocrata' },
-                              { id: 'GARDEN', label: 'Jardim Encantado', desc: 'Pétalas florais e românticas' },
-                              { id: 'RUSTIC', label: 'Rústico / Natural', desc: 'Folhas, madeiras e aconchego' },
-                              { id: 'INDUSTRIAL', label: 'Industrial Loft', desc: 'Modernidade metropolitana' }
-                            ].map((item) => (
-                              <button
-                                key={item.id}
-                                type="button"
-                                onClick={() => setSelectedLayout(item.id as LayoutMode)}
-                                className={`p-4 rounded-2xl border text-left flex flex-col justify-between h-28 cursor-pointer transition-all duration-300 ${
-                                  selectedLayout === item.id 
-                                    ? 'bg-purple-50/70 border-purple-500 ring-1 ring-purple-500 shadow'
-                                    : 'bg-white border-slate-200 hover:border-slate-300'
-                                }`}
-                              >
-                                <span className={`text-xs font-bold leading-tight ${selectedLayout === item.id ? 'text-purple-900' : 'text-slate-800'}`}>{item.label}</span>
-                                <span className="text-[10px] text-slate-500 leading-tight block">{item.desc}</span>
-                              </button>
-                            ))}
+                              { id: 'LUXURY', label: 'Luxo de Realeza', desc: 'Elegância formal e aristocrata', premium: true },
+                              { id: 'GARDEN', label: 'Jardim Encantado', desc: 'Pétalas florais e românticas', premium: true },
+                              { id: 'RUSTIC', label: 'Rústico / Natural', desc: 'Folhas, madeiras e aconchego', premium: true },
+                              { id: 'INDUSTRIAL', label: 'Industrial Loft', desc: 'Modernidade metropolitana', premium: true }
+                            ].map((item) => {
+                              const isPremium = item.premium;
+                              const isLocked = isPremium && (userProfile?.plan === 'Essencial' || !userProfile?.plan);
+                              
+                              return (
+                                <button
+                                  key={item.id}
+                                  type="button"
+                                  onClick={() => {
+                                    if (isLocked) {
+                                      setAttemptedPremiumLayout(item.label);
+                                      setShowUpgradeModal(true);
+                                      return;
+                                    }
+                                    setSelectedLayout(item.id as LayoutMode);
+                                  }}
+                                  className={`p-4 rounded-2xl border text-left flex flex-col justify-between h-28 cursor-pointer transition-all duration-300 relative ${
+                                    selectedLayout === item.id 
+                                      ? 'bg-purple-50/70 border-purple-500 ring-1 ring-purple-500 shadow'
+                                      : 'bg-white border-slate-200 hover:border-slate-300'
+                                  } ${isLocked ? 'opacity-75 bg-slate-50/50' : ''}`}
+                                >
+                                  <div className="flex items-start justify-between w-full">
+                                    <span className={`text-xs font-bold leading-tight ${selectedLayout === item.id ? 'text-purple-900' : 'text-slate-800'}`}>{item.label}</span>
+                                    {isLocked && (
+                                      <span className="bg-amber-100 text-amber-800 text-[9px] font-black px-1.5 py-0.5 rounded flex items-center gap-0.5 uppercase tracking-wider">
+                                        PRO
+                                      </span>
+                                    )}
+                                  </div>
+                                  <span className="text-[10px] text-slate-500 leading-tight block">{item.desc}</span>
+                                </button>
+                              );
+                            })}
                           </>
                         )}
                       </div>
@@ -1065,6 +1084,111 @@ export const EventCreator: React.FC = () => {
 
         </div>
       </div>
+
+      {/* Upgrade Modal */}
+      <AnimatePresence>
+        {showUpgradeModal && (
+          <div className="fixed inset-0 z-50 flex items-center justify-center p-4">
+            {/* Backdrop overlay */}
+            <motion.div
+              initial={{ opacity: 0 }}
+              animate={{ opacity: 1 }}
+              exit={{ opacity: 0 }}
+              onClick={() => setShowUpgradeModal(false)}
+              className="absolute inset-0 bg-slate-950/40 backdrop-blur-md"
+            />
+
+            {/* Modal content box */}
+            <motion.div
+              initial={{ opacity: 0, scale: 0.95, y: 15 }}
+              animate={{ opacity: 1, scale: 1, y: 0 }}
+              exit={{ opacity: 0, scale: 0.95, y: 15 }}
+              transition={{ type: 'spring', duration: 0.5 }}
+              className="bg-white/90 border border-white/50 backdrop-blur-2xl shadow-2xl rounded-3xl p-6 md:p-8 max-w-md w-full relative overflow-hidden text-center z-10"
+            >
+              {/* Subtle gold decoration ring */}
+              <div className="absolute top-0 left-0 w-full h-1.5 bg-gradient-to-r from-amber-400 via-yellow-500 to-amber-600" />
+              
+              <button
+                type="button"
+                onClick={() => setShowUpgradeModal(false)}
+                className="absolute top-4 right-4 text-slate-400 hover:text-slate-600 p-1.5 rounded-full hover:bg-slate-100 transition-all cursor-pointer outline-none"
+              >
+                <X size={18} />
+              </button>
+
+              {/* Crown / Gem Icon Container */}
+              <div className="mx-auto w-16 h-16 rounded-2xl bg-gradient-to-br from-amber-100 to-yellow-50 flex items-center justify-center border border-amber-200/50 shadow-inner mb-6 relative group">
+                <Gem className="text-amber-600 animate-pulse" size={28} />
+                <Sparkles className="text-yellow-500 absolute -top-1 -right-1" size={14} />
+              </div>
+
+              <h2 className="text-2xl font-serif font-black text-slate-900 mb-2 leading-tight">
+                Desbloqueie o Tema Premium
+              </h2>
+              {attemptedPremiumLayout && (
+                <p className="text-xs font-mono font-bold text-amber-700 bg-amber-50 px-3 py-1 rounded-full inline-block mb-4">
+                  {attemptedPremiumLayout}
+                </p>
+              )}
+
+              <p className="text-slate-600 text-sm leading-relaxed mb-6">
+                O modelo selecionado é um design premium exclusivo. Com o acesso <strong className="text-slate-900">Premium (Pagamento Único)</strong> por apenas <strong className="text-amber-600">20.000 Kz</strong>, o seu convite ganha recursos incomparáveis:
+              </p>
+
+              {/* Premium features checklist */}
+              <div className="text-left space-y-2.5 mb-8 bg-slate-50/50 p-4 rounded-2xl border border-slate-100">
+                <div className="flex items-start gap-2.5 text-xs text-slate-700">
+                  <Check className="text-amber-600 mt-0.5 flex-shrink-0" size={14} />
+                  <span>Acesso livre a <strong>TODOS os modelos</strong> luxuosos e artísticos.</span>
+                </div>
+                <div className="flex items-start gap-2.5 text-xs text-slate-700">
+                  <Check className="text-amber-600 mt-0.5 flex-shrink-0" size={14} />
+                  <span><strong>Sem Marca de Água</strong>: remova totalmente o logotipo da InoEvents do rodapé.</span>
+                </div>
+                <div className="flex items-start gap-2.5 text-xs text-slate-700">
+                  <Check className="text-amber-600 mt-0.5 flex-shrink-0" size={14} />
+                  <span><strong>RSVP Ilimitado</strong>: receba todos os convidados sem qualquer barreira ou teto.</span>
+                </div>
+                <div className="flex items-start gap-2.5 text-xs text-slate-700">
+                  <Check className="text-amber-600 mt-0.5 flex-shrink-0" size={14} />
+                  <span><strong>Música de Fundo (TocaPlayer)</strong> para encantar os convidados logo na abertura.</span>
+                </div>
+              </div>
+
+              {/* Action buttons */}
+              <div className="flex flex-col gap-2.5">
+                <a
+                  href={`https://wa.me/244952815430?text=${encodeURIComponent(
+                    `Olá! Estou na plataforma InoEvents a criar o meu convite e gostaria de comprar o acesso PREMIUM por 20.000 Kz para o modelo "${attemptedPremiumLayout || 'Luxo'}"!\n\nID: ${user?.uid || 'Não autenticado'}\nE-mail: ${user?.email || 'Sem e-mail'}`
+                  )}`}
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  className="w-full bg-slate-900 hover:bg-slate-800 text-white font-bold py-3.5 px-4 rounded-2xl transition-all shadow-lg hover:scale-[1.01] active:scale-95 text-sm flex items-center justify-center gap-2 cursor-pointer"
+                >
+                  <Gem size={16} className="text-amber-400" />
+                  Adquirir Acesso Premium (20.000 Kz)
+                </a>
+
+                <button
+                  type="button"
+                  onClick={() => {
+                    setShowUpgradeModal(false);
+                    navigate('/plans');
+                  }}
+                  className="w-full bg-slate-100 hover:bg-slate-200 text-slate-700 font-bold py-3 px-4 rounded-2xl transition-all text-sm cursor-pointer border border-slate-200/50"
+                >
+                  Ver Tabela de Planos
+                </button>
+              </div>
+
+              <p className="text-[10px] text-slate-400 mt-4 leading-relaxed">
+                *Pagamento único por evento. Sem surpresas ou taxas recorrentes mensais. Ativo até 30 dias após o evento.
+              </p>
+            </motion.div>
+          </div>
+        )}
+      </AnimatePresence>
     </div>
   );
 };

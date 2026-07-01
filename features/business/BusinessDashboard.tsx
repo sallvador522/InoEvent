@@ -10,11 +10,13 @@ import { motion, AnimatePresence } from 'framer-motion';
 import toast from 'react-hot-toast';
 import { Skeleton } from '../../components/ui/Skeleton';
 
+import { BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, Legend, ResponsiveContainer, LineChart, Line, ComposedChart } from 'recharts';
+
 export const BusinessDashboard: React.FC = () => {
     const { user, userProfile } = useFirebase();
     const [events, setEvents] = useState<any[]>([]);
-    const [transactions, setTransactions] = useState<any[]>([]);
     const [stats, setStats] = useState({ totalGuests: 0, checkedIn: 0, paperSaved: 0 });
+    const [chartData, setChartData] = useState<any[]>([]);
     const [loading, setLoading] = useState(true);
     const [isSimulateModalOpen, setIsSimulateModalOpen] = useState(false);
     const [isSimulating, setIsSimulating] = useState(false);
@@ -39,14 +41,31 @@ export const BusinessDashboard: React.FC = () => {
 
                 let totalGuestsCount = 0;
                 let checkedInCount = 0;
+                const newChartData: any[] = [];
 
                 await Promise.all(eventsList.map(async (ev) => {
                     const guestsSnap = await getDocs(collection(db, 'events', ev.id, 'guests'));
+                    let evTotal = 0;
+                    let evChecked = 0;
                     guestsSnap.forEach(g => {
+                        evTotal++;
                         totalGuestsCount++;
-                        if (g.data().checkedIn) checkedInCount++;
+                        if (g.data().checkedIn) {
+                            evChecked++;
+                            checkedInCount++;
+                        }
+                    });
+                    
+                    const conversionRate = evTotal > 0 ? Math.round((evChecked / evTotal) * 100) : 0;
+                    newChartData.push({
+                        name: ev.title || 'Evento sem título',
+                        convidados: evTotal,
+                        checkins: evChecked,
+                        taxa: conversionRate
                     });
                 }));
+
+                setChartData(newChartData);
 
                 setStats({
                     totalGuests: totalGuestsCount,
@@ -54,61 +73,16 @@ export const BusinessDashboard: React.FC = () => {
                     paperSaved: totalGuestsCount * 3.5 // Simulating R$ 3.50 saved per physical invite
                 });
 
-                const transRef = collection(db, 'transactions');
-                const transQuery = query(transRef, where("ownerId", "==", user.uid));
-                const transSnap = await getDocs(transQuery);
-                const transList = transSnap.docs.map(t => ({ id: t.id, ...t.data() }));
-                // manually sort by date desc
-                transList.sort((a: any, b: any) => new Date(b.date).getTime() - new Date(a.date).getTime());
-                setTransactions(transList);
 
             } catch (err) {
                 console.error(err);
-                handleFirestoreError(err, OperationType.LIST, 'events or guests or transactions');
+                handleFirestoreError(err, OperationType.LIST, 'events or guests');
             } finally {
                 setLoading(false);
             }
         };
         fetchEventsAndStats();
     }, [user]);
-
-    const handleBuyCredits = async () => {
-        if (!user) return;
-        setIsSimulating(true);
-        try {
-            await updateDoc(doc(db, 'users', user.uid), {
-                credits: (userProfile?.credits || 0) + 10
-            });
-            const newTransRef = doc(collection(db, 'transactions'));
-            await setDoc(newTransRef, {
-                ownerId: user.uid,
-                amount: 10,
-                type: 'CREDIT',
-                description: 'Compra de Pacote de Convites (Simulação)',
-                date: new Date().toISOString()
-            });
-
-            // Re-fetch transactions
-            setTransactions(prev => [{
-                ...{
-                    ownerId: user.uid,
-                    amount: 10,
-                    type: 'CREDIT',
-                    description: 'Compra de Pacote de Convites (Simulação)',
-                    date: new Date().toISOString()
-                },
-                id: newTransRef.id
-            }, ...prev]);
-
-            setIsSimulating(false);
-            setIsSimulateModalOpen(false);
-            toast.success("Compra simulada com sucesso! Você recebeu 10 créditos.");
-        } catch (error) {
-            console.error("Erro ao comprar créditos:", error);
-            toast.error("Erro ao comprar créditos.");
-            setIsSimulating(false);
-        }
-    };
 
     if (loading) {
         return (
@@ -175,12 +149,12 @@ export const BusinessDashboard: React.FC = () => {
                             <div className="p-3 bg-white/20 rounded-xl backdrop-blur-sm">
                                 <Ticket className="w-6 h-6 text-white" />
                             </div>
-                            <span className="text-xs font-bold uppercase tracking-widest bg-white/20 px-3 py-1 rounded-full">Convites Disponíveis</span>
+                            <span className="text-xs font-bold uppercase tracking-widest bg-white/20 px-3 py-1 rounded-full">Plano Business</span>
                         </div>
-                        <h3 className="text-4xl font-black mb-1">{userProfile?.credits || 0}</h3>
-                        <p className="text-amber-100 text-sm font-medium">Créditos de Eventos</p>
-                        <button onClick={() => navigate('/plans')} className="mt-6 w-full py-3 bg-white text-amber-600 font-bold rounded-xl text-sm hover:bg-amber-50 transition-colors shadow-sm">
-                            Comprar Pacotes de Convites
+                        <h3 className="text-4xl font-black mb-1">∞</h3>
+                        <p className="text-amber-100 text-sm font-medium">Eventos Ilimitados</p>
+                        <button onClick={() => navigate('/create-invitation')} className="mt-6 w-full py-3 bg-white text-amber-600 font-bold rounded-xl text-sm hover:bg-amber-50 transition-colors shadow-sm cursor-pointer">
+                            Criar Novo Evento
                         </button>
                     </div>
 
@@ -248,6 +222,37 @@ export const BusinessDashboard: React.FC = () => {
                      </div>
                 </div>
 
+                <div className="bg-white border border-slate-200 rounded-3xl p-8 shadow-sm mb-12">
+                    <h3 className="text-lg font-bold text-slate-800 mb-6">Desempenho por Evento (Convidados vs Check-ins)</h3>
+                    {chartData.length > 0 ? (
+                        <div className="h-[300px] w-full">
+                            <ResponsiveContainer width="100%" height="100%">
+                                <ComposedChart data={chartData} margin={{ top: 10, right: 10, left: -20, bottom: 0 }}>
+                                    <CartesianGrid strokeDasharray="3 3" vertical={false} stroke="#f1f5f9" />
+                                    <XAxis dataKey="name" axisLine={false} tickLine={false} tick={{ fontSize: 12, fill: '#64748b' }} tickFormatter={(val) => val.length > 15 ? val.substring(0, 15) + '...' : val} />
+                                    <YAxis yAxisId="left" axisLine={false} tickLine={false} tick={{ fontSize: 12, fill: '#64748b' }} />
+                                    <YAxis yAxisId="right" orientation="right" axisLine={false} tickLine={false} tick={{ fontSize: 12, fill: '#64748b' }} tickFormatter={(value) => `${value}%`} />
+                                    <Tooltip 
+                                        contentStyle={{ borderRadius: '16px', border: 'none', boxShadow: '0 10px 15px -3px rgb(0 0 0 / 0.1), 0 4px 6px -4px rgb(0 0 0 / 0.1)' }}
+                                        cursor={{ fill: '#f8fafc' }}
+                                    />
+                                    <Legend wrapperStyle={{ paddingTop: '20px' }} />
+                                    <Bar yAxisId="left" dataKey="convidados" name="Total de Convidados" fill="#3b82f6" radius={[4, 4, 0, 0]} maxBarSize={40} />
+                                    <Bar yAxisId="left" dataKey="checkins" name="Check-ins Confirmados" fill="#22c55e" radius={[4, 4, 0, 0]} maxBarSize={40} />
+                                    <Line yAxisId="right" type="monotone" dataKey="taxa" name="Taxa de Conversão (%)" stroke="#f59e0b" strokeWidth={3} dot={{ r: 4, fill: '#f59e0b', strokeWidth: 0 }} />
+                                </ComposedChart>
+                            </ResponsiveContainer>
+                        </div>
+                    ) : (
+                        <div className="flex flex-col items-center justify-center py-12 text-slate-400">
+                            <div className="w-16 h-16 bg-slate-50 text-slate-300 rounded-full flex items-center justify-center mb-4">
+                                <Briefcase size={24} />
+                            </div>
+                            <p className="text-sm">Nenhum evento com dados suficientes para o gráfico.</p>
+                        </div>
+                    )}
+                </div>
+
                 <div className="flex items-center justify-between mb-6">
                    <h2 className="text-xl font-bold text-slate-800">Eventos dos Seus Clientes</h2>
                 </div>
@@ -300,57 +305,6 @@ export const BusinessDashboard: React.FC = () => {
                     </div>
                 )}
                 
-                <div className="mt-16 flex items-center justify-between mb-6">
-                    <div>
-                       <h2 className="text-xl font-bold text-slate-800">Histórico de Transações</h2>
-                       <p className="text-sm text-slate-500 mt-1">Acompanhe a compra e o consumo dos seus créditos de convites.</p>
-                    </div>
-                </div>
-
-                <div className="bg-white border border-slate-200 rounded-3xl overflow-hidden shadow-sm">
-                    {transactions.length === 0 ? (
-                        <div className="p-12 text-center flex flex-col items-center justify-center text-slate-500">
-                             <Ticket className="w-12 h-12 mb-4 text-slate-300" />
-                             <p>Nenhuma transação encontrada no seu histórico.</p>
-                        </div>
-                    ) : (
-                        <div className="overflow-x-auto">
-                            <table className="w-full text-left border-collapse">
-                                <thead>
-                                    <tr className="bg-slate-50 border-b border-slate-200 text-xs uppercase tracking-widest text-slate-500 font-bold">
-                                        <th className="p-4 pl-6">Data</th>
-                                        <th className="p-4">Descrição</th>
-                                        <th className="p-4 text-right">Tipo</th>
-                                        <th className="p-4 pr-6 text-right">Créditos</th>
-                                    </tr>
-                                </thead>
-                                <tbody className="divide-y divide-slate-100 text-sm">
-                                    {transactions.map((trans: any) => (
-                                        <tr key={trans.id} className="hover:bg-slate-50 transition-colors">
-                                            <td className="p-4 pl-6 text-slate-500 whitespace-nowrap">
-                                                {new Date(trans.date).toLocaleDateString('pt-BR', { day: '2-digit', month: 'short', year: 'numeric', hour: '2-digit', minute: '2-digit' })}
-                                            </td>
-                                            <td className="p-4 font-medium text-slate-800">
-                                                {trans.description}
-                                            </td>
-                                            <td className="p-4 text-right">
-                                                {trans.type === 'CREDIT' ? (
-                                                    <span className="text-xs font-bold text-green-700 bg-green-50 px-2.5 py-1 rounded-full border border-green-200">Entrada</span>
-                                                ) : (
-                                                    <span className="text-xs font-bold text-slate-600 bg-slate-100 px-2.5 py-1 rounded-full border border-slate-200">Saída</span>
-                                                )}
-                                            </td>
-                                            <td className="p-4 pr-6 text-right font-bold text-slate-800 flex items-center justify-end gap-1.5">
-                                                {trans.type === 'CREDIT' ? '+' : '-'}{trans.amount}
-                                                <Ticket size={14} className={trans.type === 'CREDIT' ? 'text-green-600' : 'text-slate-400'} />
-                                            </td>
-                                        </tr>
-                                    ))}
-                                </tbody>
-                            </table>
-                        </div>
-                    )}
-                </div>
             </main>
       </div>
     );

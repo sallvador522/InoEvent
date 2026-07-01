@@ -50,26 +50,6 @@ export const AdminDashboard: React.FC = () => {
     fetchData();
   }, []);
 
-  const handleUpdateCredits = async (userId: string, currentCredits: number, change: number, e?: React.MouseEvent) => {
-    if (e) e.stopPropagation();
-    try {
-      const newCredits = (currentCredits || 0) + change;
-      if (newCredits < 0) {
-        toast.error('Créditos não podem ser negativos');
-        return;
-      }
-      await updateDoc(doc(db, 'users', userId), { credits: newCredits });
-      setUsers(users.map(u => u.id === userId ? { ...u, credits: newCredits } : u));
-      if (selectedUser?.id === userId) {
-         setSelectedUser({ ...selectedUser, credits: newCredits });
-      }
-      toast.success('Créditos atualizados!');
-    } catch (error) {
-      console.error(error);
-      toast.error('Erro ao atualizar créditos');
-    }
-  };
-
   const handlePlanChangeSelect = (userId: string, currentPlan: string, nextPlan: string, e?: React.MouseEvent) => {
     if (e) e.stopPropagation();
     setPendingPlanChange({ userId, currentPlan, nextPlan });
@@ -184,9 +164,6 @@ export const AdminDashboard: React.FC = () => {
                               {user.plan || 'Essencial'}
                           </span>
                         </div>
-                        <div className="text-right">
-                           <p className="text-xs font-bold text-slate-500">{user.credits || 0} créditos</p>
-                        </div>
                     </div>
                   ))}
               </div>
@@ -235,22 +212,6 @@ export const AdminDashboard: React.FC = () => {
               <p className="text-slate-500 text-sm mt-1">UID: <span className="font-mono text-xs bg-slate-200 px-1 rounded">{selectedUser.uid}</span></p>
             </div>
             
-            <div className="flex items-center gap-3 bg-white p-2 px-4 rounded-xl border border-slate-200 shadow-sm">
-                <span className="text-xs font-bold text-slate-500 uppercase tracking-widest mr-2">Créditos:</span>
-                <button 
-                    onClick={(e) => handleUpdateCredits(selectedUser.id, selectedUser.credits, -1, e)}
-                    className="w-8 h-8 rounded-full bg-slate-50 border border-slate-200 flex items-center justify-center text-slate-600 hover:bg-slate-200 transition-colors"
-                >
-                    <span className="material-symbols-outlined text-sm">remove</span>
-                </button>
-                <span className="text-xl font-bold text-brand-blue w-8 text-center">{selectedUser.credits || 0}</span>
-                <button 
-                    onClick={(e) => handleUpdateCredits(selectedUser.id, selectedUser.credits, 1, e)}
-                    className="w-8 h-8 rounded-full bg-slate-50 border border-slate-200 flex items-center justify-center text-slate-600 hover:bg-slate-200 transition-colors"
-                >
-                    <span className="material-symbols-outlined text-sm">add</span>
-                </button>
-            </div>
           </div>
           
           <div className="p-6 grid grid-cols-1 md:grid-cols-2 gap-8">
@@ -415,8 +376,6 @@ export const AdminDashboard: React.FC = () => {
               <tr>
                 <th className="px-6 py-4">Usuário</th>
                 <th className="px-6 py-4">Plano</th>
-                <th className="px-6 py-4 text-center">Créditos</th>
-                <th className="px-6 py-4 text-right">Ações</th>
               </tr>
             </thead>
             <tbody className="divide-y divide-slate-100">
@@ -437,25 +396,6 @@ export const AdminDashboard: React.FC = () => {
                         <option value="Business">Business</option>
                         <option value="Corporate">Corporate</option>
                     </select>
-                  </td>
-                  <td className="px-6 py-4 text-center">
-                    <span className="font-bold text-brand-blue text-base">{user.credits || 0}</span>
-                  </td>
-                  <td className="px-6 py-4 text-right">
-                    <div className="flex items-center justify-end gap-2" onClick={e => e.stopPropagation()}>
-                        <button 
-                            onClick={(e) => handleUpdateCredits(user.id, user.credits, -1, e)}
-                            className="w-7 h-7 rounded bg-white border border-slate-200 flex items-center justify-center text-slate-600 hover:bg-slate-100 transition-colors"
-                        >
-                            <span className="material-symbols-outlined text-[16px]">remove</span>
-                        </button>
-                        <button 
-                            onClick={(e) => handleUpdateCredits(user.id, user.credits, 1, e)}
-                            className="w-7 h-7 rounded bg-white border border-slate-200 flex items-center justify-center text-slate-600 hover:bg-slate-100 transition-colors"
-                        >
-                            <span className="material-symbols-outlined text-[16px]">add</span>
-                        </button>
-                    </div>
                   </td>
                 </tr>
               ))}

@@ -677,10 +677,6 @@ export const Dashboard = () => {
                     </div>
                 </div>
                 <div className="flex items-center gap-2">
-                    <span className="hidden sm:flex px-3 py-1 bg-brand-blue/10 rounded-full text-xs font-semibold text-brand-blue shadow-sm border border-brand-blue/10 mr-2 items-center gap-1">
-                        <span className="material-symbols-outlined text-[14px]">loyalty</span>
-                        {userProfile?.credits || 0} Créditos
-                    </span>
                     {(event?.plan === 'Premium' || event?.plan === 'Business' || event?.plan === 'Corporate') && (
                         <button 
                             onClick={() => setSupportOpen(true)}

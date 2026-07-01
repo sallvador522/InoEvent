@@ -135,11 +135,6 @@ export const Navbar: React.FC = () => {
                 <span className="material-symbols-outlined text-[10px] md:text-[12px] text-amber-400">verified</span>
                 <span>{userProfile?.plan || 'Essencial'}</span>
               </span>
-              
-              <span className="px-2 py-0.5 md:px-2.5 md:py-1 rounded-full text-[10px] md:text-xs font-bold leading-none bg-white/10 hover:bg-white/15 text-blue-50 border border-white/10 shadow-sm flex items-center gap-1 transition-all scale-95 md:scale-100">
-                <span className="material-symbols-outlined text-[10px] md:text-[12px] text-yellow-400">payments</span>
-                <span>{userProfile?.credits || 0} <span className="hidden xs:inline">Créditos</span><span className="xs:hidden">Cr.</span></span>
-              </span>
             </div>
           )}
         </div>
@@ -489,7 +484,7 @@ export const Navbar: React.FC = () => {
                          </div>
                          <div className="flex flex-col overflow-hidden w-full">
                            <span className="text-sm font-bold text-brand-blue truncate w-full">{userProfile?.name || user.email}</span>
-                           <span className="text-xs text-slate-500 font-medium whitespace-nowrap">Plano {userProfile?.plan || 'Essencial'} • {userProfile?.credits || 0} Créditos</span>
+                           <span className="text-xs text-slate-500 font-medium whitespace-nowrap">Plano {userProfile?.plan || 'Essencial'}</span>
                          </div>
                        </div>
                        <button onClick={() => { signOut(auth); setMobileMenuOpen(false); }} className="text-red-500 bg-red-50 w-10 h-10 flex-shrink-0 flex items-center justify-center rounded-xl hover:bg-red-100 transition-colors">

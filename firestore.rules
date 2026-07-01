@@ -50,7 +50,7 @@ service cloud.firestore {
       allow list: if isAdmin();
       allow create: if isOwner(userId) && isValidUser(incoming()) && incoming().uid == request.auth.uid;
       allow update: if isAdmin() || (isOwner(userId) && 
-                       request.resource.data.diff(resource.data).affectedKeys().hasOnly(['plan', 'whiteLabelName', 'whiteLabelLogo', 'updatedAt', 'credits', 'planExpiresAt']) &&
+                       request.resource.data.diff(resource.data).affectedKeys().hasOnly(['plan', 'whiteLabelName', 'whiteLabelLogo', 'updatedAt', 'planExpiresAt']) &&
                        request.resource.data.uid == resource.data.uid &&
                        request.resource.data.email == resource.data.email);
 

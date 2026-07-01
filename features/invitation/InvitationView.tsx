@@ -831,38 +831,27 @@ const InvitationView: React.FC = () => {
       const isNewSave = !snap.exists();
 
       if (isNewSave) {
-        const creditCost = localEvent.type === ThemeType.BRIDAL_SHOWER ? 1 : 2;
-
-        // Deduct credits if user plan requires paying credits
+        // Check plan limits
         if (
           userProfile?.plan !== "Business" &&
           userProfile?.plan !== "Corporate"
         ) {
-          const userCredits = userProfile?.credits || 0;
-          if (userCredits < creditCost) {
+          const plan = userProfile?.plan || 'Essencial';
+          let limit = 2;
+          if (plan === 'Premium') limit = 5;
+
+          const eventsRef = collection(db, 'events');
+          const q = query(eventsRef, where("ownerId", "==", user.uid));
+          const evSnap = await getDocs(q);
+          
+          if (evSnap.size >= limit) {
             toast.error(
-              `Créditos insuficientes! Salvar custa ${creditCost} créditos. Seu saldo: ${userCredits}.`,
+              `Você atingiu o limite de ${limit} eventos do seu plano. Faça upgrade para criar mais!`,
               { id: toastId },
             );
             setIsSaving(false);
             return;
           }
-
-          // Update user's credit balance
-          await updateDoc(doc(db, "users", user.uid), {
-            credits: userCredits - creditCost,
-          });
-
-          // Write debit debit billing register
-          const transRef = doc(collection(db, "transactions"));
-          await setDoc(transRef, {
-            ownerId: user.uid,
-            amount: creditCost,
-            type: "DEBIT",
-            description: `Aprovação de Layout: ${localEvent.title}`,
-            date: new Date().toISOString(),
-            eventId: localEvent.id,
-          });
         }
       }
 
@@ -905,11 +894,10 @@ const InvitationView: React.FC = () => {
           uid: credential.user.uid,
           name: authName || "Noivo(a)",
           email: authEmail,
-          credits: 3, // Initial free demo credits!
           plan: "Essencial",
           createdAt: new Date().toISOString(),
         });
-        toast.success(`Conta criada! Saldo inicial de 3 créditos.`);
+        toast.success(`Conta criada!`);
       } else {
         await signInWithEmailAndPassword(auth, authEmail, authPassword);
         toast.success(`Bem-vindo de volta!`);
@@ -937,7 +925,6 @@ const InvitationView: React.FC = () => {
           uid: res.user.uid,
           name: res.user.displayName || "Parceiro(a)",
           email: res.user.email,
-          credits: 3,
           plan: "Essencial",
           createdAt: new Date().toISOString(),
         });
@@ -5274,6 +5261,18 @@ const RSVPForm: React.FC<{ event: EventDetails; onClose: () => void }> = ({
     const toastId = toast.loading("Verificando...");
     try {
       const guestsCollection = collection(db, "events", event.id, "guests");
+
+      // Check RSVP Limit based on Plan
+      const plan = event.plan || "Essencial";
+      const limit = plan === "Essencial" ? 100 : Infinity;
+      const allGuestsSnapshot = await getDocs(query(guestsCollection));
+      if (allGuestsSnapshot.size >= limit) {
+        toast.error("O limite de convidados para este evento foi atingido.", {
+          id: toastId,
+        });
+        setLoading(false);
+        return;
+      }
 
       // Normalize phone to remove spaces, dashes, etc for comparison (keeps + if provided)
       const normalizedPhone = phone.trim().replace(/[\s\-()]/g, "");

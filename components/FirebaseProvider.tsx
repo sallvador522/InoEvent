@@ -136,7 +136,7 @@ export const FirebaseProvider: React.FC<{ children: React.ReactNode }> = ({ chil
              // Plan expired
              console.warn("Plan expired, changing to Essencial");
              uData = { ...uData, plan: 'Essencial', planExpiresAt: null };
-             // Optional: Do we update doc? It might fail if rules don't permit plan update without credits or something, but we allowed it. 
+             // Optional: Do we update doc? It might fail if rules don't permit plan update, but we allowed it. 
              // We can fire an update blindly.
              updateDoc(doc(db, 'users', snapshot.id), { plan: 'Essencial', planExpiresAt: null }).catch(console.error);
           }

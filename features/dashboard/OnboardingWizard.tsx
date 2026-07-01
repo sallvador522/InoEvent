@@ -121,26 +121,22 @@ export const OnboardingWizard: React.FC<OnboardingWizardProps> = ({ onCancel, on
         const toastId = toast.loading('A forjar o seu convite de Alta Costura...');
 
         try {
-            // Check Credit logic safely
+            // Check plan limits safely
             if (userProfile?.plan !== 'Business' && userProfile?.plan !== 'Corporate') {
-                const creditCost = 2; // FIX: Every event costs 2 credits
-                if ((userProfile?.credits || 0) < creditCost) {
-                    toast.error('Créditos insuficientes.', { id: toastId });
+                const plan = userProfile?.plan || 'Essencial';
+                let limit = 2;
+                if (plan === 'Premium') limit = 5;
+
+                const { getDocs, query, where } = await import('firebase/firestore');
+                const eventsRef = collection(db, 'events');
+                const q = query(eventsRef, where("ownerId", "==", user!.uid));
+                const snap = await getDocs(q);
+                
+                if (snap.size >= limit) {
+                    toast.error(`Você atingiu o limite de ${limit} eventos do seu plano. Faça upgrade para criar mais!`, { id: toastId });
                     setIsCreating(false);
                     return;
                 }
-                const newCredits = (userProfile?.credits || 0) - creditCost;
-                await updateDoc(doc(db, 'users', user!.uid), { credits: newCredits });
-                
-                const newTransRef = doc(collection(db, 'transactions'));
-                await setDoc(newTransRef, {
-                    ownerId: user!.uid,
-                    amount: creditCost,
-                    type: 'DEBIT',
-                    description: `Criação (Onboarding): ${computedTitle}`,
-                    date: new Date().toISOString(),
-                    eventId: newTransRef.id
-                });
             }
 
             // Create Event Document

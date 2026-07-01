@@ -121,8 +121,10 @@ export const OnboardingWizard: React.FC<OnboardingWizardProps> = ({ onCancel, on
         const toastId = toast.loading('A forjar o seu convite de Alta Costura...');
 
         try {
-            // Check plan limits safely
-            if (userProfile?.plan !== 'Business' && userProfile?.plan !== 'Corporate') {
+            // Check plan limits safely (bypass if creating a baby shower or bridal shower)
+            const isBypassLimit = eventType === 'BRIDAL_SHOWER' || eventType === 'BABY_SHOWER';
+
+            if (!isBypassLimit && userProfile?.plan !== 'Business' && userProfile?.plan !== 'Corporate') {
                 const plan = userProfile?.plan || 'Essencial';
                 let limit = 2;
                 if (plan === 'Premium') limit = 5;
@@ -132,7 +134,13 @@ export const OnboardingWizard: React.FC<OnboardingWizardProps> = ({ onCancel, on
                 const q = query(eventsRef, where("ownerId", "==", user!.uid));
                 const snap = await getDocs(q);
                 
-                if (snap.size >= limit) {
+                // Exclude baby shower and bridal shower events from limit counting
+                const paidCount = snap.docs.filter(d => {
+                    const data = d.data();
+                    return data.type !== 'BABY_SHOWER' && data.type !== 'BRIDAL_SHOWER';
+                }).length;
+
+                if (paidCount >= limit) {
                     toast.error(`Você atingiu o limite de ${limit} eventos do seu plano. Faça upgrade para criar mais!`, { id: toastId });
                     setIsCreating(false);
                     return;

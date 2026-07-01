@@ -271,14 +271,17 @@ export const UserDashboard: React.FC = () => {
     if (plan === "Premium") limit = 5;
     if (plan === "Business" || plan === "Corporate") limit = Infinity;
 
-    if (events.length >= limit) {
+    // Filter out baby showers and bridal showers from checking limits
+    const paidEvents = events.filter((e: any) => e.type !== "BABY_SHOWER" && e.type !== "BRIDAL_SHOWER");
+
+    if (paidEvents.length >= limit) {
       toast.error(
-        `Você atingiu o limite de ${limit} eventos do seu plano. Faça upgrade para criar mais!`,
+        `Você atingiu o limite de ${limit} convites de casamento do seu plano. Faça upgrade para criar mais!`,
       );
       return;
     }
 
-    navigate("/create-invitation");
+    navigate("/templates");
   };
 
   return (
@@ -537,8 +540,14 @@ export const UserDashboard: React.FC = () => {
                             </div>
                           )}
                           <div className="absolute top-4 left-4">
-                            <span className="bg-white/90 backdrop-blur-sm text-brand-blue text-xs font-bold uppercase tracking-widest px-3 py-1.5 rounded-full shadow-sm">
-                              {event.type}
+                            <span className={`backdrop-blur-md text-[10px] font-black uppercase tracking-widest px-3 py-1.5 rounded-full shadow-sm border ${
+                              event.type === 'BABY_SHOWER' 
+                                ? 'bg-cyan-50/90 text-cyan-700 border-cyan-200' 
+                                : event.type === 'BRIDAL_SHOWER' 
+                                  ? 'bg-pink-50/90 text-pink-700 border-pink-200'
+                                  : 'bg-white/95 text-brand-blue border-slate-100'
+                            }`}>
+                              {event.type === 'BABY_SHOWER' ? 'Chá de Bebé' : event.type === 'BRIDAL_SHOWER' ? 'Chá de Panela' : 'Casamento'}
                             </span>
                           </div>
                           <div className="absolute top-4 right-4 z-10">
@@ -746,7 +755,7 @@ export const UserDashboard: React.FC = () => {
                   className="flex-1 py-3 px-4 rounded-xl font-bold bg-red-500 text-white hover:bg-red-600 transition-colors flex justify-center items-center gap-2"
                 >
                   {isDeleting ? (
-                    <span className="w-5 h-5 border-2 border-white/30 border-t-white rounded-full animate-spin"></span>
+                     <span className="w-5 h-5 border-2 border-white/30 border-t-white rounded-full animate-spin"></span>
                   ) : (
                     "Eliminar!"
                   )}

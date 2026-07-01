@@ -831,8 +831,11 @@ const InvitationView: React.FC = () => {
       const isNewSave = !snap.exists();
 
       if (isNewSave) {
-        // Check plan limits
+        // Check plan limits (bypass if it's a baby shower or bridal shower template)
+        const isBypassLimit = localEvent.type === "BABY_SHOWER" || localEvent.type === "BRIDAL_SHOWER";
+
         if (
+          !isBypassLimit &&
           userProfile?.plan !== "Business" &&
           userProfile?.plan !== "Corporate"
         ) {
@@ -844,9 +847,15 @@ const InvitationView: React.FC = () => {
           const q = query(eventsRef, where("ownerId", "==", user.uid));
           const evSnap = await getDocs(q);
           
-          if (evSnap.size >= limit) {
+          // Exclude baby shower and bridal shower events from counting towards the limits
+          const paidCount = evSnap.docs.filter(d => {
+            const data = d.data();
+            return data.type !== 'BABY_SHOWER' && data.type !== 'BRIDAL_SHOWER';
+          }).length;
+
+          if (paidCount >= limit) {
             toast.error(
-              `Você atingiu o limite de ${limit} eventos do seu plano. Faça upgrade para criar mais!`,
+              `Você atingiu o limite de ${limit} convites de casamento do seu plano. Faça upgrade para criar mais!`,
               { id: toastId },
             );
             setIsSaving(false);
@@ -1115,6 +1124,10 @@ const InvitationView: React.FC = () => {
           {localEvent?.layoutMode &&
             localEvent.layoutMode.startsWith("BRIDAL_") && (
               <BridalShowerLayout {...layoutProps} />
+            )}
+          {localEvent?.layoutMode &&
+            localEvent.layoutMode.startsWith("BABY_") && (
+              <BabyShowerLayout {...layoutProps} />
             )}
         </div>
 
@@ -1914,6 +1927,9 @@ const InvitationView: React.FC = () => {
       )}
       {activeEvent.layoutMode.startsWith("BRIDAL_") && (
         <BridalShowerLayout {...layoutProps} />
+      )}
+      {activeEvent.layoutMode.startsWith("BABY_") && (
+        <BabyShowerLayout {...layoutProps} />
       )}
 
       {/* Floating Demo Template Banner (RETRACTABLE LUXURY BAR) */}
@@ -5190,6 +5206,392 @@ const BridalShowerLayout: React.FC<{
                 style={{ scrollbarWidth: "none" }}
               >
                 {(event.gallery || []).map((img, i) => (
+                  <div
+                    key={i}
+                    className="min-w-[70vw] md:min-w-[400px] aspect-[4/5] rounded-[2rem] overflow-hidden snap-center flex-shrink-0 shadow-lg relative group"
+                  >
+                    <img
+                      src={getImageUrl(img)}
+                      className="w-full h-full object-cover transition-transform duration-1000 group-hover:scale-110"
+                    />
+                    <div className="absolute inset-0 bg-black/10 group-hover:bg-transparent transition-colors duration-500"></div>
+                  </div>
+                ))}
+              </div>
+            </FadeInSection>
+          </div>
+        </EditableSectionWrapper>
+      )}
+
+      {/* FLOATING ACTION BAR */}
+      <div className="fixed bottom-6 left-1/2 -translate-x-1/2 z-50 w-full max-w-sm px-6">
+        <motion.div
+          initial={{ y: 50, opacity: 0 }}
+          animate={{ y: 0, opacity: 1 }}
+          transition={{ delay: 1, duration: 0.8 }}
+          className="w-full"
+        >
+          <button
+            onClick={onRSVP}
+            className="w-full bg-white/90 backdrop-blur-xl text-black py-4 rounded-full font-bold shadow-2xl text-xs uppercase tracking-[0.2em] hover:bg-white transition-colors border border-white/20 active:scale-95"
+          >
+            {getRSVPText(event.type, "Vou no Chá!")}
+          </button>
+        </motion.div>
+      </div>
+    </div>
+  );
+};
+
+// ============================================================================
+// BABY SHOWER LAYOUT (Apple-Level Spatial UI, Cute Elegant Glassmorphism)
+// ============================================================================
+const BabyShowerLayout: React.FC<{
+  event: EventDetails;
+  onRSVP: () => void;
+  guestName: string;
+  isEditing?: boolean;
+  onEditSection?: (section: any) => void;
+  updateField?: (field: string, value: any) => void;
+  deleteTimelineItem?: (index: number) => void;
+  deleteGiftItem?: (index: number) => void;
+  updateGalleryImage?: (index: number, val: string) => void;
+  deleteGalleryImage?: (index: number) => void;
+  updateTimelineItem?: (
+    index: number,
+    field: "time" | "title" | "description",
+    value: string,
+  ) => void;
+}> = ({
+  event,
+  onRSVP,
+  guestName,
+  isEditing,
+  onEditSection,
+  updateField,
+  deleteTimelineItem,
+  deleteGiftItem,
+  updateGalleryImage,
+  deleteGalleryImage,
+}) => {
+  const isBoy = event.layoutMode === "BABY_BOY";
+  const isGirl = event.layoutMode === "BABY_GIRL";
+
+  const bgClass = isBoy
+    ? "bg-[#F0F8FF]"
+    : isGirl
+      ? "bg-[#FFF5F5]"
+      : "bg-[#FDFBF7]";
+
+  const accentCard = isBoy
+    ? "bg-white/70 border-blue-100"
+    : isGirl
+      ? "bg-white/70 border-rose-100"
+      : "bg-white/70 border-amber-100";
+
+  const primaryText = isBoy
+    ? "text-[#1A365D]"
+    : isGirl
+      ? "text-[#5C2D3E]"
+      : "text-[#3A3D2A]";
+
+  const secondaryText = isBoy 
+    ? "text-[#4A5568]" 
+    : isGirl 
+      ? "text-[#8C7A82]" 
+      : "text-[#706B62]";
+
+  const iconColor = isBoy 
+    ? "text-blue-400" 
+    : isGirl 
+      ? "text-rose-400" 
+      : "text-amber-500";
+
+  return (
+    <div
+      className={`min-h-screen ${bgClass} ${primaryText} font-sans pb-32 selection:bg-blue-100 text-left`}
+    >
+      {/* SPATIAL HERO */}
+      <div className="">
+        <div className="relative h-[85vh] w-full overflow-hidden rounded-b-[40px] md:rounded-b-[80px] shadow-sm">
+          <EditableImageWrapper
+            src={event.heroImage}
+            onChange={(newVal) => updateField?.("heroImage", newVal)}
+            isEditing={isEditing}
+            className="absolute inset-0"
+          >
+            <motion.div
+              initial={{ scale: 1.05 }}
+              animate={{ scale: 1 }}
+              transition={{ duration: 1.5, ease: "easeOut" }}
+              className="absolute inset-0 bg-cover bg-center"
+              style={{ backgroundImage: `url('${event.heroImage}')` }}
+            />
+          </EditableImageWrapper>
+          <div className="absolute inset-0 bg-gradient-to-t from-black/40 via-transparent to-black/10 pointer-events-none" />
+
+          <motion.div
+            initial={{ opacity: 0, y: 30 }}
+            animate={{ opacity: 1, y: 0 }}
+            transition={{ delay: 0.3, duration: 1.2, ease: [0.22, 1, 0.36, 1] }}
+            className="absolute inset-0 flex flex-col items-center justify-end text-center p-8 pb-16"
+          >
+            <div
+              className={`${accentCard} backdrop-blur-xl p-8 md:p-12 rounded-[2rem] shadow-2xl border max-w-lg w-full`}
+            >
+              <p className="text-xs font-bold uppercase tracking-[0.2em] opacity-65 mb-4 text-center">
+                CHÁ DE BEBÉ
+              </p>
+              <h1 className="text-4xl md:text-5xl font-serif mb-4 leading-tight flex justify-center">
+                <EditableField
+                  value={event.title}
+                  onChange={(newVal) => updateField?.("title", newVal)}
+                  isEditing={isEditing}
+                  className="text-4xl md:text-5xl font-serif text-center"
+                />
+              </h1>
+              <div className="h-px w-12 bg-current opacity-20 mx-auto my-4"></div>
+              <p className="text-sm font-medium uppercase tracking-widest opacity-80 text-center">
+                <EditableField
+                  value={event.date}
+                  onChange={(newVal) => updateField?.("date", newVal)}
+                  isEditing={isEditing}
+                  className="text-sm font-medium uppercase tracking-widest opacity-80 text-center"
+                />
+              </p>
+            </div>
+          </motion.div>
+        </div>
+
+        {/* WELCOME NOTE */}
+        <div className="max-w-3xl mx-auto px-6 mt-16 md:mt-24 text-center flex flex-col items-center">
+          <FadeInSection>
+            <span className={`material-symbols-outlined text-4xl mb-6 ${iconColor}`}>
+              child_care
+            </span>
+            <p className="text-xl md:text-2xl font-serif italic leading-relaxed opacity-90 max-w-2xl mx-auto text-center">
+              {isEditing ? (
+                <EditableField
+                  value={event.description}
+                  onChange={(newVal) => updateField?.("description", newVal)}
+                  isEditing={isEditing}
+                  className="text-xl md:text-2xl font-serif italic leading-relaxed text-center"
+                  multiline
+                />
+              ) : (
+                `"${event.description}"`
+              )}
+            </p>
+            <div className="mt-12 p-6 rounded-[2rem] bg-white/50 backdrop-blur-lg border border-white max-w-sm mx-auto shadow-sm text-center">
+              <p className="uppercase tracking-[0.2em] text-[10px] font-bold opacity-50 mb-2">
+                Convidado Especial
+              </p>
+              <p className="text-2xl font-serif">{guestName}</p>
+            </div>
+          </FadeInSection>
+        </div>
+      </div>
+
+      {/* EVENT DETAILS (Clean Cards) */}
+      <div className="max-w-5xl mx-auto px-6 mt-24">
+        <div className="grid md:grid-cols-2 gap-6">
+          {/* LOCATION */}
+          <EditableSectionWrapper
+            isEditing={isEditing}
+            section="locations"
+            label="Locais"
+            onEditSection={onEditSection}
+            className="block"
+          >
+            <FadeInSection
+              className={`${accentCard} backdrop-blur-xl p-10 rounded-[2.5rem] border shadow-sm flex flex-col items-start min-h-[380px]`}
+            >
+              <div className="w-12 h-12 rounded-full bg-white flex items-center justify-center shadow-sm mb-6">
+                <span className={`material-symbols-outlined ${iconColor}`}>
+                  location_on
+                </span>
+              </div>
+              <h3 className="text-2xl font-serif mb-2">
+                <EditableField
+                  value={event.locationName}
+                  onChange={(newVal) => updateField?.("locationName", newVal)}
+                  isEditing={isEditing}
+                  className="text-2xl font-serif text-left"
+                />
+              </h3>
+              <p className={`text-sm ${secondaryText} mb-6 leading-relaxed flex-1 text-left`}>
+                <EditableField
+                  value={event.address}
+                  onChange={(newVal) => updateField?.("address", newVal)}
+                  isEditing={isEditing}
+                  className={`text-sm ${secondaryText} leading-relaxed text-left`}
+                  multiline
+                />
+              </p>
+              <div className="flex gap-4 w-full mt-auto pt-6 border-t border-black/5">
+                <div className="flex-1 text-left">
+                  <span className="uppercase tracking-widest text-[9px] font-bold opacity-40 block mb-1">
+                    Horário
+                  </span>
+                  <p className="text-base font-medium">
+                    <EditableField
+                      value={event.time}
+                      onChange={(newVal) => updateField?.("time", newVal)}
+                      isEditing={isEditing}
+                      className="text-base font-medium text-left"
+                    />
+                  </p>
+                </div>
+                {event.mapLink && (
+                  <button
+                    onClick={() => window.open(event.mapLink, "_blank")}
+                    className="h-12 px-6 rounded-2xl bg-black text-white hover:bg-black/80 transition-colors text-xs font-bold uppercase tracking-wider flex items-center gap-2 cursor-pointer shadow-md"
+                  >
+                    <span className="material-symbols-outlined text-sm">map</span> Ver Mapa
+                  </button>
+                )}
+              </div>
+            </FadeInSection>
+          </EditableSectionWrapper>
+
+          {/* BRIDAL PROTAGONIST SUMMARY / ABOUT BABY */}
+          <FadeInSection
+            className={`${accentCard} backdrop-blur-xl p-10 rounded-[2.5rem] border shadow-sm flex flex-col items-start min-h-[380px]`}
+          >
+            <div className="w-12 h-12 rounded-full bg-white flex items-center justify-center shadow-sm mb-6">
+              <span className={`material-symbols-outlined ${iconColor}`}>
+                featured_seasonal_and_gifts
+              </span>
+            </div>
+            <h3 className="text-2xl font-serif mb-2 text-left">
+              O Nosso Bebé
+            </h3>
+            <p className={`text-sm ${secondaryText} leading-relaxed text-left flex-1`}>
+              Queridos familiares e amigos, a nossa vida está prestes a ganhar um novo brilho. 
+              Criámos este espaço para partilhar as nossas expectativas, planos e a nossa lista de mimos recomendada para equipar o enxoval com todo o amor. 
+              A vossa presença e carinho significam tudo para nós!
+            </p>
+            <div className="w-full mt-auto pt-6 border-t border-black/5 text-left">
+              <span className="uppercase tracking-widest text-[9px] font-bold opacity-40 block mb-1">
+                Protagonista
+              </span>
+              <p className="text-xl font-serif">
+                <EditableField
+                  value={event.brideName}
+                  onChange={(newVal) => updateField?.("brideName", newVal)}
+                  isEditing={isEditing}
+                  className="text-xl font-serif text-left"
+                />
+              </p>
+            </div>
+          </FadeInSection>
+        </div>
+      </div>
+
+      {/* GIFT LIST INTEGRATION */}
+      {event.gifts && event.gifts.length > 0 && (
+        <EditableSectionWrapper
+          isEditing={isEditing}
+          section="gifts"
+          label="Presentes"
+          onEditSection={onEditSection}
+          className="block"
+        >
+          <div className="max-w-5xl mx-auto px-6 mt-24">
+            <FadeInSection className="text-center mb-12 flex flex-col items-center">
+              <span className={`material-symbols-outlined text-3xl mb-4 ${iconColor}`}>
+                card_giftcard
+              </span>
+              <h2 className="text-3xl font-serif mb-2 text-center">Lista de Mimos</h2>
+              <p className={`text-xs ${secondaryText} uppercase tracking-widest text-center`}>
+                Sugestões de presentes para ajudar a preparar o enxoval
+              </p>
+            </FadeInSection>
+
+            <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
+              {event.gifts.map((gift: any, index: number) => (
+                <div
+                  key={index}
+                  className={`${accentCard} backdrop-blur-xl border p-8 rounded-[2rem] shadow-sm hover:shadow-md transition-all flex flex-col justify-between min-h-[220px] text-left relative group`}
+                >
+                  {isEditing && (
+                    <button
+                      onClick={() => deleteGiftItem?.(index)}
+                      className="absolute top-4 right-4 w-6 h-6 rounded-full bg-red-50 text-red-500 hover:bg-red-150 flex items-center justify-center transition-all opacity-0 group-hover:opacity-100"
+                    >
+                      ×
+                    </button>
+                  )}
+                  <div>
+                    <span className="text-[10px] uppercase font-bold tracking-widest opacity-40">
+                      {gift.type === "IBAN" ? "Transferência Bancária" : "Link Externo"}
+                    </span>
+                    <h4 className="text-lg font-serif mt-2 mb-1">{gift.title}</h4>
+                    <p className={`text-xs ${secondaryText} line-clamp-2`}>
+                      {gift.description}
+                    </p>
+                  </div>
+
+                  <div className="mt-6 pt-4 border-t border-black/5 flex items-center justify-between">
+                    {gift.type === "IBAN" ? (
+                      <div className="w-full">
+                        <span className="text-[9px] uppercase font-bold opacity-30 block">
+                          {gift.bank || "BAI"}
+                        </span>
+                        <div className="flex items-center justify-between gap-2 mt-1">
+                          <code className="text-[11px] font-mono break-all line-clamp-1 select-all bg-black/5 px-2 py-1 rounded">
+                            {gift.account}
+                          </code>
+                          <button
+                            onClick={() => {
+                              navigator.clipboard.writeText(gift.account);
+                              toast.success("IBAN copiado!");
+                            }}
+                            className="text-[10px] font-bold text-brand-blue uppercase hover:underline shrink-0"
+                          >
+                            Copiar
+                          </button>
+                        </div>
+                      </div>
+                    ) : (
+                      <button
+                        onClick={() => window.open(gift.url, "_blank")}
+                        className="w-full h-10 rounded-xl bg-black/5 hover:bg-black/10 transition-colors text-xs font-bold flex items-center justify-center gap-2"
+                      >
+                        Visitar Loja <span className="material-symbols-outlined text-xs">arrow_outward</span>
+                      </button>
+                    )}
+                  </div>
+                </div>
+              ))}
+            </div>
+          </div>
+        </EditableSectionWrapper>
+      )}
+
+      {/* GALLERY / PHOTOS */}
+      {event.gallery && event.gallery.length > 0 && (
+        <EditableSectionWrapper
+          isEditing={isEditing}
+          section="gallery"
+          label="Galeria de Fotos"
+          onEditSection={onEditSection}
+          className="block"
+        >
+          <div className="max-w-7xl mx-auto mt-32">
+            <FadeInSection className="text-center mb-12 px-6 flex flex-col items-center">
+              <span className={`material-symbols-outlined text-3xl mb-4 ${iconColor}`}>
+                photo_library
+              </span>
+              <h2 className="text-3xl font-serif mb-2 text-center">Galeria de Amor</h2>
+              <p className={`text-xs ${secondaryText} uppercase tracking-widest text-center`}>
+                Momentos doces da nossa espera
+              </p>
+            </FadeInSection>
+
+            <FadeInSection>
+              <div className="flex gap-6 overflow-x-auto pb-8 px-6 md:px-12 scrollbar-none snap-x snap-mandatory">
+                {event.gallery.map((img: string, i: number) => (
                   <div
                     key={i}
                     className="min-w-[70vw] md:min-w-[400px] aspect-[4/5] rounded-[2rem] overflow-hidden snap-center flex-shrink-0 shadow-lg relative group"

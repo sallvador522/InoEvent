@@ -75,11 +75,7 @@ export const LandingPage: React.FC = () => {
   }, [user]);
 
   const handleCreateEvent = () => {
-    if (!user) {
-        navigate('/auth');
-        return;
-    }
-    navigate('/create-invitation');
+    navigate('/templates');
   }
 
   return (
@@ -154,21 +150,21 @@ export const LandingPage: React.FC = () => {
                  initial={{ opacity: 0, y: 20 }}
                  animate={{ opacity: 1, y: 0 }}
                  transition={{ duration: 0.8, ease: "easeOut", delay: 0.5 }}
-                 className="flex flex-col sm:flex-row items-center justify-center gap-4 w-full"
+                 className="flex justify-center w-full"
               >
                 {/* Primary CTA */}
                 <button 
                    onClick={handleCreateEvent}
                    className="w-full sm:w-auto px-8 py-4 bg-slate-900 text-white font-bold rounded-full hover:bg-brand-blue hover:-translate-y-1 transition-all duration-300 shadow-[0_10px_30px_rgba(0,0,0,0.15)] hover:shadow-[0_15px_35px_rgba(0,0,0,0.25)] flex items-center justify-center gap-2 group"
                 >
-                   <span>Comece Grátis Agora</span>
+                   <span>Criar Convite de Alta Costura</span>
                    <span className="material-symbols-outlined text-[18px] group-hover:translate-x-1 transition-transform">arrow_forward</span>
                 </button>
                 
                 {/* Secondary CTA */}
                 <Link 
                   to="/templates"
-                  className="w-full sm:w-auto px-8 py-4 bg-white border border-slate-200 text-slate-700 font-bold rounded-full hover:bg-slate-50 hover:border-slate-300 transition-all duration-300 shadow-sm flex items-center justify-center gap-2"
+                  className="hidden"
                 >
                   <span className="material-symbols-outlined text-[18px] text-[#BF9B30]">view_carousel</span>
                   <span>Ver Todos os Modelos</span>
@@ -369,13 +365,7 @@ export const LandingPage: React.FC = () => {
 
       </main>
 
-      {/* Mobile Sticky Bottom CTA */}
-      <div className="fixed bottom-0 left-0 right-0 p-4 bg-white border-t border-slate-100 z-40 md:hidden shadow-[0_-5px_20px_rgba(0,0,0,0.05)]">
-        <button onClick={handleCreateEvent} className="w-full h-12 bg-slate-900 text-white font-bold rounded-xl shadow-lg flex items-center justify-center gap-2 active:scale-95 transition-transform">
-          <span>{user ? 'Criar Eventos' : 'Comece Grátis Agora'}</span>
-          <span className="material-symbols-outlined text-sm">arrow_forward</span>
-        </button>
-      </div>
+
 
       <SupportModal isOpen={supportOpen} onClose={() => setSupportOpen(false)} />
 

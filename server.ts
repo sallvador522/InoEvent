@@ -40,7 +40,7 @@ app.post('/api/generate-description', async (req, res) => {
     const ai = new GoogleGenAI({ apiKey: key });
 
     const prompt = `Crie uma mensagem curta, elegante e sofisticada de convite de boas-vindas / introdução do evento no tom adequado ao estilo "${style || 'Clássico'}".
-Tipo de Evento: ${eventType === 'BRIDAL_SHOWER' ? 'CHÁ DE PANELA (Bridal Shower)' : 'CASAMENTO (Wedding)'}.
+Tipo de Evento: ${eventType === 'BABY_SHOWER' ? 'CHÁ DE BEBÊ (Baby Shower)' : eventType === 'BRIDAL_SHOWER' ? 'CHÁ DE PANELA (Bridal Shower)' : 'CASAMENTO (Wedding)'}.
 Título do Evento: "${title}".
 Data do Evento: "${date || 'A definir'}".
 Apenas retorne o parágrafo de introdução (máximo 3 frases), escrito em Português elegante, pronto para emocionar os convidados. Não inclua aspas extras nem marcas markdown, apenas o parágrafo corrido.`;

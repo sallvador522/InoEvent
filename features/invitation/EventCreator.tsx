@@ -41,6 +41,10 @@ export const EventCreator: React.FC = () => {
   const isBridalShower = location.pathname.includes('bridal') || 
                          (initialTemplate && initialTemplate.startsWith('BRIDAL_'));
 
+  // Determine if it is a baby shower
+  const isBabyShower = location.pathname.includes('baby') || 
+                       (initialTemplate && initialTemplate.startsWith('BABY_'));
+
   const [activeTab, setActiveTab] = useState<'content' | 'timeline' | 'gifts' | 'design'>('content');
   const [isLoading, setIsLoading] = useState(false);
   const [isAiGenerating, setIsAiGenerating] = useState(false);
@@ -49,21 +53,23 @@ export const EventCreator: React.FC = () => {
 
   // Event State Variables
   const [selectedLayout, setSelectedLayout] = useState<LayoutMode>(
-    (initialTemplate as LayoutMode) || (isBridalShower ? 'BRIDAL_ROMANTIC' : 'ESSENTIAL')
+    (initialTemplate as LayoutMode) || (isBabyShower ? 'BABY_NEUTRAL' : isBridalShower ? 'BRIDAL_ROMANTIC' : 'ESSENTIAL')
   );
-  const [title, setTitle] = useState(isBridalShower ? 'Chá de Panela da Sarah' : 'João & Maria');
+  const [title, setTitle] = useState(isBabyShower ? 'Chá de Bebé do Noah' : isBridalShower ? 'Chá de Panela da Sarah' : 'João & Maria');
   const [date, setDate] = useState(() => {
     const futureDate = new Date();
     futureDate.setDate(futureDate.getDate() + 30);
     return futureDate.toISOString().split('T')[0];
   });
   const [time, setTime] = useState('17:00');
-  const [brideName, setBrideName] = useState(isBridalShower ? 'Sarah' : 'Maria');
+  const [brideName, setBrideName] = useState(isBabyShower ? 'Noah' : isBridalShower ? 'Sarah' : 'Maria');
   const [groomName, setGroomName] = useState('João');
   const [description, setDescription] = useState(
-    isBridalShower 
-      ? 'Um dia muito especial para celebrar o amor e equipar o nosso novo lar com as amigas mais queridas!' 
-      : 'Estamos muito entusiasmados e ansiosos para celebrar este momento perfeito com vocês!'
+    isBabyShower
+      ? 'Estamos à espera do nosso pacotinho de amor! Venha celebrar connosco o Chá de Bebé e partilhar esta alegria única.'
+      : isBridalShower 
+        ? 'Um dia muito especial para celebrar o amor e equipar o nosso novo lar com as amigas mais queridas!' 
+        : 'Estamos muito entusiasmados e ansiosos para celebrar este momento perfeito com vocês!'
   );
   const [locationName, setLocationName] = useState('Salão Luanda Noblesse');
   const [address, setAddress] = useState('Av. Pedro de Castro Van-Dúnem Loy, Luanda');
@@ -74,7 +80,11 @@ export const EventCreator: React.FC = () => {
   
   // Dynamic arrays
   const [timeline, setTimeline] = useState<TimelineItem[]>(
-    isBridalShower ? [
+    isBabyShower ? [
+      { time: '15:00', title: 'Boas-vindas', description: 'Recepção dos convidados e início do buffet de doces.' },
+      { time: '16:30', title: 'Adivinhas & Jogos', description: 'Brincadeiras divertidas sobre fraldas e bebés.' },
+      { time: '18:00', title: 'Fotos & Bolo', description: 'Corte do bolo, registo de memórias e brinde especial.' }
+    ] : isBridalShower ? [
       { time: '17:00', title: 'Boas-vindas', description: 'Recepção das amigas mais queridas e doces de boas-vindas.' },
       { time: '18:30', title: 'Jogos & Brincadeiras', description: 'Divertir e adivinhar os presentes com prendas engraçadas.' },
       { time: '20:00', title: 'Abertura de Mimos & Bolo', description: 'Momento de fotos, brinde de felicidade e corte do bolo.' }
@@ -138,6 +148,12 @@ export const EventCreator: React.FC = () => {
         return 'https://images.unsplash.com/photo-1481653191744-97edb833d5b4?q=80&w=1200&auto=format&fit=crop';
       case 'BRIDAL_RUSTIC':
         return 'https://images.unsplash.com/photo-1524824267900-2fa9cbf7a506?q=80&w=1200&auto=format&fit=crop';
+      case 'BABY_BOY':
+        return 'https://images.unsplash.com/photo-1519689680058-324335c77eb2?q=80&w=1200&auto=format&fit=crop';
+      case 'BABY_GIRL':
+        return 'https://images.unsplash.com/photo-1555252333-9f8e92e65df9?q=80&w=1200&auto=format&fit=crop';
+      case 'BABY_NEUTRAL':
+        return 'https://images.unsplash.com/photo-1544816155-12df9643f363?q=80&w=1200&auto=format&fit=crop';
       default:
         return 'https://images.unsplash.com/photo-1519741497674-611481863552?q=80&w=1200&auto=format&fit=crop';
     }
@@ -281,8 +297,8 @@ export const EventCreator: React.FC = () => {
         return;
       }
 
-      // BILLING RULE: Check plan limit when creating a NEW invitation
-      if (!isEditingExisting && userProfile?.plan !== 'Business' && userProfile?.plan !== 'Corporate') {
+      // BILLING RULE: Check plan limit when creating a NEW invitation (only if not baby shower and not bridal shower)
+      if (!isEditingExisting && !isBabyShower && !isBridalShower && userProfile?.plan !== 'Business' && userProfile?.plan !== 'Corporate') {
         const plan = userProfile?.plan || 'Essencial';
         let limit = 2;
         if (plan === 'Premium') limit = 5;
@@ -291,8 +307,11 @@ export const EventCreator: React.FC = () => {
         const q = query(eventsRef, where("ownerId", "==", user.uid));
         const snap = await getDocs(q);
         
-        if (snap.size >= limit) {
-          toast.error(`Você atingiu o limite de ${limit} eventos do seu plano. Faça upgrade para criar mais!`, { id: toastId });
+        // Count only paid events (not baby/bridal showers)
+        const paidCount = snap.docs.filter(d => d.data().type !== 'BABY_SHOWER' && d.data().type !== 'BRIDAL_SHOWER').length;
+
+        if (paidCount >= limit) {
+          toast.error(`Você atingiu o limite de ${limit} convites de casamento do seu plano. Faça upgrade para criar mais!`, { id: toastId });
           setIsLoading(false);
           return;
         }
@@ -301,7 +320,7 @@ export const EventCreator: React.FC = () => {
       const activeEventId = eventIdParam || "evt_" + Math.random().toString(36).substr(2, 9);
       const docRef = doc(db, 'events', activeEventId);
 
-      const computedFormType = isBridalShower ? 'BRIDAL_SHOWER' : 'WEDDING';
+      const computedFormType = isBabyShower ? 'BABY_SHOWER' : isBridalShower ? 'BRIDAL_SHOWER' : 'WEDDING';
 
       const savePayload: any = {
         id: activeEventId,
@@ -323,7 +342,7 @@ export const EventCreator: React.FC = () => {
       };
 
       // Handle conditional parameters
-      if (!isBridalShower) {
+      if (!isBridalShower && !isBabyShower) {
         savePayload.brideName = brideName;
         savePayload.groomName = groomName;
         savePayload.timeline = timeline;
@@ -331,10 +350,14 @@ export const EventCreator: React.FC = () => {
           title: dressCodeTitle || 'Dress Code',
           description: dressCodeDesc || ''
         };
-      } else {
-        savePayload.brideName = brideName; // Sarah/Protagonist name
+      } else if (isBabyShower) {
+        savePayload.brideName = brideName; // For Baby shower, protagonist baby/mother name
         // We omit or hide the wedding specifics as requested in rule:
-        // Nom do Noivo, Recepção, Dress Code, and Timeline are omitted for Bridal Shower to streamline.
+        // Nom do Noivo, Recepção, Dress Code, and Timeline are omitted to streamline.
+      } else {
+        savePayload.brideName = brideName; // For Bridal shower, protagonist name
+        // We omit or hide the wedding specifics as requested in rule:
+        // Nom do Noivo, Recepção, Dress Code, and Timeline are omitted to streamline.
       }
 
       await setDoc(docRef, savePayload, { merge: true });
@@ -353,6 +376,9 @@ export const EventCreator: React.FC = () => {
 
   // RSVP Dynamic text mapping based on type
   const getDynamicRsvpText = () => {
+    if (isBabyShower) {
+      return "Confirmar Presença no Chá de Bebé";
+    }
     if (isBridalShower) {
       return "Confirmar Presença no Chá";
     }
@@ -432,7 +458,7 @@ export const EventCreator: React.FC = () => {
                 <Layout size={14} /> Design
               </button>
 
-              {!isBridalShower && (
+              {!isBridalShower && !isBabyShower && (
                 <button
                   type="button"
                   onClick={() => setActiveTab('timeline')}
@@ -487,17 +513,19 @@ export const EventCreator: React.FC = () => {
                         </div>
 
                         <div>
-                          <label className="block text-xs font-bold text-slate-500 mb-1.5 uppercase tracking-wider">Nome da Noiva (Protagonista 1)</label>
+                          <label className="block text-xs font-bold text-slate-500 mb-1.5 uppercase tracking-wider">
+                            {isBabyShower ? "Nome do Bebé / Mamã" : "Nome da Noiva"}
+                          </label>
                           <input 
                             type="text"
                             value={brideName}
                             onChange={(e) => setBrideName(e.target.value)}
                             className="w-full border border-slate-200 rounded-xl p-3 focus:border-purple-500 focus:ring-1 focus:ring-purple-500 outline-none text-sm transition-all"
-                            placeholder="Nome da Noiva"
+                            placeholder={isBabyShower ? "Nome do Bebé ou Mamã" : "Nome da Noiva"}
                           />
                         </div>
 
-                        {!isBridalShower && (
+                        {!isBridalShower && !isBabyShower && (
                           <div>
                             <label className="block text-xs font-bold text-slate-500 mb-1.5 uppercase tracking-wider">Nome do Noivo (Protagonista 2)</label>
                             <input 
@@ -604,7 +632,7 @@ export const EventCreator: React.FC = () => {
                       </div>
                     </div>
 
-                    {!isBridalShower && (
+                    {!isBridalShower && !isBabyShower && (
                       <div className="border-t border-slate-100 pt-6">
                         <h3 className="text-base font-serif font-bold text-slate-900 mb-4">Apresentação dos Noivos</h3>
                         <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
@@ -649,7 +677,29 @@ export const EventCreator: React.FC = () => {
                       <p className="text-xs text-slate-500 mb-4 font-normal">Selecione o modelo conceitual de design ideal para a sua celebração única.</p>
                       
                       <div className="grid grid-cols-2 md:grid-cols-3 gap-3">
-                        {isBridalShower ? (
+                        {isBabyShower ? (
+                          <>
+                            {[
+                              { id: 'BABY_BOY', label: 'Chá do Príncipe (Azul)', desc: 'Para o rapazinho que está a caminho' },
+                              { id: 'BABY_GIRL', label: 'Chá da Princesa (Rosa)', desc: 'Para a menina querida que está a caminho' },
+                              { id: 'BABY_NEUTRAL', label: 'Chá Neutro Safari', desc: 'Estilo neutro aconchegante' }
+                            ].map((item) => (
+                              <button
+                                key={item.id}
+                                type="button"
+                                onClick={() => setSelectedLayout(item.id as LayoutMode)}
+                                className={`p-4 rounded-2xl border text-left flex flex-col justify-between h-28 cursor-pointer transition-all duration-300 ${
+                                  selectedLayout === item.id 
+                                    ? 'bg-cyan-50/70 border-cyan-500 ring-1 ring-cyan-500 shadow'
+                                    : 'bg-white border-slate-200 hover:border-slate-300'
+                                }`}
+                              >
+                                <span className={`text-xs font-bold leading-tight ${selectedLayout === item.id ? 'text-cyan-900' : 'text-slate-800'}`}>{item.label}</span>
+                                <span className="text-[10px] text-slate-500 leading-tight block">{item.desc}</span>
+                              </button>
+                            ))}
+                          </>
+                        ) : isBridalShower ? (
                           <>
                             {[
                               { id: 'BRIDAL_ROMANTIC', label: 'Chá Romântico Rosé', desc: 'Ar pastel romântico delicado' },

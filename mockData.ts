@@ -430,6 +430,64 @@ export const EVENTS: EventDetails[] = [
         accountName: 'Manuela & Salvador'
       }
     ]
+  },
+
+  // 13. NOVO: Chá de Bebé Menino (BABY_BOY)
+  {
+    id: 'baby-boy',
+    type: ThemeType.BABY_SHOWER,
+    layoutMode: 'BABY_BOY',
+    title: 'Chá do Lorenzo',
+    hosts: 'À Espera do Nosso Príncipe',
+    date: '10 de Outubro de 2026',
+    isoDate: '2026-10-10T15:00:00',
+    time: '15:00',
+    locationName: 'Salão de Festas - Condomínio Rosas',
+    address: 'Talatona, Luanda, Angola',
+    heroImage: 'https://images.unsplash.com/photo-1519689680058-324335c77eb2?q=80&w=2000&auto=format&fit=crop', 
+    description: 'Um novo príncipe está para chegar e queremos celebrar com todos os que amamos! Venha partilhar connosco este momento doce e mágico.',
+    musicTrack: 'Disney Lullaby Piano',
+    themeColor: '#1E3A8A', 
+    timeline: [],
+    gifts: [
+      {
+        type: 'IBAN',
+        title: 'Mimos para o Enxoval',
+        description: 'Se desejar presentear o Lorenzo com um mimo em dinheiro:',
+        value: 'AO06 0055 0000 1122 3344 5566 7',
+        bankName: 'BAI',
+        accountName: 'Beatriz e Carlos'
+      }
+    ]
+  },
+
+  // 14. NOVO: Chá de Bebé Menina (BABY_GIRL)
+  {
+    id: 'baby-girl',
+    type: ThemeType.BABY_SHOWER,
+    layoutMode: 'BABY_GIRL',
+    title: 'Chá da Alícia',
+    hosts: 'À Espera da Nossa Princesa',
+    date: '24 de Outubro de 2026',
+    isoDate: '2026-10-24T16:00:00',
+    time: '16:00',
+    locationName: 'Jardim da Vovó',
+    address: 'Viana, Luanda, Angola',
+    heroImage: 'https://images.unsplash.com/photo-1541014741259-df5290b3785a?q=80&w=2000&auto=format&fit=crop', 
+    description: 'O nosso mundo vai ficar cor-de-rosa! Venha comemorar a doce espera pela nossa pequena Alícia numa tarde cheia de doçura.',
+    musicTrack: 'Disney Lullaby Piano',
+    themeColor: '#BE185D', 
+    timeline: [],
+    gifts: [
+      {
+        type: 'IBAN',
+        title: 'Mimos para a Princesa',
+        description: 'Qualquer contribuição para o quartinho da Alícia será recebida com amor:',
+        value: 'AO06 0055 0000 9988 7766 5544 3',
+        bankName: 'BFA',
+        accountName: 'Juliana e Marcos'
+      }
+    ]
   }
 ];
 

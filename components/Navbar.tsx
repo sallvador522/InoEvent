@@ -109,11 +109,7 @@ export const Navbar: React.FC = () => {
   }, [user]);
 
   const handleCreateEvent = () => {
-    if (!user) {
-        navigate('/auth');
-        return;
-    }
-    navigate('/create-invitation');
+    navigate('/templates');
   }
 
   return (

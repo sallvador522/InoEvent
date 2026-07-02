@@ -1,4 +1,4 @@
 User-agent: *
 Allow: /
 
-Sitemap: https://ino-event-black.vercel.app/sitemap.xml
+Sitemap: https://inoevent.online/sitemap.xml

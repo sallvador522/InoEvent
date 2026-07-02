@@ -23,6 +23,18 @@ app.get('/api/health', (req, res) => {
   res.json({ status: 'ok' });
 });
 
+// Serve sitemap.xml
+app.get('/sitemap.xml', (req, res) => {
+  res.header('Content-Type', 'application/xml');
+  res.sendFile(path.join(process.cwd(), 'public/sitemap.xml'));
+});
+
+// Serve robots.txt
+app.get('/robots.txt', (req, res) => {
+  res.header('Content-Type', 'text/plain');
+  res.sendFile(path.join(process.cwd(), 'public/robots.txt'));
+});
+
 // Generate bespoke invitation description during onboarding
 app.post('/api/generate-description', async (req, res) => {
   const { eventType, title, date, style } = req.body;

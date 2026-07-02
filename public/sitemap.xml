@@ -1,22 +1,22 @@
 <?xml version="1.0" encoding="UTF-8"?>
 <urlset xmlns="http://www.sitemaps.org/schemas/sitemap/0.9">
   <url>
-    <loc>https://ino-event-black.vercel.app/</loc>
+    <loc>https://inoevent.online/</loc>
     <changefreq>daily</changefreq>
     <priority>1.0</priority>
   </url>
   <url>
-    <loc>https://ino-event-black.vercel.app/templates</loc>
+    <loc>https://inoevent.online/templates</loc>
     <changefreq>weekly</changefreq>
     <priority>0.8</priority>
   </url>
   <url>
-    <loc>https://ino-event-black.vercel.app/plans</loc>
+    <loc>https://inoevent.online/plans</loc>
     <changefreq>weekly</changefreq>
     <priority>0.8</priority>
   </url>
   <url>
-    <loc>https://ino-event-black.vercel.app/about</loc>
+    <loc>https://inoevent.online/about</loc>
     <changefreq>monthly</changefreq>
     <priority>0.5</priority>
   </url>

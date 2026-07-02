@@ -81,8 +81,8 @@ export const LandingPage: React.FC = () => {
   return (
     <div className="min-h-screen relative font-display overflow-x-hidden bg-white">
       <SEO 
-        title="Convites Digitais em Angola | Casamentos e Eventos" 
-        description="A plataforma mais elegante de Angola para criar seus convites de casamento, chás de panela ou noivado. Confirmação instantânea (RSVP), UX premium e mais."
+        title="InoEvents Angola | Convites Digitais de Casamento e Chá de Panela" 
+        description="A melhor plataforma de Angola para criar seus convites digitais de casamento, chás de panela, noivado ou aniversários com RSVP automático, QR Code e lista de presentes por IBAN."
       />
       
       {/* Background Subtle Gradient */}
@@ -133,8 +133,8 @@ export const LandingPage: React.FC = () => {
                  transition={{ duration: 0.9, ease: [0.22, 1, 0.36, 1], delay: 0.2 }}
                  className="text-5xl md:text-7xl lg:text-[5rem] font-serif font-bold text-slate-900 tracking-tight leading-[1.05] mb-6"
               >
-                 Convites Digitais de <br className="hidden md:block"/>
-                 <span className="text-transparent bg-clip-text bg-gradient-to-r from-brand-blue flex-col md:flex-row to-[#BF9B30] inline-block mt-2">Nível Elite.</span>
+                 Convites Digitais em <br className="hidden md:block"/>
+                 <span className="text-transparent bg-clip-text bg-gradient-to-r from-brand-blue flex-col md:flex-row to-[#BF9B30] inline-block mt-2">Angola.</span>
               </motion.h1>
               
               <motion.p 
@@ -143,7 +143,7 @@ export const LandingPage: React.FC = () => {
                  transition={{ duration: 0.8, ease: "easeOut", delay: 0.4 }}
                  className="text-lg md:text-xl text-slate-600 max-w-2xl mx-auto leading-relaxed mb-10 font-light"
               >
-                 Diga adeus ao papel. Impressione seus convidados com uma experiência interativa, confirme presenças automaticamente e receba presentes, tudo em um só lugar.
+                 Diga adeus ao papel em Luanda e em toda Angola. Impressione os seus convidados com os melhores convites digitais de casamento e chá de panela, confirme presenças por RSVP e receba presentes com facilidade.
               </motion.p>
               
               <motion.div 
@@ -254,18 +254,18 @@ export const LandingPage: React.FC = () => {
           <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
             <FeatureCard 
               icon="qr_code_scanner" 
-              title="RSVP & QR Code"
-              desc="Confirmação de presença online com emissão automática de convite com QR Code."
+              title="RSVP & QR Code Angola"
+              desc="Confirmação de presença digital instantânea com emissão automática de QR Code personalizado para seus convidados em Angola."
             />
             <FeatureCard 
               icon="dashboard" 
               title="Gestão de Convidados"
-              desc="Acompanhe quem confirmou presença e controle as entradas diretamente pelo App."
+              desc="Controle quem vai ao seu casamento ou chá de panela em Luanda e acompanhe as confirmações de presença em tempo real."
             />
             <FeatureCard 
               icon="redeem" 
-              title="Lista de Presentes"
-              desc="Adicione IBAN de forma segura para receber presentes em dinheiro diretamente na sua conta."
+              title="Lista de Presentes com IBAN"
+              desc="Insira o seu IBAN de bancos angolanos (BAI, BFA, BIC, SOL, etc.) de forma segura para receber presentes em kwanza (AOA) diretamente na sua conta bancária."
             />
           </div>
         </section>

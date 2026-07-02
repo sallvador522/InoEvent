@@ -4,6 +4,7 @@ import { ArrowLeft, Mail, Lock, User, Eye, EyeOff } from 'lucide-react';
 import { Link, useNavigate, useLocation } from 'react-router-dom';
 import { GoogleAuthProvider, signInWithPopup, signInWithEmailAndPassword, createUserWithEmailAndPassword, updateProfile } from 'firebase/auth';
 import { auth, db } from '../../components/FirebaseProvider';
+import { SEO } from '../../components/SEO';
 
 export const AuthPage: React.FC = () => {
   const [isLogin, setIsLogin] = useState(true);
@@ -104,6 +105,10 @@ export const AuthPage: React.FC = () => {
 
   return (
     <div className="min-h-screen bg-slate-50 flex items-center justify-center p-4 font-display">
+      <SEO 
+        title={isLogin ? "Acessar Conta | InoEvents" : "Criar Conta Premium | InoEvents"}
+        description="Entre ou crie sua conta premium na InoEvents para começar a criar convites digitais de alta costura com RSVP integrado e cronograma personalizado."
+      />
       <motion.div 
         initial={{ opacity: 0, y: 20 }}
         animate={{ opacity: 1, y: 0 }}

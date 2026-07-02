@@ -20,6 +20,7 @@ import {
   OperationType,
 } from "../../components/FirebaseProvider";
 import { Navbar } from "../../components/Navbar";
+import { SEO } from "../../components/SEO";
 import { Button } from "../../components/ui/Button";
 import toast from "react-hot-toast";
 
@@ -198,6 +199,10 @@ export const PlansPage: React.FC = () => {
 
   return (
     <div className="min-h-screen bg-slate-50 font-display relative overflow-x-hidden flex flex-col">
+      <SEO 
+        title="Planos e Preços de Convites Digitais | InoEvents"
+        description="Escolha o plano perfeito para o seu momento. Do Essencial ao Luxo Corporativo, encontre as ferramentas ideais para casamentos, chás de panela ou aniversários com RSVP."
+      />
       <Navbar />
 
       {/* Elegant Ambient Background */}

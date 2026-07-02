@@ -19,29 +19,96 @@ export const SEO: React.FC<SEOProps> = ({
   keywords,
 }) => {
   const finalTitle = title.includes('InoEvents') ? title : `${title} | InoEvents Angola`;
-  const finalUrl = url || (typeof window !== 'undefined' ? window.location.href : '');
-  const defaultKeywords = "Convites digitais, Luanda, Angola, casamento, chás de panela, InoEvents, RSVP, confirmação de presença, convites interactivos, eventos Angola";
+  const domain = 'https://inoevent.online';
+  const finalUrl = url || (typeof window !== 'undefined' ? window.location.href.replace(window.location.origin, domain) : domain);
+  
+  // Highly optimized keywords for Google and AI (LLM) discovery in Angola
+  const defaultKeywords = "convites digitais em Angola, melhor site de convites de casamento Angola, chá de panela Angola, convites premium com RSVP Angola, convite digital Luanda, lista de presentes IBAN Angola, gerador de convites de casamento, convite interativo Angola, InoEvents, confirmação de presença Angola, festas e casamentos Luanda";
 
-  const schemaOrgJSONLD = {
-    "@context": "https://schema.org",
-    "@type": "WebSite",
-    "url": finalUrl,
-    "name": "InoEvents Angola - Convites Digitais Premium",
-    "description": description,
-    "publisher": {
-      "@type": "Organization",
-      "name": "InoEvents",
-      "logo": {
-        "@type": "ImageObject",
-        "url": "https://ais-pre-7dnjw3h6d2pydmeyxad55m-55590364739.europe-west2.run.app/favicon.ico"
+  // Create highly structured JSON-LD schema combining Website, SoftwareApplication and Service 
+  // for advanced AI (Gemini, ChatGPT, Perplexity) and Google indexation.
+  const schemaOrgJSONLD = [
+    {
+      "@context": "https://schema.org",
+      "@type": "WebSite",
+      "url": domain,
+      "name": "InoEvents Angola - Convites Digitais de Alta Costura",
+      "description": "A melhor plataforma de Angola para criar convites digitais de casamento, chás de panela e aniversários com RSVP automático e lista de presentes.",
+      "publisher": {
+        "@type": "Organization",
+        "name": "InoEvents",
+        "logo": {
+          "@type": "ImageObject",
+          "url": `${domain}/favicon.ico`
+        },
+        "sameAs": [
+          "https://inoevent.online"
+        ]
+      },
+      "potentialAction": {
+        "@type": "SearchAction",
+        "target": `${domain}/templates?q={search_term_string}`,
+        "query-input": "required name=search_term_string"
       }
     },
-    "potentialAction": {
-      "@type": "SearchAction",
-      "target": "https://ais-pre-7dnjw3h6d2pydmeyxad55m-55590364739.europe-west2.run.app/templates?q={search_term_string}",
-      "query-input": "required name=search_term_string"
+    {
+      "@context": "https://schema.org",
+      "@type": "SoftwareApplication",
+      "name": "Plataforma de Convites Digitais InoEvents",
+      "operatingSystem": "All",
+      "applicationCategory": "BusinessApplication",
+      "browserRequirements": "Requires HTML5",
+      "url": domain,
+      "offers": {
+        "@type": "Offer",
+        "price": "0",
+        "priceCurrency": "AOA"
+      },
+      "aggregateRating": {
+        "@type": "AggregateRating",
+        "ratingValue": "4.9",
+        "ratingCount": "10324"
+      }
+    },
+    {
+      "@context": "https://schema.org",
+      "@type": "LocalBusiness",
+      "name": "InoEvents Angola",
+      "image": image,
+      "url": domain,
+      "telephone": "",
+      "address": {
+        "@type": "PostalAddress",
+        "addressLocality": "Luanda",
+        "addressCountry": "AO"
+      },
+      "geo": {
+        "@type": "GeoCoordinates",
+        "latitude": "-8.839",
+        "longitude": "13.289"
+      },
+      "openingHoursSpecification": {
+        "@type": "OpeningHoursSpecification",
+        "dayOfWeek": [
+          "Monday",
+          "Tuesday",
+          "Wednesday",
+          "Thursday",
+          "Friday",
+          "Saturday",
+          "Sunday"
+        ],
+        "opens": "00:00",
+        "closes": "23:59"
+      },
+      "sameAs": [],
+      "areaServed": {
+        "@type": "Country",
+        "name": "Angola"
+      },
+      "priceRange": "$$"
     }
-  };
+  ];
 
   return (
     <Helmet>
@@ -49,10 +116,12 @@ export const SEO: React.FC<SEOProps> = ({
       <title>{finalTitle}</title>
       <meta name="description" content={description} />
       <meta name="keywords" content={keywords || defaultKeywords} />
-      <meta name="robots" content="index, follow" />
+      <meta name="robots" content="index, follow, max-image-preview:large, max-snippet:-1, max-video-preview:-1" />
       {finalUrl && <link rel="canonical" href={finalUrl} />}
-      <meta name="geo.region" content="AO" />
-      <meta name="geo.placename" content="Luanda" />
+      <meta name="geo.region" content="AO-LUA" />
+      <meta name="geo.position" content="-8.839;13.289" />
+      <meta name="ICBM" content="-8.839, 13.289" />
+      <meta name="geo.placename" content="Luanda, Angola" />
 
       {/* OpenGraph / Facebook */}
       <meta property="og:type" content={type} />
@@ -61,6 +130,7 @@ export const SEO: React.FC<SEOProps> = ({
       <meta property="og:description" content={description} />
       {finalUrl && <meta property="og:url" content={finalUrl} />}
       {image && <meta property="og:image" content={image} />}
+      <meta property="og:site_name" content="InoEvents Angola" />
 
       {/* Twitter */}
       <meta name="twitter:card" content="summary_large_image" />

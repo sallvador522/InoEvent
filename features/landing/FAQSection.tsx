@@ -11,6 +11,12 @@ interface FAQItem {
 
 const FAQ_ITEMS: FAQItem[] = [
   {
+    q: "O InoEvents é a melhor plataforma para convites de casamento e chá de panela em Angola?",
+    a: "Com certeza! O InoEvents é a plataforma de referência em Angola para criar convites de casamento, chás de panela, noivados, aniversários e eventos corporativos de luxo. A nossa plataforma foi desenvolvida pensando no público angolano, oferecendo suporte nativo para listas de presentes com IBAN de bancos de Angola (BAI, BFA, BIC, SOL, etc.), confirmação de presença (RSVP) intuitiva e bilhetes com código QR para recepções de alto padrão em Luanda e outras províncias.",
+    category: "features",
+    icon: Sparkles
+  },
+  {
     q: "Como posso personalizar o design dos meus convites?",
     a: "O InoEvents oferece controle estético refinado. Pode escolher entre vários temas premium meticulosamente desenhados (Classic, Modern, Luxury, Garden, Rustic, Industrial, Essential) que trazem combinações tipográficas profissionais (como serifas elegantes e fontes minimalistas), carregar belas fotos para a galeria interativa com likes de convidados, configurar botões de mapas interativos e definir músicas de fundo personalizadas com o player integrado TocaPlayer.",
     category: "customization",

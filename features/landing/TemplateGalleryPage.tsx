@@ -52,8 +52,8 @@ export const TemplateGalleryPage: React.FC = () => {
     return (
         <div className="min-h-screen bg-slate-50 flex flex-col font-sans">
             <SEO 
-                title="Modelos de Convites Digitais em Angola"
-                description="Explore os nossos designs de convites e modelos premium feitos artesanalmente para casamentos, chás de panelas, aniversários, chás de bebês e reuniões em Luanda, Angola."
+                title="Modelos de Convites Digitais Angola | Casamento e Chá de Panela"
+                description="Os mais elegantes modelos de convites digitais de casamento e chá de panela em Angola. Escolha um template de alta costura com RSVP e IBAN para presentes integrado e envie por WhatsApp."
             />
             <Navbar />
 

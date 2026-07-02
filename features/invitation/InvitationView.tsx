@@ -39,6 +39,7 @@ import { auth } from "../../components/FirebaseProvider";
 import toast from "react-hot-toast";
 import { copyToClipboard } from "../../lib/clipboard";
 import { QRCodeSVG } from "qrcode.react";
+import { SEO } from "../../components/SEO";
 
 // Helper to safely get image source URL from string or custom object
 const getImageUrl = (img: any): string => {
@@ -1010,6 +1011,11 @@ const InvitationView: React.FC = () => {
   if (isEditing) {
     return (
       <div className="min-h-screen bg-slate-900 text-slate-100 flex flex-col font-sans relative">
+        <SEO 
+          title={`Editando: ${activeEvent?.title || "Novo Convite"}`} 
+          description="Personalize seu convite digital premium de alta costura com RSVP, cronograma, galeria e muito mais."
+          image={activeEvent ? getImageUrl(activeEvent.heroImage) : undefined}
+        />
         {/* TOP FLOATING HEADER / ACTIONS (RETRACTABLE LUXURY BAR) */}
         <div
           className={`fixed top-4 left-1/2 -translate-x-1/2 z-[60] transition-all duration-500 ease-in-out ${isEditorBarExpanded ? "w-[95%] md:w-fit max-w-[95vw] md:max-w-4xl translate-y-0" : "w-auto -translate-y-2 hover:translate-y-0"}`}
@@ -1906,6 +1912,11 @@ const InvitationView: React.FC = () => {
 
   return (
     <>
+      <SEO 
+        title={activeEvent.title || "Convite Especial"} 
+        description={activeEvent.description || "Você foi convidado para o nosso evento especial! Veja os detalhes, localizações e confirme sua presença (RSVP)."}
+        image={getImageUrl(activeEvent.heroImage)}
+      />
       <TocaPlayer
         trackName={activeEvent.musicTrack}
         isDark={

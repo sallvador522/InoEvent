@@ -4,10 +4,62 @@ import path from 'path';
 import crypto from 'crypto';
 import { createServer as createViteServer } from 'vite';
 import cors from 'cors';
+import fs from 'fs';
+import admin from 'firebase-admin';
 
 const app = express();
 app.set('trust proxy', true);
 const PORT = 3000;
+
+// Read config safely
+const configPath = path.join(process.cwd(), 'firebase-applet-config.json');
+let firebaseConfig: any = {};
+try {
+  if (fs.existsSync(configPath)) {
+    firebaseConfig = JSON.parse(fs.readFileSync(configPath, 'utf8'));
+  }
+} catch (e) {
+  console.error("Error reading firebase-applet-config.json:", e);
+}
+
+// Initialize Firebase Admin
+let dbAdmin: any = null;
+try {
+  if (admin.apps.length === 0) {
+    admin.initializeApp({
+      projectId: firebaseConfig.projectId,
+    });
+  }
+  const dbId = firebaseConfig.firestoreDatabaseId;
+  if (dbId && dbId !== '(default)') {
+    try {
+      dbAdmin = admin.firestore();
+      dbAdmin.settings({ databaseId: dbId });
+    } catch (settingsError) {
+      console.warn("Falling back to standard firestore initialization:", settingsError);
+      dbAdmin = admin.firestore();
+    }
+  } else {
+    dbAdmin = admin.firestore();
+  }
+} catch (error) {
+  console.error("Error initializing Firebase Admin SDK:", error);
+}
+
+// Helper to fetch event details safely
+async function getEventDetails(eventId: string) {
+  if (!dbAdmin) return null;
+  try {
+    const docRef = dbAdmin.collection('events').doc(eventId);
+    const docSnap = await docRef.get();
+    if (docSnap.exists) {
+      return docSnap.data();
+    }
+  } catch (error) {
+    console.error(`Error fetching event details for ID ${eventId}:`, error);
+  }
+  return null;
+}
 
 app.use(cors());
 // For webhooks, we need the raw body if verifying signatures, but JSON parser is easier 
@@ -193,6 +245,69 @@ app.get('/api/payments/status', async (req, res) => {
    } else {
       res.json({ status: 'PENDING' });
    }
+});
+
+// Dynamic Open Graph / SEO support for individual invitations
+app.get('/invitation/:id', async (req, res, next) => {
+  const { id } = req.params;
+  
+  // Basic security and length check for ID
+  if (!id || id.length > 128 || !/^[a-zA-Z0-9_-]+$/.test(id)) {
+    return next();
+  }
+
+  try {
+    // Fetch event from Firestore
+    const eventData = await getEventDetails(id);
+    
+    // Read index.html
+    const isProd = process.env.NODE_ENV === 'production';
+    const htmlPath = isProd 
+      ? path.join(process.cwd(), 'dist/index.html')
+      : path.join(process.cwd(), 'index.html');
+      
+    if (!fs.existsSync(htmlPath)) {
+      return next();
+    }
+    
+    let html = fs.readFileSync(htmlPath, 'utf8');
+    
+    if (eventData) {
+      const eventTitle = eventData.title || 'Convite Especial';
+      const eventDesc = eventData.description || 'Você foi convidado para o nosso grande evento. Confirme sua presença e confira todos os detalhes!';
+      
+      // Determine the image to display
+      let eventImage = 'https://inoevent.online/inoOG.png';
+      if (eventData.heroImage) {
+        eventImage = eventData.heroImage;
+      }
+      
+      const eventUrl = `https://inoevent.online/invitation/${id}`;
+      
+      // Replace titles and descriptions in index.html to ensure crawlers get unique tags
+      html = html.replace(/<title>[^<]*<\/title>/g, `<title>${eventTitle} | InoEvents</title>`);
+      
+      // Replace meta description
+      html = html.replace(/<meta name="description" content="[^"]*"\s*\/?>/g, `<meta name="description" content="${eventDesc.replace(/"/g, '&quot;')}" />`);
+      
+      // Replace Open Graph / Facebook tags
+      html = html.replace(/<meta property="og:title" content="[^"]*"\s*\/?>/g, `<meta property="og:title" content="${eventTitle.replace(/"/g, '&quot;')}" />`);
+      html = html.replace(/<meta property="og:description" content="[^"]*"\s*\/?>/g, `<meta property="og:description" content="${eventDesc.replace(/"/g, '&quot;')}" />`);
+      html = html.replace(/<meta property="og:image" content="[^"]*"\s*\/?>/g, `<meta property="og:image" content="${eventImage}" />`);
+      html = html.replace(/<meta property="og:url" content="[^"]*"\s*\/?>/g, `<meta property="og:url" content="${eventUrl}" />`);
+      
+      // Replace Twitter tags
+      html = html.replace(/<meta name="twitter:title" content="[^"]*"\s*\/?>/g, `<meta name="twitter:title" content="${eventTitle.replace(/"/g, '&quot;')}" />`);
+      html = html.replace(/<meta name="twitter:description" content="[^"]*"\s*\/?>/g, `<meta name="twitter:description" content="${eventDesc.replace(/"/g, '&quot;')}" />`);
+      html = html.replace(/<meta name="twitter:image" content="[^"]*"\s*\/?>/g, `<meta name="twitter:image" content="${eventImage}" />`);
+    }
+    
+    res.setHeader('Content-Type', 'text/html');
+    return res.send(html);
+  } catch (err) {
+    console.error('Error in serveInvitationWithSEO route:', err);
+    return next();
+  }
 });
 
 async function startServer() {

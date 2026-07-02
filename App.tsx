@@ -1,26 +1,41 @@
-import React from 'react';
+import React, { lazy, Suspense } from 'react';
 import { BrowserRouter as Router, Routes, Route, useLocation } from 'react-router-dom';
 import { Toaster } from 'react-hot-toast';
 import { motion, AnimatePresence } from 'motion/react';
-import { LandingPage } from './features/landing/LandingPage';
-import { TemplateGalleryPage } from './features/landing/TemplateGalleryPage';
-import InvitationView from './features/invitation/InvitationView';
-import { EventCreator } from './features/invitation/EventCreator';
 import { ProtectedRoute } from './components/ProtectedRoute';
 import { AdminRoute } from './components/AdminRoute';
-import { Dashboard } from './features/dashboard/Dashboard';
-import { UserDashboard } from './features/dashboard/UserDashboard';
-import { CreateBusiness } from './features/business/CreateBusiness';
-import { BusinessDashboard } from './features/business/BusinessDashboard';
-import { AdminDashboard } from './features/admin/AdminDashboard';
-import { ClientDashboard } from './features/dashboard/ClientDashboard';
-import { CheckinScanner } from './features/checkin/CheckinScanner';
-import { AuthPage } from './features/auth/AuthPage';
-import { PlansPage } from './features/plans/PlansPage';
-import { TermsPage } from './features/landing/TermsPage';
-import { PrivacyPage } from './features/landing/PrivacyPage';
-import { AboutPage } from './features/landing/AboutPage';
 import { WhatsAppSupport } from './components/WhatsAppSupport';
+
+// Lazy-loaded pages to reduce initial bundle size and optimize Core Web Vitals for mobile users
+const LandingPage = lazy(() => import('./features/landing/LandingPage').then(m => ({ default: m.LandingPage })));
+const TemplateGalleryPage = lazy(() => import('./features/landing/TemplateGalleryPage').then(m => ({ default: m.TemplateGalleryPage })));
+const TermsPage = lazy(() => import('./features/landing/TermsPage').then(m => ({ default: m.TermsPage })));
+const PrivacyPage = lazy(() => import('./features/landing/PrivacyPage').then(m => ({ default: m.PrivacyPage })));
+const AboutPage = lazy(() => import('./features/landing/AboutPage').then(m => ({ default: m.AboutPage })));
+const InvitationView = lazy(() => import('./features/invitation/InvitationView'));
+const CheckinScanner = lazy(() => import('./features/checkin/CheckinScanner').then(m => ({ default: m.CheckinScanner })));
+const CreateBusiness = lazy(() => import('./features/business/CreateBusiness').then(m => ({ default: m.CreateBusiness })));
+const BusinessDashboard = lazy(() => import('./features/business/BusinessDashboard').then(m => ({ default: m.BusinessDashboard })));
+const UserDashboard = lazy(() => import('./features/dashboard/UserDashboard').then(m => ({ default: m.UserDashboard })));
+const Dashboard = lazy(() => import('./features/dashboard/Dashboard').then(m => ({ default: m.Dashboard })));
+const ClientDashboard = lazy(() => import('./features/dashboard/ClientDashboard').then(m => ({ default: m.ClientDashboard })));
+const AuthPage = lazy(() => import('./features/auth/AuthPage').then(m => ({ default: m.AuthPage })));
+const PlansPage = lazy(() => import('./features/plans/PlansPage').then(m => ({ default: m.PlansPage })));
+const EventCreator = lazy(() => import('./features/invitation/EventCreator').then(m => ({ default: m.EventCreator })));
+const AdminDashboard = lazy(() => import('./features/admin/AdminDashboard').then(m => ({ default: m.AdminDashboard })));
+
+// Sleek luxury-styled minimalist loading fallback
+const PageLoader: React.FC = () => (
+  <div className="flex flex-col items-center justify-center min-h-[60vh] w-full" id="page-loader">
+    <div className="relative w-10 h-10 mb-4">
+      <div className="absolute inset-0 rounded-full border-2 border-slate-100" />
+      <div className="absolute inset-0 rounded-full border-t-2 border-slate-900 animate-spin" />
+    </div>
+    <span className="text-[10px] uppercase tracking-[0.25em] text-slate-400 font-medium animate-pulse">
+      Carregando...
+    </span>
+  </div>
+);
 
 const PageWrapper = ({ children }: { children: React.ReactNode }) => (
   <motion.div
@@ -30,7 +45,9 @@ const PageWrapper = ({ children }: { children: React.ReactNode }) => (
     transition={{ duration: 0.3, ease: 'easeOut' }}
     className="w-full min-h-screen"
   >
-    {children}
+    <Suspense fallback={<PageLoader />}>
+      {children}
+    </Suspense>
   </motion.div>
 );
 

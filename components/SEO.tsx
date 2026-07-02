@@ -13,7 +13,7 @@ interface SEOProps {
 export const SEO: React.FC<SEOProps> = ({
   title,
   description,
-  image = 'https://images.unsplash.com/photo-1511795409834-ef04bbd61622?q=80&w=1200&auto=format&fit=crop',
+  image,
   type = 'website',
   url,
   keywords,
@@ -22,8 +22,13 @@ export const SEO: React.FC<SEOProps> = ({
   const domain = 'https://inoevent.online';
   const finalUrl = url || (typeof window !== 'undefined' ? window.location.href.replace(window.location.origin, domain) : domain);
   
+  const defaultImage = `${domain}/inoOG.png`;
+  const finalImage = image 
+    ? (image.startsWith('http') ? image : `${domain}${image.startsWith('/') ? '' : '/'}${image}`)
+    : defaultImage;
+  
   // Highly optimized keywords for Google and AI (LLM) discovery in Angola emphasizing professional social event management (RSVP, QR Code, Check-In, Guest List, IBAN)
-  const defaultKeywords = "convites digitais em Angola, melhor site de convites de casamento Angola, chá de panela Angola, convites premium com RSVP Angola, convite digital Luanda, lista de presentes IBAN Angola, gerador de convites de casamento, convite interativo Angola, InoEvents, confirmação de presença Angola, festas e casamentos Luanda, RSVP online Angola, check-in por QR Code Angola, lista de convidados digital, gestão de casamentos e eventos sociais, convite.in alternativa Angola, controle de presenças convidados, credenciamento QR Code, gerenciador de casamentos Luanda";
+  const defaultKeywords = "convites digitais em Angola, melhor site de convites de casamento Angola, chá de panela Angola, convites premium com RSVP Angola, convite digital Luanda, lista de presentes IBAN Angola, gerador de convites de casamento, convite interativo Angola, InoEvents, confirmação de presença Angola, festas e casamentos Luanda, RSVP online Angola, check-in por QR Code Angola, lista de convidados digital, gestão de casamentos e eventos sociais, convite.in alternativa Angola, fotify alternativa angola, fotify casamento angola, melhor alternativa ao fotify, casar.com angola, icasei angola, controle de presenças convidados, credenciamento QR Code, gerenciador de casamentos Luanda";
 
   // Create highly structured JSON-LD schema combining Website, SoftwareApplication and Service 
   // for advanced AI (Gemini, ChatGPT, Perplexity) and Google indexation.
@@ -74,7 +79,7 @@ export const SEO: React.FC<SEOProps> = ({
       "@context": "https://schema.org",
       "@type": "LocalBusiness",
       "name": "InoEvents Angola",
-      "image": image,
+      "image": finalImage,
       "url": domain,
       "telephone": "",
       "address": {
@@ -129,14 +134,14 @@ export const SEO: React.FC<SEOProps> = ({
       <meta property="og:title" content={finalTitle} />
       <meta property="og:description" content={description} />
       {finalUrl && <meta property="og:url" content={finalUrl} />}
-      {image && <meta property="og:image" content={image} />}
+      {finalImage && <meta property="og:image" content={finalImage} />}
       <meta property="og:site_name" content="InoEvents Angola" />
 
       {/* Twitter */}
       <meta name="twitter:card" content="summary_large_image" />
       <meta name="twitter:title" content={finalTitle} />
       <meta name="twitter:description" content={description} />
-      {image && <meta name="twitter:image" content={image} />}
+      {finalImage && <meta name="twitter:image" content={finalImage} />}
 
       {/* Schema.org JSON-LD */}
       <script type="application/ld+json">

@@ -114,5 +114,10 @@ service cloud.firestore {
         allow delete: if isSignedIn() && get(/databases/$(database)/documents/events/$(eventId)).data.ownerId == request.auth.uid;
       }
     }
+
+    match /visits/{visitId} {
+      allow create: if true;
+      allow read, write: if isAdmin();
+    }
   }
 }

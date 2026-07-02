@@ -100,14 +100,28 @@ interface FirebaseContextType {
   user: User | null;
   loading: boolean;
   userProfile: any | null;
+  isOnline: boolean;
 }
 
-const FirebaseContext = createContext<FirebaseContextType>({ user: null, loading: true, userProfile: null });
+const FirebaseContext = createContext<FirebaseContextType>({ user: null, loading: true, userProfile: null, isOnline: true });
 
 export const FirebaseProvider: React.FC<{ children: React.ReactNode }> = ({ children }) => {
   const [user, setUser] = useState<User | null>(null);
   const [loading, setLoading] = useState(true);
   const [userProfile, setUserProfile] = useState<any | null>(null);
+  const [isOnline, setIsOnline] = useState<boolean>(typeof navigator !== 'undefined' ? navigator.onLine : true);
+
+  useEffect(() => {
+    if (typeof window === 'undefined') return;
+    const handleOnline = () => setIsOnline(true);
+    const handleOffline = () => setIsOnline(false);
+    window.addEventListener('online', handleOnline);
+    window.addEventListener('offline', handleOffline);
+    return () => {
+      window.removeEventListener('online', handleOnline);
+      window.removeEventListener('offline', handleOffline);
+    };
+  }, []);
 
   useEffect(() => {
     const unsubscribe = onAuthStateChanged(auth, (user) => {
@@ -153,7 +167,7 @@ export const FirebaseProvider: React.FC<{ children: React.ReactNode }> = ({ chil
   }, [user]);
 
   return (
-    <FirebaseContext.Provider value={{ user, loading, userProfile }}>
+    <FirebaseContext.Provider value={{ user, loading, userProfile, isOnline }}>
       {children}
     </FirebaseContext.Provider>
   );

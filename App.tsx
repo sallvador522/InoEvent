@@ -5,6 +5,7 @@ import { motion, AnimatePresence } from 'motion/react';
 import { ProtectedRoute } from './components/ProtectedRoute';
 import { AdminRoute } from './components/AdminRoute';
 import { WhatsAppSupport } from './components/WhatsAppSupport';
+import { AnalyticsTracker } from './components/AnalyticsTracker';
 
 // Lazy-loaded pages to reduce initial bundle size and optimize Core Web Vitals for mobile users
 const LandingPage = lazy(() => import('./features/landing/LandingPage').then(m => ({ default: m.LandingPage })));
@@ -112,6 +113,7 @@ const App: React.FC = () => {
     <>
       <Toaster position="top-center" />
       <Router>
+        <AnalyticsTracker />
         <AnimatedRoutes />
         <WhatsAppSupport />
       </Router>

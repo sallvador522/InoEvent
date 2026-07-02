@@ -7,7 +7,7 @@ import { collection, query, where, getDocs, onSnapshot, orderBy, doc, updateDoc,
 export const Navbar: React.FC = () => {
   const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
   const [dashboardOpen, setDashboardOpen] = useState(false);
-  const { user, userProfile } = useFirebase();
+  const { user, userProfile, isOnline } = useFirebase();
   const [userEvents, setUserEvents] = useState<any[]>([]);
   const [notifications, setNotifications] = useState<any[]>([]);
   const [notificationsOpen, setNotificationsOpen] = useState(false);
@@ -130,6 +130,16 @@ export const Navbar: React.FC = () => {
               <span className="px-2 py-0.5 md:px-2.5 md:py-1 rounded-full text-[10px] md:text-xs font-bold leading-none bg-gradient-to-r from-amber-500/20 to-amber-600/30 text-amber-300 border border-amber-500/20 shadow-sm uppercase tracking-wider flex items-center gap-1 scale-95 md:scale-100">
                 <span className="material-symbols-outlined text-[10px] md:text-[12px] text-amber-400">verified</span>
                 <span>{userProfile?.plan || 'Essencial'}</span>
+              </span>
+            </div>
+          )}
+
+          {/* Connection Status Badge */}
+          {!isOnline && (
+            <div className="flex items-center gap-1 ml-1 sm:ml-2">
+              <span className="px-2 py-0.5 md:px-2.5 md:py-1 rounded-full text-[10px] md:text-xs font-bold leading-none bg-amber-500/10 text-amber-300 border border-amber-500/20 shadow-sm uppercase tracking-wider flex items-center gap-1.5 animate-pulse">
+                <span className="w-1.5 h-1.5 rounded-full bg-amber-400"></span>
+                <span>Sinc. Offline</span>
               </span>
             </div>
           )}

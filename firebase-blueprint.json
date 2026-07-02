@@ -91,6 +91,21 @@
         "updatedAt": { "type": "string" }
       },
       "required": ["name", "phone", "status"]
+    },
+    "Visit": {
+      "title": "Visit",
+      "description": "Page view or visit log",
+      "type": "object",
+      "properties": {
+        "id": { "type": "string" },
+        "path": { "type": "string" },
+        "eventId": { "type": "string" },
+        "referrer": { "type": "string" },
+        "browser": { "type": "string" },
+        "device": { "type": "string" },
+        "timestamp": { "type": "string" }
+      },
+      "required": ["path", "timestamp"]
     }
   },
   "firestore": {
@@ -109,6 +124,10 @@
     "/events/{eventId}/guests/{guestId}": {
       "schema": { "$ref": "Guest" },
       "description": "Guests RSVP for an event"
+    },
+    "/visits/{visitId}": {
+      "schema": { "$ref": "Visit" },
+      "description": "Page visits analytics log"
     }
   }
 }

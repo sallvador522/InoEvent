@@ -5,14 +5,16 @@ import { collection, getDocs, query, orderBy, doc, updateDoc, addDoc } from 'fir
 import { toast } from 'react-hot-toast';
 import { motion, AnimatePresence } from 'framer-motion';
 import { Skeleton } from '../../components/ui/Skeleton';
+import { ResponsiveContainer, AreaChart, Area, XAxis, YAxis, CartesianGrid, Tooltip } from 'recharts';
 
 export const AdminDashboard: React.FC = () => {
   const [users, setUsers] = useState<any[]>([]);
   const [events, setEvents] = useState<any[]>([]);
   const [transactions, setTransactions] = useState<any[]>([]);
+  const [visits, setVisits] = useState<any[]>([]);
   const [loading, setLoading] = useState(true);
   
-  const [activeTab, setActiveTab] = useState<'overview' | 'users' | 'events' | 'transactions'>('overview');
+  const [activeTab, setActiveTab] = useState<'overview' | 'users' | 'events' | 'transactions' | 'analytics'>('overview');
   const [selectedUser, setSelectedUser] = useState<any | null>(null);
   
   const [searchQuery, setSearchQuery] = useState('');
@@ -36,10 +38,19 @@ export const AdminDashboard: React.FC = () => {
         const usersSnapshot = await getDocs(query(collection(db, 'users')));
         const eventsSnapshot = await getDocs(query(collection(db, 'events')));
         const transactionsSnapshot = await getDocs(query(collection(db, 'transactions'), orderBy('date', 'desc')));
+        
+        let visitsData: any[] = [];
+        try {
+          const visitsSnapshot = await getDocs(collection(db, 'visits'));
+          visitsData = visitsSnapshot.docs.map(doc => ({ id: doc.id, ...doc.data() }));
+        } catch (visErr) {
+          console.warn('Falha ao buscar visitas (talvez a coleção esteja vazia):', visErr);
+        }
 
         setUsers(usersSnapshot.docs.map(doc => ({ id: doc.id, ...doc.data() })));
         setEvents(eventsSnapshot.docs.map(doc => ({ id: doc.id, ...doc.data() })));
         setTransactions(transactionsSnapshot.docs.map(doc => ({ id: doc.id, ...doc.data() })));
+        setVisits(visitsData);
       } catch (error) {
         console.error('Error fetching admin data:', error);
       } finally {
@@ -512,30 +523,36 @@ export const AdminDashboard: React.FC = () => {
             <p className="text-slate-500 mt-1">Gestão centralizada de usuários e eventos da plataforma.</p>
           </div>
           
-          <div className="flex p-1 bg-white rounded-xl shadow-sm border border-slate-200 w-fit">
+          <div className="flex p-1 bg-white rounded-xl shadow-sm border border-slate-200 w-fit overflow-x-auto">
             <button 
               onClick={() => { setActiveTab('overview'); setSelectedUser(null); }}
-              className={`px-4 py-2 text-sm font-bold rounded-lg transition-all ${activeTab === 'overview' ? 'bg-slate-900 text-white shadow-md' : 'text-slate-500 hover:text-slate-900 hover:bg-slate-100'}`}
+              className={`px-4 py-2 text-sm font-bold rounded-lg transition-all whitespace-nowrap ${activeTab === 'overview' ? 'bg-slate-900 text-white shadow-md' : 'text-slate-500 hover:text-slate-900 hover:bg-slate-100'}`}
             >
               Visão Geral
             </button>
             <button 
               onClick={() => { setActiveTab('users'); setSelectedUser(null); }}
-              className={`px-4 py-2 text-sm font-bold rounded-lg transition-all ${activeTab === 'users' ? 'bg-slate-900 text-white shadow-md' : 'text-slate-500 hover:text-slate-900 hover:bg-slate-100'}`}
+              className={`px-4 py-2 text-sm font-bold rounded-lg transition-all whitespace-nowrap ${activeTab === 'users' ? 'bg-slate-900 text-white shadow-md' : 'text-slate-500 hover:text-slate-900 hover:bg-slate-100'}`}
             >
               Usuários
             </button>
             <button 
               onClick={() => { setActiveTab('events'); setSelectedUser(null); }}
-              className={`px-4 py-2 text-sm font-bold rounded-lg transition-all ${activeTab === 'events' ? 'bg-slate-900 text-white shadow-md' : 'text-slate-500 hover:text-slate-900 hover:bg-slate-100'}`}
+              className={`px-4 py-2 text-sm font-bold rounded-lg transition-all whitespace-nowrap ${activeTab === 'events' ? 'bg-slate-900 text-white shadow-md' : 'text-slate-500 hover:text-slate-900 hover:bg-slate-100'}`}
             >
               Eventos
             </button>
             <button 
               onClick={() => { setActiveTab('transactions'); setSelectedUser(null); }}
-              className={`px-4 py-2 text-sm font-bold rounded-lg transition-all ${activeTab === 'transactions' ? 'bg-slate-900 text-white shadow-md' : 'text-slate-500 hover:text-slate-900 hover:bg-slate-100'}`}
+              className={`px-4 py-2 text-sm font-bold rounded-lg transition-all whitespace-nowrap ${activeTab === 'transactions' ? 'bg-slate-900 text-white shadow-md' : 'text-slate-500 hover:text-slate-900 hover:bg-slate-100'}`}
             >
               Transações
+            </button>
+            <button 
+              onClick={() => { setActiveTab('analytics'); setSelectedUser(null); }}
+              className={`px-4 py-2 text-sm font-bold rounded-lg transition-all whitespace-nowrap ${activeTab === 'analytics' ? 'bg-slate-900 text-white shadow-md' : 'text-slate-500 hover:text-slate-900 hover:bg-slate-100'}`}
+            >
+              Tráfego & Visitas
             </button>
           </div>
         </div>
@@ -552,6 +569,7 @@ export const AdminDashboard: React.FC = () => {
             {activeTab === 'users' && renderUsers()}
             {activeTab === 'events' && renderEvents()}
             {activeTab === 'transactions' && renderTransactions()}
+            {activeTab === 'analytics' && <AnalyticsView visits={visits} events={events} users={users} />}
           </motion.div>
         </AnimatePresence>
 
@@ -671,6 +689,354 @@ export const AdminDashboard: React.FC = () => {
           )}
         </AnimatePresence>
 
+      </div>
+    </div>
+  );
+};
+
+interface AnalyticsViewProps {
+  visits: any[];
+  events: any[];
+  users: any[];
+}
+
+const AnalyticsView: React.FC<AnalyticsViewProps> = ({ visits, events, users }) => {
+  const totalVisits = visits.length;
+  
+  const pageCounts: { [key: string]: number } = {};
+  visits.forEach(v => { pageCounts[v.path || '/'] = (pageCounts[v.path || '/'] || 0) + 1; });
+  const totalUniquePages = Object.keys(pageCounts).length;
+  
+  const mobileVisits = visits.filter(v => v.device === 'Celular' || v.device === 'Tablet').length;
+  const mobilePercentage = totalVisits > 0 ? Math.round((mobileVisits / totalVisits) * 100) : 0;
+  
+  const refCounts: { [key: string]: number } = {};
+  visits.forEach(v => { const ref = v.referrer || 'Direto'; refCounts[ref] = (refCounts[ref] || 0) + 1; });
+  const topReferrer = Object.keys(refCounts).reduce((a, b) => (refCounts[a] || 0) > (refCounts[b] || 0) ? a : b, 'Direto');
+  const topReferrerCount = refCounts[topReferrer] || 0;
+  const topReferrerPercentage = totalVisits > 0 ? Math.round((topReferrerCount / totalVisits) * 100) : 0;
+
+  const getVisitsTimelineData = () => {
+    const dailyCounts: { [key: string]: number } = {};
+    
+    // Initialize last 14 days with 0 to ensure continuous line
+    for (let i = 13; i >= 0; i--) {
+      const d = new Date();
+      d.setDate(d.getDate() - i);
+      const dateStr = d.toISOString().split('T')[0];
+      dailyCounts[dateStr] = 0;
+    }
+
+    visits.forEach((v: any) => {
+      if (v.timestamp) {
+        const dateStr = v.timestamp.split('T')[0];
+        if (dailyCounts[dateStr] !== undefined) {
+          dailyCounts[dateStr]++;
+        }
+      }
+    });
+
+    return Object.keys(dailyCounts).sort().map(date => {
+      const [year, month, day] = date.split('-');
+      const monthNames = ['Jan', 'Fev', 'Mar', 'Abr', 'Mai', 'Jun', 'Jul', 'Ago', 'Set', 'Out', 'Nov', 'Dez'];
+      const formattedDate = `${day}/${monthNames[parseInt(month) - 1]}`;
+      return {
+        date: formattedDate,
+        'Visitas': dailyCounts[date]
+      };
+    });
+  };
+
+  const getDeviceStats = () => {
+    const counts: { [key: string]: number } = { 'Celular': 0, 'Computador': 0, 'Tablet': 0 };
+    let total = 0;
+    
+    visits.forEach((v: any) => {
+      const dev = v.device || 'Computador';
+      if (counts[dev] !== undefined) {
+        counts[dev]++;
+        total++;
+      }
+    });
+
+    return Object.keys(counts).map(name => ({
+      name,
+      count: counts[name],
+      percentage: total > 0 ? Math.round((counts[name] / total) * 100) : 0
+    })).sort((a, b) => b.count - a.count);
+  };
+
+  const getTopPages = () => {
+    const pathCounts: { [key: string]: { count: number; eventId?: string } } = {};
+    
+    visits.forEach((v: any) => {
+      const path = v.path || '/';
+      if (!pathCounts[path]) {
+        pathCounts[path] = { count: 0, eventId: v.eventId };
+      }
+      pathCounts[path].count++;
+    });
+
+    return Object.keys(pathCounts).map(path => {
+      const data = pathCounts[path];
+      let title = 'Página Principal (Home)';
+      let ownerEmail = 'N/A';
+      
+      if (data.eventId) {
+        const event = events.find(e => e.id === data.eventId);
+        if (event) {
+          title = event.title || `Convite #${data.eventId}`;
+          const owner = users.find(u => u.uid === event.ownerId);
+          ownerEmail = owner ? owner.email : 'N/A';
+        } else {
+          title = `Convite #${data.eventId}`;
+        }
+      } else if (path.startsWith('/templates')) {
+        title = 'Galeria de Modelos';
+      } else if (path.startsWith('/plans')) {
+        title = 'Página de Planos';
+      } else if (path.startsWith('/about')) {
+        title = 'Sobre Nós';
+      }
+
+      return {
+        path,
+        title,
+        ownerEmail,
+        count: data.count
+      };
+    }).sort((a, b) => b.count - a.count).slice(0, 8);
+  };
+
+  const timelineData = getVisitsTimelineData();
+  const deviceStats = getDeviceStats();
+  const topPages = getTopPages();
+
+  const browserCounts: { [key: string]: number } = {};
+  visits.forEach(v => { const b = v.browser || 'Outros'; browserCounts[b] = (browserCounts[b] || 0) + 1; });
+  const browserStats = Object.keys(browserCounts).map(name => ({
+    name,
+    count: browserCounts[name],
+    percentage: totalVisits > 0 ? Math.round((browserCounts[name] / totalVisits) * 100) : 0
+  })).sort((a, b) => b.count - a.count);
+
+  return (
+    <div className="space-y-8 animate-in fade-in duration-300">
+      <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-6">
+        <div className="bg-white p-6 rounded-2xl shadow-sm border border-slate-100 flex items-center justify-between">
+          <div className="space-y-1">
+            <p className="text-xs font-bold text-slate-400 uppercase tracking-widest">Total de Visitas</p>
+            <h3 className="text-3xl font-serif font-bold text-slate-900">{totalVisits}</h3>
+            <p className="text-xs text-green-500 font-medium flex items-center gap-0.5">
+              <span className="material-symbols-outlined text-[14px]">trending_up</span>
+              <span>Sessões registradas</span>
+            </p>
+          </div>
+          <div className="w-12 h-12 rounded-full bg-violet-100 flex items-center justify-center text-violet-600">
+            <span className="material-symbols-outlined text-[24px]">visibility</span>
+          </div>
+        </div>
+
+        <div className="bg-white p-6 rounded-2xl shadow-sm border border-slate-100 flex items-center justify-between">
+          <div className="space-y-1">
+            <p className="text-xs font-bold text-slate-400 uppercase tracking-widest">Páginas Distintas</p>
+            <h3 className="text-3xl font-serif font-bold text-slate-900">{totalUniquePages}</h3>
+            <p className="text-xs text-slate-400">Total de URLs rastreadas</p>
+          </div>
+          <div className="w-12 h-12 rounded-full bg-emerald-100 flex items-center justify-center text-emerald-600">
+            <span className="material-symbols-outlined text-[24px]">layers</span>
+          </div>
+        </div>
+
+        <div className="bg-white p-6 rounded-2xl shadow-sm border border-slate-100 flex items-center justify-between">
+          <div className="space-y-1">
+            <p className="text-xs font-bold text-slate-400 uppercase tracking-widest">Tráfego Mobile</p>
+            <h3 className="text-3xl font-serif font-bold text-slate-900">{mobilePercentage}%</h3>
+            <p className="text-xs text-slate-400">{mobileVisits} de {totalVisits} visitas</p>
+          </div>
+          <div className="w-12 h-12 rounded-full bg-blue-100 flex items-center justify-center text-blue-600">
+            <span className="material-symbols-outlined text-[24px]">phone_iphone</span>
+          </div>
+        </div>
+
+        <div className="bg-white p-6 rounded-2xl shadow-sm border border-slate-100 flex items-center justify-between">
+          <div className="space-y-1">
+            <p className="text-xs font-bold text-slate-400 uppercase tracking-widest">Canal Principal</p>
+            <h3 className="text-3xl font-serif font-bold text-slate-900 truncate max-w-[180px]">{topReferrer}</h3>
+            <p className="text-xs text-slate-400">{topReferrerPercentage}% ({topReferrerCount} visitas)</p>
+          </div>
+          <div className="w-12 h-12 rounded-full bg-rose-100 flex items-center justify-center text-rose-600">
+            <span className="material-symbols-outlined text-[24px]">language</span>
+          </div>
+        </div>
+      </div>
+
+      <div className="grid grid-cols-1 lg:grid-cols-3 gap-8">
+        <div className="lg:col-span-2 bg-white p-6 rounded-2xl shadow-sm border border-slate-100 flex flex-col">
+          <div className="flex items-center justify-between mb-6">
+            <div>
+              <h3 className="text-lg font-serif font-bold text-slate-900">Evolução de Tráfego</h3>
+              <p className="text-xs text-slate-400 mt-0.5">Visitas totais nos últimos 14 dias</p>
+            </div>
+            <div className="flex items-center gap-2 text-xs text-slate-500 font-bold bg-slate-50 border border-slate-100 px-3 py-1.5 rounded-lg">
+              <span className="w-2.5 h-2.5 rounded-full bg-violet-500"></span>
+              <span>Acessos Únicos</span>
+            </div>
+          </div>
+          
+          <div className="h-72 w-full mt-auto">
+            {totalVisits > 0 ? (
+              <ResponsiveContainer width="100%" height="100%">
+                <AreaChart data={timelineData}>
+                  <defs>
+                    <linearGradient id="colorVisits" x1="0" y1="0" x2="0" y2="1">
+                      <stop offset="5%" stopColor="#8b5cf6" stopOpacity={0.2}/>
+                      <stop offset="95%" stopColor="#8b5cf6" stopOpacity={0}/>
+                    </linearGradient>
+                  </defs>
+                  <CartesianGrid strokeDasharray="3 3" vertical={false} stroke="#f1f5f9" />
+                  <XAxis dataKey="date" stroke="#94a3b8" fontSize={11} tickLine={false} />
+                  <YAxis stroke="#94a3b8" fontSize={11} tickLine={false} axisLine={false} />
+                  <Tooltip 
+                    contentStyle={{ background: '#0f172a', border: 'none', borderRadius: '12px', color: '#fff', fontSize: '12px' }}
+                    labelStyle={{ fontWeight: 'bold', color: '#a78bfa' }}
+                  />
+                  <Area type="monotone" dataKey="Visitas" stroke="#8b5cf6" strokeWidth={2.5} fillOpacity={1} fill="url(#colorVisits)" />
+                </AreaChart>
+              </ResponsiveContainer>
+            ) : (
+              <div className="h-full w-full flex items-center justify-center text-slate-400 text-sm font-medium border border-dashed border-slate-200 rounded-xl">
+                Nenhum dado de visita disponível ainda.
+              </div>
+            )}
+          </div>
+        </div>
+
+        <div className="space-y-6 flex flex-col justify-between">
+          <div className="bg-white p-6 rounded-2xl shadow-sm border border-slate-100 flex-1">
+            <h4 className="text-sm font-bold text-slate-800 uppercase tracking-wider mb-4 flex items-center gap-2">
+              <span className="material-symbols-outlined text-violet-500 text-[18px]">devices</span>
+              <span>Dispositivos</span>
+            </h4>
+            <div className="space-y-4">
+              {deviceStats.map((stat, i) => (
+                <div key={stat.name} className="space-y-1">
+                  <div className="flex justify-between items-center text-xs">
+                    <span className="font-bold text-slate-700">{stat.name}</span>
+                    <span className="text-slate-400 font-semibold">{stat.percentage}% ({stat.count})</span>
+                  </div>
+                  <div className="w-full bg-slate-100 h-2 rounded-full overflow-hidden">
+                    <div 
+                      className={`h-full rounded-full transition-all duration-1000 ${
+                        i === 0 ? 'bg-violet-500' : i === 1 ? 'bg-emerald-500' : 'bg-amber-500'
+                      }`}
+                      style={{ width: `${stat.percentage}%` }}
+                    />
+                  </div>
+                </div>
+              ))}
+            </div>
+          </div>
+
+          <div className="bg-white p-6 rounded-2xl shadow-sm border border-slate-100 flex-1 mt-4 lg:mt-0">
+            <h4 className="text-sm font-bold text-slate-800 uppercase tracking-wider mb-4 flex items-center gap-2">
+              <span className="material-symbols-outlined text-emerald-500 text-[18px]">language</span>
+              <span>Navegadores</span>
+            </h4>
+            <div className="space-y-3 max-h-48 overflow-y-auto custom-scrollbar pr-1">
+              {browserStats.map((stat, i) => (
+                <div key={stat.name} className="flex items-center justify-between text-xs border-b border-slate-50 pb-2 last:border-b-0 last:pb-0">
+                  <div className="flex items-center gap-2">
+                    <div className="w-2.5 h-2.5 rounded-full bg-emerald-400" />
+                    <span className="font-semibold text-slate-700">{stat.name}</span>
+                  </div>
+                  <span className="font-mono text-slate-400">{stat.percentage}% ({stat.count})</span>
+                </div>
+              ))}
+              {browserStats.length === 0 && <p className="text-xs text-slate-400">Nenhum dado.</p>}
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <div className="grid grid-cols-1 lg:grid-cols-3 gap-8">
+        <div className="lg:col-span-2 bg-white rounded-2xl shadow-sm border border-slate-100 overflow-hidden">
+          <div className="p-6 border-b border-slate-100 bg-slate-50/30">
+            <h3 className="text-lg font-serif font-bold text-slate-900">Páginas & Convites Mais Acessados</h3>
+            <p className="text-xs text-slate-400 mt-0.5">URLs com maior tráfego acumulado na plataforma</p>
+          </div>
+          
+          <div className="overflow-x-auto">
+            <table className="w-full text-left text-xs text-slate-600">
+              <thead className="bg-slate-50 text-slate-500 uppercase font-bold tracking-wider border-b border-slate-200">
+                <tr>
+                  <th className="px-6 py-4">Página / Evento</th>
+                  <th className="px-6 py-4">URL</th>
+                  <th className="px-6 py-4">Criador</th>
+                  <th className="px-6 py-4 text-right">Acessos</th>
+                </tr>
+              </thead>
+              <tbody className="divide-y divide-slate-100">
+                {topPages.map((page, i) => (
+                  <tr key={page.path} className="hover:bg-slate-50/50 transition-colors">
+                    <td className="px-6 py-4">
+                      <div className="flex items-center gap-2.5">
+                        <span className="w-5 h-5 rounded-full bg-slate-100 text-slate-500 text-[10px] font-bold flex items-center justify-center">
+                          {i + 1}
+                        </span>
+                        <span className="font-bold text-slate-800">{page.title}</span>
+                      </div>
+                    </td>
+                    <td className="px-6 py-4 font-mono text-slate-400 text-[10px]">
+                      {page.path}
+                    </td>
+                    <td className="px-6 py-4 text-slate-500">
+                      {page.ownerEmail}
+                    </td>
+                    <td className="px-6 py-4 text-right font-bold text-slate-900">
+                      {page.count}
+                    </td>
+                  </tr>
+                ))}
+                {topPages.length === 0 && (
+                  <tr>
+                    <td colSpan={4} className="px-6 py-8 text-center text-slate-400">Nenhum tráfego registrado ainda.</td>
+                  </tr>
+                )}
+              </tbody>
+            </table>
+          </div>
+        </div>
+
+        <div className="bg-white p-6 rounded-2xl shadow-sm border border-slate-100 flex flex-col">
+          <h4 className="text-sm font-bold text-slate-800 uppercase tracking-wider mb-4 flex items-center gap-2">
+            <span className="material-symbols-outlined text-rose-500 text-[18px]">share</span>
+            <span>Fontes de Referência</span>
+          </h4>
+          <div className="space-y-4 flex-1">
+            {Object.keys(refCounts).map((ref) => {
+              const count = refCounts[ref];
+              const percentage = totalVisits > 0 ? Math.round((count / totalVisits) * 100) : 0;
+              return (
+                <div key={ref} className="space-y-1 pb-3 border-b border-slate-50 last:border-0 last:pb-0">
+                  <div className="flex justify-between items-center text-xs">
+                    <span className="font-semibold text-slate-700">{ref}</span>
+                    <span className="font-bold text-slate-500">{count} ({percentage}%)</span>
+                  </div>
+                  <div className="w-full bg-slate-100 h-1.5 rounded-full">
+                    <div 
+                      className="h-full bg-rose-500 rounded-full"
+                      style={{ width: `${percentage}%` }}
+                    />
+                  </div>
+                </div>
+              );
+            })}
+            {Object.keys(refCounts).length === 0 && (
+              <p className="text-xs text-slate-400">Nenhuma fonte de tráfego detectada ainda.</p>
+            )}
+          </div>
+        </div>
       </div>
     </div>
   );

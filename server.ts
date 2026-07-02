@@ -277,12 +277,12 @@ app.get('/invitation/:id', async (req, res, next) => {
       const eventDesc = eventData.description || 'Você foi convidado para o nosso grande evento. Confirme sua presença e confira todos os detalhes!';
       
       // Determine the image to display
-      let eventImage = 'https://inoevent.online/inoOG.png';
+      let eventImage = 'https://www.inoevent.online/inoOG.png';
       if (eventData.heroImage) {
         eventImage = eventData.heroImage;
       }
       
-      const eventUrl = `https://inoevent.online/invitation/${id}`;
+      const eventUrl = `https://www.inoevent.online/invitation/${id}`;
       
       // Replace titles and descriptions in index.html to ensure crawlers get unique tags
       html = html.replace(/<title>[^<]*<\/title>/g, `<title>${eventTitle} | InoEvents</title>`);

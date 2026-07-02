@@ -19,7 +19,7 @@ export const SEO: React.FC<SEOProps> = ({
   keywords,
 }) => {
   const finalTitle = title.includes('InoEvents') ? title : `${title} | InoEvents Angola`;
-  const domain = 'https://inoevent.online';
+  const domain = 'https://www.inoevent.online';
   const finalUrl = url || (typeof window !== 'undefined' ? window.location.href.replace(window.location.origin, domain) : domain);
   
   const defaultImage = `${domain}/inoOG.png`;

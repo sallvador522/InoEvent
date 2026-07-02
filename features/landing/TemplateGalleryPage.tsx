@@ -6,6 +6,7 @@ import { ThemeType } from '../../types';
 import { Navbar } from '../../components/Navbar';
 import { SEO } from '../../components/SEO';
 import { Skeleton } from '../../components/ui/Skeleton';
+import { getOptimizedImageUrl } from '../../lib/imageOptimizer';
 
 const MotionLink = motion(Link as any) as any;
 
@@ -112,7 +113,9 @@ export const TemplateGalleryPage: React.FC = () => {
                                         <img
                                             alt={event.title}
                                             className="w-full h-full object-cover group-hover:scale-110 transition-transform duration-700"
-                                            src={event.heroImage}
+                                            src={getOptimizedImageUrl(event.heroImage, { width: 500, quality: 75 })}
+                                            loading="lazy"
+                                            referrerPolicy="no-referrer"
                                         />
                                         <div className="absolute inset-0 bg-gradient-to-t from-black/60 to-transparent opacity-60"></div>
                                         <div className="absolute top-2 right-2 md:top-4 md:right-4 z-20 flex flex-col md:flex-row gap-1 md:gap-2 items-end">

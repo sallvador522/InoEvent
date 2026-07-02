@@ -12,7 +12,12 @@ if ('serviceWorker' in navigator) {
         console.log('[InoEvents] Service Worker registrado com sucesso no escopo:', registration.scope);
       })
       .catch((err) => {
-        console.error('[InoEvents] Falha ao registrar Service Worker:', err);
+        const errorMsg = String(err);
+        if (errorMsg.includes('Rejected') || errorMsg.includes('SecurityError') || errorMsg.includes('disallowed') || errorMsg.includes('denied')) {
+          console.warn('[InoEvents] Registro do Service Worker ignorado de forma segura neste navegador/sandbox:', errorMsg);
+        } else {
+          console.error('[InoEvents] Falha ao registrar Service Worker:', err);
+        }
       });
   });
 }

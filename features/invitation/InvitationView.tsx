@@ -40,12 +40,27 @@ import toast from "react-hot-toast";
 import { copyToClipboard } from "../../lib/clipboard";
 import { QRCodeSVG } from "qrcode.react";
 import { SEO } from "../../components/SEO";
+import { getOptimizedImageUrl, OptimizeImageOptions } from "../../lib/imageOptimizer";
 
-// Helper to safely get image source URL from string or custom object
-const getImageUrl = (img: any): string => {
-  if (typeof img === "string") return img;
-  if (img && typeof img === "object" && img.url) return img.url;
-  return "";
+// Helper to safely get image source URL from string or custom object and optimize it
+const getImageUrl = (img: any, options: OptimizeImageOptions = {}): string => {
+  let url = "";
+  if (typeof img === "string") {
+    url = img;
+  } else if (img && typeof img === "object" && img.url) {
+    url = img.url;
+  }
+  
+  if (!url) return "";
+  
+  // Set default smart parameters for high-performance mobile loading in Angola
+  const optOptions: OptimizeImageOptions = {
+    width: options.width || 800,
+    quality: options.quality || 75,
+    format: options.format || "webp",
+  };
+  
+  return getOptimizedImageUrl(url, optOptions);
 };
 
 // Beautiful Wedding Background Presets from Unsplash
@@ -2570,7 +2585,7 @@ const ClassicLayout: React.FC<{
           >
             <div
               className="absolute inset-0 bg-cover bg-center transition-transform duration-[10s] hover:scale-110"
-              style={{ backgroundImage: `url('${event.heroImage}')` }}
+              style={{ backgroundImage: `url('${getImageUrl(event.heroImage, { width: 1200, quality: 80 })}')` }}
             />
           </EditableImageWrapper>
           <div className="absolute inset-0 bg-black/30 pointer-events-none" />
@@ -2921,7 +2936,7 @@ const ModernLayout: React.FC<{
               animate={{ scale: 1, opacity: 1 }}
               transition={{ duration: 1.5 }}
               className="absolute inset-0 bg-cover bg-center"
-              style={{ backgroundImage: `url('${event.heroImage}')` }}
+              style={{ backgroundImage: `url('${getImageUrl(event.heroImage, { width: 1200, quality: 80 })}')` }}
             />
           </EditableImageWrapper>
           <div className="absolute inset-0 bg-white/30 mix-blend-screen pointer-events-none" />
@@ -3009,8 +3024,10 @@ const ModernLayout: React.FC<{
           <FadeInSection className="flex flex-col md:flex-row items-center gap-12">
             <div className="w-full md:w-1/2 aspect-[4/5] bg-gray-100 relative overflow-hidden group">
               <img
-                src="https://images.unsplash.com/photo-1544070274-1b48b1111003?q=80&w=2670&auto=format&fit=crop"
+                src={getImageUrl("https://images.unsplash.com/photo-1544070274-1b48b1111003?q=80&w=2670&auto=format&fit=crop", { width: 800 })}
                 className="w-full h-full object-cover grayscale group-hover:grayscale-0 transition-all duration-700"
+                loading="lazy"
+                referrerPolicy="no-referrer"
               />
               <div className="absolute top-4 left-4 bg-white px-4 py-2 text-xs font-bold tracking-widest uppercase">
                 Cerimônia
@@ -3056,8 +3073,10 @@ const ModernLayout: React.FC<{
             <FadeInSection className="flex flex-col md:flex-row-reverse items-center gap-12">
               <div className="w-full md:w-1/2 aspect-[4/5] bg-gray-100 relative overflow-hidden group">
                 <img
-                  src={event.mapImage}
+                  src={getImageUrl(event.mapImage, { width: 800 })}
                   className="w-full h-full object-cover grayscale group-hover:grayscale-0 transition-all duration-700"
+                  loading="lazy"
+                  referrerPolicy="no-referrer"
                 />
                 <div className="absolute top-4 right-4 bg-white px-4 py-2 text-xs font-bold tracking-widest uppercase">
                   Recepção
@@ -3388,7 +3407,7 @@ const GardenLayout: React.FC<{
               animate={{ scale: 1 }}
               transition={{ duration: 10, ease: "linear" }}
               className="absolute inset-0 bg-cover bg-center"
-              style={{ backgroundImage: `url('${event.heroImage}')` }}
+              style={{ backgroundImage: `url('${getImageUrl(event.heroImage, { width: 1200, quality: 80 })}')` }}
             />
           </EditableImageWrapper>
           <div className="absolute inset-0 bg-white/20 mix-blend-overlay pointer-events-none" />
@@ -3837,7 +3856,7 @@ const RusticLayout: React.FC<{
             >
               <div
                 className="absolute inset-0 bg-cover bg-center"
-                style={{ backgroundImage: `url('${event.heroImage}')` }}
+                style={{ backgroundImage: `url('${getImageUrl(event.heroImage, { width: 1200, quality: 80 })}')` }}
               />
             </EditableImageWrapper>
             <div className="absolute inset-0 bg-gradient-to-t from-[#4E342E]/80 via-transparent to-transparent pointer-events-none" />
@@ -4170,8 +4189,9 @@ const IndustrialLayout: React.FC<{
               className="w-full h-full"
             >
               <img
-                src={event.heroImage}
+                src={getImageUrl(event.heroImage, { width: 1200, quality: 80 })}
                 className="w-full h-full object-cover grayscale"
+                referrerPolicy="no-referrer"
               />
             </EditableImageWrapper>
           </div>
@@ -4607,7 +4627,7 @@ const LuxuryLayout: React.FC<{
               >
                 <div
                   className="absolute inset-0 bg-cover bg-center grayscale contrast-125"
-                  style={{ backgroundImage: `url('${event.heroImage}')` }}
+                  style={{ backgroundImage: `url('${getImageUrl(event.heroImage, { width: 1200, quality: 80 })}')` }}
                 />
               </EditableImageWrapper>
               <div className="absolute inset-0 bg-[#0F1419]/30 mix-blend-color pointer-events-none"></div>
@@ -4982,7 +5002,7 @@ const BridalShowerLayout: React.FC<{
               animate={{ scale: 1 }}
               transition={{ duration: 1.5, ease: "easeOut" }}
               className="absolute inset-0 bg-cover bg-center"
-              style={{ backgroundImage: `url('${event.heroImage}')` }}
+              style={{ backgroundImage: `url('${getImageUrl(event.heroImage, { width: 1200, quality: 80 })}')` }}
             />
           </EditableImageWrapper>
           <div className="absolute inset-0 bg-gradient-to-t from-black/40 via-transparent to-black/10 pointer-events-none" />
@@ -5336,7 +5356,7 @@ const BabyShowerLayout: React.FC<{
               animate={{ scale: 1 }}
               transition={{ duration: 1.5, ease: "easeOut" }}
               className="absolute inset-0 bg-cover bg-center"
-              style={{ backgroundImage: `url('${event.heroImage}')` }}
+              style={{ backgroundImage: `url('${getImageUrl(event.heroImage, { width: 1200, quality: 80 })}')` }}
             />
           </EditableImageWrapper>
           <div className="absolute inset-0 bg-gradient-to-t from-black/40 via-transparent to-black/10 pointer-events-none" />

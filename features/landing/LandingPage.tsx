@@ -81,8 +81,8 @@ export const LandingPage: React.FC = () => {
   return (
     <div className="min-h-screen relative font-display overflow-x-hidden bg-white">
       <SEO 
-        title="InoEvents Angola | Convites Digitais de Casamento e Chá de Panela" 
-        description="A melhor plataforma de Angola para criar seus convites digitais de casamento, chás de panela, noivado ou aniversários com RSVP automático, QR Code e lista de presentes por IBAN."
+        title="InoEvents Angola | Convites Digitais de Casamento, Chá de Panela e Gestão de Eventos" 
+        description="A plataforma mais elegante de Angola para criar convites digitais de casamento e chás de panela com RSVP online, QR Code de acesso, check-in presencial no evento, lista de convidados e presentes por IBAN."
       />
       
       {/* Background Subtle Gradient */}
@@ -194,18 +194,18 @@ export const LandingPage: React.FC = () => {
                           transition={{ repeat: Infinity, duration: 40, ease: "linear" }}
                           className="flex flex-col gap-6"
                        >
-                          <img src="/bridal-templates/templateCha1.png" className="rounded-2xl shadow-sm object-cover w-full aspect-[3/4]" alt="Template" />
-                          <img src="/bridal-templates/templateCha3.png" className="rounded-2xl shadow-sm object-cover w-full aspect-[3/4]" alt="Template" />
-                          <img src="/bridal-templates/templateCha1.png" className="rounded-2xl shadow-sm object-cover w-full aspect-[3/4]" alt="Template" />
+                          <img src="/bridal-templates/templateCha1.png" className="rounded-2xl shadow-sm object-cover w-full aspect-[3/4]" alt="Template" loading="lazy" referrerPolicy="no-referrer" />
+                          <img src="/bridal-templates/templateCha3.png" className="rounded-2xl shadow-sm object-cover w-full aspect-[3/4]" alt="Template" loading="lazy" referrerPolicy="no-referrer" />
+                          <img src="/bridal-templates/templateCha1.png" className="rounded-2xl shadow-sm object-cover w-full aspect-[3/4]" alt="Template" loading="lazy" referrerPolicy="no-referrer" />
                        </motion.div>
                        <motion.div 
                           animate={{ y: ["-50%", "0%"] }}
                           transition={{ repeat: Infinity, duration: 50, ease: "linear" }}
                           className="flex flex-col gap-6 mt-[-50%]"
                        >
-                          <img src="/bridal-templates/templateCha2.png" className="rounded-2xl shadow-sm object-cover w-full aspect-[3/4]" alt="Template" />
-                          <img src="/bridal-templates/templateCha4.png" className="rounded-2xl shadow-sm object-cover w-full aspect-[3/4]" alt="Template" />
-                          <img src="/bridal-templates/templateCha2.png" className="rounded-2xl shadow-sm object-cover w-full aspect-[3/4]" alt="Template" />
+                          <img src="/bridal-templates/templateCha2.png" className="rounded-2xl shadow-sm object-cover w-full aspect-[3/4]" alt="Template" loading="lazy" referrerPolicy="no-referrer" />
+                          <img src="/bridal-templates/templateCha4.png" className="rounded-2xl shadow-sm object-cover w-full aspect-[3/4]" alt="Template" loading="lazy" referrerPolicy="no-referrer" />
+                          <img src="/bridal-templates/templateCha2.png" className="rounded-2xl shadow-sm object-cover w-full aspect-[3/4]" alt="Template" loading="lazy" referrerPolicy="no-referrer" />
                        </motion.div>
                     </div>
                  </div>
@@ -217,7 +217,7 @@ export const LandingPage: React.FC = () => {
                  transition={{ repeat: Infinity, duration: 6, ease: "easeInOut" }}
                  className="absolute left-2 md:left-24 top-12 w-[160px] md:w-[220px] h-[320px] md:h-[420px] bg-white rounded-3xl border-4 md:border-8 border-slate-900 shadow-2xl flex flex-col overflow-hidden z-20"
               >
-                 <img src="/bridal-templates/templateCha4.png" className="w-full h-full object-cover" alt="Phone Template Preview" />
+                 <img src="/bridal-templates/templateCha4.png" className="w-full h-full object-cover" alt="Phone Template Preview" loading="lazy" referrerPolicy="no-referrer" />
                  <div className="absolute bottom-4 left-1/2 -translate-x-1/2 w-[80%] bg-white/90 backdrop-blur text-center py-2 rounded-full text-[10px] sm:text-xs font-bold shadow-lg">
                     Confirmar Presença
                  </div>

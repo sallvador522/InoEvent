@@ -485,7 +485,7 @@ const InvitationView: React.FC = () => {
 
   // Workspace visual management variables: enforce security check so only authorized owners can edit saved invitations
   const editParam = new URLSearchParams(window.location.search).get("edit") === "true";
-  const isNew = new URLSearchParams(window.location.search).get("new") === "true" || (id && id.startsWith("evt_new_"));
+  const isNew = new URLSearchParams(window.location.search).get("new") === "true" ;
   const isTemplate = EVENTS.some((e) => e.id === id);
   const isOwner = !!(user && event && event.ownerId === user.uid);
   const canEdit = !firebaseLoading && !!user && (isTemplate || !!isNew || isOwner);
@@ -520,7 +520,7 @@ const InvitationView: React.FC = () => {
     if (firebaseLoading) return;
     
     const editParam = new URLSearchParams(window.location.search).get("edit") === "true";
-    const isNew = new URLSearchParams(window.location.search).get("new") === "true" || (id && id.startsWith("evt_new_"));
+    const isNew = new URLSearchParams(window.location.search).get("new") === "true" ;
     const isTemplate = EVENTS.some((e) => e.id === id);
     
     if (editParam) {
@@ -570,15 +570,19 @@ const InvitationView: React.FC = () => {
       // Check if temporary or query params new template initializer
       const urlParams = new URLSearchParams(window.location.search);
       const isNew =
-        urlParams.get("new") === "true" || id.startsWith("evt_new_");
+        urlParams.get("new") === "true" ;
       const templateParam =
         (urlParams.get("template") as LayoutMode) || "CLASSIC";
       const themeParam =
         (urlParams.get("theme") as ThemeType) || ThemeType.WEDDING;
+      const baseIdParam = urlParams.get("baseId");
 
       if (isNew) {
-        const baseTpl =
-          EVENTS.find((e) => e.layoutMode === templateParam) || EVENTS[0];
+        let baseTpl = EVENTS.find((e) => e.layoutMode === templateParam) || EVENTS[0];
+        if (baseIdParam) {
+           const specific = EVENTS.find((e) => e.id === baseIdParam);
+           if (specific) baseTpl = specific;
+        }
         const draft = {
           ...baseTpl,
           id: id,
@@ -769,9 +773,9 @@ const InvitationView: React.FC = () => {
       return;
     }
     // Elevate templates choice directly to the free interactive builder
-    const newId = `evt_new_${Math.random().toString(36).substr(2, 9)}`;
+    const newId = `evt_${Math.random().toString(36).substr(2, 9)}`;
     navigate(
-      `/invite/${newId}?edit=true&new=true&template=${activeEvent.layoutMode}&theme=${activeEvent.type}`,
+      `/invite/${newId}?edit=true&new=true&baseId=${activeEvent.id}&template=${activeEvent.layoutMode}&theme=${activeEvent.type}`,
     );
   };
 

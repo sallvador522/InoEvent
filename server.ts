@@ -48,12 +48,37 @@ try {
 
 // Helper to fetch event details safely
 async function getEventDetails(eventId: string) {
-  if (!dbAdmin) return null;
   try {
-    const docRef = dbAdmin.collection('events').doc(eventId);
-    const docSnap = await docRef.get();
-    if (docSnap.exists) {
-      return docSnap.data();
+    const dbId = firebaseConfig.firestoreDatabaseId || '(default)';
+    const url = `https://firestore.googleapis.com/v1/projects/${firebaseConfig.projectId}/databases/${dbId}/documents/events/${eventId}`;
+    const res = await fetch(url);
+    if (!res.ok) {
+        return null;
+    }
+    const data = await res.json();
+    if (data.fields) {
+        // Need to parse Firestore REST format to simple JS object
+        const parseValue = (val: any): any => {
+            if (val.stringValue !== undefined) return val.stringValue;
+            if (val.integerValue !== undefined) return parseInt(val.integerValue, 10);
+            if (val.booleanValue !== undefined) return val.booleanValue;
+            if (val.arrayValue !== undefined) {
+               return (val.arrayValue.values || []).map(parseValue);
+            }
+            if (val.mapValue !== undefined) {
+               const map: any = {};
+               for (const key in val.mapValue.fields) {
+                   map[key] = parseValue(val.mapValue.fields[key]);
+               }
+               return map;
+            }
+            return null;
+        };
+        const parsedData: any = {};
+        for (const key in data.fields) {
+            parsedData[key] = parseValue(data.fields[key]);
+        }
+        return parsedData;
     }
   } catch (error) {
     console.error(`Error fetching event details for ID ${eventId}:`, error);
@@ -250,6 +275,7 @@ app.get('/api/payments/status', async (req, res) => {
 // Dynamic Open Graph / SEO support for individual invitations
 app.get('/invite/:id', async (req, res, next) => {
   const { id } = req.params;
+
   
   // Basic security and length check for ID
   if (!id || id.length > 128 || !/^[a-zA-Z0-9_-]+$/.test(id)) {
@@ -259,18 +285,37 @@ app.get('/invite/:id', async (req, res, next) => {
   try {
     // Fetch event from Firestore
     const eventData = await getEventDetails(id);
+
     
     // Read index.html
     const isProd = process.env.NODE_ENV === 'production';
-    const htmlPath = isProd 
-      ? path.join(process.cwd(), 'dist/index.html')
-      : path.join(process.cwd(), 'index.html');
-      
-    if (!fs.existsSync(htmlPath)) {
-      return next();
-    }
+    let html = "";
+    const possiblePaths = [
+      path.join(process.cwd(), 'dist/index.html'),
+      path.join(process.cwd(), 'index.html'),
+      path.join(__dirname, 'dist/index.html'),
+      path.join(__dirname, 'index.html')
+    ];
+    let foundPath = possiblePaths.find(p => fs.existsSync(p));
     
-    let html = fs.readFileSync(htmlPath, 'utf8');
+    if (foundPath) {
+      html = fs.readFileSync(foundPath, 'utf8');
+    } else {
+      try {
+        const isLocal = req.headers.host && req.headers.host.includes('localhost');
+        const protocol = req.headers['x-forwarded-proto'] || (isLocal ? 'http' : 'https');
+        const host = req.headers.host || 'www.inoevent.online';
+        const fetchRes = await fetch(`${protocol}://${host}/`);
+        if (fetchRes.ok) {
+           html = await fetchRes.text();
+        } else {
+           return next();
+        }
+      } catch(e) {
+         console.error('Fallback fetch failed', e);
+         return next();
+      }
+    }
     
     if (eventData) {
       const eventTitle = eventData.title || 'Convite Especial';
@@ -297,6 +342,7 @@ app.get('/invite/:id', async (req, res, next) => {
       
       const eventUrl = `https://www.inoevent.online/invite/${id}`;
       
+
       // Replace titles and descriptions in index.html to ensure crawlers get unique tags
       html = html.replace(/<title>[^<]*<\/title>/g, `<title>${eventTitle} | InoEvents</title>`);
       

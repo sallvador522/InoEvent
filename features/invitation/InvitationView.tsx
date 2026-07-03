@@ -483,9 +483,13 @@ const InvitationView: React.FC = () => {
   const [isRSVPOpen, setRSVPOpen] = useState(false);
   const [isBannerCollapsed, setIsBannerCollapsed] = useState(false);
 
-  // Workspace visual management variables
-  const isEditing =
-    new URLSearchParams(window.location.search).get("edit") === "true";
+  // Workspace visual management variables: enforce security check so only authorized owners can edit saved invitations
+  const editParam = new URLSearchParams(window.location.search).get("edit") === "true";
+  const isNew = new URLSearchParams(window.location.search).get("new") === "true" || (id && id.startsWith("evt_new_"));
+  const isTemplate = EVENTS.some((e) => e.id === id);
+  const isOwner = !!(user && event && event.ownerId === user.uid);
+  const canEdit = !firebaseLoading && !!user && (isTemplate || !!isNew || isOwner);
+  const isEditing = editParam && canEdit;
   const [sidebarTab, setSidebarTab] = useState<
     "style" | "texts" | "locations" | "timeline" | "gifts" | "save" | "gallery"
   >("style");
@@ -510,6 +514,35 @@ const InvitationView: React.FC = () => {
   useEffect(() => {
     window.scrollTo(0, 0);
   }, []);
+
+  // Enforce editing permissions for existing events, templates, and new drafts
+  useEffect(() => {
+    if (firebaseLoading) return;
+    
+    const editParam = new URLSearchParams(window.location.search).get("edit") === "true";
+    const isNew = new URLSearchParams(window.location.search).get("new") === "true" || (id && id.startsWith("evt_new_"));
+    const isTemplate = EVENTS.some((e) => e.id === id);
+    
+    if (editParam) {
+      if (!user) {
+        toast.error("Por favor, faça login ou crie uma conta para personalizar e editar convites.");
+        const url = new URL(window.location.href);
+        url.searchParams.delete("edit");
+        url.searchParams.delete("new");
+        if (isNew) {
+          navigate("/templates", { replace: true });
+        } else {
+          navigate(url.pathname + url.search, { replace: true });
+        }
+        setIsAuthOpen(true);
+      } else if (!isTemplate && !isNew && event && event.ownerId !== user.uid) {
+        toast.error("Você não tem permissão para editar este convite.");
+        const url = new URL(window.location.href);
+        url.searchParams.delete("edit");
+        navigate(url.pathname + url.search, { replace: true });
+      }
+    }
+  }, [event, user, firebaseLoading, id, navigate]);
 
   // Sync loaded event with our free active customizer drafts state
   useEffect(() => {
@@ -728,9 +761,13 @@ const InvitationView: React.FC = () => {
   }
 
   const guestName = "Família Silva";
-  const isTemplate = EVENTS.some((e) => e.id === id);
 
   const handleUseTemplate = () => {
+    if (!user) {
+      toast.error("Por favor, faça login ou crie uma conta para personalizar este modelo!");
+      setIsAuthOpen(true);
+      return;
+    }
     // Elevate templates choice directly to the free interactive builder
     const newId = `evt_new_${Math.random().toString(36).substr(2, 9)}`;
     navigate(

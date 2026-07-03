@@ -248,7 +248,7 @@ app.get('/api/payments/status', async (req, res) => {
 });
 
 // Dynamic Open Graph / SEO support for individual invitations
-app.get('/invitation/:id', async (req, res, next) => {
+app.get('/invite/:id', async (req, res, next) => {
   const { id } = req.params;
   
   // Basic security and length check for ID
@@ -274,7 +274,20 @@ app.get('/invitation/:id', async (req, res, next) => {
     
     if (eventData) {
       const eventTitle = eventData.title || 'Convite Especial';
-      const eventDesc = eventData.description || 'Você foi convidado para o nosso grande evento. Confirme sua presença e confira todos os detalhes!';
+      
+      // Determine elegant localized invitation message
+      let eventDesc = 'Você está a ser convidado para este grande evento. Confirme sua presença e confira todos os detalhes!';
+      if (eventData.type === 'BRIDAL_SHOWER') {
+        const bride = eventData.brideName || eventData.title;
+        eventDesc = `Você está a ser convidado para o Chá de Panela de ${bride}. Confirme sua presença e confira todos os detalhes!`;
+      } else if (eventData.type === 'BABY_SHOWER') {
+        eventDesc = `Você está a ser convidado para o Chá de Bebê de ${eventData.title}. Confirme sua presença e confira todos os detalhes!`;
+      } else if (eventData.type === 'WEDDING') {
+        const couple = (eventData.brideName && eventData.groomName) ? `${eventData.brideName} & ${eventData.groomName}` : eventData.title;
+        eventDesc = `Você está a ser convidado para o Casamento de ${couple}. Confirme sua presença e confira todos os detalhes!`;
+      } else {
+        eventDesc = `Você está a ser convidado para o evento "${eventData.title}". Confirme sua presença e confira todos os detalhes!`;
+      }
       
       // Determine the image to display
       let eventImage = 'https://www.inoevent.online/inoOG.png';
@@ -282,7 +295,7 @@ app.get('/invitation/:id', async (req, res, next) => {
         eventImage = eventData.heroImage;
       }
       
-      const eventUrl = `https://www.inoevent.online/invitation/${id}`;
+      const eventUrl = `https://www.inoevent.online/invite/${id}`;
       
       // Replace titles and descriptions in index.html to ensure crawlers get unique tags
       html = html.replace(/<title>[^<]*<\/title>/g, `<title>${eventTitle} | InoEvents</title>`);

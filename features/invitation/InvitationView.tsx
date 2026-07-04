@@ -517,9 +517,24 @@ const InvitationView: React.FC = () => {
   const [authLoading, setAuthLoading] = useState(false);
   const [isEditorBarExpanded, setIsEditorBarExpanded] = useState(false);
 
-  // Scroll to top on mount
+  // Scroll to top on mount & enforce authorized domain redirect
   useEffect(() => {
     window.scrollTo(0, 0);
+
+    // Detect if accessed from unauthorized domain/subdomain and force secure redirect to primary production domain
+    const hostname = window.location.hostname;
+    const isAllowedHost =
+      hostname === "localhost" ||
+      hostname === "127.0.0.1" ||
+      hostname.endsWith(".run.app") ||
+      hostname === "inoevent.online" ||
+      hostname === "www.inoevent.online";
+
+    if (!isAllowedHost && hostname) {
+      const targetUrl = `https://www.inoevent.online${window.location.pathname}${window.location.search}${window.location.hash}`;
+      console.warn(`Redirecting to authorized domain: ${targetUrl}`);
+      window.location.replace(targetUrl);
+    }
   }, []);
 
   // Enforce editing permissions for existing events, templates, and new drafts

@@ -11,6 +11,21 @@ const app = express();
 app.set('trust proxy', true);
 const PORT = 3000;
 
+// Redirect unauthorized domains to the primary production domain (www.inoevent.online)
+app.use((req, res, next) => {
+  const host = req.headers.host || '';
+  const isLocal = host.includes('localhost') || host.includes('127.0.0.1');
+  const isCloudRun = host.includes('.run.app');
+  const isMainProd = host === 'inoevent.online' || host === 'www.inoevent.online';
+
+  if (!isLocal && !isCloudRun && !isMainProd && host) {
+    const targetUrl = `https://www.inoevent.online${req.originalUrl}`;
+    console.log(`Redirecting request from host "${host}" to target URL: ${targetUrl}`);
+    return res.redirect(301, targetUrl);
+  }
+  next();
+});
+
 // Initialize Firebase Admin
 try {
   if (admin.apps.length === 0) {

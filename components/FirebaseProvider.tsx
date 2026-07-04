@@ -105,10 +105,29 @@ interface FirebaseContextType {
 
 const FirebaseContext = createContext<FirebaseContextType>({ user: null, loading: true, userProfile: null, isOnline: true });
 
+
+const getCachedUser = () => {
+  if (typeof window === 'undefined') return null;
+  try {
+    const cached = localStorage.getItem('ino_events_user_cache');
+    if (cached) return JSON.parse(cached);
+  } catch (e) {}
+  return null;
+};
+
+const getCachedProfile = () => {
+  if (typeof window === 'undefined') return null;
+  try {
+    const cached = localStorage.getItem('ino_events_profile_cache');
+    if (cached) return JSON.parse(cached);
+  } catch (e) {}
+  return null;
+};
+
 export const FirebaseProvider: React.FC<{ children: React.ReactNode }> = ({ children }) => {
-  const [user, setUser] = useState<User | null>(null);
-  const [loading, setLoading] = useState(true);
-  const [userProfile, setUserProfile] = useState<any | null>(null);
+  const [user, setUser] = useState<User | null>(getCachedUser());
+  const [loading, setLoading] = useState(!getCachedUser());
+  const [userProfile, setUserProfile] = useState<any | null>(getCachedProfile());
   const [isOnline, setIsOnline] = useState<boolean>(typeof navigator !== 'undefined' ? navigator.onLine : true);
 
   useEffect(() => {
@@ -125,10 +144,18 @@ export const FirebaseProvider: React.FC<{ children: React.ReactNode }> = ({ chil
 
   useEffect(() => {
     const unsubscribe = onAuthStateChanged(auth, (user) => {
+      if (user) {
+        localStorage.setItem('ino_events_user_cache', JSON.stringify({ uid: user.uid, email: user.email, displayName: user.displayName, photoURL: user.photoURL, isAnonymous: user.isAnonymous, emailVerified: user.emailVerified }));
+      } else {
+        localStorage.removeItem('ino_events_user_cache');
+        localStorage.removeItem('ino_events_profile_cache');
+      }
       setUser(user);
       setLoading(false);
     }, (error) => {
       console.warn('Auth State Error (Normal for iframe previews): ', error);
+      localStorage.removeItem('ino_events_user_cache');
+      localStorage.removeItem('ino_events_profile_cache');
       setUser(null);
       setLoading(false);
     });
@@ -147,14 +174,12 @@ export const FirebaseProvider: React.FC<{ children: React.ReactNode }> = ({ chil
         if (uData.plan && uData.plan !== 'Essencial' && uData.plan !== 'Free' && uData.planExpiresAt) {
           const expiresAtDate = new Date(uData.planExpiresAt);
           if (expiresAtDate < new Date()) {
-             // Plan expired
              console.warn("Plan expired, changing to Essencial");
              uData = { ...uData, plan: 'Essencial', planExpiresAt: null };
-             // Optional: Do we update doc? It might fail if rules don't permit plan update, but we allowed it. 
-             // We can fire an update blindly.
              updateDoc(doc(db, 'users', snapshot.id), { plan: 'Essencial', planExpiresAt: null }).catch(console.error);
           }
         }
+        localStorage.setItem('ino_events_profile_cache', JSON.stringify(uData));
         setUserProfile(uData);
 
       } else {

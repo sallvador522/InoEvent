@@ -2,25 +2,14 @@ import 'dotenv/config';
 import express from 'express';
 import path from 'path';
 import crypto from 'crypto';
-import { createServer as createViteServer } from 'vite';
 import cors from 'cors';
 import fs from 'fs';
 import admin from 'firebase-admin';
+import firebaseConfig from './firebase-applet-config.json';
 
 const app = express();
 app.set('trust proxy', true);
 const PORT = 3000;
-
-// Read config safely
-const configPath = path.join(process.cwd(), 'firebase-applet-config.json');
-let firebaseConfig: any = {};
-try {
-  if (fs.existsSync(configPath)) {
-    firebaseConfig = JSON.parse(fs.readFileSync(configPath, 'utf8'));
-  }
-} catch (e) {
-  console.error("Error reading firebase-applet-config.json:", e);
-}
 
 // Initialize Firebase Admin
 try {
@@ -371,6 +360,7 @@ app.get('/invite/:id', async (req, res, next) => {
 
 async function startServer() {
   if (process.env.NODE_ENV !== 'production') {
+    const { createServer: createViteServer } = await import('vite');
     const vite = await createViteServer({
       server: { middlewareMode: true },
       appType: 'spa'

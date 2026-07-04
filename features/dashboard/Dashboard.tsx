@@ -56,6 +56,9 @@ export const Dashboard = () => {
     const [statsPeriodFilter, setStatsPeriodFilter] = useState<'all' | '24h' | '7d' | '30d'>('all');
     const [statsSubgroupFilter, setStatsSubgroupFilter] = useState<'all' | 'adults' | 'children'>('all');
     const [showReportModal, setShowReportModal] = useState(false);
+    const [showExportModal, setShowExportModal] = useState(false);
+    const [exportFilter, setExportFilter] = useState<'all' | 'confirmed' | 'pending' | 'declined'>('confirmed');
+    const [exportFormat, setExportFormat] = useState<'csv' | 'excel'>('excel');
 
     const [activeTab, setActiveTab] = useState<'guests' | 'analytics' | 'assistant' | 'gifts' | 'messages' | 'team'>('guests');
 
@@ -229,26 +232,111 @@ export const Dashboard = () => {
 
     const confirmDelete = () => setShowDeleteConfirm(true);
 
-    const handleExportCSV = () => {
-        const headers = ['Nome', 'Telefone', 'Status', 'Confirmados', 'Mensagem', 'Data'];
-        const rows = guests.map(g => [
-            `"${g.name || ''}"`,
-            `"${g.phone || ''}"`,
-            `"${g.status === 'CONFIRMED' ? 'Confirmado' : 'Recusado'}"`,
-            g.adults || 0,
-            `"${(g.message || '').replace(/"/g, '""')}"`,
-            `"${g.createdAt ? new Date(g.createdAt).toLocaleDateString('pt-BR') : ''}"`
-        ]);
-        const csvContent = "data:text/csv;charset=utf-8,\uFEFF" 
-            + [headers.join(','), ...rows.map(r => r.join(','))].join('\n');
-        const encodedUri = encodeURI(csvContent);
-        const link = document.createElement("a");
-        link.setAttribute("href", encodedUri);
-        link.setAttribute("download", `convidados_${event.title.replace(/\s+/g, '_')}.csv`);
-        document.body.appendChild(link);
-        link.click();
-        document.body.removeChild(link);
-        toast.success("Lista exportada com sucesso");
+    const handleExport = (filter: 'all' | 'confirmed' | 'pending' | 'declined', format: 'csv' | 'excel') => {
+        let filtered = guests;
+        if (filter === 'confirmed') {
+            filtered = guests.filter(g => g.status === 'CONFIRMED');
+        } else if (filter === 'pending') {
+            filtered = guests.filter(g => g.status === 'PENDING' || !g.status);
+        } else if (filter === 'declined') {
+            filtered = guests.filter(g => g.status === 'DECLINED');
+        }
+
+        const titleSlug = (event?.title || 'convidados').replace(/\s+/g, '_').toLowerCase();
+
+        if (format === 'csv') {
+            const headers = ['Nome', 'Telefone', 'Status', 'Adultos', 'Crianças', 'Mensagem', 'Check-in', 'Data de Confirmação'];
+            const rows = filtered.map(g => [
+                `"${(g.name || '').replace(/"/g, '""')}"`,
+                `"${(g.phone || '').replace(/"/g, '""')}"`,
+                `"${g.status === 'CONFIRMED' ? 'Confirmado' : g.status === 'DECLINED' ? 'Recusado' : 'Pendente'}"`,
+                g.adults || 1,
+                g.children || 0,
+                `"${(g.message || '').replace(/"/g, '""')}"`,
+                `"${g.checkedIn ? 'Sim' : 'Não'}"`,
+                `"${g.createdAt ? new Date(g.createdAt).toLocaleDateString('pt-BR') : ''}"`
+            ]);
+            
+            const csvContent = "sep=,\n" + [headers.join(','), ...rows.map(r => r.join(','))].join('\n');
+            const blob = new Blob(["\uFEFF" + csvContent], { type: 'text/csv;charset=utf-8;' });
+            const url = URL.createObjectURL(blob);
+            
+            const link = document.createElement("a");
+            link.setAttribute("href", url);
+            link.setAttribute("download", `convidados_${titleSlug}_${filter}.csv`);
+            document.body.appendChild(link);
+            link.click();
+            document.body.removeChild(link);
+            toast.success("Arquivo CSV exportado com sucesso!");
+        } else {
+            let html = `<html xmlns:o="urn:schemas-microsoft-com:office:office" xmlns:x="urn:schemas-microsoft-com:office:excel" xmlns="http://www.w3.org/TR/REC-html40">
+<head>
+<meta http-equiv="content-type" content="text/plain; charset=UTF-8"/>
+<!--[if gte mso 9]><xml><x:ExcelWorkbook><x:ExcelWorksheets><x:ExcelWorksheet><x:Name>Convidados</x:Name><x:WorksheetOptions><x:DisplayGridlines/></x:WorksheetOptions></x:ExcelWorksheet></x:ExcelWorksheets></x:ExcelWorkbook></xml><![endif]-->
+<style>
+  table { border-collapse: collapse; font-family: Calibri, sans-serif; }
+  th { background-color: #f2f2f2; font-weight: bold; border: 1px solid #cccccc; padding: 8px; text-align: left; }
+  td { border: 1px solid #e0e0e0; padding: 6px 8px; }
+  .confirmed { background-color: #e6f4ea; color: #137333; }
+  .declined { background-color: #fce8e6; color: #c5221f; }
+  .pending { background-color: #fef7e0; color: #b06000; }
+</style>
+</head>
+<body>
+<h2>Lista de Convidados - ${event?.title || 'Evento'}</h2>
+<p>Exportado em: ${new Date().toLocaleString('pt-BR')}</p>
+<table>
+<thead>
+<tr>
+  <th>Nome</th>
+  <th>Telefone</th>
+  <th>Status</th>
+  <th>Adultos</th>
+  <th>Crianças</th>
+  <th>Total de Pessoas</th>
+  <th>Check-in</th>
+  <th>Mensagem</th>
+  <th>Data</th>
+</tr>
+</thead>
+<tbody>`;
+
+            filtered.forEach(g => {
+                const statusStr = g.status === 'CONFIRMED' ? 'Confirmado' : g.status === 'DECLINED' ? 'Recusado' : 'Pendente';
+                const statusClass = g.status === 'CONFIRMED' ? 'confirmed' : g.status === 'DECLINED' ? 'declined' : 'pending';
+                const total = (g.adults || 1) + (g.children || 0);
+                
+                html += `
+<tr>
+  <td>${g.name || ''}</td>
+  <td>${g.phone || ''}</td>
+  <td class="${statusClass}">${statusStr}</td>
+  <td>${g.adults || 1}</td>
+  <td>${g.children || 0}</td>
+  <td>${total}</td>
+  <td>${g.checkedIn ? 'Sim' : 'Não'}</td>
+  <td>${g.message || ''}</td>
+  <td>${g.createdAt ? new Date(g.createdAt).toLocaleDateString('pt-BR') : ''}</td>
+</tr>`;
+            });
+
+            html += `
+</tbody>
+</table>
+</body>
+</html>`;
+
+            const blob = new Blob(["\uFEFF" + html], { type: 'application/vnd.ms-excel;charset=utf-8' });
+            const url = URL.createObjectURL(blob);
+            
+            const link = document.createElement("a");
+            link.setAttribute("href", url);
+            link.setAttribute("download", `convidados_${titleSlug}_${filter}.xls`);
+            document.body.appendChild(link);
+            link.click();
+            document.body.removeChild(link);
+            toast.success("Planilha Excel exportada com sucesso!");
+        }
     };
 
     const handleManualAddGuest = async () => {
@@ -986,11 +1074,11 @@ export const Dashboard = () => {
                                 }} className="justify-center text-sm font-bold text-white bg-emerald-600 px-4 py-2 rounded-xl hover:bg-emerald-700 transition-colors flex items-center gap-2 shadow-sm text-center">
                                     <UploadCloud size={16} /> Importar CSV
                                 </button>
-                                <button onClick={handleExportCSV} className="text-sm font-bold text-brand-blue bg-brand-blue/5 px-4 py-2 rounded-xl hover:bg-brand-blue/10 transition-colors hidden sm:flex items-center gap-2 text-center">
+                                <button onClick={() => setShowExportModal(true)} className="justify-center text-sm font-bold text-brand-blue bg-brand-blue/5 px-4 py-2 rounded-xl hover:bg-brand-blue/10 transition-colors flex items-center gap-2 text-center">
                                     <Download size={16} /> Exportar
                                 </button>
                                 {(event?.plan === 'Business' || event?.plan === 'Corporate' || event?.plan === 'Premium') && (
-                                    <button onClick={() => setShowReportModal(true)} className="text-sm font-bold text-slate-800 bg-slate-100 border border-slate-200 px-4 py-2 rounded-xl hover:bg-slate-200 transition-colors hidden sm:flex items-center gap-2 text-center cursor-pointer">
+                                    <button onClick={() => setShowReportModal(true)} className="justify-center text-sm font-bold text-slate-800 bg-slate-100 border border-slate-200 px-4 py-2 rounded-xl hover:bg-slate-200 transition-colors flex items-center gap-2 text-center cursor-pointer">
                                         <Printer size={16} className="text-slate-600" /> Relatório PDF
                                     </button>
                                 )}
@@ -1634,6 +1722,130 @@ export const Dashboard = () => {
             </AnimatePresence>
 
             <SupportModal isOpen={supportOpen} onClose={() => setSupportOpen(false)} />
+
+            {/* Export Modal */}
+            <AnimatePresence>
+                {showExportModal && (
+                    <motion.div 
+                        initial={{ opacity: 0 }}
+                        animate={{ opacity: 1 }}
+                        exit={{ opacity: 0 }}
+                        className="fixed inset-0 z-[110] flex items-center justify-center p-4 bg-slate-900/40 backdrop-blur-sm"
+                    >
+                        <motion.div 
+                            initial={{ scale: 0.95, y: 20 }}
+                            animate={{ scale: 1, y: 0 }}
+                            exit={{ scale: 0.95, y: 20 }}
+                            className="bg-white rounded-3xl p-6 max-w-md w-full shadow-2xl border border-slate-100"
+                        >
+                            <h3 className="text-lg font-bold text-slate-800 mb-2">Exportar Lista de Convidados</h3>
+                            <p className="text-xs text-slate-500 mb-6">Selecione os filtros e formato desejados para exportar seus dados de convidados.</p>
+                            
+                            <div className="space-y-5 mb-6">
+                                {/* Filter Section */}
+                                <div>
+                                    <label className="block text-xs font-bold uppercase tracking-wider text-slate-500 mb-2">Quais convidados exportar?</label>
+                                    <div className="grid grid-cols-2 gap-2">
+                                        <button 
+                                            type="button"
+                                            onClick={() => setExportFilter('confirmed')}
+                                            className={`p-3 rounded-xl border text-left transition-all ${exportFilter === 'confirmed' ? 'border-emerald-500 bg-emerald-50/30 text-emerald-800 ring-2 ring-emerald-500/10' : 'border-slate-200 hover:border-slate-300 text-slate-700'}`}
+                                        >
+                                            <div className="text-xs font-bold flex items-center gap-1">
+                                                <span className="w-2 h-2 rounded-full bg-emerald-500" /> Apenas Confirmados
+                                            </div>
+                                            <div className="text-[10px] text-slate-500 mt-1">
+                                                {guests.filter(g => g.status === 'CONFIRMED').length} convidados
+                                            </div>
+                                        </button>
+                                        
+                                        <button 
+                                            type="button"
+                                            onClick={() => setExportFilter('all')}
+                                            className={`p-3 rounded-xl border text-left transition-all ${exportFilter === 'all' ? 'border-brand-blue bg-blue-50/30 text-blue-800 ring-2 ring-blue-500/10' : 'border-slate-200 hover:border-slate-300 text-slate-700'}`}
+                                        >
+                                            <div className="text-xs font-bold flex items-center gap-1">
+                                                <span className="w-2 h-2 rounded-full bg-slate-400" /> Todos os RSVPs
+                                            </div>
+                                            <div className="text-[10px] text-slate-500 mt-1">
+                                                {guests.length} convidados
+                                            </div>
+                                        </button>
+                                        
+                                        <button 
+                                            type="button"
+                                            onClick={() => setExportFilter('pending')}
+                                            className={`p-3 rounded-xl border text-left transition-all ${exportFilter === 'pending' ? 'border-amber-500 bg-amber-50/30 text-amber-800 ring-2 ring-amber-500/10' : 'border-slate-200 hover:border-slate-300 text-slate-700'}`}
+                                        >
+                                            <div className="text-xs font-bold flex items-center gap-1">
+                                                <span className="w-2 h-2 rounded-full bg-amber-500" /> Apenas Pendentes
+                                            </div>
+                                            <div className="text-[10px] text-slate-500 mt-1">
+                                                {guests.filter(g => g.status === 'PENDING' || !g.status).length} convidados
+                                            </div>
+                                        </button>
+                                        
+                                        <button 
+                                            type="button"
+                                            onClick={() => setExportFilter('declined')}
+                                            className={`p-3 rounded-xl border text-left transition-all ${exportFilter === 'declined' ? 'border-red-500 bg-red-50/30 text-red-800 ring-2 ring-red-500/10' : 'border-slate-200 hover:border-slate-300 text-slate-700'}`}
+                                        >
+                                            <div className="text-xs font-bold flex items-center gap-1">
+                                                <span className="w-2 h-2 rounded-full bg-red-500" /> Apenas Recusados
+                                            </div>
+                                            <div className="text-[10px] text-slate-500 mt-1">
+                                                {guests.filter(g => g.status === 'DECLINED').length} convidados
+                                            </div>
+                                        </button>
+                                    </div>
+                                </div>
+                                
+                                {/* Format Section */}
+                                <div>
+                                    <label className="block text-xs font-bold uppercase tracking-wider text-slate-500 mb-2">Formato do arquivo</label>
+                                    <div className="grid grid-cols-2 gap-2">
+                                        <button 
+                                            type="button"
+                                            onClick={() => setExportFormat('excel')}
+                                            className={`p-3 rounded-xl border text-left transition-all flex flex-col justify-between ${exportFormat === 'excel' ? 'border-emerald-600 bg-emerald-50/30 text-emerald-800 ring-2 ring-emerald-500/10' : 'border-slate-200 hover:border-slate-300 text-slate-700'}`}
+                                        >
+                                            <span className="text-xs font-bold">Planilha Excel (.xls)</span>
+                                            <span className="text-[10px] text-slate-500 mt-1">Formatada, com cores, ideal para Excel.</span>
+                                        </button>
+                                        
+                                        <button 
+                                            type="button"
+                                            onClick={() => setExportFormat('csv')}
+                                            className={`p-3 rounded-xl border text-left transition-all flex flex-col justify-between ${exportFormat === 'csv' ? 'border-slate-700 bg-slate-50 text-slate-800 ring-2 ring-slate-500/10' : 'border-slate-200 hover:border-slate-300 text-slate-700'}`}
+                                        >
+                                            <span className="text-xs font-bold">Arquivo CSV (.csv)</span>
+                                            <span className="text-[10px] text-slate-500 mt-1">Universal, ideal para Google Sheets.</span>
+                                        </button>
+                                    </div>
+                                </div>
+                            </div>
+                            
+                            <div className="flex gap-2">
+                                <button 
+                                    onClick={() => setShowExportModal(false)}
+                                    className="flex-1 py-3 rounded-xl font-bold bg-slate-100 text-slate-600 hover:bg-slate-200 transition-colors"
+                                >
+                                    Cancelar
+                                </button>
+                                <button 
+                                    onClick={() => {
+                                        handleExport(exportFilter, exportFormat);
+                                        setShowExportModal(false);
+                                    }}
+                                    className="flex-1 py-3 rounded-xl font-bold bg-brand-blue text-white hover:bg-blue-600 transition-colors flex items-center justify-center gap-2"
+                                >
+                                    <Download size={16} /> Exportar
+                                </button>
+                            </div>
+                        </motion.div>
+                    </motion.div>
+                )}
+            </AnimatePresence>
 
             <ExecutiveReportModal 
                 isOpen={showReportModal} 

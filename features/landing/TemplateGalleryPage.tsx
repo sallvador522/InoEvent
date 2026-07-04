@@ -1,6 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { motion } from 'framer-motion';
-import { Link } from 'react-router-dom';
+import { Link, useSearchParams } from 'react-router-dom';
 import { EVENTS } from '../../mockData';
 import { ThemeType } from '../../types';
 import { Navbar } from '../../components/Navbar';
@@ -20,8 +20,16 @@ const CATEGORIES = [
 ];
 
 export const TemplateGalleryPage: React.FC = () => {
-    const [selectedCategory, setSelectedCategory] = useState('all');
+    const [searchParams, setSearchParams] = useSearchParams();
+    const catParam = searchParams.get('category') || 'all';
+    const [selectedCategory, setSelectedCategory] = useState(catParam);
     const [isLoading, setIsLoading] = useState(true);
+
+    useEffect(() => {
+        if (catParam) {
+            setSelectedCategory(catParam);
+        }
+    }, [catParam]);
 
     useEffect(() => {
         setIsLoading(true);
@@ -50,6 +58,20 @@ export const TemplateGalleryPage: React.FC = () => {
         }
     };
 
+    const getLayoutLabel = (layoutMode: string) => {
+        switch (layoutMode) {
+            case 'CLASSIC': return 'Clássico Romântico';
+            case 'MODERN': return 'Minimalista Etéreo';
+            case 'LUXURY': return 'Luxuoso Black Tie';
+            case 'LIMINTSO_GOLD': return 'Ouro Imperial';
+            case 'LIMINTSO_ME': return 'Nobreza de Luanda';
+            case 'GARDEN': return 'Jardim Elegante';
+            case 'RUSTIC': return 'Rústico Chic';
+            case 'INDUSTRIAL': return 'Industrial Urbano';
+            default: return layoutMode;
+        }
+    };
+
     return (
         <div className="min-h-screen bg-slate-50 flex flex-col font-sans">
             <SEO 
@@ -69,7 +91,10 @@ export const TemplateGalleryPage: React.FC = () => {
                     {CATEGORIES.map(cat => (
                         <button
                             key={cat.id}
-                            onClick={() => setSelectedCategory(cat.id)}
+                            onClick={() => {
+                                setSelectedCategory(cat.id);
+                                setSearchParams({ category: cat.id });
+                            }}
                             className={`px-5 py-3 rounded-full flex items-center gap-2 text-sm font-bold whitespace-nowrap transition-all shadow-sm ${
                                 selectedCategory === cat.id
                                 ? 'bg-brand-blue text-white shadow-brand-blue/30'
@@ -120,7 +145,7 @@ export const TemplateGalleryPage: React.FC = () => {
                                         <div className="absolute inset-0 bg-gradient-to-t from-black/60 to-transparent opacity-60"></div>
                                         <div className="absolute top-2 right-2 md:top-4 md:right-4 z-20 flex flex-col md:flex-row gap-1 md:gap-2 items-end">
                                             <span className={`inline-block px-2 py-1 md:px-3 md:py-1.5 backdrop-blur-md rounded-full text-[8px] md:text-xs font-bold shadow-sm ${badge.className}`}>
-                                                {event.layoutMode}
+                                                {getLayoutLabel(event.layoutMode)}
                                             </span>
                                             {!['MODERN', 'CLASSIC', 'ESSENTIAL'].includes(event.layoutMode) && (
                                                 <span className="inline-block px-2 py-1 md:px-3 md:py-1.5 bg-gradient-to-r from-amber-200 to-amber-400 text-amber-900 rounded-full text-[8px] md:text-xs font-bold shadow-sm">

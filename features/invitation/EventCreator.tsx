@@ -324,7 +324,7 @@ export const EventCreator: React.FC = () => {
       const isUserEssencial = userProfile?.plan === 'Essencial' || !userProfile?.plan;
       if (isPremiumLayout && isUserEssencial) {
         toast.dismiss(toastId);
-        setAttemptedPremiumLayout(selectedLayout === 'LUXURY' ? 'Luxo de Realeza' : selectedLayout === 'LIMINTSO_GOLD' ? 'Limintso Gold' : selectedLayout === 'LIMINTSO_ME' ? 'Limintso Me' : selectedLayout === 'GARDEN' ? 'Jardim Encantado' : selectedLayout === 'RUSTIC' ? 'Rústico / Natural' : 'Industrial Loft');
+        setAttemptedPremiumLayout(selectedLayout === 'LUXURY' ? 'Luxo de Realeza' : selectedLayout === 'LIMINTSO_GOLD' ? 'Ouro Imperial' : selectedLayout === 'LIMINTSO_ME' ? 'Nobreza de Luanda' : selectedLayout === 'GARDEN' ? 'Jardim Encantado' : selectedLayout === 'RUSTIC' ? 'Rústico / Natural' : 'Industrial Loft');
         setShowUpgradeModal(true);
         setIsLoading(false);
         return;
@@ -722,7 +722,7 @@ export const EventCreator: React.FC = () => {
                               <button
                                 key={item.id}
                                 type="button"
-                                onClick={() => setSelectedLayout(item.id as LayoutMode)}
+                                onClick={() => handleLayoutSelect(item.id as LayoutMode)}
                                 className={`p-4 rounded-2xl border text-left flex flex-col justify-between h-28 cursor-pointer transition-all duration-300 ${
                                   selectedLayout === item.id 
                                     ? 'bg-cyan-50/70 border-cyan-500 ring-1 ring-cyan-500 shadow'
@@ -747,7 +747,7 @@ export const EventCreator: React.FC = () => {
                               <button
                                 key={item.id}
                                 type="button"
-                                onClick={() => setSelectedLayout(item.id as LayoutMode)}
+                                onClick={() => handleLayoutSelect(item.id as LayoutMode)}
                                 className={`p-4 rounded-2xl border text-left flex flex-col justify-between h-28 cursor-pointer transition-all duration-300 ${
                                   selectedLayout === item.id 
                                     ? 'bg-purple-50/70 border-purple-500 ring-1 ring-purple-500 shadow'
@@ -766,8 +766,8 @@ export const EventCreator: React.FC = () => {
                               { id: 'CLASSIC', label: 'Clássico Romântico', desc: 'Elegância de contos de reis' },
                               { id: 'MODERN', label: 'Cosmopolita / Moderno', desc: 'Aparência ousada espacial' },
                               { id: 'LUXURY', label: 'Luxo de Realeza', desc: 'Elegância formal e aristocrata', premium: true },
-                              { id: 'LIMINTSO_GOLD', label: 'Limintso Ouro', desc: 'Chany & Pedro Luxo Dourado', premium: true },
-                              { id: 'LIMINTSO_ME', label: 'Limintso Me', desc: 'Marnela & Evandro Nobreza', premium: true },
+                              { id: 'LIMINTSO_GOLD', label: 'Ouro Imperial', desc: 'Chany & Pedro Luxo Dourado', premium: true },
+                              { id: 'LIMINTSO_ME', label: 'Nobreza de Luanda', desc: 'Marnela & Evandro Nobreza Clássica', premium: true },
                               { id: 'GARDEN', label: 'Jardim Encantado', desc: 'Pétalas florais e românticas', premium: true },
                               { id: 'RUSTIC', label: 'Rústico / Natural', desc: 'Folhas, madeiras e aconchego', premium: true },
                               { id: 'INDUSTRIAL', label: 'Industrial Loft', desc: 'Modernidade metropolitana', premium: true }
@@ -785,7 +785,7 @@ export const EventCreator: React.FC = () => {
                                       setShowUpgradeModal(true);
                                       return;
                                     }
-                                    setSelectedLayout(item.id as LayoutMode);
+                                    handleLayoutSelect(item.id as LayoutMode);
                                   }}
                                   className={`p-4 rounded-2xl border text-left flex flex-col justify-between h-28 cursor-pointer transition-all duration-300 relative ${
                                     selectedLayout === item.id 

@@ -10,6 +10,25 @@ export const TocaPlayer: React.FC<TocaPlayerProps> = ({ trackName, isDark = fals
   const [isPlaying, setIsPlaying] = useState(false);
   const audioRef = useRef<HTMLAudioElement | null>(null);
 
+  // Determine the actual URL/path to play
+  const getAudioUrl = () => {
+    if (!trackName || trackName === "" || trackName === "romantic_piano.mp3" || trackName === "romantic") {
+      // Default fallback music
+      return '/audio/oracao_do_amor.m4a';
+    }
+    if (trackName === 'none' || trackName === 'No Music') {
+      return null;
+    }
+    // If it's a direct URL, base64 data, or custom path
+    if (trackName.startsWith('http') || trackName.startsWith('data:') || trackName.startsWith('/')) {
+      return trackName;
+    }
+    // Default fallback for any other chosen names
+    return '/audio/oracao_do_amor.m4a';
+  };
+
+  const audioUrl = getAudioUrl();
+
   useEffect(() => {
     let audio: HTMLAudioElement | null = null;
     let interactionListenersActive = false;
@@ -38,8 +57,8 @@ export const TocaPlayer: React.FC<TocaPlayerProps> = ({ trackName, isDark = fals
       }
     };
 
-    if (trackName && (trackName.startsWith('http') || trackName.startsWith('data:audio'))) {
-      audio = new Audio(trackName);
+    if (audioUrl) {
+      audio = new Audio(audioUrl);
       audio.loop = true;
       audioRef.current = audio;
 
@@ -71,7 +90,7 @@ export const TocaPlayer: React.FC<TocaPlayerProps> = ({ trackName, isDark = fals
         audio.src = "";
       }
     };
-  }, [trackName]);
+  }, [audioUrl]);
 
   const togglePlay = () => {
     if (audioRef.current) {
@@ -84,7 +103,7 @@ export const TocaPlayer: React.FC<TocaPlayerProps> = ({ trackName, isDark = fals
     }
   };
 
-  if (!trackName) return null;
+  if (!audioUrl) return null;
 
   return (
     <div className="fixed top-12 right-5 z-40 animate-fade-in-down">

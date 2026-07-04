@@ -27,6 +27,7 @@ export const LandingPage: React.FC = () => {
   const [userEvents, setUserEvents] = useState<any[]>([]);
   const [currentTestimonialIndex, setCurrentTestimonialIndex] = useState(0);
   const [supportOpen, setSupportOpen] = useState(false);
+  const [showTypeModal, setShowTypeModal] = useState(false);
   
   const navigate = useNavigate();
   const location = useLocation();
@@ -75,7 +76,7 @@ export const LandingPage: React.FC = () => {
   }, [user]);
 
   const handleCreateEvent = () => {
-    navigate('/templates');
+    setShowTypeModal(true);
   }
 
   return (
@@ -150,12 +151,12 @@ export const LandingPage: React.FC = () => {
                  initial={{ opacity: 0, y: 20 }}
                  animate={{ opacity: 1, y: 0 }}
                  transition={{ duration: 0.8, ease: "easeOut", delay: 0.5 }}
-                 className="flex justify-center w-full"
+                 className="flex flex-col sm:flex-row gap-4 justify-center w-full max-w-lg mx-auto"
               >
                 {/* Primary CTA */}
                 <button 
                    onClick={handleCreateEvent}
-                   className="w-full sm:w-auto px-8 py-4 bg-slate-900 text-white font-bold rounded-full hover:bg-brand-blue hover:-translate-y-1 transition-all duration-300 shadow-[0_10px_30px_rgba(0,0,0,0.15)] hover:shadow-[0_15px_35px_rgba(0,0,0,0.25)] flex items-center justify-center gap-2 group"
+                   className="w-full sm:w-auto px-8 py-4 bg-slate-900 text-white font-bold rounded-full hover:bg-brand-blue hover:-translate-y-1 transition-all duration-300 shadow-[0_10px_30px_rgba(0,0,0,0.15)] hover:shadow-[0_15px_35px_rgba(0,0,0,0.25)] flex items-center justify-center gap-2 group cursor-pointer"
                 >
                    <span>Criar Convite de Alta Costura</span>
                    <span className="material-symbols-outlined text-[18px] group-hover:translate-x-1 transition-transform">arrow_forward</span>
@@ -164,10 +165,10 @@ export const LandingPage: React.FC = () => {
                 {/* Secondary CTA */}
                 <Link 
                   to="/templates"
-                  className="hidden"
+                  className="w-full sm:w-auto px-8 py-4 border-2 border-slate-200 text-slate-800 font-bold rounded-full hover:border-slate-800 hover:bg-slate-50 hover:-translate-y-1 transition-all duration-300 flex items-center justify-center gap-2 bg-white/60 backdrop-blur-md shadow-sm"
                 >
-                  <span className="material-symbols-outlined text-[18px] text-[#BF9B30]">view_carousel</span>
-                  <span>Ver Todos os Modelos</span>
+                  <span className="material-symbols-outlined text-[18px] text-brand-blue">collections</span>
+                  <span>Ver Galeria</span>
                 </Link>
               </motion.div>
            </div>
@@ -368,6 +369,83 @@ export const LandingPage: React.FC = () => {
 
 
       <SupportModal isOpen={supportOpen} onClose={() => setSupportOpen(false)} />
+
+      {/* Event Type Selection Modal */}
+      <AnimatePresence>
+        {showTypeModal && (
+          <motion.div
+            initial={{ opacity: 0 }}
+            animate={{ opacity: 1 }}
+            exit={{ opacity: 0 }}
+            className="fixed inset-0 z-[100] flex items-center justify-center p-4 bg-slate-900/60 backdrop-blur-md"
+          >
+            <motion.div
+              initial={{ scale: 0.95, y: 20 }}
+              animate={{ scale: 1, y: 0 }}
+              exit={{ scale: 0.95, y: 20 }}
+              transition={{ type: "spring", duration: 0.5 }}
+              className="bg-white rounded-[2.5rem] p-6 md:p-8 max-w-lg w-full max-h-[90vh] md:max-h-[85vh] flex flex-col shadow-2xl border border-slate-100 relative overflow-hidden text-left"
+            >
+              {/* Decorative design details */}
+              <div className="absolute top-0 left-0 w-full h-2 bg-gradient-to-r from-brand-blue to-[#BF9B30]" />
+              
+              <button
+                onClick={() => setShowTypeModal(false)}
+                className="absolute top-6 right-6 text-slate-400 hover:text-slate-600 p-2 rounded-full hover:bg-slate-100 transition-all cursor-pointer border border-slate-100"
+              >
+                <span className="material-symbols-outlined text-[20px] block">close</span>
+              </button>
+
+              <div className="text-center mb-6 shrink-0">
+                <div className="mx-auto w-12 h-12 bg-blue-50 text-brand-blue rounded-xl flex items-center justify-center mb-3">
+                  <span className="material-symbols-outlined text-[28px]">celebration</span>
+                </div>
+                <h3 className="text-xl md:text-2xl font-serif font-black text-slate-900 mb-1">Que tipo de evento deseja criar?</h3>
+                <p className="text-slate-500 text-xs md:text-sm">Selecione uma das opções abaixo para ver os modelos ideais e personalizados para o seu momento único.</p>
+              </div>
+
+              <div className="grid grid-cols-1 gap-3 mb-6 flex-1 min-h-0 overflow-y-auto pr-1">
+                {[
+                  { id: 'wedding', label: 'Casamento', desc: 'União de almas, RSVP detalhado, lista de presentes e IBAN.', icon: 'diamond', color: 'from-amber-500/10 to-amber-600/10 text-amber-600' },
+                  { id: 'bridal', label: 'Chá de Panela', desc: 'Chá de cozinha, presentes práticos e brincadeiras animadas.', icon: 'kitchen', color: 'from-pink-500/10 to-rose-600/10 text-pink-600' },
+                  { id: 'birthday', label: 'Aniversário', desc: 'Comemoração, contagem regressiva e confirmação de presença rápida.', icon: 'cake', color: 'from-purple-500/10 to-indigo-600/10 text-purple-600' },
+                  { id: 'baby', label: 'Chá de Bebê', desc: 'Boas-vindas calorosas ao novo membro especial da família.', icon: 'child_care', color: 'from-cyan-500/10 to-blue-600/10 text-cyan-600' },
+                  { id: 'corporate', label: 'Evento Corporativo', desc: 'Palestras, conferências, lançamentos e credenciamento ágil.', icon: 'business_center', color: 'from-slate-700/10 to-slate-950/10 text-slate-800' },
+                ].map((item) => (
+                  <button
+                    key={item.id}
+                    onClick={() => {
+                      navigate(`/templates?category=${item.id}`);
+                      setShowTypeModal(false);
+                    }}
+                    className="flex items-center gap-4 p-4 rounded-2xl border border-slate-100 hover:border-slate-300 hover:bg-slate-50/50 text-left transition-all duration-300 group cursor-pointer w-full bg-white"
+                  >
+                    <div className={`w-12 h-12 rounded-xl bg-gradient-to-br ${item.color} flex items-center justify-center shrink-0`}>
+                      <span className="material-symbols-outlined text-[24px]">{item.icon}</span>
+                    </div>
+                    <div className="flex-1">
+                      <h4 className="font-bold text-slate-900 text-sm md:text-base group-hover:text-brand-blue transition-colors flex items-center gap-1.5">
+                        {item.label}
+                        <span className="material-symbols-outlined text-[16px] opacity-0 group-hover:opacity-100 group-hover:translate-x-1 transition-all">arrow_forward</span>
+                      </h4>
+                      <p className="text-slate-500 text-xs mt-0.5 leading-relaxed">{item.desc}</p>
+                    </div>
+                  </button>
+                ))}
+              </div>
+
+              <div className="flex justify-end gap-3 border-t border-slate-100 pt-5">
+                <button
+                  onClick={() => setShowTypeModal(false)}
+                  className="px-6 py-3 rounded-full font-bold bg-slate-100 hover:bg-slate-200 text-slate-600 transition-colors cursor-pointer text-xs md:text-sm"
+                >
+                  Cancelar
+                </button>
+              </div>
+            </motion.div>
+          </motion.div>
+        )}
+      </AnimatePresence>
 
     </div>
   );

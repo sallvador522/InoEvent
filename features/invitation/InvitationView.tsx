@@ -118,8 +118,8 @@ const LAYOUT_PRESETS: { mode: LayoutMode; name: string }[] = [
   { mode: "CLASSIC", name: "Clássico Romântico" },
   { mode: "MODERN", name: "Minimalista Etéreo" },
   { mode: "LUXURY", name: "Luxuoso Black Tie" },
-  { mode: "LIMINTSO_GOLD", name: "Limintso Ouro (Chany & Pedro)" },
-  { mode: "LIMINTSO_ME", name: "Limintso Me (Marnela & Evandro)" },
+  { mode: "LIMINTSO_GOLD", name: "Ouro Imperial (Chany & Pedro)" },
+  { mode: "LIMINTSO_ME", name: "Nobreza de Luanda (Marnela & Evandro)" },
   { mode: "GARDEN", name: "Jardim Elegante" },
   { mode: "RUSTIC", name: "Rústico Chic" },
   { mode: "INDUSTRIAL", name: "Industrial Urbano" },
@@ -1278,12 +1278,15 @@ const InvitationView: React.FC = () => {
                           Música de Fundo
                         </label>
                         <select
-                          value={localEvent?.musicTrack || "romantic_piano.mp3"}
+                          value={localEvent?.musicTrack || "/audio/oracao_do_amor.m4a"}
                           onChange={(e) =>
                             updateField("musicTrack", e.target.value)
                           }
                           className="w-full bg-[#1A2026] border border-[#BF9B30]/30 rounded-xl px-4 py-3 text-sm text-white focus:outline-none focus:border-[#BF9B30] transition-colors appearance-none"
                         >
+                          <option value="/audio/oracao_do_amor.m4a">
+                            Oração do Amor (Padrão)
+                          </option>
                           <option value="romantic_piano.mp3">
                             Piano Romântico
                           </option>
@@ -2030,7 +2033,7 @@ const InvitationView: React.FC = () => {
       )}
 
       {/* Floating Demo Template Banner (RETRACTABLE LUXURY BAR) */}
-      {isTemplate && (
+      {isTemplate && user && (
         <div
           className={`fixed top-4 left-1/2 -translate-x-1/2 z-[100] transition-all duration-500 ease-in-out ${isBannerCollapsed ? "w-auto -translate-y-2 hover:translate-y-0" : "w-[95%] md:w-fit max-w-[95vw] md:max-w-4xl translate-y-0"}`}
         >
@@ -2127,12 +2130,12 @@ const FadeInSection: React.FC<{
   delay?: number;
 }> = ({ children, className = "", delay = 0 }) => (
   <motion.div
-    initial={{ opacity: 0, y: 40, filter: "blur(4px)" }}
+    initial={{ opacity: 0, y: 50, filter: "blur(6px)" }}
     whileInView={{ opacity: 1, y: 0, filter: "blur(0px)" }}
-    viewport={{ once: true, margin: "-50px" }} // Trigger slightly before element is full view
+    viewport={{ once: true, margin: "-100px" }} // Trigger slightly before element is full view
     transition={{
-      duration: 1.2,
-      ease: [0.22, 1, 0.36, 1], // Custom Bezier for "Luxury" feel (OutExpo-ish)
+      duration: 2.2, // Much slower and more graceful transition
+      ease: [0.16, 1, 0.3, 1], // Slow Out-Expo for premium luxury feel
       delay,
     }}
     className={`will-change-[transform,opacity] ${className}`}
@@ -2469,7 +2472,7 @@ const FloatingDesignDock: React.FC<{
                 value={
                   localEvent?.musicTrack?.startsWith("data:")
                     ? "custom"
-                    : localEvent?.musicTrack || "romantic_piano.mp3"
+                    : localEvent?.musicTrack || "/audio/oracao_do_amor.m4a"
                 }
                 onChange={(e) => {
                   if (e.target.value !== "custom") {
@@ -2478,6 +2481,7 @@ const FloatingDesignDock: React.FC<{
                 }}
                 className="w-full bg-slate-950 border border-slate-800 rounded-xl px-3 py-2 text-xs text-slate-200 focus:outline-none focus:border-violet-500 cursor-pointer"
               >
+                <option value="/audio/oracao_do_amor.m4a">Oração do Amor (Padrão)</option>
                 <option value="romantic_piano.mp3">Piano Romântico</option>
                 <option value="acoustic_guitar.mp3">
                   Violão Acústico Solo
@@ -2683,14 +2687,14 @@ const ClassicLayout: React.FC<{
           <motion.div
             initial={{ opacity: 0 }}
             animate={{ opacity: 1 }}
-            transition={{ duration: 1.5 }}
+            transition={{ duration: 2.5, ease: "easeInOut" }}
             className="absolute inset-0 flex flex-col justify-end items-center pb-24 text-white text-center p-6 pointer-events-none"
           >
             <div className="pointer-events-auto flex flex-col items-center">
               <motion.h1
                 initial={{ y: 20, opacity: 0 }}
                 animate={{ y: 0, opacity: 1 }}
-                transition={{ delay: 0.3, duration: 1 }}
+                transition={{ delay: 0.5, duration: 2.0, ease: [0.16, 1, 0.3, 1] }}
                 className="text-5xl font-script mb-2"
               >
                 <EditableField
@@ -2704,7 +2708,7 @@ const ClassicLayout: React.FC<{
               <motion.p
                 initial={{ y: 20, opacity: 0 }}
                 animate={{ y: 0, opacity: 1 }}
-                transition={{ delay: 0.5, duration: 1 }}
+                transition={{ delay: 1.0, duration: 2.0, ease: [0.16, 1, 0.3, 1] }}
                 className="text-xl tracking-widest uppercase"
               >
                 <EditableField
@@ -3027,7 +3031,7 @@ const ModernLayout: React.FC<{
             <motion.div
               initial={{ scale: 1.1, opacity: 0 }}
               animate={{ scale: 1, opacity: 1 }}
-              transition={{ duration: 1.5 }}
+              transition={{ duration: 2.6, ease: "easeInOut" }}
               className="absolute inset-0 bg-cover bg-center"
               style={{ backgroundImage: `url('${getImageUrl(event.heroImage, { width: 1200, quality: 80 })}')` }}
             />
@@ -3038,7 +3042,7 @@ const ModernLayout: React.FC<{
           <motion.div
             initial={{ opacity: 0, y: 40, filter: "blur(5px)" }}
             animate={{ opacity: 1, y: 0, filter: "blur(0px)" }}
-            transition={{ delay: 0.5, duration: 1.2, ease: [0.22, 1, 0.36, 1] }}
+            transition={{ delay: 0.8, duration: 2.2, ease: [0.16, 1, 0.3, 1] }}
             className="absolute inset-0 flex flex-col items-center justify-center text-center p-8 pointer-events-none"
           >
             <div className="border border-[#8A817C]/30 bg-white/80 backdrop-blur-sm p-10 md:p-16 max-w-lg w-full shadow-2xl shadow-gray-200/50 pointer-events-auto">
@@ -3509,7 +3513,7 @@ const GardenLayout: React.FC<{
           <motion.div
             initial={{ opacity: 0, y: 30, filter: "blur(5px)" }}
             animate={{ opacity: 1, y: 0, filter: "blur(0px)" }}
-            transition={{ delay: 0.5, duration: 1.2, ease: [0.22, 1, 0.36, 1] }}
+            transition={{ delay: 0.8, duration: 2.2, ease: [0.16, 1, 0.3, 1] }}
             className="absolute inset-0 flex flex-col items-center justify-center text-center p-6 drop-shadow-sm pointer-events-none"
           >
             <div className="bg-white/70 backdrop-blur-sm p-8 px-10 rounded-t-[100px] rounded-b-[100px] shadow-xl border border-white pointer-events-auto">
@@ -4683,9 +4687,9 @@ const LuxuryLayout: React.FC<{
               initial={{ opacity: 0, scale: 0.9, filter: "blur(5px)" }}
               animate={{ opacity: 1, scale: 1, filter: "blur(0px)" }}
               transition={{
-                duration: 1.5,
-                ease: [0.22, 1, 0.36, 1],
-                delay: 0.4,
+                duration: 2.4,
+                ease: [0.16, 1, 0.3, 1],
+                delay: 0.6,
               }}
               className="text-4xl text-white mb-2 flex justify-center"
             >
@@ -5107,7 +5111,7 @@ const BridalShowerLayout: React.FC<{
           <motion.div
             initial={{ opacity: 0, y: 30 }}
             animate={{ opacity: 1, y: 0 }}
-            transition={{ delay: 0.3, duration: 1.2, ease: [0.22, 1, 0.36, 1] }}
+            transition={{ delay: 0.8, duration: 2.4, ease: [0.16, 1, 0.3, 1] }}
             className="absolute inset-0 flex flex-col items-center justify-end text-center p-8 pb-16 pointer-events-none"
           >
             <div
@@ -5451,7 +5455,7 @@ const BabyShowerLayout: React.FC<{
             <motion.div
               initial={{ scale: 1.05 }}
               animate={{ scale: 1 }}
-              transition={{ duration: 1.5, ease: "easeOut" }}
+              transition={{ duration: 2.8, ease: "easeInOut" }}
               className="absolute inset-0 bg-cover bg-center"
               style={{ backgroundImage: `url('${getImageUrl(event.heroImage, { width: 1200, quality: 80 })}')` }}
             />
@@ -5461,7 +5465,7 @@ const BabyShowerLayout: React.FC<{
           <motion.div
             initial={{ opacity: 0, y: 30 }}
             animate={{ opacity: 1, y: 0 }}
-            transition={{ delay: 0.3, duration: 1.2, ease: [0.22, 1, 0.36, 1] }}
+            transition={{ delay: 0.8, duration: 2.4, ease: [0.16, 1, 0.3, 1] }}
             className="absolute inset-0 flex flex-col items-center justify-end text-center p-8 pb-16 pointer-events-none"
           >
             <div
@@ -5843,7 +5847,7 @@ const LimintsoGoldLayout: React.FC<{
               <motion.div
                 initial={{ y: 30, opacity: 0, filter: "blur(6px)" }}
                 animate={{ y: 0, opacity: 1, filter: "blur(0px)" }}
-                transition={{ delay: 0.3, duration: 1.2, ease: [0.22, 1, 0.36, 1] }}
+                transition={{ delay: 0.8, duration: 2.2, ease: [0.16, 1, 0.3, 1] }}
                 className="space-y-4 md:space-y-6"
               >
                 <p className="text-[10px] md:text-xs uppercase tracking-[0.3em] text-[#dcb349] font-sans font-semibold">
@@ -5988,7 +5992,12 @@ const LimintsoGoldLayout: React.FC<{
         <FadeInSection>
           <span className="material-symbols-outlined text-[#b49232] text-4xl mb-4">auto_awesome</span>
           <h2 className="text-xl md:text-2xl font-serif text-[#b49232] tracking-wider mb-8">
-            Lei Divina...
+            <EditableField
+              value={event.editableContent?.leiDivinaTitle || "Lei Divina..."}
+              onChange={(val) => updateField?.("editableContent.leiDivinaTitle", val)}
+              isEditing={isEditing}
+              className="text-xl md:text-2xl font-serif text-[#b49232] tracking-wider text-center"
+            />
           </h2>
           <div className="relative p-8 md:p-12 border border-[#dcb349]/20 rounded-[2rem] bg-white/60 backdrop-blur-sm shadow-sm max-w-2xl mx-auto">
             {/* Fine decoration lines in corners */}
@@ -6013,10 +6022,20 @@ const LimintsoGoldLayout: React.FC<{
       <div className="max-w-6xl mx-auto py-16 px-6 md:px-12">
         <FadeInSection className="text-center mb-16">
           <p className="text-xs uppercase tracking-[0.25em] text-[#b49232] font-semibold mb-2 font-sans">
-            Apresentamos
+            <EditableField
+              value={event.editableContent?.noivosSectionPreTitle || "Apresentamos"}
+              onChange={(val) => updateField?.("editableContent.noivosSectionPreTitle", val)}
+              isEditing={isEditing}
+              className="text-xs uppercase tracking-[0.25em] text-[#b49232] font-semibold font-sans text-center"
+            />
           </p>
           <h2 className="text-3xl md:text-4xl font-serif text-slate-800">
-            Os Noivos
+            <EditableField
+              value={event.editableContent?.noivosSectionTitle || "Os Noivos"}
+              onChange={(val) => updateField?.("editableContent.noivosSectionTitle", val)}
+              isEditing={isEditing}
+              className="text-3xl md:text-4xl font-serif text-slate-800 text-center"
+            />
           </h2>
           <div className="w-16 h-[1px] bg-[#dcb349]/30 mx-auto mt-4" />
         </FadeInSection>
@@ -6029,8 +6048,8 @@ const LimintsoGoldLayout: React.FC<{
             whileInView={{ opacity: 1, x: 0, filter: "blur(0px)" }}
             viewport={{ once: true, margin: "-50px" }}
             transition={{
-              duration: 1.4,
-              ease: [0.22, 1, 0.36, 1],
+              duration: 2.4,
+              ease: [0.16, 1, 0.3, 1],
               delay: 0.1,
             }}
             className="order-2 lg:order-1 bg-white border border-[#dcb349]/10 rounded-[2.5rem] p-8 text-center shadow-sm relative hover:shadow-md transition-shadow duration-500 will-change-[transform,opacity]"
@@ -6058,11 +6077,22 @@ const LimintsoGoldLayout: React.FC<{
             </p>
 
             <div className="text-slate-600 text-sm leading-relaxed font-serif mt-6 px-2">
-              <p>
-                "Este é o nosso primeiro e único casamento, e não poderia estar mais feliz por dar esse passo com alguém tão incrível. Não é só um “sim” diante do altar. É um “sim” para a vida toda: para os sonhos, os planos, os desafios e todas as alegrias que virão. E queremos dividir esse momento com você."
+              <p className="min-h-[40px]">
+                <EditableField
+                  value={event.editableContent?.groomStory || '"Este é o nosso primeiro e único casamento, e não poderia estar mais feliz por dar esse passo com alguém tão incrível. Não é só um “sim” diante do altar. É um “sim” para a vida toda: para os sonhos, os planos, os desafios e todas as alegrias que virão. E queremos dividir esse momento com você."'}
+                  onChange={(val) => updateField?.("editableContent.groomStory", val)}
+                  isEditing={isEditing}
+                  multiline
+                  className="text-slate-600 text-sm leading-relaxed font-serif text-center"
+                />
               </p>
               <span className="block text-xs font-semibold text-[#b49232] mt-4">
-                {groomVerseRef}
+                <EditableField
+                  value={event.editableContent?.groomVerseRef || "— Mateus 19:6"}
+                  onChange={(val) => updateField?.("editableContent.groomVerseRef", val)}
+                  isEditing={isEditing}
+                  className="text-xs font-semibold text-[#b49232] text-center"
+                />
               </span>
             </div>
           </motion.div>
@@ -6073,8 +6103,8 @@ const LimintsoGoldLayout: React.FC<{
             whileInView={{ opacity: 1, scale: 1, filter: "blur(0px)" }}
             viewport={{ once: true, margin: "-50px" }}
             transition={{
-              duration: 1.5,
-              ease: [0.22, 1, 0.36, 1],
+              duration: 2.5,
+              ease: [0.16, 1, 0.3, 1],
               delay: 0.2,
             }}
             className="order-1 lg:order-2 bg-white border border-[#dcb349]/20 rounded-[2.5rem] p-4 shadow-md relative hover:shadow-lg transition-all duration-500 will-change-[transform,opacity]"
@@ -6106,8 +6136,8 @@ const LimintsoGoldLayout: React.FC<{
             whileInView={{ opacity: 1, x: 0, filter: "blur(0px)" }}
             viewport={{ once: true, margin: "-50px" }}
             transition={{
-              duration: 1.4,
-              ease: [0.22, 1, 0.36, 1],
+              duration: 2.4,
+              ease: [0.16, 1, 0.3, 1],
               delay: 0.1,
             }}
             className="order-3 lg:order-3 bg-white border border-[#dcb349]/10 rounded-[2.5rem] p-8 text-center shadow-sm relative hover:shadow-md transition-shadow duration-500 will-change-[transform,opacity]"
@@ -6135,11 +6165,22 @@ const LimintsoGoldLayout: React.FC<{
             </p>
 
             <div className="text-slate-600 text-sm leading-relaxed font-serif mt-6 px-2">
-              <p>
-                "O coração bate mais forte a cada dia… Mal posso esperar para começar a nossa vida juntos, lado a lado, com Deus no centro e amor em cada passo."
+              <p className="min-h-[40px]">
+                <EditableField
+                  value={event.editableContent?.brideStory || '"O coração bate mais forte a cada dia… Mal posso esperar para começar a nossa vida juntos, lado a lado, com Deus no centro e amor em cada passo."'}
+                  onChange={(val) => updateField?.("editableContent.brideStory", val)}
+                  isEditing={isEditing}
+                  multiline
+                  className="text-slate-600 text-sm leading-relaxed font-serif text-center"
+                />
               </p>
               <span className="block text-xs font-semibold text-[#b49232] mt-4">
-                {brideVerseRef}
+                <EditableField
+                  value={event.editableContent?.brideVerseRef || "— Eclesiastes 3:1"}
+                  onChange={(val) => updateField?.("editableContent.brideVerseRef", val)}
+                  isEditing={isEditing}
+                  className="text-xs font-semibold text-[#b49232] text-center"
+                />
               </span>
             </div>
           </motion.div>
@@ -6163,8 +6204,14 @@ const LimintsoGoldLayout: React.FC<{
             </p>
             
             <div className="max-w-xl mx-auto mt-6 text-sm text-slate-600 leading-relaxed font-serif">
-              <p>
-                Temos a honra de convidá-lo(a) a comemorar esta data especial connosco. Venha juntar-se a nós e celebrar de acordo com a agenda abaixo:
+              <p className="min-h-[45px]">
+                <EditableField
+                  value={event.editableContent?.agendaDescription || "Temos a honra de convidá-lo(a) a comemorar esta data especial connosco. Venha juntar-se a nós e celebrar de acordo com a agenda abaixo:"}
+                  onChange={(val) => updateField?.("editableContent.agendaDescription", val)}
+                  isEditing={isEditing}
+                  multiline
+                  className="text-sm text-slate-600 leading-relaxed font-serif text-center"
+                />
               </p>
             </div>
           </FadeInSection>
@@ -6339,7 +6386,7 @@ const LimintsoGoldLayout: React.FC<{
             onClick={onRSVP}
             className="w-full max-w-xs bg-[#dcb349] hover:bg-[#b49232] text-white py-4 rounded-full font-bold shadow-lg text-xs uppercase tracking-[0.2em] transition-all duration-300 active:scale-95"
           >
-            Confirmar Presença
+            {getRSVPText(event.type, "Confirmar Presença")}
           </button>
         </FadeInSection>
       </div>
@@ -6507,7 +6554,7 @@ const LimintsoMeLayout: React.FC<{
             <motion.div
               initial={{ opacity: 0, y: 30 }}
               animate={{ opacity: 1, y: 0 }}
-              transition={{ delay: 0.3, duration: 1 }}
+              transition={{ delay: 0.6, duration: 2.2, ease: [0.16, 1, 0.3, 1] }}
               className="z-10 text-center"
             >
               <p className="josefin-font text-base md:text-lg uppercase tracking-[0.3em] text-[#ffffff] font-semibold">
@@ -6528,7 +6575,7 @@ const LimintsoMeLayout: React.FC<{
             <motion.div
               initial={{ opacity: 0, scale: 0.95 }}
               animate={{ opacity: 1, scale: 1 }}
-              transition={{ delay: 0.6, duration: 1.2 }}
+              transition={{ delay: 1.2, duration: 2.5, ease: [0.16, 1, 0.3, 1] }}
               className="z-10 text-center my-auto px-4"
             >
               <h1 className="whispering-text text-6xl md:text-8xl text-white tracking-normal font-normal leading-tight drop-shadow-[0_4px_12px_rgba(0,0,0,0.5)]">
@@ -6558,7 +6605,7 @@ const LimintsoMeLayout: React.FC<{
             <motion.div
               initial={{ opacity: 0, y: -30 }}
               animate={{ opacity: 1, y: 0 }}
-              transition={{ delay: 0.9, duration: 1 }}
+              transition={{ delay: 1.8, duration: 2.2, ease: [0.16, 1, 0.3, 1] }}
               className="z-10 text-center space-y-8 w-full max-w-sm px-6"
             >
               <p className="josefin-font text-base md:text-lg uppercase tracking-[0.25em] text-[#ffffff] font-medium">
@@ -6590,7 +6637,7 @@ const LimintsoMeLayout: React.FC<{
         <motion.div
           initial={{ opacity: 0 }}
           animate={{ opacity: 1 }}
-          transition={{ duration: 1.5 }}
+          transition={{ duration: 2.6, ease: "easeInOut" }}
           className="space-y-0"
         >
           {/* 2. WELCOME / BEM-VINDO SECTION (inicio) */}
@@ -6701,7 +6748,7 @@ const LimintsoMeLayout: React.FC<{
                   initial={{ opacity: 0, x: -50 }}
                   whileInView={{ opacity: 1, x: 0 }}
                   viewport={{ once: true }}
-                  transition={{ duration: 1 }}
+                  transition={{ duration: 2.2, ease: [0.16, 1, 0.3, 1] }}
                   className="bg-white border border-[#E9BE5D]/10 rounded-[2rem] p-8 text-center shadow-sm relative space-y-6"
                 >
                   <div className="w-12 h-[2px] bg-[#E9BE5D]/30 mx-auto" />
@@ -6729,7 +6776,7 @@ const LimintsoMeLayout: React.FC<{
                   initial={{ opacity: 0, scale: 0.9 }}
                   whileInView={{ opacity: 1, scale: 1 }}
                   viewport={{ once: true }}
-                  transition={{ duration: 1 }}
+                  transition={{ duration: 2.4, ease: [0.16, 1, 0.3, 1] }}
                   className="bg-white border border-[#E9BE5D]/10 rounded-[2rem] p-4 shadow-sm"
                 >
                   <div className="relative aspect-[3/4] rounded-[1.5rem] overflow-hidden group">
@@ -6752,7 +6799,7 @@ const LimintsoMeLayout: React.FC<{
                   initial={{ opacity: 0, x: 50 }}
                   whileInView={{ opacity: 1, x: 0 }}
                   viewport={{ once: true }}
-                  transition={{ duration: 1 }}
+                  transition={{ duration: 2.2, ease: [0.16, 1, 0.3, 1] }}
                   className="bg-white border border-[#E9BE5D]/10 rounded-[2rem] p-8 text-center shadow-sm relative space-y-6"
                 >
                   <div className="w-12 h-[2px] bg-[#E9BE5D]/30 mx-auto" />
@@ -6987,7 +7034,7 @@ const LimintsoMeLayout: React.FC<{
                 onClick={onRSVP}
                 className="josefin-font px-8 py-4 bg-[#E9BE5D] hover:bg-[#d4ac4c] text-white rounded-full text-xs uppercase tracking-[0.2em] font-bold transition-all duration-300 shadow-md hover:shadow-xl hover:-translate-y-0.5 active:translate-y-0"
               >
-                Confirmar Presença
+                {getRSVPText(event.type, "Confirmar Presença")}
               </button>
             </FadeInSection>
           </div>

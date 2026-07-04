@@ -293,7 +293,7 @@ export const EVENTS: EventDetails[] = [
     ]
   },
 
-  // 6.5. CLONE: Chany & Pedro (Limintso Gold Theme)
+  // 6.5. CLONE: Chany & Pedro (Ouro Imperial Theme)
   {
     id: 'chany-pedro-wedding',
     type: ThemeType.WEDDING,
@@ -307,11 +307,11 @@ export const EVENTS: EventDetails[] = [
     date: '09 de Agosto de 2025',
     isoDate: '2025-08-09T12:00:00',
     time: '12:00',
-    locationName: 'The Gardens',
-    address: 'Muntanhana N66 Marracuene',
+    locationName: 'Complexo Lookal',
+    address: 'Ilha de Luanda, Luanda, Angola',
     receptionName: "Copo d'água",
-    receptionAddress: 'The Gardens, Marracuene',
-    mapLink: 'https://maps.google.com/?q=The+Gardens+Muntanhana+Marracuene',
+    receptionAddress: 'Lookal Ocean Club, Ilha de Luanda',
+    mapLink: 'https://maps.google.com/?q=Lookal+Ocean+Club+Luanda',
     heroImage: '/casalModel.webp',
     description: 'Temos a honra de convidá-lo(a) a comemorar esta data especial connosco. Venha juntar-se a nós e ajudar-nos a celebrar o nosso enlace matrimonial de acordo com a agenda abaixo:',
     musicTrack: 'TEEKS - First Time',
@@ -322,9 +322,9 @@ export const EVENTS: EventDetails[] = [
       'https://images.unsplash.com/photo-1515934751635-c81c6bc9a2d8?q=80&w=2574&auto=format&fit=crop'
     ],
     timeline: [
-      { time: '12:00', title: 'Cerimónia Civil', description: "The Gardens, Marracuene" },
-      { time: '13:00', title: 'Cerimónia Religiosa', description: "The Gardens, Marracuene" },
-      { time: '14:30', title: "Copo d'água", description: "The Gardens, Marracuene" }
+      { time: '12:00', title: 'Cerimónia Civil', description: "Complexo Lookal, Luanda" },
+      { time: '13:00', title: 'Cerimónia Religiosa', description: "Complexo Lookal, Luanda" },
+      { time: '14:30', title: "Copo d'água", description: "Lookal Ocean Club, Luanda" }
     ],
     dressCode: {
       title: 'Formal / Esporte Fino',
@@ -343,7 +343,7 @@ export const EVENTS: EventDetails[] = [
     ]
   },
 
-  // 6.6. CLONE: Marnela & Evandro (Limintso Me Theme)
+  // 6.6. CLONE: Marnela & Evandro (Nobreza de Luanda Theme)
   {
     id: 'marnela-evandro-wedding',
     type: ThemeType.WEDDING,
@@ -357,11 +357,11 @@ export const EVENTS: EventDetails[] = [
     date: 'Sábado, 11 de Outubro de 2025',
     isoDate: '2025-10-11T11:00:00',
     time: '11:00',
-    locationName: 'The Gardens',
-    address: 'Muntanhana N66 Marracuene',
+    locationName: 'Salão Noblesse Talatona',
+    address: 'Via AL14, Talatona, Luanda, Angola',
     receptionName: "Copo d'água",
-    receptionAddress: 'The Gardens, Marracuene',
-    mapLink: 'https://maps.google.com/?q=The+Gardens+Muntanhana+Marracuene',
+    receptionAddress: 'Salão Noblesse, Talatona, Luanda',
+    mapLink: 'https://maps.google.com/?q=Talatona+Luanda',
     heroImage: 'https://in.limintso.com/wp-content/uploads/2025/08/cav33.jpg',
     description: 'I Coríntios 13: 4-7\nAqui começa o nosso lar, erguido sobre a fé e o amor de Deus.\nCada passo que damos é promessa de que ele será sempre o alicerce da nossa Família.',
     musicTrack: 'TEEKS - First Time',
@@ -373,9 +373,9 @@ export const EVENTS: EventDetails[] = [
       'https://in.limintso.com/wp-content/uploads/2025/08/marb2222.jpg'
     ],
     timeline: [
-      { time: '11:00', title: 'Cerimónia Civil', description: "The Gardens, Marracuene" },
-      { time: '12:00', title: 'Cerimónia Religiosa', description: "The Gardens, Marracuene" },
-      { time: '14:00', title: "Copo d'água", description: "The Gardens, Marracuene" }
+      { time: '11:00', title: 'Cerimónia Civil', description: "Salão Noblesse, Talatona" },
+      { time: '12:00', title: 'Cerimónia Religiosa', description: "Salão Noblesse, Talatona" },
+      { time: '14:00', title: "Copo d'água", description: "Salão Noblesse, Talatona" }
     ],
     dressCode: {
       title: 'Formal / Passeio Completo',

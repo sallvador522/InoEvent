@@ -135,40 +135,51 @@ export const LandingPage: React.FC = () => {
                  className="text-5xl md:text-7xl lg:text-[5rem] font-serif font-bold text-slate-900 tracking-tight leading-[1.05] mb-6"
               >
                  Convites Digitais em <br className="hidden md:block"/>
-                 <span className="text-transparent bg-clip-text bg-gradient-to-r from-brand-blue flex-col md:flex-row to-[#BF9B30] inline-block mt-2">Angola.</span>
+                 <span className="text-transparent bg-clip-text bg-gradient-to-r from-brand-blue to-[#BF9B30] inline-block mt-2">Angola.</span>
               </motion.h1>
               
               <motion.p 
                  initial={{ opacity: 0, y: 20 }}
                  animate={{ opacity: 1, y: 0 }}
                  transition={{ duration: 0.8, ease: "easeOut", delay: 0.4 }}
-                 className="text-lg md:text-xl text-slate-600 max-w-2xl mx-auto leading-relaxed mb-10 font-light"
+                 className="text-lg md:text-xl text-slate-600 max-w-2xl mx-auto leading-relaxed mb-10 font-light text-center"
               >
                  Diga adeus ao papel em Luanda e em toda Angola. Impressione os seus convidados com os melhores convites digitais de casamento e chá de panela, confirme presenças por RSVP e receba presentes com facilidade.
               </motion.p>
-              
-              <motion.div 
+               <motion.div 
                  initial={{ opacity: 0, y: 20 }}
                  animate={{ opacity: 1, y: 0 }}
                  transition={{ duration: 0.8, ease: "easeOut", delay: 0.5 }}
-                 className="flex flex-col sm:flex-row gap-4 justify-center w-full max-w-lg mx-auto"
+                 className="flex flex-col items-center gap-6 w-full max-w-2xl mx-auto px-4"
               >
-                {/* Primary CTA */}
-                <button 
-                   onClick={handleCreateEvent}
-                   className="w-full sm:w-auto px-8 py-4 bg-slate-900 text-white font-bold rounded-full hover:bg-brand-blue hover:-translate-y-1 transition-all duration-300 shadow-[0_10px_30px_rgba(0,0,0,0.15)] hover:shadow-[0_15px_35px_rgba(0,0,0,0.25)] flex items-center justify-center gap-2 group cursor-pointer"
-                >
-                   <span>Criar Convite de Alta Costura</span>
-                   <span className="material-symbols-outlined text-[18px] group-hover:translate-x-1 transition-transform">arrow_forward</span>
-                </button>
+                {/* Primary Actions side-by-side */}
+                <div className="flex flex-row items-center justify-center gap-2.5 sm:gap-4 w-full max-w-sm sm:max-w-lg">
+                  {/* Primary CTA - Create */}
+                  <button
+                     onClick={handleCreateEvent}
+                     className="flex-1 h-11 sm:h-12 px-3 sm:px-6 bg-[#1B365D] text-white text-[10px] sm:text-xs font-semibold uppercase tracking-wider rounded-full hover:bg-[#142947] hover:-translate-y-0.5 active:scale-[0.98] transition-all duration-300 shadow-[0_4px_12px_rgba(27,54,93,0.12)] hover:shadow-[0_8px_24px_rgba(27,54,93,0.22)] flex items-center justify-center gap-1.5 group cursor-pointer border border-[#1B365D]"
+                  >
+                     <span className="truncate">Criar Convite</span>
+                     <span className="material-symbols-outlined text-[15px] sm:text-[18px] group-hover:translate-x-0.5 transition-transform shrink-0">arrow_forward</span>
+                  </button>
+                  
+                  {/* Premium CTA - Order Custom */}
+                  <button
+                     onClick={() => setSupportOpen(true)}
+                     className="flex-1 h-11 sm:h-12 px-3 sm:px-6 bg-[#C5A028] text-white text-[10px] sm:text-xs font-semibold uppercase tracking-wider rounded-full hover:bg-[#b08d20] hover:-translate-y-0.5 active:scale-[0.98] transition-all duration-300 shadow-[0_4px_12px_rgba(197,160,40,0.12)] hover:shadow-[0_8px_24px_rgba(197,160,40,0.22)] flex items-center justify-center gap-1.5 group cursor-pointer border border-[#C5A028]"
+                  >
+                     <span className="material-symbols-outlined text-[15px] sm:text-[18px] text-white shrink-0">workspace_premium</span>
+                     <span className="truncate">Encomendar VIP</span>
+                  </button>
+                </div>
                 
-                {/* Secondary CTA */}
-                <Link 
-                  to="/templates"
-                  className="w-full sm:w-auto px-8 py-4 border-2 border-slate-200 text-slate-800 font-bold rounded-full hover:border-slate-800 hover:bg-slate-50 hover:-translate-y-1 transition-all duration-300 flex items-center justify-center gap-2 bg-white/60 backdrop-blur-md shadow-sm"
+                {/* Secondary CTA - Gallery */}
+                <Link
+                   to="/templates"
+                   className="px-5 py-2 border border-slate-200 text-slate-500 hover:text-[#1B365D] hover:border-[#1B365D]/30 text-[10px] sm:text-xs font-semibold uppercase tracking-wider rounded-full hover:-translate-y-0.5 transition-all duration-300 flex items-center justify-center gap-1.5 bg-white/40 backdrop-blur-md shadow-sm"
                 >
-                  <span className="material-symbols-outlined text-[18px] text-brand-blue">collections</span>
-                  <span>Ver Galeria</span>
+                  <span className="material-symbols-outlined text-[15px] sm:text-[16px] text-[#1B365D]">collections</span>
+                  <span>Ver Templates</span>
                 </Link>
               </motion.div>
            </div>

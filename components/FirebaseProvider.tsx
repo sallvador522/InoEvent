@@ -111,7 +111,9 @@ const getCachedUser = () => {
   try {
     const cached = localStorage.getItem('ino_events_user_cache');
     if (cached) return JSON.parse(cached);
-  } catch (e) {}
+  } catch (e) {
+    console.debug('[InoEvents] Erro ao ler cache de utilizador', e);
+  }
   return null;
 };
 
@@ -120,7 +122,9 @@ const getCachedProfile = () => {
   try {
     const cached = localStorage.getItem('ino_events_profile_cache');
     if (cached) return JSON.parse(cached);
-  } catch (e) {}
+  } catch (e) {
+    console.debug('[InoEvents] Erro ao ler cache de perfil', e);
+  }
   return null;
 };
 

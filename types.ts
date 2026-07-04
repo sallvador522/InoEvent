@@ -68,6 +68,8 @@ export interface EventDetails {
   gallery?: Array<string | { id: string; url: string; likes: number }>;
   themeColor?: string;
   
+  hiddenSections?: string[];
+  
   // New Sections
   gifts?: GiftItem[];
   tips?: TipItem[];

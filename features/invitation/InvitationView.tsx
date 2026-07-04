@@ -139,12 +139,14 @@ const EditableField: React.FC<{
   value: string;
   onChange: (newVal: string) => void;
   className?: string;
+  isHidden?: boolean;
   multiline?: boolean;
   isEditing?: boolean;
 }> = ({
   value,
   onChange,
   className = "",
+  isHidden = false,
   multiline = false,
   isEditing = false,
 }) => {
@@ -501,7 +503,7 @@ const InvitationView: React.FC = () => {
     "style" | "texts" | "locations" | "timeline" | "gifts" | "save" | "gallery"
   >("style");
   const [activeModal, setActiveModal] = useState<
-    "style" | "locations" | "timeline" | "gifts" | "gallery" | null
+    "style" | "locations" | "timeline" | "gifts" | "gallery" | "hero" | null
   >(null);
   const [showLayersPanel, setShowLayersPanel] = useState(true);
   const [isSaving, setIsSaving] = useState(false);
@@ -1069,6 +1071,7 @@ const InvitationView: React.FC = () => {
     setIsOpenCover,
     onEditSection: (sec: string) => {
       if (sec === "gallery" || sec === "photos") setActiveModal("gallery");
+      else if (sec === "hero" || sec === "capa") setActiveModal("hero");
       else if (sec === "gifts" || sec === "contas") setActiveModal("gifts");
       else if (sec === "timeline" || sec === "etapas")
         setActiveModal("timeline");
@@ -1257,17 +1260,20 @@ const InvitationView: React.FC = () => {
                     <span className="material-symbols-outlined text-[#BF9B30]">
                       {activeModal === "style"
                         ? "palette"
-                        : activeModal === "gallery"
-                          ? "image"
-                          : activeModal === "locations"
-                            ? "pin_drop"
-                            : activeModal === "timeline"
-                              ? "schedule"
-                              : "volunteer_activism"}
+                        : activeModal === "hero"
+                          ? "auto_stories"
+                          : activeModal === "gallery"
+                            ? "image"
+                            : activeModal === "locations"
+                              ? "pin_drop"
+                              : activeModal === "timeline"
+                                ? "schedule"
+                                : "volunteer_activism"}
                     </span>
                     <span className="font-bold text-white text-sm uppercase tracking-widest">
                       {activeModal === "style" && "Editar Música de Fundo"}
-                      {activeModal === "gallery" && "Editar Capa & Fotos"}
+                      {activeModal === "hero" && "Editar Capa & Textos"}
+                      {activeModal === "gallery" && "Editar Galeria de Fotos"}
                       {activeModal === "locations" && "Editar Localizações"}
                       {activeModal === "timeline" && "Editar Cronograma"}
                       {activeModal === "gifts" && "Editar Dress Code & Contas"}
@@ -1320,8 +1326,8 @@ const InvitationView: React.FC = () => {
                     </div>
                   )}
 
-                  {/* 2. CAPA & FOTOS FIELDS */}
-                  {activeModal === "gallery" && (
+                  {/* 2. CAPA & TEXTS FIELDS */}
+                  {activeModal === "hero" && (
                     <div className="space-y-4">
                       <div className="grid grid-cols-1 gap-4">
                         <div>
@@ -1424,7 +1430,38 @@ const InvitationView: React.FC = () => {
                           </button>
                         </div>
                       </div>
+                    </div>
+                  )}
 
+                  {/* 3. GALERIA FIELDS */}
+                  {activeModal === "gallery" && (
+                    <div className="space-y-4">
+                      {/* Section Toggle */}
+                      <div className="flex items-center justify-between bg-[#1A2026] p-4 rounded-2xl border border-[#BF9B30]/20 mb-6">
+                        <span className="text-xs font-bold text-slate-300 uppercase tracking-widest">
+                          {(localEvent?.hiddenSections || []).includes("gallery") ? "Seção Oculta no Convite" : "Seção Visível"}
+                        </span>
+                        <button
+                          type="button"
+                          onClick={() => {
+                            const hs = localEvent?.hiddenSections || [];
+                            if (hs.includes("gallery")) {
+                              updateField("hiddenSections", hs.filter(s => s !== "gallery"));
+                            } else {
+                              updateField("hiddenSections", [...hs, "gallery"]);
+                              setActiveModal(null);
+                            }
+                          }}
+                          className={`px-4 py-2 text-[10px] font-bold rounded-lg transition-all ${
+                            (localEvent?.hiddenSections || []).includes("gallery")
+                              ? "bg-[#BF9B30]/10 text-[#BF9B30] border border-[#BF9B30]/30 hover:bg-[#BF9B30]/20"
+                              : "bg-red-500/10 text-red-400 border border-red-500/30 hover:bg-red-500/20"
+                          }`}
+                        >
+                          {(localEvent?.hiddenSections || []).includes("gallery") ? "Mostrar Seção" : "Excluir Seção"}
+                        </button>
+                      </div>
+                      
                       <div>
                         <div className="flex items-center justify-between mb-3">
                           <label className="block text-xs font-semibold text-[#BF9B30] uppercase tracking-widest">
@@ -1471,6 +1508,32 @@ const InvitationView: React.FC = () => {
                   {/* 3. LOCATIONS FIELDS */}
                   {activeModal === "locations" && (
                     <div className="space-y-6">
+                      {/* Section Toggle */}
+                      <div className="flex items-center justify-between bg-[#1A2026] p-4 rounded-2xl border border-[#BF9B30]/20 mb-2">
+                        <span className="text-xs font-bold text-slate-300 uppercase tracking-widest">
+                          {(localEvent?.hiddenSections || []).includes("locations") ? "Seção Oculta no Convite" : "Seção Visível"}
+                        </span>
+                        <button
+                          type="button"
+                          onClick={() => {
+                            const hs = localEvent?.hiddenSections || [];
+                            if (hs.includes("locations")) {
+                              updateField("hiddenSections", hs.filter(s => s !== "locations"));
+                            } else {
+                              updateField("hiddenSections", [...hs, "locations"]);
+                              setActiveModal(null);
+                            }
+                          }}
+                          className={`px-4 py-2 text-[10px] font-bold rounded-lg transition-all ${
+                            (localEvent?.hiddenSections || []).includes("locations")
+                              ? "bg-[#BF9B30]/10 text-[#BF9B30] border border-[#BF9B30]/30 hover:bg-[#BF9B30]/20"
+                              : "bg-red-500/10 text-red-400 border border-red-500/30 hover:bg-red-500/20"
+                          }`}
+                        >
+                          {(localEvent?.hiddenSections || []).includes("locations") ? "Mostrar Seção" : "Excluir Seção"}
+                        </button>
+                      </div>
+
                       {/* Ceremony details */}
                       <div className="bg-[#1A2026] p-5 rounded-2xl border border-[#BF9B30]/20 space-y-4">
                         <span className="text-xs font-bold text-[#BF9B30] uppercase tracking-widest block">
@@ -1601,6 +1664,32 @@ const InvitationView: React.FC = () => {
                   {/* 4. TIMELINE FIELDS */}
                   {activeModal === "timeline" && (
                     <div className="space-y-6">
+                      {/* Section Toggle */}
+                      <div className="flex items-center justify-between bg-[#1A2026] p-4 rounded-2xl border border-[#BF9B30]/20 mb-2">
+                        <span className="text-xs font-bold text-slate-300 uppercase tracking-widest">
+                          {(localEvent?.hiddenSections || []).includes("timeline") ? "Seção Oculta no Convite" : "Seção Visível"}
+                        </span>
+                        <button
+                          type="button"
+                          onClick={() => {
+                            const hs = localEvent?.hiddenSections || [];
+                            if (hs.includes("timeline")) {
+                              updateField("hiddenSections", hs.filter(s => s !== "timeline"));
+                            } else {
+                              updateField("hiddenSections", [...hs, "timeline"]);
+                              setActiveModal(null);
+                            }
+                          }}
+                          className={`px-4 py-2 text-[10px] font-bold rounded-lg transition-all ${
+                            (localEvent?.hiddenSections || []).includes("timeline")
+                              ? "bg-[#BF9B30]/10 text-[#BF9B30] border border-[#BF9B30]/30 hover:bg-[#BF9B30]/20"
+                              : "bg-red-500/10 text-red-400 border border-red-500/30 hover:bg-red-500/20"
+                          }`}
+                        >
+                          {(localEvent?.hiddenSections || []).includes("timeline") ? "Mostrar Seção" : "Excluir Seção"}
+                        </button>
+                      </div>
+
                       <div className="flex items-center justify-between">
                         <span className="text-xs font-bold text-[#BF9B30] uppercase tracking-widest">
                           Milestones do Cronograma
@@ -1726,6 +1815,32 @@ const InvitationView: React.FC = () => {
                   {/* 5. DRESS CODE & GIFTS FIELDS */}
                   {activeModal === "gifts" && (
                     <div className="space-y-6">
+                      {/* Section Toggle */}
+                      <div className="flex items-center justify-between bg-[#1A2026] p-4 rounded-2xl border border-[#BF9B30]/20 mb-2">
+                        <span className="text-xs font-bold text-slate-300 uppercase tracking-widest">
+                          {(localEvent?.hiddenSections || []).includes("gifts") ? "Seção Oculta no Convite" : "Seção Visível"}
+                        </span>
+                        <button
+                          type="button"
+                          onClick={() => {
+                            const hs = localEvent?.hiddenSections || [];
+                            if (hs.includes("gifts")) {
+                              updateField("hiddenSections", hs.filter(s => s !== "gifts"));
+                            } else {
+                              updateField("hiddenSections", [...hs, "gifts"]);
+                              setActiveModal(null);
+                            }
+                          }}
+                          className={`px-4 py-2 text-[10px] font-bold rounded-lg transition-all ${
+                            (localEvent?.hiddenSections || []).includes("gifts")
+                              ? "bg-[#BF9B30]/10 text-[#BF9B30] border border-[#BF9B30]/30 hover:bg-[#BF9B30]/20"
+                              : "bg-red-500/10 text-red-400 border border-red-500/30 hover:bg-red-500/20"
+                          }`}
+                        >
+                          {(localEvent?.hiddenSections || []).includes("gifts") ? "Mostrar Seção" : "Excluir Seção"}
+                        </button>
+                      </div>
+
                       {/* Dress code */}
                       {localEvent?.type !== "BRIDAL_SHOWER" && (
                         <div className="bg-[#1A2026] p-5 rounded-2xl border border-[#BF9B30]/20 space-y-4">
@@ -2142,6 +2257,7 @@ const InvitationView: React.FC = () => {
 const FadeInSection: React.FC<{
   children: React.ReactNode;
   className?: string;
+  isHidden?: boolean;
   delay?: number;
 }> = ({ children, className = "", delay = 0 }) => (
   <motion.div
@@ -2241,6 +2357,7 @@ const EditableImageWrapper: React.FC<{
   onChange: (newUrl: string) => void;
   isEditing?: boolean;
   className?: string;
+  isHidden?: boolean;
   children: React.ReactNode;
 }> = ({ src, onChange, isEditing, className = "", children }) => {
   const [isOpen, setIsOpen] = useState(false);
@@ -2416,7 +2533,7 @@ const FloatingDesignDock: React.FC<{
   addGiftItem: () => void;
   addGalleryImage: () => void;
   openModal: (
-    modal: "style" | "locations" | "timeline" | "gifts" | "gallery",
+    modal: "style" | "locations" | "timeline" | "gifts" | "gallery" | "hero",
   ) => void;
 }> = ({
   localEvent,
@@ -2542,6 +2659,15 @@ const FloatingDesignDock: React.FC<{
         <div className="space-y-4 text-xs text-slate-300">
           <div className="grid grid-cols-2 gap-2">
             <button
+              onClick={() => openModal("hero")}
+              className="p-3 bg-slate-950 border border-slate-800 hover:border-violet-500/50 hover:bg-slate-800 rounded-xl flex items-center gap-2 justify-center font-bold text-slate-200 transition-all cursor-pointer"
+            >
+              <span className="material-symbols-outlined text-sm text-violet-400">
+                auto_stories
+              </span>
+              <span>Capa & Textos</span>
+            </button>
+            <button
               onClick={() => openModal("locations")}
               className="p-3 bg-slate-950 border border-slate-800 hover:border-violet-500/50 hover:bg-slate-800 rounded-xl flex items-center gap-2 justify-center font-bold text-slate-200 transition-all cursor-pointer"
             >
@@ -2551,7 +2677,7 @@ const FloatingDesignDock: React.FC<{
               <span>
                 {localEvent?.type === "BRIDAL_SHOWER"
                   ? "Localização"
-                  : "Cerimônia & Recepção"}
+                  : "Cerimônia"}
               </span>
             </button>
             {localEvent?.type !== "BRIDAL_SHOWER" && (
@@ -2567,21 +2693,21 @@ const FloatingDesignDock: React.FC<{
             )}
             <button
               onClick={() => openModal("gifts")}
-              className={`p-3 bg-slate-950 border border-slate-800 hover:border-violet-500/50 hover:bg-slate-800 rounded-xl flex items-center gap-2 justify-center font-bold text-slate-200 transition-all cursor-pointer ${localEvent?.type === "BRIDAL_SHOWER" ? "col-span-1" : ""}`}
+              className={`p-3 bg-slate-950 border border-slate-800 hover:border-violet-500/50 hover:bg-slate-800 rounded-xl flex items-center gap-2 justify-center font-bold text-slate-200 transition-all cursor-pointer`}
             >
               <span className="material-symbols-outlined text-sm text-violet-400">
                 account_balance_wallet
               </span>
-              <span>IBAN & Presentes</span>
+              <span>Presentes</span>
             </button>
             <button
               onClick={() => openModal("gallery")}
-              className={`p-3 bg-slate-950 border border-slate-800 hover:border-violet-500/50 hover:bg-slate-800 rounded-xl flex items-center gap-2 justify-center font-bold text-slate-200 transition-all cursor-pointer ${localEvent?.type === "BRIDAL_SHOWER" ? "col-span-2" : ""}`}
+              className={`p-3 bg-slate-950 border border-slate-800 hover:border-violet-500/50 hover:bg-slate-800 rounded-xl flex items-center gap-2 justify-center font-bold text-slate-200 transition-all cursor-pointer col-span-2`}
             >
               <span className="material-symbols-outlined text-sm text-violet-400">
                 image
               </span>
-              <span>Capa & Galeria</span>
+              <span>Galeria de Fotos</span>
             </button>
           </div>
           <p className="text-[9px] text-slate-500 text-center">
@@ -2613,6 +2739,7 @@ const EditableSectionWrapper: React.FC<{
   onEditSection?: (section: any) => void;
   children: React.ReactNode;
   className?: string;
+  isHidden?: boolean;
 }> = ({
   isEditing,
   section,
@@ -2620,7 +2747,9 @@ const EditableSectionWrapper: React.FC<{
   onEditSection,
   children,
   className = "",
+  isHidden = false,
 }) => {
+  if (isHidden) return null;
   if (!isEditing) {
     return <div className={className}>{children}</div>;
   }
@@ -2755,6 +2884,7 @@ const ClassicLayout: React.FC<{
         <EditableSectionWrapper
           isEditing={isEditing}
           section="timeline"
+          isHidden={(event.hiddenSections || []).includes("timeline")}
           label="Cronograma"
           onEditSection={onEditSection}
         >
@@ -2823,6 +2953,7 @@ const ClassicLayout: React.FC<{
         <EditableSectionWrapper
           isEditing={isEditing}
           section="locations"
+          isHidden={(event.hiddenSections || []).includes("locations")}
           label="Localização"
           onEditSection={onEditSection}
         >
@@ -2862,6 +2993,7 @@ const ClassicLayout: React.FC<{
           <EditableSectionWrapper
             isEditing={isEditing}
             section="gifts"
+          isHidden={(event.hiddenSections || []).includes("gifts")}
             label="Lista de Presentes"
             onEditSection={onEditSection}
           >
@@ -2943,6 +3075,7 @@ const ClassicLayout: React.FC<{
           <EditableSectionWrapper
             isEditing={isEditing}
             section="gallery"
+          isHidden={(event.hiddenSections || []).includes("gallery")}
             label="Galeria"
             onEditSection={onEditSection}
           >
@@ -3127,6 +3260,7 @@ const ModernLayout: React.FC<{
       <EditableSectionWrapper
         isEditing={isEditing}
         section="locations"
+          isHidden={(event.hiddenSections || []).includes("locations")}
         label="Localização"
         onEditSection={onEditSection}
         className="max-w-5xl mx-auto px-6 mb-24"
@@ -3240,6 +3374,7 @@ const ModernLayout: React.FC<{
       <EditableSectionWrapper
         isEditing={isEditing}
         section="timeline"
+          isHidden={(event.hiddenSections || []).includes("timeline")}
         label="Cronograma"
         onEditSection={onEditSection}
         className="bg-[#F4F4F4] py-24 px-6 my-10"
@@ -3306,6 +3441,7 @@ const ModernLayout: React.FC<{
       <EditableSectionWrapper
         isEditing={isEditing}
         section="gifts"
+          isHidden={(event.hiddenSections || []).includes("gifts")}
         label="Dress Code & Contas"
         onEditSection={onEditSection}
         className="grid md:grid-cols-2 max-w-6xl mx-auto w-full py-12"
@@ -3607,6 +3743,7 @@ const GardenLayout: React.FC<{
       <EditableSectionWrapper
         isEditing={isEditing}
         section="locations"
+          isHidden={(event.hiddenSections || []).includes("locations")}
         label="Locais"
         onEditSection={onEditSection}
         className="max-w-4xl mx-auto px-6 py-16 block"
@@ -3722,6 +3859,7 @@ const GardenLayout: React.FC<{
       <EditableSectionWrapper
         isEditing={isEditing}
         section="timeline"
+          isHidden={(event.hiddenSections || []).includes("timeline")}
         label="Cronograma"
         onEditSection={onEditSection}
       >
@@ -3779,6 +3917,7 @@ const GardenLayout: React.FC<{
         <EditableSectionWrapper
           isEditing={isEditing}
           section="gallery"
+          isHidden={(event.hiddenSections || []).includes("gallery")}
           label="Galeria"
           onEditSection={onEditSection}
         >
@@ -3807,6 +3946,7 @@ const GardenLayout: React.FC<{
       <EditableSectionWrapper
         isEditing={isEditing}
         section="gifts"
+          isHidden={(event.hiddenSections || []).includes("gifts")}
         label="Lista de Presentes & Trajes"
         onEditSection={onEditSection}
         className="grid md:grid-cols-2 gap-8 max-w-4xl mx-auto px-6 mb-24 block"
@@ -4034,6 +4174,7 @@ const RusticLayout: React.FC<{
       <EditableSectionWrapper
         isEditing={isEditing}
         section="locations"
+          isHidden={(event.hiddenSections || []).includes("locations")}
         label="Locais"
         onEditSection={onEditSection}
         className="px-4 md:px-8 space-y-4 mb-16 block"
@@ -4080,6 +4221,7 @@ const RusticLayout: React.FC<{
       <EditableSectionWrapper
         isEditing={isEditing}
         section="timeline"
+          isHidden={(event.hiddenSections || []).includes("timeline")}
         label="Cronograma"
         onEditSection={onEditSection}
       >
@@ -4140,6 +4282,7 @@ const RusticLayout: React.FC<{
       <EditableSectionWrapper
         isEditing={isEditing}
         section="gifts"
+          isHidden={(event.hiddenSections || []).includes("gifts")}
         label="Lista de Presentes & Trajes"
         onEditSection={onEditSection}
         className="grid md:grid-cols-2 gap-4 px-4 mt-16 mb-24 block"
@@ -4350,6 +4493,7 @@ const IndustrialLayout: React.FC<{
       <EditableSectionWrapper
         isEditing={isEditing}
         section="timeline"
+          isHidden={(event.hiddenSections || []).includes("timeline")}
         label="Cronograma"
         onEditSection={onEditSection}
       >
@@ -4424,6 +4568,7 @@ const IndustrialLayout: React.FC<{
       <EditableSectionWrapper
         isEditing={isEditing}
         section="locations"
+          isHidden={(event.hiddenSections || []).includes("locations")}
         label="Locais"
         onEditSection={onEditSection}
         className="grid grid-cols-1 md:grid-cols-2 h-[60vh] block"
@@ -4490,6 +4635,7 @@ const IndustrialLayout: React.FC<{
         <EditableSectionWrapper
           isEditing={isEditing}
           section="gifts"
+          isHidden={(event.hiddenSections || []).includes("gifts")}
           label="Lista de Presentes"
           onEditSection={onEditSection}
           className="block border-b border-white/20"
@@ -4565,6 +4711,7 @@ const IndustrialLayout: React.FC<{
         <EditableSectionWrapper
           isEditing={isEditing}
           section="gallery"
+          isHidden={(event.hiddenSections || []).includes("gallery")}
           label="Galeria"
           onEditSection={onEditSection}
           className="block"
@@ -4801,6 +4948,7 @@ const LuxuryLayout: React.FC<{
         <EditableSectionWrapper
           isEditing={isEditing}
           section="locations"
+          isHidden={(event.hiddenSections || []).includes("locations")}
           label="Locais"
           onEditSection={onEditSection}
           className="w-full block"
@@ -4920,6 +5068,7 @@ const LuxuryLayout: React.FC<{
           <EditableSectionWrapper
             isEditing={isEditing}
             section="gifts"
+          isHidden={(event.hiddenSections || []).includes("gifts")}
             label="Lista de Presentes"
             onEditSection={onEditSection}
             className="w-full block"
@@ -5006,6 +5155,7 @@ const LuxuryLayout: React.FC<{
           <EditableSectionWrapper
             isEditing={isEditing}
             section="gallery"
+          isHidden={(event.hiddenSections || []).includes("gallery")}
             label="Galeria"
             onEditSection={onEditSection}
             className="w-full block"
@@ -5192,6 +5342,7 @@ const BridalShowerLayout: React.FC<{
           <EditableSectionWrapper
             isEditing={isEditing}
             section="locations"
+          isHidden={(event.hiddenSections || []).includes("locations")}
             label="Locais"
             onEditSection={onEditSection}
             className="block"
@@ -5247,6 +5398,7 @@ const BridalShowerLayout: React.FC<{
             <EditableSectionWrapper
               isEditing={isEditing}
               section="gifts"
+          isHidden={(event.hiddenSections || []).includes("gifts")}
               label="Lista de Presentes"
               onEditSection={onEditSection}
               className="block"
@@ -5339,6 +5491,7 @@ const BridalShowerLayout: React.FC<{
         <EditableSectionWrapper
           isEditing={isEditing}
           section="gallery"
+          isHidden={(event.hiddenSections || []).includes("gallery")}
           label="Galeria"
           onEditSection={onEditSection}
           className="block mt-24"
@@ -5546,6 +5699,7 @@ const BabyShowerLayout: React.FC<{
           <EditableSectionWrapper
             isEditing={isEditing}
             section="locations"
+          isHidden={(event.hiddenSections || []).includes("locations")}
             label="Locais"
             onEditSection={onEditSection}
             className="block"
@@ -5640,6 +5794,7 @@ const BabyShowerLayout: React.FC<{
         <EditableSectionWrapper
           isEditing={isEditing}
           section="gifts"
+          isHidden={(event.hiddenSections || []).includes("gifts")}
           label="Presentes"
           onEditSection={onEditSection}
           className="block"
@@ -5721,6 +5876,7 @@ const BabyShowerLayout: React.FC<{
         <EditableSectionWrapper
           isEditing={isEditing}
           section="gallery"
+          isHidden={(event.hiddenSections || []).includes("gallery")}
           label="Galeria de Fotos"
           onEditSection={onEditSection}
           className="block"

@@ -23,7 +23,6 @@ try {
 }
 
 // Initialize Firebase Admin
-let dbAdmin: any = null;
 try {
   if (admin.apps.length === 0) {
     admin.initializeApp({
@@ -33,15 +32,16 @@ try {
   const dbId = firebaseConfig.firestoreDatabaseId;
   if (dbId && dbId !== '(default)') {
     try {
-      dbAdmin = admin.firestore();
-      dbAdmin.settings({ databaseId: dbId });
+      const dbInstance = admin.firestore();
+      dbInstance.settings({ databaseId: dbId });
     } catch (settingsError) {
       console.warn("Falling back to standard firestore initialization:", settingsError);
-      dbAdmin = admin.firestore();
+      admin.firestore();
     }
   } else {
-    dbAdmin = admin.firestore();
+    admin.firestore();
   }
+  console.log("Firebase Admin Firestore initialized successfully");
 } catch (error) {
   console.error("Error initializing Firebase Admin SDK:", error);
 }

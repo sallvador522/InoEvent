@@ -7,7 +7,7 @@ export enum ThemeType {
   BABY_SHOWER = 'BABY_SHOWER'
 }
 
-export type LayoutMode = 'CLASSIC' | 'MODERN' | 'LUXURY' | 'GARDEN' | 'RUSTIC' | 'INDUSTRIAL' | 'BRIDAL_BEAUTY' | 'BRIDAL_ROMANTIC' | 'BRIDAL_MINIMAL' | 'BRIDAL_TEA_PARTY' | 'BRIDAL_CHEF' | 'BRIDAL_TROPICAL' | 'BABY_BOY' | 'BABY_GIRL' | 'BABY_NEUTRAL';
+export type LayoutMode = 'CLASSIC' | 'MODERN' | 'LUXURY' | 'GARDEN' | 'RUSTIC' | 'INDUSTRIAL' | 'BRIDAL_BEAUTY' | 'BRIDAL_ROMANTIC' | 'BRIDAL_MINIMAL' | 'BRIDAL_TEA_PARTY' | 'BRIDAL_CHEF' | 'BRIDAL_TROPICAL' | 'BABY_BOY' | 'BABY_GIRL' | 'BABY_NEUTRAL' | 'LIMINTSO_GOLD' | 'LIMINTSO_ME';
 
 export interface TimelineItem {
   time: string;
@@ -73,6 +73,12 @@ export interface EventDetails {
   tips?: TipItem[];
   dressCode?: DressCode;
   phone?: string; // Add phone
+  brideQuote?: string;
+  groomQuote?: string;
+  coupleTitle?: string;
+  footerMessage?: string;
+  welcomeMessage?: string;
+  editableContent?: Record<string, string>;
 }
 
 export interface ThemeConfig {

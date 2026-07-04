@@ -77,6 +77,9 @@ export const EventCreator: React.FC = () => {
   const [musicTrack, setMusicTrack] = useState('romantic');
   const [dressCodeTitle, setDressCodeTitle] = useState('Dress Code');
   const [dressCodeDesc, setDressCodeDesc] = useState('Esporte Fino - Sugerimos tons pastéis suaves.');
+  const [heroImage, setHeroImage] = useState<string>('');
+  const [editableContent, setEditableContent] = useState<Record<string, string>>({});
+  const [mapImage, setMapImage] = useState<string>('');
   
   // Dynamic arrays
   const [timeline, setTimeline] = useState<TimelineItem[]>(
@@ -136,6 +139,10 @@ export const EventCreator: React.FC = () => {
         return 'https://images.unsplash.com/photo-1511285560929-80b456fea0bc?q=80&w=1200&auto=format&fit=crop';
       case 'LUXURY':
         return 'https://images.unsplash.com/photo-1507504038482-7621c518d50d?q=80&w=1200&auto=format&fit=crop';
+      case 'LIMINTSO_GOLD':
+        return '/casalModel.webp';
+      case 'LIMINTSO_ME':
+        return 'https://in.limintso.com/wp-content/uploads/2025/08/cav33.jpg';
       case 'GARDEN':
         return 'https://images.unsplash.com/photo-1469371670807-013ccf25f16a?q=80&w=1200&auto=format&fit=crop';
       case 'RUSTIC':
@@ -156,6 +163,29 @@ export const EventCreator: React.FC = () => {
         return 'https://images.unsplash.com/photo-1544816155-12df9643f363?q=80&w=1200&auto=format&fit=crop';
       default:
         return 'https://images.unsplash.com/photo-1519741497674-611481863552?q=80&w=1200&auto=format&fit=crop';
+    }
+  };
+
+  const handleLayoutSelect = (layoutId: LayoutMode) => {
+    setSelectedLayout(layoutId);
+    const defaults = [
+      'https://images.unsplash.com/photo-1519741497674-611481863552?q=80&w=1200&auto=format&fit=crop',
+      'https://images.unsplash.com/photo-1511285560929-80b456fea0bc?q=80&w=1200&auto=format&fit=crop',
+      'https://images.unsplash.com/photo-1507504038482-7621c518d50d?q=80&w=1200&auto=format&fit=crop',
+      '/casalModel.webp',
+      'https://in.limintso.com/wp-content/uploads/2025/08/cav33.jpg',
+      'https://images.unsplash.com/photo-1469371670807-013ccf25f16a?q=80&w=1200&auto=format&fit=crop',
+      'https://images.unsplash.com/photo-1532712938310-34cb3982ef74?q=80&w=1200&auto=format&fit=crop',
+      'https://images.unsplash.com/photo-1465495976277-4387d4b0b4c6?q=80&w=1200&auto=format&fit=crop',
+      'https://images.unsplash.com/photo-1515934751635-c81c6bc9a2d8?q=80&w=1200&auto=format&fit=crop',
+      'https://images.unsplash.com/photo-1481653191744-97edb833d5b4?q=80&w=1200&auto=format&fit=crop',
+      'https://images.unsplash.com/photo-1524824267900-2fa9cbf7a506?q=80&w=1200&auto=format&fit=crop',
+      'https://images.unsplash.com/photo-1519689680058-324335c77eb2?q=80&w=1200&auto=format&fit=crop',
+      'https://images.unsplash.com/photo-1555252333-9f8e92e65df9?q=80&w=1200&auto=format&fit=crop',
+      'https://images.unsplash.com/photo-1544816155-12df9643f363?q=80&w=1200&auto=format&fit=crop'
+    ];
+    if (!heroImage || defaults.includes(heroImage)) {
+      setHeroImage(getHeroImageUrl(layoutId));
     }
   };
 
@@ -181,6 +211,9 @@ export const EventCreator: React.FC = () => {
             setMusicTrack(data.musicTrack || 'romantic');
             if (data.timeline) setTimeline(data.timeline);
             if (data.gifts) setGifts(data.gifts);
+            if (data.heroImage) setHeroImage(data.heroImage);
+            if (data.editableContent) setEditableContent(data.editableContent);
+            if (data.mapImage) setMapImage(data.mapImage);
             if (data.dressCode) {
               setDressCodeTitle(data.dressCode.title || 'Dress Code');
               setDressCodeDesc(data.dressCode.description || '');
@@ -287,11 +320,11 @@ export const EventCreator: React.FC = () => {
 
     try {
       // PREMIUM LAYOUT RULE: Check if selecting a premium layout on an Essencial plan
-      const isPremiumLayout = ['LUXURY', 'GARDEN', 'RUSTIC', 'INDUSTRIAL'].includes(selectedLayout);
+      const isPremiumLayout = ['LUXURY', 'GARDEN', 'RUSTIC', 'INDUSTRIAL', 'LIMINTSO_GOLD', 'LIMINTSO_ME'].includes(selectedLayout);
       const isUserEssencial = userProfile?.plan === 'Essencial' || !userProfile?.plan;
       if (isPremiumLayout && isUserEssencial) {
         toast.dismiss(toastId);
-        setAttemptedPremiumLayout(selectedLayout === 'LUXURY' ? 'Luxo de Realeza' : selectedLayout === 'GARDEN' ? 'Jardim Encantado' : selectedLayout === 'RUSTIC' ? 'Rústico / Natural' : 'Industrial Loft');
+        setAttemptedPremiumLayout(selectedLayout === 'LUXURY' ? 'Luxo de Realeza' : selectedLayout === 'LIMINTSO_GOLD' ? 'Limintso Gold' : selectedLayout === 'LIMINTSO_ME' ? 'Limintso Me' : selectedLayout === 'GARDEN' ? 'Jardim Encantado' : selectedLayout === 'RUSTIC' ? 'Rústico / Natural' : 'Industrial Loft');
         setShowUpgradeModal(true);
         setIsLoading(false);
         return;
@@ -336,7 +369,9 @@ export const EventCreator: React.FC = () => {
         address: address,
         mapLink: mapLink,
         musicTrack: musicTrack,
-        heroImage: getHeroImageUrl(selectedLayout),
+        heroImage: heroImage || getHeroImageUrl(selectedLayout),
+        editableContent: editableContent || {},
+        ...(mapImage ? { mapImage } : {}),
         gifts: gifts,
         createdAt: new Date().toISOString(),
       };
@@ -731,6 +766,8 @@ export const EventCreator: React.FC = () => {
                               { id: 'CLASSIC', label: 'Clássico Romântico', desc: 'Elegância de contos de reis' },
                               { id: 'MODERN', label: 'Cosmopolita / Moderno', desc: 'Aparência ousada espacial' },
                               { id: 'LUXURY', label: 'Luxo de Realeza', desc: 'Elegância formal e aristocrata', premium: true },
+                              { id: 'LIMINTSO_GOLD', label: 'Limintso Ouro', desc: 'Chany & Pedro Luxo Dourado', premium: true },
+                              { id: 'LIMINTSO_ME', label: 'Limintso Me', desc: 'Marnela & Evandro Nobreza', premium: true },
                               { id: 'GARDEN', label: 'Jardim Encantado', desc: 'Pétalas florais e românticas', premium: true },
                               { id: 'RUSTIC', label: 'Rústico / Natural', desc: 'Folhas, madeiras e aconchego', premium: true },
                               { id: 'INDUSTRIAL', label: 'Industrial Loft', desc: 'Modernidade metropolitana', premium: true }
@@ -1036,6 +1073,8 @@ export const EventCreator: React.FC = () => {
                 selectedLayout === 'CLASSIC' ? 'bg-[#FCFAF8] text-[#2C2621] font-serif' :
                 selectedLayout === 'MODERN' ? 'bg-[#111112] text-white font-sans' :
                 selectedLayout === 'LUXURY' ? 'bg-[#0E131F] text-[#D4AF37] font-serif' :
+                selectedLayout === 'LIMINTSO_GOLD' ? 'bg-[#FFFDF9] text-[#b49232] font-serif border border-[#f5ebcf]' :
+                selectedLayout === 'LIMINTSO_ME' ? 'bg-[#FCFAF6] text-[#121212] font-serif border border-stone-200' :
                 selectedLayout === 'GARDEN' ? 'bg-emerald-50/75 text-[#1C3A27] font-serif' :
                 selectedLayout === 'RUSTIC' ? 'bg-[#FAF6F0] text-[#5C4D3C] font-serif' :
                 selectedLayout === 'INDUSTRIAL' ? 'bg-[#F2F2F2] text-slate-900 font-mono' :

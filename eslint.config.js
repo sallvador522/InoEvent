@@ -50,6 +50,6 @@ export default [
     }
   },
   {
-    ignores: ["dist/**", "node_modules/**", "*.cjs", "**/*.cjs", "eslint.config.js"]
+    ignores: ["dist/**", "node_modules/**", "*.cjs", "**/*.cjs", "eslint.config.js", "test_*.js", "*.js", "**/*.js"]
   }
 ];

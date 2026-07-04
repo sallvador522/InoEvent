@@ -293,6 +293,112 @@ export const EVENTS: EventDetails[] = [
     ]
   },
 
+  // 6.5. CLONE: Chany & Pedro (Limintso Gold Theme)
+  {
+    id: 'chany-pedro-wedding',
+    type: ThemeType.WEDDING,
+    layoutMode: 'LIMINTSO_GOLD',
+    title: 'Chany & Pedro',
+    hosts: 'O Casamento de',
+    brideName: 'Chany Huó',
+    groomName: 'Pedro Palate Jr',
+    brideParents: 'Ilda Dique e Jorge Dique',
+    groomParents: 'Angélica Palate e Pedro Palate',
+    date: '09 de Agosto de 2025',
+    isoDate: '2025-08-09T12:00:00',
+    time: '12:00',
+    locationName: 'The Gardens',
+    address: 'Muntanhana N66 Marracuene',
+    receptionName: "Copo d'água",
+    receptionAddress: 'The Gardens, Marracuene',
+    mapLink: 'https://maps.google.com/?q=The+Gardens+Muntanhana+Marracuene',
+    heroImage: '/casalModel.webp',
+    description: 'Temos a honra de convidá-lo(a) a comemorar esta data especial connosco. Venha juntar-se a nós e ajudar-nos a celebrar o nosso enlace matrimonial de acordo com a agenda abaixo:',
+    musicTrack: 'TEEKS - First Time',
+    themeColor: '#dcb349', // Elegant Gold
+    gallery: [
+      'https://images.unsplash.com/photo-1511285560982-1356c11d4606?q=80&w=2670&auto=format&fit=crop',
+      'https://images.unsplash.com/photo-1583939003579-730e3918a45a?q=80&w=2670&auto=format&fit=crop',
+      'https://images.unsplash.com/photo-1515934751635-c81c6bc9a2d8?q=80&w=2574&auto=format&fit=crop'
+    ],
+    timeline: [
+      { time: '12:00', title: 'Cerimónia Civil', description: "The Gardens, Marracuene" },
+      { time: '13:00', title: 'Cerimónia Religiosa', description: "The Gardens, Marracuene" },
+      { time: '14:30', title: "Copo d'água", description: "The Gardens, Marracuene" }
+    ],
+    dressCode: {
+      title: 'Formal / Esporte Fino',
+      description: 'Sugerimos trajes finos formais para celebrar connosco em grande elegância.',
+      image: 'https://images.unsplash.com/photo-1511285560982-1356c11d4606?q=80&w=2670&auto=format&fit=crop'
+    },
+    gifts: [
+      {
+        type: 'IBAN',
+        title: 'Presentes em Dinheiro',
+        description: 'Sua presença é o nosso maior presente! Se desejar nos presentear, sinta-se à vontade:',
+        value: 'AO06 0000 0000 0000 0000 0000 0',
+        bankName: 'BAI',
+        accountName: 'Chany & Pedro'
+      }
+    ]
+  },
+
+  // 6.6. CLONE: Marnela & Evandro (Limintso Me Theme)
+  {
+    id: 'marnela-evandro-wedding',
+    type: ThemeType.WEDDING,
+    layoutMode: 'LIMINTSO_ME',
+    title: 'Marnela & Evandro',
+    hosts: 'A UNIÃO MATRIMONIAL DE',
+    brideName: 'Marnela Zunguze',
+    groomName: 'Evandro Jojó',
+    brideParents: 'Jorge Senete Zunguze\ne\nAlia Alexandre Gueze',
+    groomParents: 'José João Jojó\ne\nAnacanizia Lopes Lima',
+    date: 'Sábado, 11 de Outubro de 2025',
+    isoDate: '2025-10-11T11:00:00',
+    time: '11:00',
+    locationName: 'The Gardens',
+    address: 'Muntanhana N66 Marracuene',
+    receptionName: "Copo d'água",
+    receptionAddress: 'The Gardens, Marracuene',
+    mapLink: 'https://maps.google.com/?q=The+Gardens+Muntanhana+Marracuene',
+    heroImage: 'https://in.limintso.com/wp-content/uploads/2025/08/cav33.jpg',
+    description: 'I Coríntios 13: 4-7\nAqui começa o nosso lar, erguido sobre a fé e o amor de Deus.\nCada passo que damos é promessa de que ele será sempre o alicerce da nossa Família.',
+    musicTrack: 'TEEKS - First Time',
+    themeColor: '#E9BE5D', // Elegant Gold
+    mapImage: 'https://in.limintso.com/wp-content/uploads/2025/08/marrr11.jpg',
+    gallery: [
+      'https://in.limintso.com/wp-content/uploads/2025/08/mar.jpg',
+      'https://in.limintso.com/wp-content/uploads/2025/08/mar23.jpg',
+      'https://in.limintso.com/wp-content/uploads/2025/08/marb2222.jpg'
+    ],
+    timeline: [
+      { time: '11:00', title: 'Cerimónia Civil', description: "The Gardens, Marracuene" },
+      { time: '12:00', title: 'Cerimónia Religiosa', description: "The Gardens, Marracuene" },
+      { time: '14:00', title: "Copo d'água", description: "The Gardens, Marracuene" }
+    ],
+    dressCode: {
+      title: 'Formal / Passeio Completo',
+      description: 'Sugerimos trajes finos formais para celebrar connosco em grande elegância.',
+      image: 'https://images.unsplash.com/photo-1511285560982-1356c11d4606?q=80&w=2670&auto=format&fit=crop'
+    },
+    gifts: [
+      {
+        type: 'IBAN',
+        title: 'Presentes em Dinheiro',
+        description: 'Sua presença é o nosso maior presente! Se desejar nos presentear, sinta-se à vontade:',
+        value: 'AO06 0000 0000 0000 0000 0000 0',
+        bankName: 'BAI',
+        accountName: 'Marnela & Evandro'
+      }
+    ],
+    brideQuote: 'Desde que os meus olhos encontram os seus, a taquicardia tomou conta de mim, era a promessa de Deus se cumprindo. O nosso amor será até após a vinda do Senhor.',
+    groomQuote: 'Quando você apareceu no meu caminho, você era a luz que eu precisava para ver as coisas boas ao meu redor. Prometo te amar para sempre e te fazer feliz a cada segundo da sua vida.',
+    coupleTitle: 'Ó meu Amor,',
+    footerMessage: 'Estamos ansiosos para celebrar este dia especial com você!',
+    welcomeMessage: 'Bem-vindo/a'
+  },
+
   // 7. NOVO: Chá de Panela (BRIDAL BEAUTY)
   {
     id: 'bridal-beauty',

@@ -41,6 +41,7 @@ import { copyToClipboard } from "../../lib/clipboard";
 import { QRCodeSVG } from "qrcode.react";
 import { SEO } from "../../components/SEO";
 import { getOptimizedImageUrl, OptimizeImageOptions } from "../../lib/imageOptimizer";
+import { Guestbook } from "./Guestbook";
 
 // Helper to safely get image source URL from string or custom object and optimize it
 const getImageUrl = (img: any, options: OptimizeImageOptions = {}): string => {
@@ -117,6 +118,8 @@ const LAYOUT_PRESETS: { mode: LayoutMode; name: string }[] = [
   { mode: "CLASSIC", name: "Clássico Romântico" },
   { mode: "MODERN", name: "Minimalista Etéreo" },
   { mode: "LUXURY", name: "Luxuoso Black Tie" },
+  { mode: "LIMINTSO_GOLD", name: "Limintso Ouro (Chany & Pedro)" },
+  { mode: "LIMINTSO_ME", name: "Limintso Me (Marnela & Evandro)" },
   { mode: "GARDEN", name: "Jardim Elegante" },
   { mode: "RUSTIC", name: "Rústico Chic" },
   { mode: "INDUSTRIAL", name: "Industrial Urbano" },
@@ -482,6 +485,10 @@ const InvitationView: React.FC = () => {
   const [networkError, setNetworkError] = useState<string | null>(null);
   const [isRSVPOpen, setRSVPOpen] = useState(false);
   const [isBannerCollapsed, setIsBannerCollapsed] = useState(false);
+  const [isOpenCover, setIsOpenCover] = useState(() => {
+    const isEdit = new URLSearchParams(window.location.search).get("edit") === "true";
+    return isEdit;
+  });
 
   // Workspace visual management variables: enforce security check so only authorized owners can edit saved invitations
   const editParam = new URLSearchParams(window.location.search).get("edit") === "true";
@@ -1043,6 +1050,8 @@ const InvitationView: React.FC = () => {
     onRSVP: () => setRSVPOpen(true),
     guestName,
     isEditing,
+    isOpenCover,
+    setIsOpenCover,
     onEditSection: (sec: string) => {
       if (sec === "gallery" || sec === "photos") setActiveModal("gallery");
       else if (sec === "gifts" || sec === "contas") setActiveModal("gifts");
@@ -1108,6 +1117,19 @@ const InvitationView: React.FC = () => {
             <div
               className={`flex items-center gap-1.5 md:gap-2 overflow-hidden transition-all duration-500 ${isEditorBarExpanded ? "max-w-[800px] opacity-100" : "max-w-0 opacity-0 pointer-events-none"}`}
             >
+              {((localEvent?.layoutMode || activeEvent?.layoutMode) === "LIMINTSO_GOLD" || (localEvent?.layoutMode || activeEvent?.layoutMode) === "LIMINTSO_ME") && (
+                <button
+                  type="button"
+                  onClick={() => setIsOpenCover(!isOpenCover)}
+                  className="px-3 md:px-4 py-2 bg-transparent border border-[#BF9B30]/40 hover:border-[#BF9B30] rounded-full text-[9px] md:text-xs font-bold text-[#BF9B30] transition-all cursor-pointer flex items-center gap-1.5 whitespace-nowrap uppercase tracking-widest hover:bg-[#BF9B30]/5 active:scale-95 shrink-0"
+                >
+                  <span className="material-symbols-outlined text-[14px]">
+                    {isOpenCover ? "auto_stories" : "edit_document"}
+                  </span>
+                  <span>{isOpenCover ? "Visualizar Capa" : "Visualizar Convite"}</span>
+                </button>
+              )}
+
               <button
                 type="button"
                 onClick={() => setRSVPOpen(true)}
@@ -1173,6 +1195,12 @@ const InvitationView: React.FC = () => {
           )}
           {localEvent?.layoutMode === "LUXURY" && (
             <LuxuryLayout {...layoutProps} />
+          )}
+          {localEvent?.layoutMode === "LIMINTSO_GOLD" && (
+            <LimintsoGoldLayout {...layoutProps} />
+          )}
+          {localEvent?.layoutMode === "LIMINTSO_ME" && (
+            <LimintsoMeLayout {...layoutProps} />
           )}
           {localEvent?.layoutMode === "GARDEN" && (
             <GardenLayout {...layoutProps} />
@@ -1987,6 +2015,8 @@ const InvitationView: React.FC = () => {
       )}
       {activeEvent.layoutMode === "MODERN" && <ModernLayout {...layoutProps} />}
       {activeEvent.layoutMode === "LUXURY" && <LuxuryLayout {...layoutProps} />}
+      {activeEvent.layoutMode === "LIMINTSO_GOLD" && <LimintsoGoldLayout {...layoutProps} />}
+      {activeEvent.layoutMode === "LIMINTSO_ME" && <LimintsoMeLayout {...layoutProps} />}
       {activeEvent.layoutMode === "GARDEN" && <GardenLayout {...layoutProps} />}
       {activeEvent.layoutMode === "RUSTIC" && <RusticLayout {...layoutProps} />}
       {activeEvent.layoutMode === "INDUSTRIAL" && (
@@ -2229,6 +2259,26 @@ const EditableImageWrapper: React.FC<{
     <div className={`relative group/image-wrap cursor-pointer ${className}`}>
       {children}
 
+      {/* Floating button on the top-right corner, always visible in edit mode, with high z-index to bypass overlapping issues */}
+      <div className="absolute top-4 right-4 z-[95] pointer-events-auto">
+        <button
+          type="button"
+          onClick={(e) => {
+            e.stopPropagation();
+            e.preventDefault();
+            setIsOpen(true);
+          }}
+          className="bg-slate-900/95 hover:bg-[#BF9B30] text-white hover:text-slate-950 px-3.5 py-2 rounded-full shadow-[0_4px_20px_rgba(0,0,0,0.5)] border border-white/20 transition-all duration-300 hover:scale-105 active:scale-95 flex items-center gap-1.5 cursor-pointer backdrop-blur-sm"
+        >
+          <span className="material-symbols-outlined text-[16px] text-[#BF9B30]">
+            photo_camera
+          </span>
+          <span className="text-[10px] font-bold uppercase tracking-widest font-sans pr-0.5">
+            Alterar Foto
+          </span>
+        </button>
+      </div>
+
       {/* Absolute overlay button to trigger image editing popover */}
       <div
         className="absolute inset-0 bg-black/40 opacity-0 group-hover/image-wrap:opacity-100 transition-opacity flex items-center justify-center z-25 pointer-events-auto cursor-pointer"
@@ -2250,7 +2300,7 @@ const EditableImageWrapper: React.FC<{
 
       {isOpen &&
         createPortal(
-          <div className="fixed inset-0 bg-[#0F1419]/90 backdrop-blur-md flex items-center justify-center p-4 z-[120] animate-in fade-in duration-200">
+          <div className="fixed inset-0 bg-[#0F1419]/90 backdrop-blur-md flex items-center justify-center p-4 z-[9999] animate-in fade-in duration-200">
             <div
               className="bg-[#0F1419] border border-[#BF9B30]/30 rounded-3xl w-full max-w-sm shadow-[0_20px_50px_rgba(0,0,0,0.5)] flex flex-col overflow-hidden animate-in zoom-in-95 duration-200"
               onClick={(e) => e.stopPropagation()}
@@ -2634,35 +2684,37 @@ const ClassicLayout: React.FC<{
             initial={{ opacity: 0 }}
             animate={{ opacity: 1 }}
             transition={{ duration: 1.5 }}
-            className="absolute inset-0 flex flex-col justify-end items-center pb-24 text-white text-center p-6"
+            className="absolute inset-0 flex flex-col justify-end items-center pb-24 text-white text-center p-6 pointer-events-none"
           >
-            <motion.h1
-              initial={{ y: 20, opacity: 0 }}
-              animate={{ y: 0, opacity: 1 }}
-              transition={{ delay: 0.3, duration: 1 }}
-              className="text-5xl font-script mb-2"
-            >
-              <EditableField
-                value={event.title}
-                onChange={(newVal) => updateField?.("title", newVal)}
-                isEditing={isEditing}
-                className="text-white text-5xl font-script text-center"
-              />
-            </motion.h1>
-            <div className="w-12 h-px bg-white/60 my-4"></div>
-            <motion.p
-              initial={{ y: 20, opacity: 0 }}
-              animate={{ y: 0, opacity: 1 }}
-              transition={{ delay: 0.5, duration: 1 }}
-              className="text-xl tracking-widest uppercase"
-            >
-              <EditableField
-                value={event.date}
-                onChange={(newVal) => updateField?.("date", newVal)}
-                isEditing={isEditing}
-                className="text-white text-xl tracking-widest uppercase text-center"
-              />
-            </motion.p>
+            <div className="pointer-events-auto flex flex-col items-center">
+              <motion.h1
+                initial={{ y: 20, opacity: 0 }}
+                animate={{ y: 0, opacity: 1 }}
+                transition={{ delay: 0.3, duration: 1 }}
+                className="text-5xl font-script mb-2"
+              >
+                <EditableField
+                  value={event.title}
+                  onChange={(newVal) => updateField?.("title", newVal)}
+                  isEditing={isEditing}
+                  className="text-white text-5xl font-script text-center"
+                />
+              </motion.h1>
+              <div className="w-12 h-px bg-white/60 my-4"></div>
+              <motion.p
+                initial={{ y: 20, opacity: 0 }}
+                animate={{ y: 0, opacity: 1 }}
+                transition={{ delay: 0.5, duration: 1 }}
+                className="text-xl tracking-widest uppercase"
+              >
+                <EditableField
+                  value={event.date}
+                  onChange={(newVal) => updateField?.("date", newVal)}
+                  isEditing={isEditing}
+                  className="text-white text-xl tracking-widest uppercase text-center"
+                />
+              </motion.p>
+            </div>
           </motion.div>
         </div>
       </div>
@@ -2987,9 +3039,9 @@ const ModernLayout: React.FC<{
             initial={{ opacity: 0, y: 40, filter: "blur(5px)" }}
             animate={{ opacity: 1, y: 0, filter: "blur(0px)" }}
             transition={{ delay: 0.5, duration: 1.2, ease: [0.22, 1, 0.36, 1] }}
-            className="absolute inset-0 flex flex-col items-center justify-center text-center p-8"
+            className="absolute inset-0 flex flex-col items-center justify-center text-center p-8 pointer-events-none"
           >
-            <div className="border border-[#8A817C]/30 bg-white/80 backdrop-blur-sm p-10 md:p-16 max-w-lg w-full shadow-2xl shadow-gray-200/50">
+            <div className="border border-[#8A817C]/30 bg-white/80 backdrop-blur-sm p-10 md:p-16 max-w-lg w-full shadow-2xl shadow-gray-200/50 pointer-events-auto">
               <span className="font-display text-[10px] uppercase tracking-[0.4em] text-gray-500 mb-6 block">
                 Convite de Casamento
               </span>
@@ -3458,9 +3510,9 @@ const GardenLayout: React.FC<{
             initial={{ opacity: 0, y: 30, filter: "blur(5px)" }}
             animate={{ opacity: 1, y: 0, filter: "blur(0px)" }}
             transition={{ delay: 0.5, duration: 1.2, ease: [0.22, 1, 0.36, 1] }}
-            className="absolute inset-0 flex flex-col items-center justify-center text-center p-6 drop-shadow-sm"
+            className="absolute inset-0 flex flex-col items-center justify-center text-center p-6 drop-shadow-sm pointer-events-none"
           >
-            <div className="bg-white/70 backdrop-blur-sm p-8 px-10 rounded-t-[100px] rounded-b-[100px] shadow-xl border border-white">
+            <div className="bg-white/70 backdrop-blur-sm p-8 px-10 rounded-t-[100px] rounded-b-[100px] shadow-xl border border-white pointer-events-auto">
               <p
                 className={`text-xs uppercase tracking-[0.3em] mb-4 ${accentColor} font-sans`}
               >
@@ -3906,27 +3958,29 @@ const RusticLayout: React.FC<{
               initial={{ opacity: 0, y: 20 }}
               animate={{ opacity: 1, y: 0 }}
               transition={{ delay: 0.5, duration: 1 }}
-              className="absolute bottom-0 w-full p-8 md:p-16 text-center text-[#FDF5E6]"
+              className="absolute bottom-0 w-full p-8 md:p-16 text-center text-[#FDF5E6] pointer-events-none"
             >
-              <p className="uppercase tracking-[0.3em] text-xs mb-2">
-                Save the Date
-              </p>
-              <h1 className="text-5xl md:text-7xl font-script mb-2">
-                <EditableField
-                  value={event.title}
-                  onChange={(newVal) => updateField?.("title", newVal)}
-                  isEditing={isEditing}
-                  className="text-5xl md:text-7xl font-script text-white text-center"
-                />
-              </h1>
-              <p className="text-lg">
-                <EditableField
-                  value={event.date}
-                  onChange={(newVal) => updateField?.("date", newVal)}
-                  isEditing={isEditing}
-                  className="text-lg text-white text-center"
-                />
-              </p>
+              <div className="pointer-events-auto">
+                <p className="uppercase tracking-[0.3em] text-xs mb-2">
+                  Save the Date
+                </p>
+                <h1 className="text-5xl md:text-7xl font-script mb-2">
+                  <EditableField
+                    value={event.title}
+                    onChange={(newVal) => updateField?.("title", newVal)}
+                    isEditing={isEditing}
+                    className="text-5xl md:text-7xl font-script text-white text-center"
+                  />
+                </h1>
+                <p className="text-lg">
+                  <EditableField
+                    value={event.date}
+                    onChange={(newVal) => updateField?.("date", newVal)}
+                    isEditing={isEditing}
+                    className="text-lg text-white text-center"
+                  />
+                </p>
+              </div>
             </motion.div>
           </div>
         </div>
@@ -4673,27 +4727,29 @@ const LuxuryLayout: React.FC<{
               </EditableImageWrapper>
               <div className="absolute inset-0 bg-[#0F1419]/30 mix-blend-color pointer-events-none"></div>
 
-              <div className="absolute bottom-0 w-full bg-gradient-to-t from-[#0F1419] to-transparent pt-20 pb-6 text-center">
-                <p className="text-2xl text-white font-italic">
-                  <EditableField
-                    value={event.date}
-                    onChange={(newVal) => updateField?.("date", newVal)}
-                    isEditing={isEditing}
-                    className="text-2xl text-white text-center"
-                  />
-                </p>
-                <p className="text-[#BF9B30] text-sm">
-                  {isEditing ? (
+              <div className="absolute bottom-0 w-full bg-gradient-to-t from-[#0F1419] to-transparent pt-20 pb-6 text-center pointer-events-none">
+                <div className="pointer-events-auto">
+                  <p className="text-2xl text-white font-italic">
                     <EditableField
-                      value={event.time}
-                      onChange={(newVal) => updateField?.("time", newVal)}
+                      value={event.date}
+                      onChange={(newVal) => updateField?.("date", newVal)}
                       isEditing={isEditing}
-                      className="text-[#BF9B30] text-sm text-center"
+                      className="text-2xl text-white text-center"
                     />
-                  ) : (
-                    `${event.time} Horas`
-                  )}
-                </p>
+                  </p>
+                  <p className="text-[#BF9B30] text-sm">
+                    {isEditing ? (
+                      <EditableField
+                        value={event.time}
+                        onChange={(newVal) => updateField?.("time", newVal)}
+                        isEditing={isEditing}
+                        className="text-[#BF9B30] text-sm text-center"
+                      />
+                    ) : (
+                      `${event.time} Horas`
+                    )}
+                  </p>
+                </div>
               </div>
             </div>
           </FadeInSection>
@@ -5052,10 +5108,10 @@ const BridalShowerLayout: React.FC<{
             initial={{ opacity: 0, y: 30 }}
             animate={{ opacity: 1, y: 0 }}
             transition={{ delay: 0.3, duration: 1.2, ease: [0.22, 1, 0.36, 1] }}
-            className="absolute inset-0 flex flex-col items-center justify-end text-center p-8 pb-16"
+            className="absolute inset-0 flex flex-col items-center justify-end text-center p-8 pb-16 pointer-events-none"
           >
             <div
-              className={`${accentCard} backdrop-blur-xl p-8 md:p-12 rounded-[2rem] shadow-2xl border border-white/40 max-w-lg w-full transform perspective-1000`}
+              className={`${accentCard} backdrop-blur-xl p-8 md:p-12 rounded-[2rem] shadow-2xl border border-white/40 max-w-lg w-full transform perspective-1000 pointer-events-auto`}
             >
               <p className="text-xs font-bold uppercase tracking-[0.2em] opacity-60 mb-4">
                 CHÁ DE PANELA
@@ -5406,10 +5462,10 @@ const BabyShowerLayout: React.FC<{
             initial={{ opacity: 0, y: 30 }}
             animate={{ opacity: 1, y: 0 }}
             transition={{ delay: 0.3, duration: 1.2, ease: [0.22, 1, 0.36, 1] }}
-            className="absolute inset-0 flex flex-col items-center justify-end text-center p-8 pb-16"
+            className="absolute inset-0 flex flex-col items-center justify-end text-center p-8 pb-16 pointer-events-none"
           >
             <div
-              className={`${accentCard} backdrop-blur-xl p-8 md:p-12 rounded-[2rem] shadow-2xl border max-w-lg w-full`}
+              className={`${accentCard} backdrop-blur-xl p-8 md:p-12 rounded-[2rem] shadow-2xl border max-w-lg w-full pointer-events-auto`}
             >
               <p className="text-xs font-bold uppercase tracking-[0.2em] opacity-65 mb-4 text-center">
                 CHÁ DE BEBÉ
@@ -5702,12 +5758,1387 @@ const BabyShowerLayout: React.FC<{
 };
 
 // ============================================================================
+// CLONE LAYOUT: LIMINTSO GOLD (Chany & Pedro Elegant Wedding Clone)
+// ============================================================================
+const LimintsoGoldLayout: React.FC<{
+  event: EventDetails;
+  onRSVP: () => void;
+  guestName?: string;
+  isEditing?: boolean;
+  isOpenCover?: boolean;
+  setIsOpenCover?: (open: boolean) => void;
+  onEditSection?: (section: any) => void;
+  updateField?: (field: string, value: any) => void;
+  deleteTimelineItem?: (index: number) => void;
+  updateTimelineItem?: (
+    index: number,
+    field: "time" | "title" | "description",
+    value: string,
+  ) => void;
+}> = ({
+  event,
+  onRSVP,
+  isEditing,
+  isOpenCover,
+  setIsOpenCover,
+  updateField,
+  deleteTimelineItem,
+  updateTimelineItem,
+}) => {
+  const [localIsOpen, setLocalIsOpen] = useState(isEditing ? true : false);
+  const isOpen = isOpenCover !== undefined ? isOpenCover : localIsOpen;
+  const setIsOpen = setIsOpenCover !== undefined ? setIsOpenCover : setLocalIsOpen;
+
+  // Extract initials for the monogram
+  const getMonogramInitials = () => {
+    if (event.brideName && event.groomName) {
+      const b = event.brideName.trim().charAt(0);
+      const g = event.groomName.trim().charAt(0);
+      return `${b} & ${g}`;
+    }
+    const parts = event.title.split("&");
+    if (parts.length >= 2) {
+      return `${parts[0].trim().charAt(0)} & ${parts[1].trim().charAt(0)}`;
+    }
+    return "C & P";
+  };
+
+  const groomVerseRef = "— Mateus 19:6";
+  const brideVerseRef = "— Eclesiastes 3:1";
+
+  return (
+    <div className="min-h-screen bg-[#FCFAF6] text-[#2C2924] font-serif relative overflow-x-hidden selection:bg-[#dcb349]/30 pb-24">
+      
+      {/* 1. ENTRANCE SCREEN COVER (CAPA OVERLAY) */}
+      <AnimatePresence>
+        {!isOpen && (
+          <motion.div
+            initial={{ opacity: 1 }}
+            exit={{ opacity: 0, y: "-100%", transition: { duration: 1.2, ease: [0.77, 0, 0.175, 1] } }}
+            className="fixed inset-0 bg-[#0F1419] z-[999] flex flex-col items-center justify-between py-20 px-6 overflow-hidden text-white"
+          >
+            {/* Fullscreen background image with subtle scale and overlay */}
+            <div className="absolute inset-0 z-0 pointer-events-auto">
+              <EditableImageWrapper
+                src={event.heroImage || "/casalModel.webp"}
+                onChange={(newVal) => updateField?.("heroImage", newVal)}
+                isEditing={isEditing}
+                className="absolute inset-0"
+              >
+                <div
+                  className="absolute inset-0 bg-cover bg-center transition-transform duration-[12s] ease-out-quad scale-105"
+                  style={{ backgroundImage: `url('${getImageUrl(event.heroImage || "/casalModel.webp", { width: 1200, quality: 80 })}')` }}
+                />
+              </EditableImageWrapper>
+              
+              {/* Dark subtle gradient overlay to guarantee perfect contrast and elite readability */}
+              <div className="absolute inset-0 bg-gradient-to-t from-slate-950/85 via-slate-950/40 to-slate-950/50 pointer-events-none" />
+            </div>
+
+            {/* Top tiny ornamental line */}
+            <div className="w-12 h-[1px] bg-white/20 mt-2 z-10" />
+
+            {/* Central Monogram and Info Card */}
+            <div className="flex flex-col items-center justify-center text-center space-y-6 md:space-y-8 my-auto z-10 max-w-xl px-4">
+              <motion.div
+                initial={{ y: 30, opacity: 0, filter: "blur(6px)" }}
+                animate={{ y: 0, opacity: 1, filter: "blur(0px)" }}
+                transition={{ delay: 0.3, duration: 1.2, ease: [0.22, 1, 0.36, 1] }}
+                className="space-y-4 md:space-y-6"
+              >
+                <p className="text-[10px] md:text-xs uppercase tracking-[0.3em] text-[#dcb349] font-sans font-semibold">
+                  {isEditing ? (
+                    <EditableField
+                      value={event.hosts || "A UNIÃO MATRIMONIAL DE"}
+                      onChange={(newVal) => updateField?.("hosts", newVal)}
+                      isEditing={isEditing}
+                      className="text-[#dcb349] text-center bg-transparent"
+                    />
+                  ) : (
+                    event.hosts || "A UNIÃO MATRIMONIAL DE"
+                  )}
+                </p>
+                
+                <h1 className="text-5xl md:text-7xl font-serif font-light tracking-wide text-white leading-tight">
+                  <EditableField
+                    value={event.title}
+                    onChange={(newVal) => updateField?.("title", newVal)}
+                    isEditing={isEditing}
+                    className="text-white text-5xl md:text-7xl font-serif font-light text-center"
+                  />
+                </h1>
+                
+                <div className="flex items-center justify-center pt-2">
+                  {isEditing ? (
+                    <EditableField
+                      value={event.date}
+                      onChange={(newVal) => updateField?.("date", newVal)}
+                      isEditing={isEditing}
+                      className="text-slate-200 text-sm md:text-lg text-center font-sans tracking-[0.25em]"
+                    />
+                  ) : (
+                    <span className="text-slate-200 font-sans text-sm md:text-lg tracking-[0.25em]">
+                      {event.date ? event.date.replace(/-/g, " • ").replace(/\//g, " • ").replace(/\./g, " • ") : "09 • 08 • 2025"}
+                    </span>
+                  )}
+                </div>
+              </motion.div>
+            </div>
+
+            {/* Open/VER CONVITE Elegant Button */}
+            <motion.div
+              initial={{ y: 20, opacity: 0 }}
+              animate={{ y: 0, opacity: 1 }}
+              transition={{ delay: 0.6, duration: 1 }}
+              className="z-10 flex flex-col items-center space-y-4 mb-4"
+            >
+              <button
+                onClick={() => setIsOpen(true)}
+                className="group relative px-10 py-4.5 bg-[#C5A880] hover:bg-[#b49232] text-slate-950 rounded-full shadow-[0_10px_35px_rgba(0,0,0,0.4)] text-xs uppercase tracking-[0.25em] font-sans font-bold transition-all duration-500 hover:scale-105 active:scale-95 flex items-center space-x-2.5 cursor-pointer border border-[#C5A880]/20"
+              >
+                <span className="material-symbols-outlined text-sm text-slate-950 transition-colors">
+                  play_arrow
+                </span>
+                <span>VER CONVITE</span>
+              </button>
+              <p className="text-[9px] uppercase tracking-[0.15em] text-[#C5A880]/70 font-sans">
+                Clique para escutar a música
+              </p>
+            </motion.div>
+          </motion.div>
+        )}
+      </AnimatePresence>
+
+      {/* MAIN WEDDING INVITATION FLOW */}
+      {/* 2. HERO HEADER SECTION */}
+      <div className="relative min-h-[90vh] md:min-h-[95vh] flex flex-col justify-between items-center py-16 px-6 overflow-hidden">
+        {/* Fullscreen hero background under fine frame */}
+        <div className="absolute inset-0 p-4 md:p-8">
+          <div className="w-full h-full rounded-[2.5rem] overflow-hidden relative shadow-inner">
+            <EditableImageWrapper
+              src={event.heroImage}
+              onChange={(newVal) => updateField?.("heroImage", newVal)}
+              isEditing={isEditing}
+              className="absolute inset-0"
+            >
+              <div
+                className="absolute inset-0 bg-cover bg-center transition-transform duration-[12s] scale-105 hover:scale-110"
+                style={{ backgroundImage: `url('${getImageUrl(event.heroImage, { width: 1200, quality: 80 })}')` }}
+              />
+            </EditableImageWrapper>
+            <div className="absolute inset-0 bg-gradient-to-t from-slate-950/80 via-slate-950/30 to-slate-950/40" />
+          </div>
+        </div>
+
+        {/* Content overlaid on fine framed image */}
+        <div className="z-10 text-white text-center flex flex-col justify-center items-center flex-1 space-y-4 max-w-xl px-4 mt-8">
+          <motion.p
+            initial={{ opacity: 0, y: -20 }}
+            animate={isOpen ? { opacity: 1, y: 0 } : {}}
+            transition={{ duration: 1, delay: 0.2 }}
+            className="text-xs md:text-sm uppercase tracking-[0.3em] text-[#dcb349] font-sans font-semibold"
+          >
+            A união matrimonial de
+          </motion.p>
+          <motion.h2
+            initial={{ opacity: 0, scale: 0.95 }}
+            animate={isOpen ? { opacity: 1, scale: 1 } : {}}
+            transition={{ duration: 1.2, delay: 0.4 }}
+            className="text-4xl md:text-6xl font-serif font-light tracking-wide leading-tight"
+          >
+            <EditableField
+              value={event.title}
+              onChange={(val) => updateField?.("title", val)}
+              isEditing={isEditing}
+              className="text-white"
+            />
+          </motion.h2>
+          <motion.div
+            initial={{ opacity: 0 }}
+            animate={isOpen ? { opacity: 0.6 } : {}}
+            transition={{ duration: 1.5, delay: 0.8 }}
+            className="w-12 h-[1px] bg-white my-2"
+          />
+          <motion.p
+            initial={{ opacity: 0, y: 20 }}
+            animate={isOpen ? { opacity: 1, y: 0 } : {}}
+            transition={{ duration: 1, delay: 0.6 }}
+            className="text-base md:text-xl tracking-[0.2em] font-light text-gray-200"
+          >
+            <EditableField
+              value={event.date}
+              onChange={(val) => updateField?.("date", val)}
+              isEditing={isEditing}
+            />
+          </motion.p>
+        </div>
+
+        {/* Scroll indicator with gold chevron */}
+        <motion.div
+          animate={{ y: [0, 8, 0] }}
+          transition={{ repeat: Infinity, duration: 1.8, ease: "easeInOut" }}
+          className="z-10 text-center text-[#dcb349] flex flex-col items-center mt-auto"
+        >
+          <span className="material-symbols-outlined text-3xl">keyboard_double_arrow_down</span>
+        </motion.div>
+      </div>
+
+      {/* 3. LEI DIVINA (THE BEAUTIFUL SCRIPTURE QUOTE BOX) */}
+      <div className="max-w-4xl mx-auto py-24 px-6 md:px-12 text-center">
+        <FadeInSection>
+          <span className="material-symbols-outlined text-[#b49232] text-4xl mb-4">auto_awesome</span>
+          <h2 className="text-xl md:text-2xl font-serif text-[#b49232] tracking-wider mb-8">
+            Lei Divina...
+          </h2>
+          <div className="relative p-8 md:p-12 border border-[#dcb349]/20 rounded-[2rem] bg-white/60 backdrop-blur-sm shadow-sm max-w-2xl mx-auto">
+            {/* Fine decoration lines in corners */}
+            <div className="absolute top-4 left-4 w-6 h-6 border-t border-l border-[#dcb349]/30 rounded-tl-xl" />
+            <div className="absolute top-4 right-4 w-6 h-6 border-t border-r border-[#dcb349]/30 rounded-tr-xl" />
+            <div className="absolute bottom-4 left-4 w-6 h-6 border-b border-l border-[#dcb349]/30 rounded-bl-xl" />
+            <div className="absolute bottom-4 right-4 w-6 h-6 border-b border-r border-[#dcb349]/30 rounded-br-xl" />
+
+            <div className="text-slate-700 leading-relaxed font-serif italic text-base md:text-lg space-y-4">
+              <EditableField
+                value={event.description}
+                onChange={(val) => updateField?.("description", val)}
+                isEditing={isEditing}
+                multiline
+              />
+            </div>
+          </div>
+        </FadeInSection>
+      </div>
+
+      {/* 4. THE NOIVOS SECTION ("Os Noivos") */}
+      <div className="max-w-6xl mx-auto py-16 px-6 md:px-12">
+        <FadeInSection className="text-center mb-16">
+          <p className="text-xs uppercase tracking-[0.25em] text-[#b49232] font-semibold mb-2 font-sans">
+            Apresentamos
+          </p>
+          <h2 className="text-3xl md:text-4xl font-serif text-slate-800">
+            Os Noivos
+          </h2>
+          <div className="w-16 h-[1px] bg-[#dcb349]/30 mx-auto mt-4" />
+        </FadeInSection>
+
+        {/* Groom, Couple Image, and Bride 3-Column Grid */}
+        <div className="grid grid-cols-1 lg:grid-cols-3 gap-8 items-center max-w-6xl mx-auto">
+          {/* O NOIVO - Slide in from Left */}
+          <motion.div
+            initial={{ opacity: 0, x: -60, filter: "blur(6px)" }}
+            whileInView={{ opacity: 1, x: 0, filter: "blur(0px)" }}
+            viewport={{ once: true, margin: "-50px" }}
+            transition={{
+              duration: 1.4,
+              ease: [0.22, 1, 0.36, 1],
+              delay: 0.1,
+            }}
+            className="order-2 lg:order-1 bg-white border border-[#dcb349]/10 rounded-[2.5rem] p-8 text-center shadow-sm relative hover:shadow-md transition-shadow duration-500 will-change-[transform,opacity]"
+          >
+            {/* Fine luxury header line */}
+            <div className="w-12 h-[2px] bg-[#dcb349]/20 mx-auto mb-6" />
+            
+            <h3 className="text-2xl font-serif text-slate-800 font-medium mb-1">
+              <EditableField
+                value={event.groomName || "Pedro Palate Jr"}
+                onChange={(val) => updateField?.("groomName", val)}
+                isEditing={isEditing}
+              />
+            </h3>
+            
+            <p className="text-[11px] uppercase tracking-widest text-[#b49232] font-sans font-bold mb-4">
+              Filho de: <br/>
+              <EditableField
+                value={event.groomParents || "Angélica Palate e Pedro Palate"}
+                onChange={(val) => updateField?.("groomParents", val)}
+                isEditing={isEditing}
+                className="text-xs mt-1"
+                multiline
+              />
+            </p>
+
+            <div className="text-slate-600 text-sm leading-relaxed font-serif mt-6 px-2">
+              <p>
+                "Este é o nosso primeiro e único casamento, e não poderia estar mais feliz por dar esse passo com alguém tão incrível. Não é só um “sim” diante do altar. É um “sim” para a vida toda: para os sonhos, os planos, os desafios e todas as alegrias que virão. E queremos dividir esse momento com você."
+              </p>
+              <span className="block text-xs font-semibold text-[#b49232] mt-4">
+                {groomVerseRef}
+              </span>
+            </div>
+          </motion.div>
+
+          {/* FOTO DO CASAL - Center zoomIn animation exactly like original */}
+          <motion.div
+            initial={{ opacity: 0, scale: 0.85, filter: "blur(8px)" }}
+            whileInView={{ opacity: 1, scale: 1, filter: "blur(0px)" }}
+            viewport={{ once: true, margin: "-50px" }}
+            transition={{
+              duration: 1.5,
+              ease: [0.22, 1, 0.36, 1],
+              delay: 0.2,
+            }}
+            className="order-1 lg:order-2 bg-white border border-[#dcb349]/20 rounded-[2.5rem] p-4 shadow-md relative hover:shadow-lg transition-all duration-500 will-change-[transform,opacity]"
+          >
+            {/* Fine dual gold border detailing */}
+            <div className="absolute inset-2 border border-[#dcb349]/10 rounded-[2rem] pointer-events-none" />
+            
+            <div className="relative aspect-[3/4] rounded-[2rem] overflow-hidden group shadow-inner">
+              <EditableImageWrapper
+                src={event.heroImage || "/casalModel.webp"}
+                onChange={(newVal) => updateField?.("heroImage", newVal)}
+                isEditing={isEditing}
+                className="absolute inset-0"
+              >
+                <div
+                  className="absolute inset-0 bg-cover bg-center transition-transform duration-[8s] ease-out group-hover:scale-105"
+                  style={{ backgroundImage: `url('${getImageUrl(event.heroImage || "/casalModel.webp", { width: 800, quality: 80 })}')` }}
+                />
+              </EditableImageWrapper>
+              
+              {/* Subtle lighting overlay */}
+              <div className="absolute inset-0 bg-gradient-to-t from-slate-950/40 via-transparent to-transparent pointer-events-none" />
+            </div>
+          </motion.div>
+
+          {/* A NOIVA - Slide in from Right */}
+          <motion.div
+            initial={{ opacity: 0, x: 60, filter: "blur(6px)" }}
+            whileInView={{ opacity: 1, x: 0, filter: "blur(0px)" }}
+            viewport={{ once: true, margin: "-50px" }}
+            transition={{
+              duration: 1.4,
+              ease: [0.22, 1, 0.36, 1],
+              delay: 0.1,
+            }}
+            className="order-3 lg:order-3 bg-white border border-[#dcb349]/10 rounded-[2.5rem] p-8 text-center shadow-sm relative hover:shadow-md transition-shadow duration-500 will-change-[transform,opacity]"
+          >
+            {/* Fine luxury header line */}
+            <div className="w-12 h-[2px] bg-[#dcb349]/20 mx-auto mb-6" />
+            
+            <h3 className="text-2xl font-serif text-slate-800 font-medium mb-1">
+              <EditableField
+                value={event.brideName || "Chany Huó"}
+                onChange={(val) => updateField?.("brideName", val)}
+                isEditing={isEditing}
+              />
+            </h3>
+            
+            <p className="text-[11px] uppercase tracking-widest text-[#b49232] font-sans font-bold mb-4">
+              Filha de: <br/>
+              <EditableField
+                value={event.brideParents || "Ilda Dique e Jorge Dique"}
+                onChange={(val) => updateField?.("brideParents", val)}
+                isEditing={isEditing}
+                className="text-xs mt-1"
+                multiline
+              />
+            </p>
+
+            <div className="text-slate-600 text-sm leading-relaxed font-serif mt-6 px-2">
+              <p>
+                "O coração bate mais forte a cada dia… Mal posso esperar para começar a nossa vida juntos, lado a lado, com Deus no centro e amor em cada passo."
+              </p>
+              <span className="block text-xs font-semibold text-[#b49232] mt-4">
+                {brideVerseRef}
+              </span>
+            </div>
+          </motion.div>
+        </div>
+      </div>
+
+      {/* 5. THE AGENDA & CHRONOGRAM SECTION */}
+      <div className="bg-[#FAF7F2] py-24 border-y border-[#dcb349]/10">
+        <div className="max-w-4xl mx-auto px-6 md:px-12">
+          <FadeInSection className="text-center mb-16">
+            <span className="material-symbols-outlined text-[#b49232] text-3xl mb-3">calendar_month</span>
+            <h2 className="text-3xl font-serif text-slate-800">
+              Agenda do Grande Dia
+            </h2>
+            <p className="text-xs uppercase tracking-widest text-[#b49232] font-sans font-bold mt-2">
+              <EditableField
+                value={event.date}
+                onChange={(val) => updateField?.("date", val)}
+                isEditing={isEditing}
+              />
+            </p>
+            
+            <div className="max-w-xl mx-auto mt-6 text-sm text-slate-600 leading-relaxed font-serif">
+              <p>
+                Temos a honra de convidá-lo(a) a comemorar esta data especial connosco. Venha juntar-se a nós e celebrar de acordo com a agenda abaixo:
+              </p>
+            </div>
+          </FadeInSection>
+
+          {/* Timeline events */}
+          <div className="max-w-2xl mx-auto space-y-8 relative">
+            {/* Center line decorator */}
+            <div className="absolute top-2 bottom-2 left-6 md:left-1/2 -translate-x-[0.5px] w-[1px] bg-[#dcb349]/30 pointer-events-none" />
+
+            {event.timeline && event.timeline.map((item, idx) => (
+              <FadeInSection key={idx}>
+                <div className={`flex flex-col md:flex-row items-start ${idx % 2 === 0 ? "md:flex-row-reverse" : ""} relative`}>
+                  {/* Timeline point */}
+                  <div className="absolute top-1 left-6 md:left-1/2 -translate-x-[8px] w-4 h-4 rounded-full bg-white border border-[#dcb349] z-10 flex items-center justify-center shadow-sm">
+                    <div className="w-1.5 h-1.5 rounded-full bg-[#dcb349]" />
+                  </div>
+
+                  {/* Left spacer block for desktop */}
+                  <div className="hidden md:block md:w-1/2" />
+
+                  {/* Content card */}
+                  <div className="w-full md:w-1/2 pl-14 md:pl-0 md:px-8">
+                    <div className="bg-white border border-[#dcb349]/10 rounded-2xl p-6 shadow-sm hover:shadow-md transition-all duration-300 relative">
+                      <div className="flex items-baseline justify-between mb-2">
+                        <span className="text-lg font-serif font-bold text-[#b49232] tracking-wide">
+                          <EditableField
+                            value={item.time}
+                            onChange={(val) => updateTimelineItem?.(idx, "time", val)}
+                            isEditing={isEditing}
+                          />
+                        </span>
+                        {isEditing && (
+                          <button
+                            onClick={() => deleteTimelineItem?.(idx)}
+                            className="text-xs text-red-500 hover:underline flex items-center gap-1 font-sans font-bold"
+                          >
+                            <span className="material-symbols-outlined text-[10px]">delete</span> Excluir
+                          </button>
+                        )}
+                      </div>
+                      
+                      <h4 className="text-base font-serif font-semibold text-slate-800 mb-1">
+                        <EditableField
+                          value={item.title}
+                          onChange={(val) => updateTimelineItem?.(idx, "title", val)}
+                          isEditing={isEditing}
+                        />
+                      </h4>
+                      
+                      <p className="text-xs text-slate-500 leading-relaxed">
+                        <EditableField
+                          value={item.description}
+                          onChange={(val) => updateTimelineItem?.(idx, "description", val)}
+                          isEditing={isEditing}
+                          multiline
+                        />
+                      </p>
+                    </div>
+                  </div>
+                </div>
+              </FadeInSection>
+            ))}
+          </div>
+
+          {/* Location details card */}
+          <FadeInSection className="mt-16 text-center max-w-md mx-auto">
+            <div className="bg-white border border-[#dcb349]/20 rounded-3xl p-8 shadow-sm">
+              <span className="material-symbols-outlined text-[#b49232] text-2xl mb-2">location_on</span>
+              <h4 className="text-lg font-serif text-slate-800 font-semibold mb-1">
+                <EditableField
+                  value={event.locationName}
+                  onChange={(val) => updateField?.("locationName", val)}
+                  isEditing={isEditing}
+                />
+              </h4>
+              <p className="text-xs text-slate-500 mb-6">
+                <EditableField
+                  value={event.address}
+                  onChange={(val) => updateField?.("address", val)}
+                  isEditing={isEditing}
+                  multiline
+                />
+              </p>
+              
+              {event.mapLink && (
+                <button
+                  onClick={() => window.open(event.mapLink, "_blank")}
+                  className="px-6 py-3 bg-white border border-[#dcb349] text-[#b49232] rounded-full text-xs uppercase tracking-[0.15em] font-sans font-bold hover:bg-[#dcb349] hover:text-white transition-colors flex items-center justify-center gap-2 mx-auto shadow-sm"
+                >
+                  <span className="material-symbols-outlined text-sm">map</span> Ver Localização / Mapa
+                </button>
+              )}
+            </div>
+          </FadeInSection>
+        </div>
+      </div>
+
+      {/* 6. GUESTBOOK / MURAL DE RECADOS (FELICITAÇÕES) */}
+      <div className="py-24 max-w-4xl mx-auto px-6 md:px-12">
+        <FadeInSection>
+          <div className="text-center mb-12">
+            <span className="material-symbols-outlined text-[#b49232] text-3xl mb-2">forum</span>
+            <h2 className="text-3xl font-serif text-slate-800">
+              Felicitações & Votos
+            </h2>
+            <div className="w-12 h-[1px] bg-[#dcb349]/30 mx-auto mt-4" />
+          </div>
+
+          <Guestbook eventId={event.id} layoutMode={event.layoutMode} />
+        </FadeInSection>
+      </div>
+
+      {/* 7. GIFTS / PRESENTES (IBAN INFO) */}
+      {event.gifts && event.gifts.length > 0 && (
+        <div className="py-24 bg-white border-t border-[#dcb349]/10">
+          <div className="max-w-4xl mx-auto px-6 md:px-12">
+            <FadeInSection className="text-center mb-12">
+              <span className="material-symbols-outlined text-[#b49232] text-3xl mb-2">volunteer_activism</span>
+              <h2 className="text-2xl md:text-3xl font-serif text-slate-800">Lista de Presentes</h2>
+              <p className="text-xs text-slate-500 uppercase tracking-widest mt-2">Mimos em Dinheiro / Apoio</p>
+              <div className="w-12 h-[1px] bg-[#dcb349]/30 mx-auto mt-4" />
+            </FadeInSection>
+
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-6 max-w-2xl mx-auto">
+              {event.gifts.map((gift, i) => (
+                <FadeInSection key={i} className="bg-[#FCFAF6] border border-[#dcb349]/10 rounded-2xl p-6 shadow-sm">
+                  <span className="text-[10px] uppercase font-bold tracking-widest text-[#b49232] opacity-80 block mb-2">
+                    {gift.type === "IBAN" ? "Transferência Bancária" : "Link Externo"}
+                  </span>
+                  <h4 className="text-base font-serif font-bold text-slate-800 mb-1">{gift.title}</h4>
+                  <p className="text-xs text-slate-500 leading-relaxed mb-4">{gift.description}</p>
+                  
+                  {gift.type === "IBAN" && (
+                    <div className="bg-white border border-[#dcb349]/10 rounded-xl p-3 flex items-center justify-between gap-2 shadow-sm">
+                      <div className="truncate">
+                        <span className="text-[9px] uppercase font-bold text-slate-400 block">{gift.bankName || "BAI"}</span>
+                        <code className="text-[11px] font-mono font-bold text-slate-700 select-all">{gift.value}</code>
+                      </div>
+                      <button
+                        onClick={() => {
+                          navigator.clipboard.writeText(gift.value);
+                          toast.success("IBAN copiado!");
+                        }}
+                        className="text-[10px] font-sans font-bold text-[#b49232] uppercase hover:underline shrink-0"
+                      >
+                        Copiar
+                      </button>
+                    </div>
+                  )}
+                </FadeInSection>
+              ))}
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* 8. RSVP FLOATING / FIXED ACTION CARD */}
+      <div className="py-24 text-center max-w-xl mx-auto px-6">
+        <FadeInSection className="bg-white border border-[#dcb349]/20 rounded-[2.5rem] p-10 shadow-sm relative">
+          <div className="absolute top-4 left-4 w-4 h-4 border-t border-l border-[#dcb349]/30" />
+          <div className="absolute top-4 right-4 w-4 h-4 border-t border-r border-[#dcb349]/30" />
+          <div className="absolute bottom-4 left-4 w-4 h-4 border-b border-l border-[#dcb349]/30" />
+          <div className="absolute bottom-4 right-4 w-4 h-4 border-b border-r border-[#dcb349]/30" />
+
+          <span className="material-symbols-outlined text-[#b49232] text-3xl mb-2">rsvp</span>
+          <h2 className="text-2xl font-serif text-slate-800 mb-3">Sua Presença</h2>
+          <p className="text-xs text-slate-500 leading-relaxed mb-8 max-w-sm mx-auto">
+            Se recebeu este convite significa que é nosso convidado de honra e a sua presença é importante para nós. Por favor confirme a sua presença para melhor nos organizarmos.
+          </p>
+
+          <button
+            onClick={onRSVP}
+            className="w-full max-w-xs bg-[#dcb349] hover:bg-[#b49232] text-white py-4 rounded-full font-bold shadow-lg text-xs uppercase tracking-[0.2em] transition-all duration-300 active:scale-95"
+          >
+            Confirmar Presença
+          </button>
+        </FadeInSection>
+      </div>
+
+      {/* FOOTER */}
+      <footer className="text-center py-12 text-[10px] text-slate-400 tracking-wider font-sans uppercase">
+        <p>© 2025 {event.title} • Criado com InoEvents</p>
+      </footer>
+    </div>
+  );
+};
+
+// ============================================================================
+// CLONE LAYOUT: LIMINTSO ME (Marnela & Evandro Elegant Wedding Clone)
+// ============================================================================
+const LimintsoMeLayout: React.FC<{
+  event: EventDetails;
+  onRSVP: () => void;
+  guestName?: string;
+  isEditing?: boolean;
+  isOpenCover?: boolean;
+  setIsOpenCover?: (open: boolean) => void;
+  onEditSection?: (section: any) => void;
+  updateField?: (field: string, value: any) => void;
+  deleteTimelineItem?: (index: number) => void;
+  updateTimelineItem?: (
+    index: number,
+    field: "time" | "title" | "description",
+    value: string,
+  ) => void;
+}> = ({
+  event,
+  onRSVP,
+  isEditing,
+  isOpenCover,
+  setIsOpenCover,
+  updateField,
+  deleteTimelineItem,
+  updateTimelineItem,
+  guestName,
+}) => {
+  const [localIsOpen, setLocalIsOpen] = useState(isEditing ? true : false);
+  const isOpen = isOpenCover !== undefined ? isOpenCover : localIsOpen;
+  const setIsOpen = setIsOpenCover !== undefined ? setIsOpenCover : setLocalIsOpen;
+
+  // Extract initials for the monogram
+  const getMonogramInitials = () => {
+    if (event.brideName && event.groomName) {
+      const b = event.brideName.trim().charAt(0);
+      const g = event.groomName.trim().charAt(0);
+      return `${b} & ${g}`;
+    }
+    const parts = event.title.split("&");
+    if (parts.length >= 2) {
+      return `${parts[0].trim().charAt(0)} & ${parts[1].trim().charAt(0)}`;
+    }
+    return "M & E";
+  };
+
+  // Safe helper to get/update gallery images
+  const getGalleryImage = (index: number, fallback: string) => {
+    if (!event.gallery || event.gallery.length <= index) return fallback;
+    const item = event.gallery[index];
+    return typeof item === "string" ? item : item?.url || fallback;
+  };
+
+  const updateGalleryImage = (index: number, newVal: string) => {
+    if (!updateField) return;
+    const currentGallery = event.gallery || [];
+    const newGallery = [...currentGallery];
+    
+    // Ensure array is padded up to index
+    while (newGallery.length <= index) {
+      newGallery.push("");
+    }
+    
+    newGallery[index] = newVal;
+    updateField("gallery", newGallery);
+  };
+
+  // Countdown calculations
+  const [timeLeft, setTimeLeft] = useState({ days: 0, hours: 0, minutes: 0, seconds: 0 });
+
+  useEffect(() => {
+    const targetDate = event.isoDate ? new Date(event.isoDate) : new Date("2025-10-11T11:00:00");
+    
+    const updateCountdown = () => {
+      const now = new Date();
+      const difference = targetDate.getTime() - now.getTime();
+      
+      if (difference <= 0) {
+        setTimeLeft({ days: 0, hours: 0, minutes: 0, seconds: 0 });
+      } else {
+        const days = Math.floor(difference / (1000 * 60 * 60 * 24));
+        const hours = Math.floor((difference / (1000 * 60 * 60)) % 24);
+        const minutes = Math.floor((difference / 1000 / 60) % 60);
+        const seconds = Math.floor((difference / 1000) % 60);
+        setTimeLeft({ days, hours, minutes, seconds });
+      }
+    };
+
+    updateCountdown();
+    const interval = setInterval(updateCountdown, 1000);
+    return () => clearInterval(interval);
+  }, [event.isoDate]);
+
+  return (
+    <div className="min-h-screen bg-[#FCFAF6] text-[#121212] font-serif relative overflow-x-hidden selection:bg-[#E9BE5D]/30 pb-24">
+      {/* 0. INJECT CUSTOM SIGNATURE FONT AND ANIMATIONS */}
+      <style dangerouslySetInnerHTML={{ __html: `
+        @import url('https://fonts.googleapis.com/css2?family=Cinzel:wght@400;600;700&family=Josefin+Sans:wght@300;400;600;700&family=Montserrat:wght@300;400;600&family=Quicksand:wght@400;700&display=swap');
+        
+        @font-face {
+          font-family: 'Whispering Signature';
+          font-style: normal;
+          font-weight: normal;
+          font-display: swap;
+          src: url('https://in.limintso.com/wp-content/uploads/2025/07/WhisperingSignature.ttf') format('truetype');
+        }
+        
+        .whispering-text {
+          font-family: 'Whispering Signature', cursive, sans-serif !important;
+        }
+        .josefin-font {
+          font-family: 'Josefin Sans', sans-serif !important;
+        }
+        .cinzel-font {
+          font-family: 'Cinzel', serif !important;
+        }
+        .montserrat-font {
+          font-family: 'Montserrat', sans-serif !important;
+        }
+        .quicksand-font {
+          font-family: 'Quicksand', sans-serif !important;
+        }
+      ` }} />
+
+      {/* 1. ENTRANCE SCREEN COVER (CAPA OVERLAY) */}
+      <AnimatePresence>
+        {!isOpen && (
+          <motion.div
+            initial={{ opacity: 1 }}
+            exit={{ opacity: 0, y: "-100%", transition: { duration: 1.2, ease: [0.77, 0, 0.175, 1] } }}
+            className="fixed inset-0 bg-[#000000] z-[999] flex flex-col items-center justify-between py-20 px-6 overflow-hidden text-white"
+          >
+            {/* Background cover image exactly matching original me-wedding (cav33.jpg as default) */}
+            <div className="absolute inset-0 z-0 pointer-events-auto">
+              <EditableImageWrapper
+                src={event.heroImage || "https://in.limintso.com/wp-content/uploads/2025/08/cav33.jpg"}
+                onChange={(newVal) => updateField?.("heroImage", newVal)}
+                isEditing={isEditing}
+                className="absolute inset-0"
+              >
+                <div
+                  className="absolute inset-0 bg-cover bg-center transition-transform duration-[15s] ease-out-quad scale-105"
+                  style={{ backgroundImage: `url('${getImageUrl(event.heroImage || "https://in.limintso.com/wp-content/uploads/2025/08/cav33.jpg", { width: 1200, quality: 80 })}')` }}
+                />
+              </EditableImageWrapper>
+              
+              {/* Overlay with subtle dark shade for clean premium legibility */}
+              <div className="absolute inset-0 bg-black/45 pointer-events-none" />
+            </div>
+
+            {/* A UNIÃO MATRIMONIAL DE */}
+            <motion.div
+              initial={{ opacity: 0, y: 30 }}
+              animate={{ opacity: 1, y: 0 }}
+              transition={{ delay: 0.3, duration: 1 }}
+              className="z-10 text-center"
+            >
+              <p className="josefin-font text-base md:text-lg uppercase tracking-[0.3em] text-[#ffffff] font-semibold">
+                {isEditing ? (
+                  <EditableField
+                    value={event.hosts || "A UNIÃO MATRIMONIAL DE"}
+                    onChange={(newVal) => updateField?.("hosts", newVal)}
+                    isEditing={isEditing}
+                    className="text-white text-center bg-transparent"
+                  />
+                ) : (
+                  event.hosts || "A UNIÃO MATRIMONIAL DE"
+                )}
+              </p>
+            </motion.div>
+
+            {/* Marnela & Evandro Display Names */}
+            <motion.div
+              initial={{ opacity: 0, scale: 0.95 }}
+              animate={{ opacity: 1, scale: 1 }}
+              transition={{ delay: 0.6, duration: 1.2 }}
+              className="z-10 text-center my-auto px-4"
+            >
+              <h1 className="whispering-text text-6xl md:text-8xl text-white tracking-normal font-normal leading-tight drop-shadow-[0_4px_12px_rgba(0,0,0,0.5)]">
+                {isEditing ? (
+                  <div className="flex flex-col md:flex-row items-center justify-center gap-2">
+                    <EditableField
+                      value={event.brideName || "Marnela"}
+                      onChange={(newVal) => updateField?.("brideName", newVal)}
+                      isEditing={isEditing}
+                      className="bg-transparent text-center"
+                    />
+                    <span className="text-white">&</span>
+                    <EditableField
+                      value={event.groomName || "Evandro"}
+                      onChange={(newVal) => updateField?.("groomName", newVal)}
+                      isEditing={isEditing}
+                      className="bg-transparent text-center"
+                    />
+                  </div>
+                ) : (
+                  `${event.brideName || "Marnela"} & ${event.groomName || "Evandro"}`
+                )}
+              </h1>
+            </motion.div>
+
+            {/* Date and Ver Convite Button at bottom */}
+            <motion.div
+              initial={{ opacity: 0, y: -30 }}
+              animate={{ opacity: 1, y: 0 }}
+              transition={{ delay: 0.9, duration: 1 }}
+              className="z-10 text-center space-y-8 w-full max-w-sm px-6"
+            >
+              <p className="josefin-font text-base md:text-lg uppercase tracking-[0.25em] text-[#ffffff] font-medium">
+                {isEditing ? (
+                  <EditableField
+                    value={event.date || "11 • 10 • 2025"}
+                    onChange={(newVal) => updateField?.("date", newVal)}
+                    isEditing={isEditing}
+                    className="text-white text-center bg-transparent"
+                  />
+                ) : (
+                  event.date || "11 • 10 • 2025"
+                )}
+              </p>
+
+              <button
+                onClick={() => setIsOpen(true)}
+                className="josefin-font w-full py-4 bg-transparent hover:bg-white text-white hover:text-black border border-white hover:border-transparent rounded-full text-sm uppercase tracking-[0.2em] font-medium transition-all duration-300 transform active:scale-[0.98] shadow-md hover:shadow-xl hover:-translate-y-[2px]"
+              >
+                Ver Convite
+              </button>
+            </motion.div>
+          </motion.div>
+        )}
+      </AnimatePresence>
+
+      {/* MAIN CONTAINER (REVEALED CONTENT) */}
+      {isOpen && (
+        <motion.div
+          initial={{ opacity: 0 }}
+          animate={{ opacity: 1 }}
+          transition={{ duration: 1.5 }}
+          className="space-y-0"
+        >
+          {/* 2. WELCOME / BEM-VINDO SECTION (inicio) */}
+          <div
+            id="inicio"
+            className="min-h-screen flex flex-col items-center justify-center relative py-24 text-center px-6 overflow-hidden"
+          >
+            <div className="absolute inset-0 z-0">
+              <EditableImageWrapper
+                src={getGalleryImage(0, "https://in.limintso.com/wp-content/uploads/2025/08/mar.jpg")}
+                onChange={(newVal) => updateGalleryImage(0, newVal)}
+                isEditing={isEditing}
+                className="absolute inset-0"
+              >
+                <div
+                  className="absolute inset-0 bg-cover bg-center"
+                  style={{ backgroundImage: `url('${getImageUrl(getGalleryImage(0, "https://in.limintso.com/wp-content/uploads/2025/08/mar.jpg"), { width: 1200, quality: 80 })}')` }}
+                />
+              </EditableImageWrapper>
+            </div>
+
+            {/* Dark glassmorphic background plate for readability */}
+            <div className="absolute inset-0 bg-black/60 z-5 pointer-events-none" />
+            
+            <FadeInSection className="z-10 flex flex-col items-center max-w-2xl mx-auto space-y-8">
+              {/* Envelope Icon */}
+              <div className="w-16 h-16 rounded-full border border-white/20 flex items-center justify-center text-white animate-pulse">
+                <span className="material-symbols-outlined text-4xl text-white">mail</span>
+              </div>
+              
+              <div className="space-y-4">
+                <p id="guestNameWelcome" className="josefin-font text-lg md:text-xl font-bold uppercase tracking-[0.2em] text-white">
+                  <EditableField
+                    value={event.welcomeMessage || "Bem-vindo/a"}
+                    onChange={(val) => updateField?.("welcomeMessage", val)}
+                    isEditing={isEditing}
+                    className="text-center text-white"
+                  />
+                </p>
+                <h2 id="guestName" className="cinzel-font text-2xl md:text-3xl font-normal text-white uppercase tracking-[0.15em] border-b border-white/20 pb-4 px-6 min-w-[200px]">
+                  {guestName || "Convidado Especial"}
+                </h2>
+              </div>
+              
+              {/* Scrolling Indicator */}
+              <span className="material-symbols-outlined text-white/50 text-4xl animate-bounce mt-16">
+                keyboard_double_arrow_down
+              </span>
+            </FadeInSection>
+          </div>
+
+          {/* 3. ALIANÇA INABALÁVEL SECTION */}
+          <div className="py-24 bg-white text-center px-6 border-b border-stone-200">
+            <FadeInSection className="max-w-2xl mx-auto space-y-8">
+              {/* Rings Icon */}
+              <div className="w-20 h-20 bg-amber-50 rounded-full border border-[#E9BE5D]/20 flex items-center justify-center text-[#E9BE5D] mx-auto">
+                <span className="material-symbols-outlined text-4xl text-[#E9BE5D]">favorite</span>
+              </div>
+
+              <h2 className="josefin-font text-2xl md:text-3xl font-bold uppercase tracking-[0.2em] text-[#121212]">
+                Aliança Inabalável
+              </h2>
+
+              <div className="josefin-font text-[#666666] text-base md:text-lg leading-relaxed space-y-4">
+                <p className="font-bold text-[#E9BE5D] tracking-widest uppercase">
+                  <EditableField
+                    value={event.description.split("\n")[0] || "I Coríntios 13: 4-7"}
+                    onChange={(val) => {
+                      const lines = event.description.split("\n");
+                      lines[0] = val;
+                      updateField?.("description", lines.join("\n"));
+                    }}
+                    isEditing={isEditing}
+                    className="text-center"
+                  />
+                </p>
+                <div className="italic text-[#121212]">
+                  <EditableField
+                    value={event.description.split("\n").slice(1).join("\n") || "Aqui começa o nosso lar, erguido sobre a fé e o amor de Deus.\nCada passo que damos é promessa de que ele será sempre o alicerce da nossa Família."}
+                    onChange={(val) => {
+                      const lines = event.description.split("\n");
+                      const first = lines[0] || "I Coríntios 13: 4-7";
+                      updateField?.("description", `${first}\n${val}`);
+                    }}
+                    isEditing={isEditing}
+                    multiline
+                    className="text-center font-normal leading-relaxed"
+                  />
+                </div>
+              </div>
+            </FadeInSection>
+          </div>
+
+          {/* 4. OS NOIVOS SECTION */}
+          <div id="casal" className="py-24 bg-[#FCFAF6] px-6 md:px-12">
+            <div className="max-w-5xl mx-auto space-y-16">
+              <FadeInSection className="text-center">
+                <h2 className="josefin-font text-3xl md:text-4xl font-semibold uppercase tracking-[0.25em] text-[#121212]">
+                  Os Noivos
+                </h2>
+                <div className="w-16 h-[1px] bg-[#E9BE5D] mx-auto mt-4" />
+              </FadeInSection>
+
+              {/* Grid 3 Columns: Groom, Photo, Bride */}
+              <div className="grid grid-cols-1 lg:grid-cols-3 gap-12 items-center">
+                {/* Groom Info */}
+                <motion.div
+                  initial={{ opacity: 0, x: -50 }}
+                  whileInView={{ opacity: 1, x: 0 }}
+                  viewport={{ once: true }}
+                  transition={{ duration: 1 }}
+                  className="bg-white border border-[#E9BE5D]/10 rounded-[2rem] p-8 text-center shadow-sm relative space-y-6"
+                >
+                  <div className="w-12 h-[2px] bg-[#E9BE5D]/30 mx-auto" />
+                  <h3 className="josefin-font text-2xl font-bold uppercase tracking-[0.1em] text-[#121212]">
+                    <EditableField
+                      value={event.groomName || "Evandro Jojó"}
+                      onChange={(val) => updateField?.("groomName", val)}
+                      isEditing={isEditing}
+                    />
+                  </h3>
+                  <div className="josefin-font text-sm text-[#666666]">
+                    <p className="underline uppercase tracking-wider text-[11px] font-bold text-[#E9BE5D] mb-2">Filho de</p>
+                    <EditableField
+                      value={event.groomParents || "José João Jojó\ne\nAnacanizia Lopes Lima"}
+                      onChange={(val) => updateField?.("groomParents", val)}
+                      isEditing={isEditing}
+                      multiline
+                      className="text-center"
+                    />
+                  </div>
+                </motion.div>
+
+                {/* Center Image */}
+                <motion.div
+                  initial={{ opacity: 0, scale: 0.9 }}
+                  whileInView={{ opacity: 1, scale: 1 }}
+                  viewport={{ once: true }}
+                  transition={{ duration: 1 }}
+                  className="bg-white border border-[#E9BE5D]/10 rounded-[2rem] p-4 shadow-sm"
+                >
+                  <div className="relative aspect-[3/4] rounded-[1.5rem] overflow-hidden group">
+                    <EditableImageWrapper
+                      src={event.mapImage || "https://in.limintso.com/wp-content/uploads/2025/08/marrr11.jpg"}
+                      onChange={(newVal) => updateField?.("mapImage", newVal)}
+                      isEditing={isEditing}
+                      className="absolute inset-0"
+                    >
+                      <div
+                        className="absolute inset-0 bg-cover bg-center transition-transform duration-500 group-hover:scale-105"
+                        style={{ backgroundImage: `url('${getImageUrl(event.mapImage || "https://in.limintso.com/wp-content/uploads/2025/08/marrr11.jpg", { width: 600, quality: 80 })}')` }}
+                      />
+                    </EditableImageWrapper>
+                  </div>
+                </motion.div>
+
+                {/* Bride Info */}
+                <motion.div
+                  initial={{ opacity: 0, x: 50 }}
+                  whileInView={{ opacity: 1, x: 0 }}
+                  viewport={{ once: true }}
+                  transition={{ duration: 1 }}
+                  className="bg-white border border-[#E9BE5D]/10 rounded-[2rem] p-8 text-center shadow-sm relative space-y-6"
+                >
+                  <div className="w-12 h-[2px] bg-[#E9BE5D]/30 mx-auto" />
+                  <h3 className="josefin-font text-2xl font-bold uppercase tracking-[0.1em] text-[#121212]">
+                    <EditableField
+                      value={event.brideName || "Marnela Zunguze"}
+                      onChange={(val) => updateField?.("brideName", val)}
+                      isEditing={isEditing}
+                    />
+                  </h3>
+                  <div className="josefin-font text-sm text-[#666666]">
+                    <p className="underline uppercase tracking-wider text-[11px] font-bold text-[#E9BE5D] mb-2">Filha de</p>
+                    <EditableField
+                      value={event.brideParents || "Jorge Senete Zunguze\ne\nAlia Alexandre Gueze"}
+                      onChange={(val) => updateField?.("brideParents", val)}
+                      isEditing={isEditing}
+                      multiline
+                      className="text-center"
+                    />
+                  </div>
+                </motion.div>
+              </div>
+
+              {/* Sub-quote section "Ó meu Amor," */}
+              <FadeInSection className="text-center space-y-6 pt-12">
+                <h2 className="whispering-text text-5xl md:text-6xl text-[#E9BE5D] font-normal tracking-wide">
+                  <EditableField
+                    value={event.coupleTitle || "Ó meu Amor,"}
+                    onChange={(val) => updateField?.("coupleTitle", val)}
+                    isEditing={isEditing}
+                    className="text-center text-[#E9BE5D]"
+                  />
+                </h2>
+                
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-12 max-w-4xl mx-auto text-left leading-relaxed font-serif text-slate-700 text-base italic">
+                  {/* Marnela's Quote */}
+                  <div className="bg-white border border-[#E9BE5D]/10 rounded-3xl p-8 space-y-4">
+                    <div className="min-h-[60px]">
+                      <EditableField
+                        value={event.brideQuote || "Desde que os meus olhos encontram os seus, a taquicardia tomou conta de mim, era a promessa de Deus se cumprindo. O nosso amor será até após a vinda do Senhor."}
+                        onChange={(val) => updateField?.("brideQuote", val)}
+                        isEditing={isEditing}
+                        multiline
+                        className="text-left font-serif leading-relaxed italic"
+                      />
+                    </div>
+                    <p className="josefin-font text-sm font-bold text-[#E9BE5D] uppercase tracking-widest text-right">
+                      — {event.brideName?.split(" ")[0] || "Marnela"}
+                    </p>
+                  </div>
+                  
+                  {/* Evandro's Quote */}
+                  <div className="bg-white border border-[#E9BE5D]/10 rounded-3xl p-8 space-y-4">
+                    <div className="min-h-[60px]">
+                      <EditableField
+                        value={event.groomQuote || "Quando você apareceu no meu caminho, você era a luz que eu precisava para ver as coisas boas ao meu redor. Prometo te amar para sempre e te fazer feliz a cada segundo da sua vida."}
+                        onChange={(val) => updateField?.("groomQuote", val)}
+                        isEditing={isEditing}
+                        multiline
+                        className="text-left font-serif leading-relaxed italic"
+                      />
+                    </div>
+                    <p className="josefin-font text-sm font-bold text-[#E9BE5D] uppercase tracking-widest text-right">
+                      — {event.groomName?.split(" ")[0] || "Evandro"}
+                    </p>
+                  </div>
+                </div>
+              </FadeInSection>
+            </div>
+          </div>
+
+          {/* 5. THE CONVITE (CEREMONY DETAILS) SECTION */}
+          <div
+            className="py-24 bg-cover bg-center bg-fixed flex flex-col items-center justify-center relative px-6 text-white text-center"
+            style={{ backgroundImage: `url('https://in.limintso.com/wp-content/uploads/2025/03/bible-golden-ring-love-56926.webp')` }}
+          >
+            {/* Soft tint over church background */}
+            <div className="absolute inset-0 bg-[#35100F]/70 pointer-events-none" />
+
+            <FadeInSection className="z-10 max-w-4xl mx-auto space-y-12">
+              <span className="material-symbols-outlined text-4xl text-[#E9BE5D] animate-pulse">calendar_month</span>
+              <h2 className="josefin-font text-3xl md:text-4xl font-bold uppercase tracking-[0.25em] text-white">
+                CONVITE
+              </h2>
+              <div className="w-16 h-[1px] bg-white/20 mx-auto" />
+
+              <h3 className="josefin-font text-xl md:text-2xl font-semibold uppercase tracking-[0.2em] text-[#E9BE5D]">
+                <EditableField
+                  value={event.date || "Sábado, 11 de Outubro de 2025"}
+                  onChange={(val) => updateField?.("date", val)}
+                  isEditing={isEditing}
+                  className="text-center text-white"
+                />
+              </h3>
+
+              {/* Ceremony / Timeline dynamic grid cards */}
+              <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-8 max-w-5xl mx-auto pt-8 text-[#121212]">
+                {event.timeline && event.timeline.map((item, idx) => (
+                  <motion.div
+                    key={idx}
+                    initial={{ opacity: 0, y: 30 }}
+                    whileInView={{ opacity: 1, y: 0 }}
+                    viewport={{ once: true }}
+                    transition={{ duration: 0.8, delay: idx * 0.2 }}
+                    className="bg-white rounded-3xl p-8 border border-stone-100 shadow-lg relative flex flex-col justify-between min-h-[250px]"
+                  >
+                    <div className="space-y-4">
+                      {/* Ceremony Title */}
+                      <h4 className="josefin-font text-lg font-bold uppercase tracking-wider text-[#121212]">
+                        <EditableField
+                          value={item.title}
+                          onChange={(val) => updateTimelineItem?.(idx, "title", val)}
+                          isEditing={isEditing}
+                        />
+                      </h4>
+                      
+                      {/* Time divider */}
+                      <div className="w-10 h-[1px] bg-[#E9BE5D] mx-auto" />
+                      
+                      {/* Time */}
+                      <h5 className="josefin-font text-2xl font-bold text-[#E9BE5D]">
+                        <EditableField
+                          value={item.time}
+                          onChange={(val) => updateTimelineItem?.(idx, "time", val)}
+                          isEditing={isEditing}
+                        />
+                      </h5>
+                    </div>
+
+                    <div className="space-y-4 mt-6">
+                      {/* Location description */}
+                      <p className="montserrat-font text-xs text-slate-500 leading-relaxed">
+                        <EditableField
+                          value={item.description}
+                          onChange={(val) => updateTimelineItem?.(idx, "description", val)}
+                          isEditing={isEditing}
+                          multiline
+                        />
+                      </p>
+
+                      {/* Map Button */}
+                      {event.mapLink && (
+                        <button
+                          onClick={() => window.open(event.mapLink, "_blank")}
+                          className="josefin-font px-4 py-2 bg-transparent hover:bg-[#E9BE5D] text-[#E9BE5D] hover:text-white border border-[#E9BE5D] rounded-full text-[11px] uppercase tracking-wider font-bold transition-all duration-300 flex items-center justify-center gap-1.5 mx-auto"
+                        >
+                          <span className="material-symbols-outlined text-sm">map</span> Ver Mapa
+                        </button>
+                      )}
+                    </div>
+                  </motion.div>
+                ))}
+              </div>
+            </FadeInSection>
+          </div>
+
+          {/* 6. COUNTDOWN SECTION */}
+          <div
+            className="py-32 bg-cover bg-center flex flex-col items-center justify-center relative px-6 text-white text-center overflow-hidden"
+          >
+            <div className="absolute inset-0 z-0">
+              <EditableImageWrapper
+                src={getGalleryImage(1, "https://in.limintso.com/wp-content/uploads/2025/08/mar23.jpg")}
+                onChange={(newVal) => updateGalleryImage(1, newVal)}
+                isEditing={isEditing}
+                className="absolute inset-0"
+              >
+                <div
+                  className="absolute inset-0 bg-cover bg-center"
+                  style={{ backgroundImage: `url('${getImageUrl(getGalleryImage(1, "https://in.limintso.com/wp-content/uploads/2025/08/mar23.jpg"), { width: 1200, quality: 80 })}')` }}
+                />
+              </EditableImageWrapper>
+            </div>
+
+            {/* Ambient overlay */}
+            <div className="absolute inset-0 bg-black/60 z-5 pointer-events-none" />
+
+            <FadeInSection className="z-10 max-w-4xl mx-auto space-y-12">
+              <h2 className="josefin-font text-3xl md:text-4xl font-bold uppercase tracking-[0.25em] text-white">
+                Falta Pouco ...
+              </h2>
+              
+              <div className="w-12 h-[2px] bg-[#E9BE5D]/40 mx-auto" />
+
+              {/* Countdown Board */}
+              <div className="grid grid-cols-4 gap-4 md:gap-8 max-w-2xl mx-auto">
+                {/* Days */}
+                <div className="bg-white/10 backdrop-blur-md rounded-2xl p-4 md:p-6 min-w-[70px] md:min-w-[120px] border border-white/10">
+                  <span className="josefin-font text-3xl md:text-5xl font-bold block text-[#E9BE5D]">{timeLeft.days}</span>
+                  <span className="josefin-font text-[10px] md:text-xs uppercase tracking-widest text-slate-300 block mt-1">Dias</span>
+                </div>
+                {/* Hours */}
+                <div className="bg-white/10 backdrop-blur-md rounded-2xl p-4 md:p-6 min-w-[70px] md:min-w-[120px] border border-white/10">
+                  <span className="josefin-font text-3xl md:text-5xl font-bold block text-[#E9BE5D]">{timeLeft.hours}</span>
+                  <span className="josefin-font text-[10px] md:text-xs uppercase tracking-widest text-slate-300 block mt-1">Horas</span>
+                </div>
+                {/* Minutes */}
+                <div className="bg-white/10 backdrop-blur-md rounded-2xl p-4 md:p-6 min-w-[70px] md:min-w-[120px] border border-white/10">
+                  <span className="josefin-font text-3xl md:text-5xl font-bold block text-[#E9BE5D]">{timeLeft.minutes}</span>
+                  <span className="josefin-font text-[10px] md:text-xs uppercase tracking-widest text-slate-300 block mt-1">Minutos</span>
+                </div>
+                {/* Seconds */}
+                <div className="bg-white/10 backdrop-blur-md rounded-2xl p-4 md:p-6 min-w-[70px] md:min-w-[120px] border border-white/10">
+                  <span className="josefin-font text-3xl md:text-5xl font-bold block text-white">{timeLeft.seconds}</span>
+                  <span className="josefin-font text-[10px] md:text-xs uppercase tracking-widest text-slate-300 block mt-1">Segundos</span>
+                </div>
+              </div>
+            </FadeInSection>
+          </div>
+
+          {/* 7. RSVP SECTION */}
+          <div className="py-24 bg-white text-center px-6 border-b border-stone-200">
+            <FadeInSection className="max-w-xl mx-auto space-y-8">
+              <span className="material-symbols-outlined text-4xl text-[#E9BE5D]">how_to_reg</span>
+              
+              <div className="space-y-2">
+                <h2 className="josefin-font text-3xl md:text-4xl font-bold uppercase tracking-[0.2em] text-[#121212]">
+                  R.S.V.P
+                </h2>
+                <h3 className="josefin-font text-lg md:text-xl text-[#666666] tracking-wider italic">
+                  Caro(a), {guestName || "Convidado Especial"}
+                </h3>
+              </div>
+
+              <div className="w-12 h-[1px] bg-[#E9BE5D]/30 mx-auto" />
+
+              <p className="montserrat-font text-sm text-slate-500 leading-relaxed">
+                Para nos ajudar a planejar cada detalhe deste dia perfeito com perfeição, confirme a sua ilustre presença clicando no botão abaixo até à data limite informada.
+              </p>
+
+              <button
+                onClick={onRSVP}
+                className="josefin-font px-8 py-4 bg-[#E9BE5D] hover:bg-[#d4ac4c] text-white rounded-full text-xs uppercase tracking-[0.2em] font-bold transition-all duration-300 shadow-md hover:shadow-xl hover:-translate-y-0.5 active:translate-y-0"
+              >
+                Confirmar Presença
+              </button>
+            </FadeInSection>
+          </div>
+
+          {/* 8. FELICITAÇÕES / GUESTBOOK SECTION */}
+          <div className="py-24 bg-[#FCFAF6] px-6 md:px-12 border-b border-stone-200">
+            <FadeInSection className="max-w-4xl mx-auto">
+              <div className="text-center mb-12 space-y-4">
+                <span className="material-symbols-outlined text-3xl text-[#E9BE5D]">forum</span>
+                <h2 className="josefin-font text-3xl md:text-4xl font-semibold uppercase tracking-[0.2em] text-[#121212]">
+                  Felicitações
+                </h2>
+                <div className="w-12 h-[1px] bg-[#E9BE5D]/30 mx-auto" />
+              </div>
+
+              <Guestbook eventId={event.id} layoutMode={event.layoutMode} />
+            </FadeInSection>
+          </div>
+
+          {/* 9. GALERIA (MASONRY GALLERY) SECTION */}
+          {event.gallery && event.gallery.length > 0 && (
+            <div className="py-24 bg-white px-6 md:px-12 border-b border-stone-200">
+              <FadeInSection className="max-w-5xl mx-auto space-y-12">
+                <div className="text-center space-y-4">
+                  <span className="material-symbols-outlined text-3xl text-[#E9BE5D]">photo_library</span>
+                  <h2 className="josefin-font text-3xl md:text-4xl font-semibold uppercase tracking-[0.2em] text-[#121212]">
+                    Galeria
+                  </h2>
+                  <div className="w-12 h-[1px] bg-[#E9BE5D]/30 mx-auto" />
+                </div>
+
+                <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-4">
+                  {event.gallery.map((img, i) => {
+                    const url = typeof img === "string" ? img : img?.url;
+                    return (
+                      <div
+                        key={i}
+                        className="aspect-square relative rounded-2xl overflow-hidden shadow-sm group border border-stone-100 bg-stone-50"
+                      >
+                        <EditableImageWrapper
+                          src={url}
+                          onChange={(newVal) =>
+                            updateField?.(
+                              "gallery",
+                              event.gallery?.map((g, gi) =>
+                                gi === i ? newVal : g,
+                              ),
+                            )
+                          }
+                          isEditing={isEditing}
+                          className="absolute inset-0"
+                        >
+                          <div
+                            className="absolute inset-0 bg-cover bg-center transition-transform duration-500 group-hover:scale-105"
+                            style={{ backgroundImage: `url('${getImageUrl(url, { width: 400, quality: 80 })}')` }}
+                          />
+                        </EditableImageWrapper>
+                      </div>
+                    );
+                  })}
+                </div>
+              </FadeInSection>
+            </div>
+          )}
+
+          {/* 10. GIFTS LIST SECTION */}
+          {event.gifts && event.gifts.length > 0 && (
+            <div className="py-24 bg-[#FCFAF6] border-b border-stone-200">
+              <div className="max-w-4xl mx-auto px-6 md:px-12">
+                <FadeInSection className="text-center mb-12 space-y-4">
+                  <span className="material-symbols-outlined text-3xl text-[#E9BE5D]">volunteer_activism</span>
+                  <h2 className="josefin-font text-3xl md:text-4xl font-semibold uppercase tracking-[0.2em] text-[#121212]">Lista de Presentes</h2>
+                  <p className="montserrat-font text-xs text-slate-500 uppercase tracking-widest mt-2">Mimos em Dinheiro / Apoio</p>
+                  <div className="w-12 h-[1px] bg-[#E9BE5D]/30 mx-auto" />
+                </FadeInSection>
+
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-6 max-w-2xl mx-auto">
+                  {event.gifts.map((gift, i) => (
+                    <FadeInSection key={i} className="bg-white border border-[#E9BE5D]/10 rounded-3xl p-8 shadow-sm text-center space-y-4">
+                      <span className="josefin-font text-[10px] uppercase font-bold tracking-widest text-[#E9BE5D] block">
+                        {gift.type === "IBAN" ? "Transferência Bancária" : "Link Externo"}
+                      </span>
+                      <h4 className="josefin-font text-lg font-bold text-slate-800">{gift.title}</h4>
+                      <p className="montserrat-font text-xs text-slate-500 leading-relaxed">{gift.description}</p>
+                      
+                      <div className="p-4 bg-amber-50/50 rounded-2xl border border-amber-100 inline-block w-full">
+                        <span className="montserrat-font text-sm font-semibold text-slate-800 tracking-wider select-all block break-all">
+                          {gift.value}
+                        </span>
+                      </div>
+                    </FadeInSection>
+                  ))}
+                </div>
+              </div>
+            </div>
+          )}
+
+          {/* 11. ENDING FOOTER HERO SECTION */}
+          <div
+            className="py-32 bg-cover bg-center flex flex-col items-center justify-center relative px-6 text-white text-center overflow-hidden"
+          >
+            <div className="absolute inset-0 z-0">
+              <EditableImageWrapper
+                src={getGalleryImage(2, "https://in.limintso.com/wp-content/uploads/2025/08/marb2222.jpg")}
+                onChange={(newVal) => updateGalleryImage(2, newVal)}
+                isEditing={isEditing}
+                className="absolute inset-0"
+              >
+                <div
+                  className="absolute inset-0 bg-cover bg-center"
+                  style={{ backgroundImage: `url('${getImageUrl(getGalleryImage(2, "https://in.limintso.com/wp-content/uploads/2025/08/marb2222.jpg"), { width: 1200, quality: 80 })}')` }}
+                />
+              </EditableImageWrapper>
+            </div>
+
+            {/* Ambient overlay */}
+            <div className="absolute inset-0 bg-[#35100F]/65 z-5 pointer-events-none" />
+
+            <FadeInSection className="z-10 max-w-xl mx-auto space-y-6">
+              <h2 className="josefin-font text-2xl md:text-3xl font-bold uppercase tracking-[0.2em] text-white">
+                <EditableField
+                  value={event.footerMessage || "Estamos ansiosos para celebrar este dia especial com você!"}
+                  onChange={(val) => updateField?.("footerMessage", val)}
+                  isEditing={isEditing}
+                  multiline
+                  className="text-center text-white"
+                />
+              </h2>
+            </FadeInSection>
+          </div>
+        </motion.div>
+      )}
+
+      {/* FOOTER */}
+      <footer className="text-center py-12 text-[10px] text-slate-400 tracking-wider font-sans uppercase">
+        <p>© 2025 {event.title} • Criado com InoEvents</p>
+      </footer>
+    </div>
+  );
+};
+
+// ============================================================================
 const RSVPForm: React.FC<{ event: EventDetails; onClose: () => void }> = ({
   event,
   onClose,
 }) => {
   const isLuxury =
-    event.layoutMode === "LUXURY" || event.layoutMode === "INDUSTRIAL";
+    event.layoutMode === "LUXURY" ||
+    event.layoutMode === "INDUSTRIAL" ||
+    event.layoutMode === "LIMINTSO_GOLD" ||
+    event.layoutMode === "LIMINTSO_ME";
   const isBridal = event.type === "BRIDAL_SHOWER";
   const [status, setStatus] = useState<"yes" | "no">("yes");
   const [name, setName] = useState("");

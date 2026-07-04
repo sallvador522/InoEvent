@@ -5,7 +5,14 @@ import crypto from 'crypto';
 import cors from 'cors';
 import fs from 'fs';
 import admin from 'firebase-admin';
-import firebaseConfig from './firebase-applet-config.json';
+import { createRequire } from 'module';
+const require = createRequire(import.meta.url);
+const firebaseConfig = require('./firebase-applet-config.json');
+
+import { fileURLToPath } from 'url';
+
+const __filename = fileURLToPath(import.meta.url);
+const __dirname = path.dirname(__filename);
 
 const app = express();
 app.set('trust proxy', true);

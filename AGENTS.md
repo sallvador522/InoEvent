@@ -13,3 +13,11 @@ The RSVP text strings (e.g., button text, modal titles) must be dynamic based on
 ## Bridal Shower Form Logic
 - **Conditional Fields:** When the user selects a template corresponding to a Bridal Shower (`event.type === 'BRIDAL_SHOWER'` or the layout mode starts with `BRIDAL_`), the system must strictly request only the data relevant to that occasion.
 - **Hide Wedding Fields:** Specific fields such as "Nome do Noivo", "Recepção", "Dress Code", and "Timeline" are often unnecessary for a Bridal Shower and should be hidden or made explicitly optional/alternative to streamline the user experience when creating or editing an event.
+
+## Backend / Vercel Environment (ESM)
+- **NO `__dirname`:** Do not use `__dirname` or `__filename` anywhere in the server-side code (e.g. `server.ts`). The project runs in an ESM environment (Vercel Node.js Serverless), where these globals are undefined and will crash the app with `ReferenceError: __dirname is not defined`.
+- **Use `process.cwd()`:** For file system paths, use `process.cwd()` to resolve paths dynamically from the project root instead.
+
+## Vite Development Mode vs Production (SEO Routes)
+- **White Screen Fix:** When intercepting routes like `/invite/:id` or `/plans` on the Express server to inject SEO tags, **you must bypass this interception in development mode** (`if (process.env.NODE_ENV !== 'production') return next();`). 
+- **Why?** In development, Vite uses a middleware to inject HMR and client-side modules into `index.html`. If the Express route reads the raw `index.html` and sends it directly (via `fs.readFileSync` and `res.send`), it completely bypasses Vite's transformations, resulting in a white screen because the React scripts are never loaded.

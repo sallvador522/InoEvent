@@ -278,13 +278,14 @@ app.get('/api/payments/status', async (req, res) => {
 
 // Dynamic Open Graph / SEO support for plans page (to help AI and LLMs read pricing)
 app.get('/plans', async (req, res, next) => {
+  if (process.env.NODE_ENV !== 'production') {
+    return next();
+  }
   try {
     let html = "";
     const possiblePaths = [
       path.join(process.cwd(), 'dist/index.html'),
-      path.join(process.cwd(), 'index.html'),
-      path.join(__dirname, 'dist/index.html'),
-      path.join(__dirname, 'index.html')
+      path.join(process.cwd(), 'index.html')
     ];
     let foundPath = possiblePaths.find(p => fs.existsSync(p));
     
@@ -328,6 +329,11 @@ app.get('/plans', async (req, res, next) => {
 
 // Dynamic Open Graph / SEO support for individual invitations
 app.get('/invite/:id', async (req, res, next) => {
+  // In development, skip SEO injection and let Vite handle the HTML to prevent white screens
+  if (process.env.NODE_ENV !== 'production') {
+    return next();
+  }
+
   const { id } = req.params;
 
   
@@ -346,9 +352,7 @@ app.get('/invite/:id', async (req, res, next) => {
     let html = "";
     const possiblePaths = [
       path.join(process.cwd(), 'dist/index.html'),
-      path.join(process.cwd(), 'index.html'),
-      path.join(__dirname, 'dist/index.html'),
-      path.join(__dirname, 'index.html')
+      path.join(process.cwd(), 'index.html')
     ];
     let foundPath = possiblePaths.find(p => fs.existsSync(p));
     

@@ -762,12 +762,12 @@ export const EventCreator: React.FC = () => {
                         ) : (
                           <>
                             {[
+                              { id: 'LIMINTSO_GOLD', label: 'Ouro Imperial', desc: 'Chany & Pedro Luxo Dourado', premium: true },
+                              { id: 'LIMINTSO_ME', label: 'Nobreza de Luanda', desc: 'Marnela & Evandro Nobreza Clássica', premium: true },
                               { id: 'ESSENTIAL', label: 'Essencial Moderno', desc: 'Aparência límpida e polida' },
                               { id: 'CLASSIC', label: 'Clássico Romântico', desc: 'Elegância de contos de reis' },
                               { id: 'MODERN', label: 'Cosmopolita / Moderno', desc: 'Aparência ousada espacial' },
                               { id: 'LUXURY', label: 'Luxo de Realeza', desc: 'Elegância formal e aristocrata', premium: true },
-                              { id: 'LIMINTSO_GOLD', label: 'Ouro Imperial', desc: 'Chany & Pedro Luxo Dourado', premium: true },
-                              { id: 'LIMINTSO_ME', label: 'Nobreza de Luanda', desc: 'Marnela & Evandro Nobreza Clássica', premium: true },
                               { id: 'GARDEN', label: 'Jardim Encantado', desc: 'Pétalas florais e românticas', premium: true },
                               { id: 'RUSTIC', label: 'Rústico / Natural', desc: 'Folhas, madeiras e aconchego', premium: true },
                               { id: 'INDUSTRIAL', label: 'Industrial Loft', desc: 'Modernidade metropolitana', premium: true }

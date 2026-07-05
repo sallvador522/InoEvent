@@ -6,8 +6,7 @@ import { Users2, Shield, UserPlus, Trash2, Link2, Check, Copy, AlertCircle, Spar
 import toast from 'react-hot-toast';
 
 interface TeamManagerProps {
-    eventId: string;
-    eventPlan?: string;
+    event: any;
 }
 
 interface TeamMember {
@@ -22,7 +21,9 @@ interface TeamMember {
 
 import { copyToClipboard } from '../../lib/clipboard';
 
-export const TeamManager: React.FC<TeamManagerProps> = ({ eventId, eventPlan }) => {
+export const TeamManager: React.FC<TeamManagerProps> = ({ event }) => {
+    const eventId = event.id;
+    const eventPlan = event.plan;
     const [team, setTeam] = useState<TeamMember[]>([]);
     const [loading, setLoading] = useState(true);
     
@@ -128,22 +129,29 @@ export const TeamManager: React.FC<TeamManagerProps> = ({ eventId, eventPlan }) 
 
     const getPublicOrigin = () => {
         let origin = window.location.origin;
-        if (origin.includes('ais-dev-')) {
-            return origin.replace('ais-dev-', 'ais-pre-');
-        }
         return origin;
     };
 
-    const handleCopyLink = (member: TeamMember) => {
+    const handleCopyLink = async (member: TeamMember) => {
+        let token = event?.clientToken || '';
+        if (!token && (member.role === 'scanner' || member.role === 'viewer')) {
+            token = Math.random().toString(36).substring(2, 8).toUpperCase();
+            try {
+                await updateDoc(doc(db, 'events', event.id), { clientToken: token });
+            } catch (error) {
+                console.error("Error generating token", error);
+            }
+        }
+        
         const path = member.role === 'viewer'
-            ? `${getPublicOrigin()}/client-dashboard/${eventId}?token=B2B_PARTNER`
+            ? `${getPublicOrigin()}/client-dashboard/${eventId}?token=${token}`
             : member.role === 'scanner'
-                ? `${getPublicOrigin()}/checkin/${eventId}`
+                ? `${getPublicOrigin()}/checkin/${eventId}?token=${token}&mode=reception`
                 : `${getPublicOrigin()}/dashboard/${eventId}`;
-
+                
         copyToClipboard(path);
         setCopiedId(member.id);
-        toast.success("Link específico copiado!");
+        toast.success("Link de acesso copiado!");
         setTimeout(() => setCopiedId(null), 3000);
     };
 

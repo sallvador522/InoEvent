@@ -62,6 +62,9 @@ const plans = [
       "RSVP Ilimitado",
       "Sem marca d'água (White-label)",
       "Música de Fundo (TocaPlayer)",
+      "Domínio Personalizado (.com)",
+      "Mapa das Mesas",
+      "Livro de Assinaturas Digital",
     ],
   },
   {

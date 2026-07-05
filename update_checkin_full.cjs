@@ -1,4 +1,6 @@
-import React, { useEffect, useState } from 'react';
+const fs = require('fs');
+
+const content = `import React, { useEffect, useState } from 'react';
 import { useParams, useSearchParams, useNavigate } from 'react-router-dom';
 import { motion, AnimatePresence } from 'framer-motion';
 import { collection, doc, getDoc, updateDoc, onSnapshot } from 'firebase/firestore';
@@ -91,13 +93,13 @@ export const CheckinScanner: React.FC = () => {
 
                 if (guestData.status === 'CHECKED_IN' || guestData.checkedIn) {
                     setStatus('error');
-                    setMessage(`${guestData.name} já realizou check-in anteriormente!`);
+                    setMessage(\`\${guestData.name} já realizou check-in anteriormente!\`);
                     return;
                 }
 
                 if (guestData.status === 'DECLINED') {
                     setStatus('error');
-                    setMessage(`${guestData.name} recusou o convite, mas está tentando entrar.`);
+                    setMessage(\`\${guestData.name} recusou o convite, mas está tentando entrar.\`);
                     return;
                 }
 
@@ -106,7 +108,7 @@ export const CheckinScanner: React.FC = () => {
                     checkedIn: true,
                     status: 'CHECKED_IN',
                     name: guestData.name, // required by schema rule
-                    checkedInAt: new Date().toISOString(), clientToken: token || null
+                    checkedInAt: new Date().toISOString()
                 });
 
                 setStatus('success');
@@ -114,7 +116,7 @@ export const CheckinScanner: React.FC = () => {
             } catch (err: any) {
                 console.error(err);
                 if(!err.message?.includes("Missing or insufficient permissions")) {
-                   handleFirestoreError(err, OperationType.GET, `events/${id}`);
+                   handleFirestoreError(err, OperationType.GET, \`events/\${id}\`);
                 }
                 setStatus('error');
                 setMessage('Falha ao processar o check-in.');
@@ -126,7 +128,7 @@ export const CheckinScanner: React.FC = () => {
 
     useEffect(() => {
         if (status === 'reception_mode' && id) {
-            const unsubscribe = onSnapshot(collection(db, `events/${id}/guests`), (snapshot) => {
+            const unsubscribe = onSnapshot(collection(db, \`events/\${id}/guests\`), (snapshot) => {
                 const guestsList = snapshot.docs.map(doc => ({
                     id: doc.id,
                     ...doc.data()
@@ -167,7 +169,7 @@ export const CheckinScanner: React.FC = () => {
                             checkedIn: true, 
                             status: 'CHECKED_IN',
                             name: data.name,
-                            checkedInAt: new Date().toISOString(), clientToken: token || null 
+                            checkedInAt: new Date().toISOString() 
                         });
                         setScanState({ 
                             status: 'success', 
@@ -220,13 +222,13 @@ export const CheckinScanner: React.FC = () => {
                     <div className="flex gap-2 mb-4">
                         <button 
                             onClick={() => setActiveTab('scanner')}
-                            className={`flex-1 py-3 px-4 rounded-t-xl font-bold transition-colors flex items-center justify-center gap-2 ${activeTab === 'scanner' ? 'bg-slate-800 text-brand-blue border-b-2 border-brand-blue' : 'text-slate-400 hover:text-slate-200'}`}
+                            className={\`flex-1 py-3 px-4 rounded-t-xl font-bold transition-colors flex items-center justify-center gap-2 \${activeTab === 'scanner' ? 'bg-slate-800 text-brand-blue border-b-2 border-brand-blue' : 'text-slate-400 hover:text-slate-200'}\`}
                         >
                             <ScanLine size={18} /> Scanner
                         </button>
                         <button 
                             onClick={() => setActiveTab('list')}
-                            className={`flex-1 py-3 px-4 rounded-t-xl font-bold transition-colors flex items-center justify-center gap-2 ${activeTab === 'list' ? 'bg-slate-800 text-brand-blue border-b-2 border-brand-blue' : 'text-slate-400 hover:text-slate-200'}`}
+                            className={\`flex-1 py-3 px-4 rounded-t-xl font-bold transition-colors flex items-center justify-center gap-2 \${activeTab === 'list' ? 'bg-slate-800 text-brand-blue border-b-2 border-brand-blue' : 'text-slate-400 hover:text-slate-200'}\`}
                         >
                             <Users size={18} /> Lista
                         </button>
@@ -265,12 +267,12 @@ export const CheckinScanner: React.FC = () => {
                                             initial={{ opacity: 0, scale: 0.95 }}
                                             animate={{ opacity: 1, scale: 1 }}
                                             exit={{ opacity: 0 }}
-                                            className={`absolute inset-0 flex flex-col items-center justify-center text-white p-6 text-center backdrop-blur-md z-10 font-bold text-xl ${
+                                            className={\`absolute inset-0 flex flex-col items-center justify-center text-white p-6 text-center backdrop-blur-md z-10 font-bold text-xl \${
                                                 scanState.status === 'success' ? 'bg-green-500/95' :
                                                 scanState.status === 'already_scanned' ? 'bg-yellow-500/95' :
                                                 scanState.status === 'error' ? 'bg-red-500/95' :
                                                 'bg-brand-blue/95'
-                                            }`}
+                                            }\`}
                                         >
                                             <div className="mb-2">
                                                 {scanState.status === 'success' && <CheckCircle2 size={56} className="mx-auto drop-shadow-md" />}
@@ -317,7 +319,7 @@ export const CheckinScanner: React.FC = () => {
                                         <p className="font-bold text-white truncate text-lg">{guest.name}</p>
                                         <div className="flex items-center gap-3 mt-1 flex-wrap">
                                             <span className="text-sm text-slate-400 bg-slate-900/50 px-2 py-0.5 rounded-md">
-                                                {(guest.adults || 1)} Adulto(s) {guest.children ? `• ${guest.children} Criança(s)` : ''}
+                                                {(guest.adults || 1)} Adulto(s) {guest.children ? \`• \${guest.children} Criança(s)\` : ''}
                                             </span>
                                             {guest.tableId && (
                                                 <span className="text-sm text-brand-blue bg-brand-blue/10 px-2 py-0.5 rounded-md">
@@ -328,7 +330,7 @@ export const CheckinScanner: React.FC = () => {
                                     </div>
                                     <button 
                                         onClick={() => handleManualCheckIn(guest)}
-                                        className={`w-14 h-14 rounded-2xl flex items-center justify-center shrink-0 transition-colors ${guest.checkedIn ? 'bg-emerald-500/20 text-emerald-500 border border-emerald-500/30' : 'bg-slate-700 text-slate-400 hover:bg-slate-600'}`}
+                                        className={\`w-14 h-14 rounded-2xl flex items-center justify-center shrink-0 transition-colors \${guest.checkedIn ? 'bg-emerald-500/20 text-emerald-500 border border-emerald-500/30' : 'bg-slate-700 text-slate-400 hover:bg-slate-600'}\`}
                                     >
                                         {guest.checkedIn ? <CheckCircle2 size={28} /> : <div className="w-7 h-7 rounded-full border-2 border-current opacity-50" />}
                                     </button>
@@ -371,7 +373,7 @@ export const CheckinScanner: React.FC = () => {
                         <h2 className="text-2xl font-bold text-slate-800 mb-2">Acesso Liberado</h2>
                         <p className="text-emerald-600 font-bold text-lg mb-2">{guestName}</p>
                         <p className="text-slate-500 text-sm mb-8">{message}</p>
-                        <Button fullWidth onClick={() => navigate(`/dashboard/${id}`)}>Ir para Dashboard</Button>
+                        <Button fullWidth onClick={() => navigate(\`/dashboard/\${id}\`)}>Ir para Dashboard</Button>
                     </div>
                 )}
 
@@ -383,7 +385,7 @@ export const CheckinScanner: React.FC = () => {
                         <h2 className="text-2xl font-bold text-slate-800 mb-2">Acesso Negado</h2>
                         {guestName && <p className="text-slate-700 font-bold mb-2">{guestName}</p>}
                         <p className="text-red-500 text-sm mb-8 font-medium">{message}</p>
-                        <Button fullWidth onClick={() => navigate(`/dashboard/${id}`)}>Ir para Dashboard</Button>
+                        <Button fullWidth onClick={() => navigate(\`/dashboard/\${id}\`)}>Ir para Dashboard</Button>
                     </div>
                 )}
 
@@ -401,3 +403,7 @@ export const CheckinScanner: React.FC = () => {
         </div>
     );
 };
+`;
+
+fs.writeFileSync('features/checkin/CheckinScanner.tsx', content);
+console.log("Updated CheckinScanner");

@@ -63,7 +63,7 @@ export const Guestbook: React.FC<{ eventId: string; layoutMode?: string }> = ({ 
             });
             setNewMessage('');
             toast.success(moderationEnabled 
-                ? 'Mensagem enviada com sucesso! Ela aparecerá no mural assim que os anfitriões aprovarem.' 
+                ? 'Mensagem enviada com sucesso! Ela aparecerá no livro assim que os anfitriões aprovarem.' 
                 : 'Mensagem enviada com sucesso!'
             );
         } catch (error) {
@@ -78,7 +78,7 @@ export const Guestbook: React.FC<{ eventId: string; layoutMode?: string }> = ({ 
         <div className="w-full max-w-2xl mx-auto py-12 px-4">
             <div className="text-center mb-8">
                 <Heart className="mx-auto text-rose-400 mb-3" size={32} />
-                <h2 className="text-2xl md:text-3xl font-display font-bold text-slate-800 mb-2">Mural de Recados</h2>
+                <h2 className="text-2xl md:text-3xl font-display font-bold text-slate-800 mb-2">Livro de Assinaturas</h2>
                 <p className="text-slate-500 text-sm">Deixe uma mensagem especial para nós apagarmos nunca!</p>
             </div>
 

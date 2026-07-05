@@ -15,6 +15,7 @@ import { Skeleton } from '../../components/ui/Skeleton';
 
 import { VirtualGiftsManager } from './VirtualGiftsManager';
 import { GuestbookManager } from './GuestbookManager';
+import { TableManager } from './TableManager';
 import { GuestsProgressBar } from './GuestsProgressBar';
 import { TeamManager } from './TeamManager';
 import { ExecutiveReportModal } from './ExecutiveReportModal';
@@ -29,9 +30,6 @@ export const Dashboard = () => {
 
     const getPublicOrigin = () => {
         let origin = window.location.origin;
-        if (origin.includes('ais-dev-')) {
-            return origin.replace('ais-dev-', 'ais-pre-');
-        }
         return origin;
     };
 
@@ -60,7 +58,7 @@ export const Dashboard = () => {
     const [exportFilter, setExportFilter] = useState<'all' | 'confirmed' | 'pending' | 'declined'>('confirmed');
     const [exportFormat, setExportFormat] = useState<'csv' | 'excel'>('excel');
 
-    const [activeTab, setActiveTab] = useState<'guests' | 'analytics' | 'assistant' | 'gifts' | 'messages' | 'team'>('guests');
+    const [activeTab, setActiveTab] = useState<'guests' | 'analytics' | 'assistant' | 'gifts' | 'messages' | 'team' | 'premium' | 'tables'>('guests');
 
     const [pushEnabled, setPushEnabled] = useState(() => {
         if (typeof window !== 'undefined') {
@@ -245,7 +243,7 @@ export const Dashboard = () => {
         const titleSlug = (event?.title || 'convidados').replace(/\s+/g, '_').toLowerCase();
 
         if (format === 'csv') {
-            const headers = ['Nome', 'Telefone', 'Status', 'Adultos', 'Crianças', 'Mensagem', 'Check-in', 'Data de Confirmação'];
+            const headers = ['Nome', 'Telefone', 'Status', 'Adultos', 'Crianças', 'Restrição Alimentar', 'Mensagem', 'Check-in', 'Data de Confirmação'];
             const rows = filtered.map(g => [
                 `"${(g.name || '').replace(/"/g, '""')}"`,
                 `"${(g.phone || '').replace(/"/g, '""')}"`,
@@ -295,7 +293,8 @@ export const Dashboard = () => {
   <th>Crianças</th>
   <th>Total de Pessoas</th>
   <th>Check-in</th>
-  <th>Mensagem</th>
+  <th>Restrição Alimentar</th>
+                  <th>Mensagem</th>
   <th>Data</th>
 </tr>
 </thead>
@@ -981,20 +980,30 @@ export const Dashboard = () => {
                     >
                         Analytics
                     </button>
+
                     {(event?.plan === 'Business' || event?.plan === 'Corporate' || event?.plan === 'Premium') && (
+                        <button 
+                            onClick={() => setActiveTab('tables')}
+                            className={`flex-1 md:flex-none justify-center px-4 md:px-6 py-2.5 rounded-xl lg:rounded-full font-bold text-sm transition-all flex items-center gap-2 ${activeTab === 'tables' ? 'bg-white shadow-sm text-brand-blue' : 'text-slate-500 hover:text-slate-700'}`}
+                        >
+                            <span className="material-symbols-outlined text-[18px]">table_restaurant</span> Mapa das Mesas
+                        </button>
+                    )}
+
                         <button 
                             onClick={() => setActiveTab('gifts')}
                             className={`flex-1 md:flex-none justify-center px-4 md:px-6 py-2.5 rounded-xl lg:rounded-full font-bold text-sm transition-all flex items-center gap-2 ${activeTab === 'gifts' ? 'bg-white shadow-sm text-brand-blue' : 'text-slate-500 hover:text-slate-700'}`}
                         >
                             <Gem size={16} className={activeTab === 'gifts' ? 'text-brand-blue' : 'text-slate-400'} /> Presentes
                         </button>
+                    {(event?.plan === 'Business' || event?.plan === 'Corporate' || event?.plan === 'Premium') && (
+                        <button 
+                            onClick={() => setActiveTab('messages')}
+                            className={`flex-1 md:flex-none justify-center px-4 md:px-6 py-2.5 rounded-xl lg:rounded-full font-bold text-sm transition-all flex items-center gap-2 ${activeTab === 'messages' ? 'bg-white shadow-sm text-brand-blue' : 'text-slate-500 hover:text-slate-700'}`}
+                        >
+                            <MessageSquare size={16} className={activeTab === 'messages' ? 'text-brand-blue' : 'text-slate-400'} /> Livro de Assinaturas
+                        </button>
                     )}
-                    <button 
-                        onClick={() => setActiveTab('messages')}
-                        className={`flex-1 md:flex-none justify-center px-4 md:px-6 py-2.5 rounded-xl lg:rounded-full font-bold text-sm transition-all flex items-center gap-2 ${activeTab === 'messages' ? 'bg-white shadow-sm text-brand-blue' : 'text-slate-500 hover:text-slate-700'}`}
-                    >
-                        <MessageSquare size={16} className={activeTab === 'messages' ? 'text-brand-blue' : 'text-slate-400'} /> Mural
-                    </button>
                     {(event?.plan === 'Corporate' || event?.plan === 'Premium') && (
                         <button 
                             onClick={() => setActiveTab('assistant')}
@@ -1011,7 +1020,16 @@ export const Dashboard = () => {
                             <Users size={16} className={activeTab === 'team' ? 'text-brand-blue' : 'text-slate-400'} /> Equipe
                         </button>
                     )}
+                    {(event?.plan === 'Premium' || event?.plan === 'Business' || event?.plan === 'Corporate') && (
+                        <button 
+                            onClick={() => setActiveTab('premium')}
+                            className={`flex-1 md:flex-none justify-center px-4 md:px-6 py-2.5 rounded-xl lg:rounded-full font-bold text-sm transition-all flex items-center gap-2 ${activeTab === 'premium' ? 'bg-amber-100 shadow-sm text-amber-700' : 'text-amber-500 hover:text-amber-600'}`}
+                        >
+                            <Gem size={16} className={activeTab === 'premium' ? 'text-amber-700' : 'text-amber-500'} /> VIP & Domínio
+                        </button>
+                    )}
                 </div>
+
 
                 {/* Main Content Area */}
                 <div className="grid lg:grid-cols-3 gap-8">
@@ -1422,6 +1440,13 @@ export const Dashboard = () => {
                         </div>
                     )}
                     
+
+                    {activeTab === 'tables' && (
+                        <div className="lg:col-span-2 flex flex-col gap-6 min-w-0">
+                            <TableManager event={event} guests={guests} />
+                        </div>
+                    )}
+
                     {activeTab === 'gifts' && (
                         <div className="lg:col-span-2 flex flex-col gap-6 min-w-0">
                             <VirtualGiftsManager event={event} />
@@ -1434,9 +1459,51 @@ export const Dashboard = () => {
                         </div>
                     )}
 
+
+                    {activeTab === 'premium' && (
+                        <div className="lg:col-span-2 flex flex-col gap-6 min-w-0">
+                            <div>
+                                <h3 className="text-2xl font-serif text-slate-800 mb-1">Central VIP & Exclusividades</h3>
+                                <p className="text-slate-500 text-sm">Gerencie o seu domínio personalizado para ter um link exclusivo.</p>
+                            </div>
+                            
+                            {/* Custom Domain Feature */}
+                            <div className="bg-white border border-slate-100 p-6 md:p-8 rounded-3xl shadow-sm relative overflow-hidden">
+                                <div className="absolute top-0 right-0 w-32 h-32 bg-amber-50 rounded-full blur-3xl -mr-10 -mt-10 pointer-events-none"></div>
+                                <div className="flex items-start gap-4 mb-6">
+                                    <div className="w-12 h-12 rounded-2xl bg-amber-100 text-amber-600 flex items-center justify-center shrink-0">
+                                        <span className="material-symbols-outlined text-2xl">language</span>
+                                    </div>
+                                    <div>
+                                        <h4 className="text-lg font-bold text-slate-800">Domínio Personalizado (.com / .co.ao)</h4>
+                                        <p className="text-slate-500 text-sm mt-1">Gere um link exclusivo e requintado (ex: o-nosso-casamento.com) para o seu convite.</p>
+                                    </div>
+                                </div>
+                                
+                                <div className="flex flex-col sm:flex-row gap-4 items-end mb-4">
+                                    <div className="flex-1 w-full">
+                                        <label className="text-xs font-bold text-slate-400 uppercase tracking-wider mb-2 block">Seu domínio ideal</label>
+                                        <div className="relative">
+                                            <span className="absolute left-4 top-1/2 -translate-y-1/2 text-slate-400 font-medium text-sm">www.</span>
+                                            <input type="text" placeholder="mariana-e-joao.com" className="w-full bg-slate-50 border border-slate-200 text-slate-800 px-4 py-3 pl-14 rounded-xl focus:outline-none focus:border-amber-400 font-medium" />
+                                        </div>
+                                    </div>
+                                    <button onClick={() => toast.success('Pedido de domínio enviado! Nossa equipa vai verificar a disponibilidade e configurá-lo em até 24h.')} className="px-8 py-3 bg-slate-900 hover:bg-slate-800 text-white text-sm font-bold rounded-xl transition-all shadow-md w-full sm:w-auto h-[46px] whitespace-nowrap">
+                                        Solicitar Domínio
+                                    </button>
+                                </div>
+                                <p className="text-xs text-slate-400 leading-relaxed">
+                                    A configuração do domínio pode levar até 24h úteis. O domínio será válido por 1 ano. Está incluído no seu plano Premium, sem custos adicionais.
+                                </p>
+                            </div>
+                            
+                            
+                        </div>
+                    )}
+
                     {activeTab === 'team' && (
                         <div className="lg:col-span-2 flex flex-col gap-6 min-w-0">
-                            <TeamManager eventId={event.id} eventPlan={event?.plan} />
+                            <TeamManager event={event} />
                         </div>
                     )}
 
@@ -1615,6 +1682,10 @@ export const Dashboard = () => {
                             <div className="bg-slate-50 p-4 rounded-xl mb-4 text-sm text-slate-600">
                                 <p className="font-bold text-xs uppercase text-slate-400 mb-1">Mensagem enviada:</p>
                                 {selectedGuest.message || 'Nenhuma mensagem enviada.'}
+                            </div>
+                            <div className="bg-slate-50 rounded-xl p-4">
+                                <p className="font-bold text-xs uppercase text-slate-400 mb-1">Restrição Alimentar:</p>
+                                {(selectedGuest as any).dietaryRestrictions || 'Nenhuma'}
                             </div>
                             <div className="mb-6">
                                 <p className="font-bold text-xs uppercase text-slate-400 mb-2">Alterar Status:</p>

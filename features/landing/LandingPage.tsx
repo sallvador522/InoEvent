@@ -7,6 +7,7 @@ import { Navbar } from '../../components/Navbar';
 import { SEO } from '../../components/SEO';
 import { FAQSection } from './FAQSection';
 import { SupportModal } from '../../components/SupportModal';
+import { EVENTS } from '../../mockData';
 
 // Create a motion component from the React Router Link
 const MotionLink = motion(Link);
@@ -206,18 +207,18 @@ export const LandingPage: React.FC = () => {
                           transition={{ repeat: Infinity, duration: 40, ease: "linear" }}
                           className="flex flex-col gap-6"
                        >
-                          <img src="/bridal-templates/templateCha1.png" className="rounded-2xl shadow-sm object-cover w-full aspect-[3/4]" alt="Template" loading="lazy" referrerPolicy="no-referrer" />
-                          <img src="/bridal-templates/templateCha3.png" className="rounded-2xl shadow-sm object-cover w-full aspect-[3/4]" alt="Template" loading="lazy" referrerPolicy="no-referrer" />
-                          <img src="/bridal-templates/templateCha1.png" className="rounded-2xl shadow-sm object-cover w-full aspect-[3/4]" alt="Template" loading="lazy" referrerPolicy="no-referrer" />
+                          <img src={EVENTS[0]?.heroImage || "/bridal-templates/templateCha1.png"} className="rounded-2xl shadow-sm object-cover w-full aspect-[3/4]" alt="Template" loading="lazy" referrerPolicy="no-referrer" />
+                          <img src={EVENTS[1]?.heroImage || "/bridal-templates/templateCha3.png"} className="rounded-2xl shadow-sm object-cover w-full aspect-[3/4]" alt="Template" loading="lazy" referrerPolicy="no-referrer" />
+                          <img src={EVENTS[2]?.heroImage || "/bridal-templates/templateCha1.png"} className="rounded-2xl shadow-sm object-cover w-full aspect-[3/4]" alt="Template" loading="lazy" referrerPolicy="no-referrer" />
                        </motion.div>
                        <motion.div 
                           animate={{ y: ["-50%", "0%"] }}
                           transition={{ repeat: Infinity, duration: 50, ease: "linear" }}
                           className="flex flex-col gap-6 mt-[-50%]"
                        >
-                          <img src="/bridal-templates/templateCha2.png" className="rounded-2xl shadow-sm object-cover w-full aspect-[3/4]" alt="Template" loading="lazy" referrerPolicy="no-referrer" />
-                          <img src="/bridal-templates/templateCha4.png" className="rounded-2xl shadow-sm object-cover w-full aspect-[3/4]" alt="Template" loading="lazy" referrerPolicy="no-referrer" />
-                          <img src="/bridal-templates/templateCha2.png" className="rounded-2xl shadow-sm object-cover w-full aspect-[3/4]" alt="Template" loading="lazy" referrerPolicy="no-referrer" />
+                          <img src={EVENTS[3]?.heroImage || "/bridal-templates/templateCha2.png"} className="rounded-2xl shadow-sm object-cover w-full aspect-[3/4]" alt="Template" loading="lazy" referrerPolicy="no-referrer" />
+                          <img src={EVENTS[4]?.heroImage || "/bridal-templates/templateCha4.png"} className="rounded-2xl shadow-sm object-cover w-full aspect-[3/4]" alt="Template" loading="lazy" referrerPolicy="no-referrer" />
+                          <img src={EVENTS[5]?.heroImage || "/bridal-templates/templateCha2.png"} className="rounded-2xl shadow-sm object-cover w-full aspect-[3/4]" alt="Template" loading="lazy" referrerPolicy="no-referrer" />
                        </motion.div>
                     </div>
                  </div>
@@ -229,7 +230,7 @@ export const LandingPage: React.FC = () => {
                  transition={{ repeat: Infinity, duration: 6, ease: "easeInOut" }}
                  className="absolute left-2 md:left-24 top-12 w-[160px] md:w-[220px] h-[320px] md:h-[420px] bg-white rounded-3xl border-4 md:border-8 border-slate-900 shadow-2xl flex flex-col overflow-hidden z-20"
               >
-                 <img src="/bridal-templates/templateCha4.png" className="w-full h-full object-cover" alt="Phone Template Preview" loading="lazy" referrerPolicy="no-referrer" />
+                 <img src={EVENTS[3]?.heroImage || "/bridal-templates/templateCha4.png"} className="w-full h-full object-cover" alt="Phone Template Preview" loading="lazy" referrerPolicy="no-referrer" />
                  <div className="absolute bottom-4 left-1/2 -translate-x-1/2 w-[80%] bg-white/90 backdrop-blur text-center py-2 rounded-full text-[10px] sm:text-xs font-bold shadow-lg">
                     Confirmar Presença
                  </div>
@@ -322,6 +323,14 @@ export const LandingPage: React.FC = () => {
                        <span className="material-symbols-outlined text-[18px] text-[#DFB135]">check_circle</span>
                        <span>Sem marca d'água InoEvents</span>
                     </li>
+                    <li className="flex items-center gap-3 text-[13px] text-blue-50">
+                       <span className="material-symbols-outlined text-[18px] text-[#DFB135]">check_circle</span>
+                       <span>Envio Automático via WhatsApp</span>
+                    </li>
+                    <li className="flex items-center gap-3 text-[13px] text-blue-50">
+                       <span className="material-symbols-outlined text-[18px] text-[#DFB135]">check_circle</span>
+                       <span>Domínio Personalizado (.com)</span>
+                    </li>
                  </ul>
                  <button className="w-full py-3 rounded-full bg-gradient-to-r from-[#DFB135] to-[#A07B18] text-white font-bold text-xs uppercase tracking-wider hover:from-[#EABF45] hover:to-[#B38B20] shadow-[0_4px_14px_rgba(197,160,40,0.35)] transition-all hover:-translate-y-0.5 border border-[#F3CD68]/30">
                     Criar Convite Premium
@@ -393,6 +402,31 @@ export const LandingPage: React.FC = () => {
               icon="redeem" 
               title="Lista de Presentes com IBAN"
               desc="Insira o seu IBAN de bancos angolanos (BAI, BFA, BIC, SOL, etc.) de forma segura para receber presentes em kwanza (AOA) diretamente na sua conta bancária."
+            />
+            <FeatureCard 
+              icon="language" 
+              title="Domínio Personalizado"
+              desc="Tenha um link exclusivo para o seu evento (ex: oseucasamento.com), garantindo muito mais requinte e exclusividade."
+            />
+            <FeatureCard 
+              icon="table_restaurant" 
+              title="Mapa das Mesas"
+              desc="Organize graficamente onde cada convidado vai sentar e crie uma experiência fluida para a recepção."
+            />
+            <FeatureCard 
+              icon="menu_book" 
+              title="Livro de Assinaturas Digital"
+              desc="Um mural onde os convidados podem deixar recados carinhosos, fotos e votos de felicidade para os anfitriões."
+            />
+            <FeatureCard 
+              icon="bar_chart" 
+              title="Estatísticas em Tempo Real"
+              desc="Acompanhe gráficos detalhados de presenças, respostas e presentes através de um painel de organizador completo."
+            />
+            <FeatureCard 
+              icon="smart_toy" 
+              title="Assistente IA"
+              desc="Inteligência Artificial para ajudar a responder a dúvidas dos convidados sobre trajes, localização e presentes."
             />
           </div>
         </section>

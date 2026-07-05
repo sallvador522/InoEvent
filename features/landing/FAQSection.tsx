@@ -11,6 +11,12 @@ interface FAQItem {
 
 const FAQ_ITEMS: FAQItem[] = [
   {
+    q: "Como criar convites digitais online?",
+    a: "Criar convites digitais na InoEvents é simples e rápido. Basta criar a sua conta, escolher o plano ideal (Essencial, Premium ou Business) e selecionar um template do nosso catálogo. Depois, preencha os dados do evento (data, local, etc) e ative ferramentas como confirmação de presença (RSVP) e lista de presentes. Por fim, publique e partilhe o link exclusivo com os seus convidados via WhatsApp.",
+    category: "features",
+    icon: Sparkles
+  },
+  {
     q: "O InoEvents é a melhor plataforma para convites de casamento e chá de panela em Angola?",
     a: "Com certeza! O InoEvents é a plataforma de referência em Angola para criar convites de casamento, chás de panela, noivados, aniversários e eventos corporativos de luxo. A nossa plataforma foi desenvolvida pensando no público angolano, oferecendo suporte nativo para listas de presentes com IBAN de bancos de Angola (BAI, BFA, BIC, SOL, etc.), confirmação de presença (RSVP) intuitiva e bilhetes com código QR para recepções de alto padrão em Luanda e outras províncias.",
     category: "features",
@@ -70,8 +76,25 @@ export const FAQSection: React.FC = () => {
     { id: 'features', label: 'Lista de Presentes & Extras' }
   ];
 
+  const faqSchema = {
+    "@context": "https://schema.org",
+    "@type": "FAQPage",
+    "mainEntity": FAQ_ITEMS.map(item => ({
+      "@type": "Question",
+      "name": item.q,
+      "acceptedAnswer": {
+        "@type": "Answer",
+        "text": item.a
+      }
+    }))
+  };
+
   return (
     <section className="py-28 px-6 bg-slate-50/50 relative border-t border-b border-slate-100" id="faq">
+      <script
+        type="application/ld+json"
+        dangerouslySetInnerHTML={{ __html: JSON.stringify(faqSchema) }}
+      />
       {/* Background elements */}
       <div className="absolute inset-0 z-0 overflow-hidden pointer-events-none">
         <div className="absolute top-1/4 left-1/10 w-96 h-96 bg-blue-100/30 rounded-full blur-3xl" />

@@ -391,9 +391,9 @@ export const Navbar: React.FC = () => {
             className="fixed top-0 right-0 bottom-0 w-[85%] max-w-sm bg-white z-50 p-6 shadow-2xl md:hidden overflow-y-auto flex flex-col font-display"
           >
             <div className="flex justify-between items-center mb-8">
-              <div className="font-bold text-2xl text-brand-blue w-10 h-10 bg-brand-blue rounded-xl flex items-center justify-center text-white">
-                <span className="material-symbols-outlined">celebration</span>
-              </div>
+              <Link to="/" onClick={() => setMobileMenuOpen(false)} className="w-10 h-10 rounded-xl overflow-hidden border border-slate-100 shadow-sm flex items-center justify-center bg-white">
+                <img src="/favicon.ico" alt="InoEvents Logo" className="w-8 h-8 object-contain" referrerPolicy="no-referrer" />
+              </Link>
               <button 
                 onClick={() => setMobileMenuOpen(false)}
                 className="bg-slate-100 hover:bg-slate-200 text-slate-500 p-2 rounded-full transition-colors flex items-center justify-center w-10 h-10"

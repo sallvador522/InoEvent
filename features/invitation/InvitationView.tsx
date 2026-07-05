@@ -115,11 +115,11 @@ const TRACK_PRESETS = [
 
 // Available templates list for layout switcher
 const LAYOUT_PRESETS: { mode: LayoutMode; name: string }[] = [
+  { mode: "LIMINTSO_GOLD", name: "Ouro Imperial (Chany & Pedro)" },
+  { mode: "LIMINTSO_ME", name: "Nobreza de Luanda (Marnela & Evandro)" },
   { mode: "CLASSIC", name: "Clássico Romântico" },
   { mode: "MODERN", name: "Minimalista Etéreo" },
   { mode: "LUXURY", name: "Luxuoso Black Tie" },
-  { mode: "LIMINTSO_GOLD", name: "Ouro Imperial (Chany & Pedro)" },
-  { mode: "LIMINTSO_ME", name: "Nobreza de Luanda (Marnela & Evandro)" },
   { mode: "GARDEN", name: "Jardim Elegante" },
   { mode: "RUSTIC", name: "Rústico Chic" },
   { mode: "INDUSTRIAL", name: "Industrial Urbano" },
@@ -486,7 +486,7 @@ const InvitationView: React.FC = () => {
   const [firebaseLoading, setFirebaseLoading] = useState(true);
   const [networkError, setNetworkError] = useState<string | null>(null);
   const [isRSVPOpen, setRSVPOpen] = useState(false);
-  const [isBannerCollapsed, setIsBannerCollapsed] = useState(false);
+  const [isBannerCollapsed, setIsBannerCollapsed] = useState(true);
   const [isOpenCover, setIsOpenCover] = useState(() => {
     const isEdit = new URLSearchParams(window.location.search).get("edit") === "true";
     return isEdit;
@@ -7363,6 +7363,7 @@ const RSVPForm: React.FC<{ event: EventDetails; onClose: () => void }> = ({
   const [phone, setPhone] = useState("");
   const [companions, setCompanions] = useState(0);
   const [message, setMessage] = useState("");
+  const [dietaryRestrictions, setDietaryRestrictions] = useState("");
   const [loading, setLoading] = useState(false);
   const [successData, setSuccessData] = useState<{
     id: string;
@@ -7428,6 +7429,7 @@ const RSVPForm: React.FC<{ event: EventDetails; onClose: () => void }> = ({
         adults: status === "yes" ? companions + 1 : 0,
         children: 0,
         message: message.trim(),
+        dietaryRestrictions: dietaryRestrictions.trim(),
         checkedIn: false,
         createdAt: new Date().toISOString(),
         updatedAt: new Date().toISOString(),
@@ -7630,6 +7632,24 @@ const RSVPForm: React.FC<{ event: EventDetails; onClose: () => void }> = ({
           </div>
         )}
 
+
+        {status === "yes" && (
+          <div>
+            <label
+              className={`text-xs font-bold uppercase tracking-wider mb-1 block ${isLuxury ? "text-[#BF9B30]" : "opacity-50"}`}
+            >
+              Restrições Alimentares (Opcional)
+            </label>
+            <input
+              type="text"
+              placeholder="Ex: Vegetariano, alergia a glúten, nenhuma..."
+              value={dietaryRestrictions}
+              onChange={(e) => setDietaryRestrictions(e.target.value)}
+              className={`w-full bg-transparent border-b py-2 focus:outline-none ${isLuxury ? "border-gray-600 text-white focus:border-[#BF9B30] placeholder-gray-600" : "border-gray-300 text-black focus:border-black placeholder-gray-400"}`}
+              disabled={loading}
+            />
+          </div>
+        )}
         <div>
           <label
             className={`text-xs font-bold uppercase tracking-wider mb-1 block ${isLuxury ? "text-[#BF9B30]" : "opacity-50"}`}

@@ -74,7 +74,7 @@ export const GuestbookManager: React.FC<{ event: any }> = ({ event }) => {
                 <div>
                     <h3 className="text-xl font-bold flex items-center gap-2 text-slate-800">
                         <MessageSquare size={24} className="text-brand-blue" />
-                        Mural de Recados ({messages.length})
+                        Livro de Assinaturas Digital ({messages.length})
                     </h3>
                     <p className="text-slate-500 text-sm mt-1">
                         Leia, aprove, oculte ou guarde as mensagens especiais deixadas pelos seus convidados.

@@ -93,6 +93,20 @@ service cloud.firestore {
         allow delete: if isSignedIn() && get(/databases/$(database)/documents/events/$(eventId)).data.ownerId == request.auth.uid;
       }
 
+      
+      
+      // --- Team Subcollection ---
+      match /team/{memberId} {
+        allow read: if true;
+        allow create, update, delete: if isSignedIn() && get(/databases/$(database)/documents/events/$(eventId)).data.ownerId == request.auth.uid;
+      }
+
+      // --- Tables Subcollection ---
+      match /tables/{tableId} {
+        allow read: if true;
+        allow create, update, delete: if isSignedIn() && get(/databases/$(database)/documents/events/$(eventId)).data.ownerId == request.auth.uid;
+      }
+
       // --- Messages Subcollection ---
       match /messages/{messageId} {
         allow read: if true;
@@ -109,7 +123,8 @@ service cloud.firestore {
         // Public can update if they provide the existing phone number
         allow update: if isValidId(guestId) && (
             (isSignedIn() && get(/databases/$(database)/documents/events/$(eventId)).data.ownerId == request.auth.uid) ||
-            (existing().phone == incoming().phone)
+            (existing().get('phone', 'none') == incoming().get('phone', 'none')) ||
+            (incoming().get('clientToken', 'invalid') == get(/databases/$(database)/documents/events/$(eventId)).data.clientToken)
         );
         allow delete: if isSignedIn() && get(/databases/$(database)/documents/events/$(eventId)).data.ownerId == request.auth.uid;
       }

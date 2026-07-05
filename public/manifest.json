@@ -1,0 +1,58 @@
+{
+  "name": "InoEvents Angola | Convites Digitais",
+  "short_name": "InoEvents",
+  "description": "Crie convites digitais e controle a lista de convidados para o seu evento.",
+  "id": "/?source=pwa",
+  "start_url": "/?source=pwa",
+  "display": "standalone",
+  "display_override": ["window-controls-overlay", "standalone", "minimal-ui"],
+  "background_color": "#FFFFFF",
+  "theme_color": "#1B365D",
+  "orientation": "portrait-primary",
+  "dir": "ltr",
+  "lang": "pt-AO",
+  "icons": [
+    {
+      "src": "/favicon.ico",
+      "sizes": "64x64 32x32 24x24 16x16",
+      "type": "image/x-icon"
+    },
+    {
+      "src": "/android-chrome-192x192.png",
+      "sizes": "192x192",
+      "type": "image/png",
+      "purpose": "any"
+    },
+    {
+      "src": "/android-chrome-192x192.png",
+      "sizes": "192x192",
+      "type": "image/png",
+      "purpose": "maskable"
+    },
+    {
+      "src": "/android-chrome-512x512.png",
+      "sizes": "512x512",
+      "type": "image/png",
+      "purpose": "any"
+    },
+    {
+      "src": "/android-chrome-512x512.png",
+      "sizes": "512x512",
+      "type": "image/png",
+      "purpose": "maskable"
+    }
+  ],
+  "categories": ["events", "lifestyle", "productivity"],
+  "shortcuts": [
+    {
+      "name": "Painel",
+      "url": "/dashboard?source=pwa_shortcut",
+      "description": "Acessar o seu painel de controle"
+    },
+    {
+      "name": "Modelos",
+      "url": "/templates?source=pwa_shortcut",
+      "description": "Ver galeria de modelos"
+    }
+  ]
+}

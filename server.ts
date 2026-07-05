@@ -5,14 +5,7 @@ import crypto from 'crypto';
 import cors from 'cors';
 import fs from 'fs';
 import admin from 'firebase-admin';
-import { createRequire } from 'module';
-const require = createRequire(import.meta.url);
-const firebaseConfig = require('./firebase-applet-config.json');
-
-import { fileURLToPath } from 'url';
-
-const __filename = fileURLToPath(import.meta.url);
-const __dirname = path.dirname(__filename);
+const firebaseConfig = JSON.parse(fs.readFileSync(path.join(process.cwd(), 'firebase-applet-config.json'), 'utf8'));
 
 const app = express();
 app.set('trust proxy', true);
@@ -346,14 +339,10 @@ app.get('/invite/:id', async (req, res, next) => {
       }
       
       // Determine the image to display
-      let eventImage = 'https://www.inoevent.online/inoOG.png';
-      if (eventData.heroImage) {
-        eventImage = eventData.heroImage;
-      }
+      let eventImage = 'https://www.inoevent.online/inoOG.jpg';
       
       const eventUrl = `https://www.inoevent.online/invite/${id}`;
       
-
       // Replace titles and descriptions in index.html to ensure crawlers get unique tags
       html = html.replace(/<title>[^<]*<\/title>/g, `<title>${eventTitle} | InoEvents</title>`);
       

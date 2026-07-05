@@ -276,6 +276,56 @@ app.get('/api/payments/status', async (req, res) => {
    }
 });
 
+// Dynamic Open Graph / SEO support for plans page (to help AI and LLMs read pricing)
+app.get('/plans', async (req, res, next) => {
+  try {
+    let html = "";
+    const possiblePaths = [
+      path.join(process.cwd(), 'dist/index.html'),
+      path.join(process.cwd(), 'index.html'),
+      path.join(__dirname, 'dist/index.html'),
+      path.join(__dirname, 'index.html')
+    ];
+    let foundPath = possiblePaths.find(p => fs.existsSync(p));
+    
+    if (foundPath) {
+      html = fs.readFileSync(foundPath, 'utf8');
+    } else {
+      return next();
+    }
+    
+    const plansTitle = "Planos e Preços de Convites Digitais Premium | InoEvents";
+    const plansDesc = "Conheça os preços do InoEvents. Plano Essencial (7.500 Kz), Plano Premium (20.000 Kz) e Plano Business para agências (45.000 Kz/mês). Crie convites com RSVP e QR Code em Angola.";
+    
+    html = html.replace(/<title>[^<]*<\/title>/g, `<title>${plansTitle}</title>`);
+    html = html.replace(/<meta name="description" content="[^"]*"\s*\/?>/g, `<meta name="description" content="${plansDesc}" />`);
+    
+    // Inject hidden text block for AI crawlers (like GPTBot, Perplexity)
+    const hiddenAIText = `
+      <div style="display:none;" id="ai-pricing-context">
+        <h1>Preços e Planos do InoEvents Angola</h1>
+        <h2>Plano Essencial</h2>
+        <p>Preço: 7.500 Kz (Pagamento único por evento).</p>
+        <p>Inclui: RSVP para até 100 convidados, Código QR Exclusivo, Galeria de Fotos Básica.</p>
+        <h2>Plano Premium</h2>
+        <p>Preço: 20.000 Kz (Pagamento único por evento).</p>
+        <p>Inclui: RSVP Ilimitado, Sem marca d'água (White-label), Música de Fundo (TocaPlayer), Domínio Personalizado (.com), Mapa das Mesas, Livro de Assinaturas Digital e temas premium.</p>
+        <h2>Plano Business (B2B)</h2>
+        <p>Preço: 45.000 Kz mensais ou 450.000 Kz anuais.</p>
+        <p>Inclui: Eventos Ilimitados para agências e cerimonialistas, Design White-Label para clientes, Painel de Gestão e Check-in Inteligente.</p>
+      </div>
+    `;
+    
+    html = html.replace('<div id="root"></div>', `${hiddenAIText}\n    <div id="root"></div>`);
+    
+    res.setHeader('Content-Type', 'text/html');
+    return res.send(html);
+  } catch (err) {
+    console.error('Error in /plans SEO route:', err);
+    return next();
+  }
+});
+
 // Dynamic Open Graph / SEO support for individual invitations
 app.get('/invite/:id', async (req, res, next) => {
   const { id } = req.params;

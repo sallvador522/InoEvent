@@ -157,7 +157,7 @@ export const LandingPage: React.FC = () => {
                   {/* Primary CTA - Create */}
                   <button
                      onClick={handleCreateEvent}
-                     className="flex-1 h-11 sm:h-12 px-3 sm:px-6 bg-[#1B365D] text-white text-[10px] sm:text-xs font-semibold uppercase tracking-wider rounded-full hover:bg-[#142947] hover:-translate-y-0.5 active:scale-[0.98] transition-all duration-300 shadow-[0_4px_12px_rgba(27,54,93,0.12)] hover:shadow-[0_8px_24px_rgba(27,54,93,0.22)] flex items-center justify-center gap-1.5 group cursor-pointer border border-[#1B365D]"
+                     className="flex-1 h-12 px-3 sm:px-6 bg-[#1B365D] text-white text-[10px] sm:text-xs font-bold uppercase tracking-wider rounded-full relative overflow-hidden transition-all duration-150 ease-out border-b-4 border-[#10223B] hover:bg-[#224373] hover:-translate-y-[1px] hover:border-b-[5px] hover:shadow-[0_6px_16px_rgba(27,54,93,0.35)] active:translate-y-[3px] active:border-b-[1px] active:shadow-[0_2px_4px_rgba(27,54,93,0.2)] shadow-[0_4px_12px_rgba(27,54,93,0.2),inset_0_1px_0_rgba(255,255,255,0.15)] flex items-center justify-center gap-1.5 group cursor-pointer"
                   >
                      <span className="truncate">Criar Convite</span>
                      <span className="material-symbols-outlined text-[15px] sm:text-[18px] group-hover:translate-x-0.5 transition-transform shrink-0">arrow_forward</span>
@@ -166,7 +166,7 @@ export const LandingPage: React.FC = () => {
                   {/* Premium CTA - Order Custom */}
                   <button
                      onClick={() => setSupportOpen(true)}
-                     className="flex-1 h-11 sm:h-12 px-3 sm:px-6 bg-[#C5A028] text-white text-[10px] sm:text-xs font-semibold uppercase tracking-wider rounded-full hover:bg-[#b08d20] hover:-translate-y-0.5 active:scale-[0.98] transition-all duration-300 shadow-[0_4px_12px_rgba(197,160,40,0.12)] hover:shadow-[0_8px_24px_rgba(197,160,40,0.22)] flex items-center justify-center gap-1.5 group cursor-pointer border border-[#C5A028]"
+                     className="flex-1 h-12 px-3 sm:px-6 bg-gradient-to-b from-[#DFB135] to-[#A07B18] text-white text-[10px] sm:text-xs font-bold uppercase tracking-wider rounded-full relative overflow-hidden transition-all duration-150 ease-out border-b-4 border-[#765B11] hover:from-[#EABF45] hover:to-[#B38B20] hover:-translate-y-[1px] hover:border-b-[5px] hover:shadow-[0_6px_16px_rgba(197,160,40,0.35)] active:translate-y-[3px] active:border-b-[1px] active:shadow-[0_2px_4px_rgba(197,160,40,0.2)] shadow-[0_4px_12px_rgba(197,160,40,0.2),inset_0_1px_0_rgba(255,255,255,0.25)] flex items-center justify-center gap-1.5 group cursor-pointer"
                   >
                      <span className="material-symbols-outlined text-[15px] sm:text-[18px] text-white shrink-0">workspace_premium</span>
                      <span className="truncate">Encomendar VIP</span>
@@ -176,7 +176,7 @@ export const LandingPage: React.FC = () => {
                 {/* Secondary CTA - Gallery */}
                 <Link
                    to="/templates"
-                   className="px-5 py-2 border border-slate-200 text-slate-500 hover:text-[#1B365D] hover:border-[#1B365D]/30 text-[10px] sm:text-xs font-semibold uppercase tracking-wider rounded-full hover:-translate-y-0.5 transition-all duration-300 flex items-center justify-center gap-1.5 bg-white/40 backdrop-blur-md shadow-sm"
+                   className="px-6 py-2.5 border border-slate-200 border-b-[3px] border-b-slate-300 text-slate-500 hover:text-[#1B365D] hover:border-[#1B365D]/40 text-[10px] sm:text-xs font-bold uppercase tracking-wider rounded-full hover:-translate-y-[1px] hover:border-b-4 hover:shadow-md active:translate-y-[2px] active:border-b-[1px] active:shadow-sm transition-all duration-150 flex items-center justify-center gap-1.5 bg-white/60 backdrop-blur-md shadow-sm"
                 >
                   <span className="material-symbols-outlined text-[15px] sm:text-[16px] text-[#1B365D]">collections</span>
                   <span>Ver Templates</span>
@@ -251,6 +251,121 @@ export const LandingPage: React.FC = () => {
                  </div>
               </motion.div>
            </motion.div>
+        </section>
+
+        {/* Pricing Section (New) */}
+        <section id="pricing" className="px-6 py-20 w-full relative z-20">
+          <div className="max-w-6xl mx-auto">
+            <div className="text-center max-w-2xl mx-auto mb-16">
+              <span className="text-[#C5A028] font-bold tracking-widest text-[10px] sm:text-xs uppercase mb-2 block">Investimento</span>
+              <h3 className="text-3xl md:text-5xl font-serif font-bold text-slate-900 mb-4">Planos que cabem no seu sonho</h3>
+              <p className="text-slate-500 text-sm md:text-base font-light">Escolha a solução perfeita para tornar o seu evento inesquecível com a elegância que você merece.</p>
+            </div>
+            
+            <div className="flex flex-col md:flex-row items-center md:items-stretch justify-center gap-6 lg:gap-8">
+              {/* Plan 1: Essencial */}
+              <div className="flex-1 w-full max-w-sm bg-white rounded-3xl p-8 border border-slate-100 shadow-[0_8px_30px_rgb(0,0,0,0.04)] hover:shadow-[0_8px_30px_rgb(0,0,0,0.08)] transition-all duration-300 flex flex-col relative group">
+                 <h4 className="text-xl font-bold text-slate-800 mb-2">Essencial</h4>
+                 <p className="text-slate-500 text-[13px] leading-relaxed mb-6 h-10">Prático, rápido e acessível. Ideal para pequenos eventos.</p>
+                 <div className="mb-6 flex items-baseline gap-1">
+                    <span className="text-4xl font-bold text-slate-900">7.500</span>
+                    <span className="text-slate-500 text-sm font-medium">AOA / evento</span>
+                 </div>
+                 <ul className="flex flex-col gap-3 mb-8 flex-1">
+                    <li className="flex items-center gap-3 text-[13px] text-slate-600">
+                       <span className="material-symbols-outlined text-[18px] text-emerald-500">check_circle</span>
+                       <span>Até 100 convidados (RSVP)</span>
+                    </li>
+                    <li className="flex items-center gap-3 text-[13px] text-slate-600">
+                       <span className="material-symbols-outlined text-[18px] text-emerald-500">check_circle</span>
+                       <span>Layouts Clássicos</span>
+                    </li>
+                    <li className="flex items-center gap-3 text-[13px] text-slate-600">
+                       <span className="material-symbols-outlined text-[18px] text-emerald-500">check_circle</span>
+                       <span>Galeria de Fotos Básica</span>
+                    </li>
+                    <li className="flex items-center gap-3 text-[13px] text-slate-600">
+                       <span className="material-symbols-outlined text-[18px] text-emerald-500">check_circle</span>
+                       <span>Ativo até 30 dias após o evento</span>
+                    </li>
+                 </ul>
+                 <button className="w-full py-3 rounded-full border border-slate-200 text-slate-700 font-bold text-xs uppercase tracking-wider hover:bg-slate-50 hover:border-slate-300 transition-colors">
+                    Escolher Essencial
+                 </button>
+              </div>
+              
+              {/* Plan 2: Premium (Highlighted) */}
+              <div className="flex-1 w-full max-w-sm bg-gradient-to-b from-[#1B365D] to-[#10223B] rounded-3xl p-8 shadow-2xl relative flex flex-col transform md:-translate-y-4 border border-[#2A4B7C]">
+                 <div className="absolute top-0 left-1/2 -translate-x-1/2 -translate-y-1/2 bg-gradient-to-r from-[#DFB135] to-[#A07B18] text-white text-[10px] font-bold uppercase tracking-wider py-1 px-4 rounded-full shadow-md border border-[#F3CD68]/30">
+                    Mais Escolhido
+                 </div>
+                 <h4 className="text-xl font-bold text-white mb-2">Premium</h4>
+                 <p className="text-blue-200/80 text-[13px] leading-relaxed mb-6 h-10">Requinte, exclusividade e sem limites para o seu grande dia.</p>
+                 <div className="mb-6 flex items-baseline gap-1">
+                    <span className="text-4xl font-bold text-white">20.000</span>
+                    <span className="text-blue-300 text-sm font-medium">AOA / evento</span>
+                 </div>
+                 <ul className="flex flex-col gap-3 mb-8 flex-1">
+                    <li className="flex items-center gap-3 text-[13px] text-blue-50">
+                       <span className="material-symbols-outlined text-[18px] text-[#DFB135]">check_circle</span>
+                       <span>Convidados Ilimitados (RSVP)</span>
+                    </li>
+                    <li className="flex items-center gap-3 text-[13px] text-blue-50">
+                       <span className="material-symbols-outlined text-[18px] text-[#DFB135]">check_circle</span>
+                       <span>Layouts Premium & Luxury</span>
+                    </li>
+                    <li className="flex items-center gap-3 text-[13px] text-blue-50">
+                       <span className="material-symbols-outlined text-[18px] text-[#DFB135]">check_circle</span>
+                       <span>TocaPlayer (Música de Fundo)</span>
+                    </li>
+                    <li className="flex items-center gap-3 text-[13px] text-blue-50">
+                       <span className="material-symbols-outlined text-[18px] text-[#DFB135]">check_circle</span>
+                       <span>Sem marca d'água InoEvents</span>
+                    </li>
+                 </ul>
+                 <button className="w-full py-3 rounded-full bg-gradient-to-r from-[#DFB135] to-[#A07B18] text-white font-bold text-xs uppercase tracking-wider hover:from-[#EABF45] hover:to-[#B38B20] shadow-[0_4px_14px_rgba(197,160,40,0.35)] transition-all hover:-translate-y-0.5 border border-[#F3CD68]/30">
+                    Criar Convite Premium
+                 </button>
+              </div>
+              
+              {/* Plan 3: VIP */}
+              <div className="flex-1 w-full max-w-sm bg-[#0A0A0A] rounded-3xl p-8 border border-white/10 shadow-[0_8px_30px_rgb(0,0,0,0.12)] flex flex-col relative overflow-hidden group hover:border-white/20 transition-all duration-300">
+                 <div className="absolute -top-10 -right-10 p-4 opacity-5 pointer-events-none group-hover:scale-110 transition-transform duration-700">
+                    <span className="material-symbols-outlined text-[150px] text-white">diamond</span>
+                 </div>
+                 <h4 className="text-xl font-bold text-white mb-2 relative z-10 flex items-center gap-2">
+                   Business 
+                   <span className="material-symbols-outlined text-[18px] text-[#DFB135]">domain</span>
+                 </h4>
+                 <p className="text-slate-400 text-[13px] leading-relaxed mb-6 h-10 relative z-10">Software B2B completo para Agências e Cerimonialistas.</p>
+                 <div className="mb-6 flex items-baseline gap-1 relative z-10">
+                    <span className="text-3xl font-bold text-white leading-[1.2]">45.000</span>
+                    <span className="text-[#DFB135] text-sm font-medium">AOA / mês</span>
+                 </div>
+                 <ul className="flex flex-col gap-3 mb-8 flex-1 relative z-10">
+                    <li className="flex items-center gap-3 text-[13px] text-slate-300">
+                       <span className="material-symbols-outlined text-[18px] text-[#DFB135]">check_circle</span>
+                       <span>Eventos ativos ilimitados (∞)</span>
+                    </li>
+                    <li className="flex items-center gap-3 text-[13px] text-slate-300">
+                       <span className="material-symbols-outlined text-[18px] text-[#DFB135]">check_circle</span>
+                       <span>White-label (Sua Marca)</span>
+                    </li>
+                    <li className="flex items-center gap-3 text-[13px] text-slate-300">
+                       <span className="material-symbols-outlined text-[18px] text-[#DFB135]">check_circle</span>
+                       <span>Painel de Gestão B2B</span>
+                    </li>
+                    <li className="flex items-center gap-3 text-[13px] text-slate-300">
+                       <span className="material-symbols-outlined text-[18px] text-[#DFB135]">check_circle</span>
+                       <span>Suporte VIP Prioritário</span>
+                    </li>
+                 </ul>
+                 <button className="w-full py-3 rounded-full bg-transparent border border-[#DFB135] text-[#DFB135] font-bold text-xs uppercase tracking-wider hover:bg-[#DFB135] hover:text-[#0A0A0A] transition-all relative z-10">
+                    Assinar Plano B2B
+                 </button>
+              </div>
+            </div>
+          </div>
         </section>
 
         {/* Templates CTA Section (Removed) */}

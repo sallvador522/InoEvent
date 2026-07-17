@@ -5,7 +5,7 @@ import { motion, AnimatePresence } from 'framer-motion';
 import { doc, collection, onSnapshot, getDoc } from 'firebase/firestore';
 import { db } from '../../components/FirebaseProvider';
 import { GuestsProgressBar } from './GuestsProgressBar';
-import { ResponsiveContainer, PieChart, Pie, Cell } from 'recharts';
+import { ResponsiveContainer, PieChart, Pie, Cell, LineChart, Line, XAxis, YAxis, Tooltip } from 'recharts';
 import { ExecutiveReportModal } from './ExecutiveReportModal';
 import { Skeleton } from '../../components/ui/Skeleton';
 import { GuestDetailsModal } from './GuestDetailsModal';
@@ -77,22 +77,26 @@ export const ClientDashboard = () => {
                     }
                 }
 
-                // Listen to guests
-                const guestsRef = collection(db, 'events', id, 'guests');
-                const unsubscribeGuests = onSnapshot(guestsRef,
-                    (snapshot) => {
-                        const guestsList = snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() }));
-                        setGuests(guestsList);
-                        setLoading(false);
-                    },
-                    (error) => {
-                        console.error("Guest read error", error);
+                // Fetch guests securely via API
+                const fetchGuests = async () => {
+                    try {
+                        const res = await fetch(`/api/events/${id}/guests?token=${tokenParam}`);
+                        if (res.ok) {
+                            const data = await res.json();
+                            setGuests(data.guests || []);
+                        }
+                    } catch (err) {
+                        console.error("Guest fetch error", err);
+                    } finally {
                         setLoading(false);
                     }
-                );
+                };
+                
+                fetchGuests();
+                const interval = setInterval(fetchGuests, 15000); // Polling every 15s
                 
                 return () => {
-                    unsubscribeGuests();
+                    clearInterval(interval);
                 };
             } catch (err) {
                 console.error("Error fetching event for client", err);
@@ -219,9 +223,18 @@ export const ClientDashboard = () => {
                             Acompanhe em tempo real as respostas dos seus convidados.
                         </p>
                     </div>
-                    <Link to={`/invite/${event.id}`} target="_blank" className="flex bg-white border border-slate-200 px-6 py-3 rounded-full font-bold text-sm text-brand-blue shadow-sm hover:shadow-md transition-all gap-2 items-center w-full md:w-auto justify-center">
-                        <ExternalLink size={16} /> Ver Meu Convite
-                    </Link>
+                    
+                    <div className="flex flex-col md:flex-row items-center gap-3 w-full md:w-auto">
+                        {event?.isBlocked || (event?.scheduledBlockDate && new Date(event.scheduledBlockDate) <= new Date()) ? (
+                            <div className="flex bg-red-50 border border-red-200 px-6 py-3 rounded-full font-bold text-sm text-red-600 shadow-sm gap-2 items-center w-full md:w-auto justify-center cursor-not-allowed">
+                                <span className="material-symbols-outlined text-[16px]">lock</span> Convite Bloqueado
+                            </div>
+                        ) : (
+                            <Link to={`/invite/${event.id}`} target="_blank" className="flex bg-white border border-slate-200 px-6 py-3 rounded-full font-bold text-sm text-brand-blue shadow-sm hover:shadow-md transition-all gap-2 items-center w-full md:w-auto justify-center">
+                                <ExternalLink size={16} /> Ver Meu Convite
+                            </Link>
+                        )}
+                    </div>
                 </div>
 
                 {/* Status Cards */}
@@ -233,7 +246,7 @@ export const ClientDashboard = () => {
                     <StatCard title="Recusados" value={declinedCount} icon={Users} color="bg-red-50 text-red-600" />
                 </div>
 
-                <div className="grid md:grid-cols-3 gap-6 mb-8">
+                <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6 mb-8">
                     {/* Progress Bar Widget */}
                     <div className="md:col-span-2 bg-white border border-slate-200 rounded-3xl p-6 shadow-sm flex flex-col justify-between">
                         <div>
@@ -285,6 +298,43 @@ export const ClientDashboard = () => {
                             <span className="flex items-center gap-1"><span className="w-2.5 h-2.5 rounded-full bg-[#EF4444]" /> Recus. ({declinedCount})</span>
                         </div>
                     </div>
+                    {/* Access Chart Widget */}
+                    <div className="bg-white border border-slate-200 rounded-3xl p-6 shadow-sm flex flex-col justify-between">
+                        <div>
+                            <span className="text-xs font-bold text-blue-600 uppercase tracking-wider block mb-1">Acessos & Visitas</span>
+                            <h4 className="font-bold text-slate-800 text-sm">Visualizações ao longo dos dias</h4>
+                        </div>
+                        <div className="h-28 relative flex items-center justify-center my-2 w-full">
+                            {event?.dailyAccesses && Object.keys(event.dailyAccesses).length > 0 ? (
+                                <ResponsiveContainer width="100%" height="100%">
+                                    <LineChart
+                                        data={Object.entries(event.dailyAccesses || {})
+                                            .sort((a, b) => new Date(a[0]).getTime() - new Date(b[0]).getTime())
+                                            .map(([date, count]) => ({
+                                            date: new Date(date).toLocaleDateString('pt-BR', { day: '2-digit', month: '2-digit' }),
+                                            acessos: count
+                                        }))}
+                                    >
+                                        <XAxis dataKey="date" hide />
+                                        <Tooltip 
+                                            contentStyle={{ borderRadius: '16px', border: '1px solid #e2e8f0', boxShadow: '0 4px 6px -1px rgb(0 0 0 / 0.1)' }}
+                                            labelStyle={{ color: '#64748b', fontSize: '10px', textTransform: 'uppercase', fontWeight: 'bold' }}
+                                            itemStyle={{ color: '#0f172a', fontSize: '14px', fontWeight: 'bold' }}
+                                            cursor={{ stroke: '#cbd5e1', strokeWidth: 1, strokeDasharray: '3 3' }}
+                                        />
+                                        <Line type="monotone" dataKey="acessos" stroke="#3b82f6" strokeWidth={3} dot={{ r: 4, fill: '#3b82f6', strokeWidth: 2, stroke: '#fff' }} activeDot={{ r: 6, fill: '#1d4ed8', stroke: '#fff', strokeWidth: 2 }} />
+                                    </LineChart>
+                                </ResponsiveContainer>
+                            ) : (
+                                <span className="text-xs text-slate-400 font-bold">Ainda sem visitas</span>
+                            )}
+                        </div>
+                        <div className="flex justify-between items-center text-[10px] font-bold text-slate-500 w-full px-2">
+                            <span>Total de Acessos:</span>
+                            <span className="text-blue-600 text-sm">{event?.accessCount || 0}</span>
+                        </div>
+                    </div>
+
                 </div>
 
                 {/* Filters & Search */}

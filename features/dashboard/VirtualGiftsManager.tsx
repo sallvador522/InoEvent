@@ -82,7 +82,7 @@ export const VirtualGiftsManager: React.FC<{ event: any }> = ({ event }) => {
                      Lista de Presentes (Contribuições Virtuais)
                  </h3>
                  <p className="text-slate-500 text-sm mt-1">
-                     Permita que os convidados contribuam financeiramente para experiências e presentes via Multicaixa Express (PlinqPay).
+                     Permita que os convidados contribuam financeiramente para experiências e presentes de forma simples e direta.
                  </p>
               </div>
               <button 
@@ -143,8 +143,8 @@ export const VirtualGiftsManager: React.FC<{ event: any }> = ({ event }) => {
                       <button onClick={() => setIsEditing(true)} className="text-brand-blue font-bold mt-2 hover:underline">Criar a primeira</button>
                    </div>
                )}
-               {gifts.map(gift => (
-                   <div key={gift.id} className="border border-slate-200 rounded-2xl p-5 flex flex-col justify-between bg-white shadow-sm hover:shadow-md transition-shadow relative group">
+               {gifts.map((gift, idx) => (
+                   <div key={gift.id || 'gift-' + idx} className="border border-slate-200 rounded-2xl p-5 flex flex-col justify-between bg-white shadow-sm hover:shadow-md transition-shadow relative group">
                        <button onClick={() => handleDeleteGift(gift.id)} className="absolute top-4 right-4 text-slate-300 hover:text-red-500 opacity-0 group-hover:opacity-100 transition-opacity">
                            <Trash2 size={16} />
                        </button>
@@ -174,8 +174,8 @@ export const VirtualGiftsManager: React.FC<{ event: any }> = ({ event }) => {
                                </tr>
                            </thead>
                            <tbody className="divide-y divide-slate-100">
-                               {contributions.map(cont => (
-                                   <tr key={cont.id} className="hover:bg-white transition-colors">
+                               {contributions.map((cont, idx) => (
+                                   <tr key={cont.id || 'cont-' + idx} className="hover:bg-white transition-colors">
                                        <td className="p-4 font-bold text-slate-800">{cont.guestName}</td>
                                        <td className="p-4 text-slate-500 font-mono text-xs">{cont.guestPhone}</td>
                                        <td className="p-4 text-slate-600 truncate max-w-[200px]">{cont.giftTitle}</td>

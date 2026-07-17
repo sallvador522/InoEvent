@@ -2,11 +2,11 @@ import React, { useState, useEffect } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
 import { useNavigate, useLocation } from 'react-router-dom';
 import { useFirebase, db } from '../../components/FirebaseProvider';
-import { doc, getDoc, setDoc, updateDoc, collection } from 'firebase/firestore';
+import { doc, getDoc, setDoc, updateDoc, collection, query, where, getDocs } from 'firebase/firestore';
 import toast from 'react-hot-toast';
 import { 
   Sparkles, Plus, Trash, Music, Calendar, MapPin, Clock, 
-  User, Checkroom, Gift, Save, FileText, ChevronRight, 
+  User,  Gift, Save, FileText, ChevronRight, 
   Heart, ArrowLeft, AlignLeft, Eye, Layout, Sliders, Globe,
   Gem, X, Check
 } from 'lucide-react';
@@ -53,7 +53,7 @@ export const EventCreator: React.FC = () => {
 
   // Event State Variables
   const [selectedLayout, setSelectedLayout] = useState<LayoutMode>(
-    (initialTemplate as LayoutMode) || (isBabyShower ? 'BABY_NEUTRAL' : isBridalShower ? 'BRIDAL_ROMANTIC' : 'ESSENTIAL')
+    (initialTemplate as LayoutMode) || (isBabyShower ? 'BABY_NEUTRAL' : isBridalShower ? 'BRIDAL_ROMANTIC' : 'CLASSIC' as any)
   );
   const [title, setTitle] = useState(isBabyShower ? 'Chá de Bebé do Noah' : isBridalShower ? 'Chá de Panela da Sarah' : 'João & Maria');
   const [date, setDate] = useState(() => {
@@ -153,7 +153,7 @@ export const EventCreator: React.FC = () => {
         return 'https://images.unsplash.com/photo-1515934751635-c81c6bc9a2d8?q=80&w=1200&auto=format&fit=crop';
       case 'BRIDAL_MINIMAL':
         return 'https://images.unsplash.com/photo-1481653191744-97edb833d5b4?q=80&w=1200&auto=format&fit=crop';
-      case 'BRIDAL_RUSTIC':
+      case 'BRIDAL_CHEF':
         return 'https://images.unsplash.com/photo-1524824267900-2fa9cbf7a506?q=80&w=1200&auto=format&fit=crop';
       case 'BABY_BOY':
         return 'https://images.unsplash.com/photo-1519689680058-324335c77eb2?q=80&w=1200&auto=format&fit=crop';
@@ -201,7 +201,7 @@ export const EventCreator: React.FC = () => {
             setTitle(data.title || '');
             setDate(data.date || '');
             setTime(data.time || '17:00');
-            setSelectedLayout(data.layoutMode || 'ESSENTIAL');
+            setSelectedLayout(data.layoutMode || 'CLASSIC' as any);
             setBrideName(data.brideName || '');
             setGroomName(data.groomName || '');
             setLocationName(data.locationName || '');
@@ -239,9 +239,10 @@ export const EventCreator: React.FC = () => {
     setIsAiGenerating(true);
     const toastId = toast.loading('Consultando inteligência lírica de Alta Costura...');
     try {
+      const token = user ? await user.getIdToken() : '';
       const response = await fetch('/api/generate-description', {
         method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
+        headers: { 'Content-Type': 'application/json', ...(token ? { 'Authorization': `Bearer ${token}` } : {}) },
         body: JSON.stringify({
           eventType: isBridalShower ? 'BRIDAL_SHOWER' : 'WEDDING',
           title: title,
@@ -739,7 +740,7 @@ export const EventCreator: React.FC = () => {
                             {[
                               { id: 'BRIDAL_ROMANTIC', label: 'Chá Romântico Rosé', desc: 'Ar pastel romântico delicado' },
                               { id: 'BRIDAL_MINIMAL', label: 'Chá Minimalista Chic', desc: 'Estética contemporânea clean' },
-                              { id: 'BRIDAL_RUSTIC', label: 'Chá de Linhas Rústicas', desc: 'Madeiras rústicas e folhagens' },
+                              { id: 'BRIDAL_CHEF', label: 'Chá de Linhas Rústicas', desc: 'Madeiras rústicas e folhagens' },
                               { id: 'BRIDAL_BEAUTY', label: 'Estilo Beleza & Spa', desc: 'Toques de luxo e relaxamento' },
                               { id: 'BRIDAL_TEA_PARTY', label: 'Tea Party Delicado', desc: 'Ar aristocrático vintage' },
                               { id: 'BRIDAL_TROPICAL', label: 'Tropical Elegante', desc: 'Ar festivo e florido angolano' }
@@ -764,7 +765,7 @@ export const EventCreator: React.FC = () => {
                             {[
                               { id: 'LIMINTSO_GOLD', label: 'Ouro Imperial', desc: 'Chany & Pedro Luxo Dourado', premium: true },
                               { id: 'LIMINTSO_ME', label: 'Nobreza de Luanda', desc: 'Marnela & Evandro Nobreza Clássica', premium: true },
-                              { id: 'ESSENTIAL', label: 'Essencial Moderno', desc: 'Aparência límpida e polida' },
+                              { id: 'CLASSIC', label: 'Essencial Moderno', desc: 'Aparência límpida e polida' },
                               { id: 'CLASSIC', label: 'Clássico Romântico', desc: 'Elegância de contos de reis' },
                               { id: 'MODERN', label: 'Cosmopolita / Moderno', desc: 'Aparência ousada espacial' },
                               { id: 'LUXURY', label: 'Luxo de Realeza', desc: 'Elegância formal e aristocrata', premium: true },

@@ -5,9 +5,12 @@ import { X, MessageSquare, Shield, Clock } from 'lucide-react';
 interface SupportModalProps {
   isOpen: boolean;
   onClose: () => void;
+  userPlan?: string;
 }
 
-export const SupportModal: React.FC<SupportModalProps> = ({ isOpen, onClose }) => {
+export const SupportModal: React.FC<SupportModalProps> = ({ isOpen, onClose, userPlan }) => {
+  const isBusiness = userPlan === "Business" || userPlan === "Corporate";
+
   const handleOpenWhatsApp = (number: string) => {
     const text = encodeURIComponent("Olá! Preciso de suporte com a plataforma InoEvents.");
     window.open(`https://wa.me/244${number}?text=${text}`, '_blank', 'noopener,noreferrer');
@@ -87,7 +90,7 @@ export const SupportModal: React.FC<SupportModalProps> = ({ isOpen, onClose }) =
                     <MessageSquare size={18} className="animate-pulse text-white" />
                   </div>
                   <div>
-                    <span className="text-[10px] text-emerald-100 block font-bold uppercase tracking-wider">Agente Principal</span>
+                    <span className="text-[10px] text-emerald-100 block font-bold uppercase tracking-wider">{isBusiness ? "Gestor de Conta Dedicado" : "Agente Principal"}</span>
                     <span className="font-bold text-sm text-white">+244 952 815 430</span>
                   </div>
                 </div>

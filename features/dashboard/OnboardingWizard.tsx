@@ -82,10 +82,12 @@ export const OnboardingWizard: React.FC<OnboardingWizardProps> = ({ onCancel, on
         const toastId = toast.loading('InoAI está a redigir o parágrafo perfeito...');
 
         try {
+            const token = user ? await user.getIdToken() : '';
             const response = await fetch('/api/generate-description', {
                 method: 'POST',
                 headers: {
-                    'Content-Type': 'application/json'
+                    'Content-Type': 'application/json',
+                    ...(token ? { 'Authorization': `Bearer ${token}` } : {})
                 },
                 body: JSON.stringify({
                     eventType,
@@ -122,7 +124,7 @@ export const OnboardingWizard: React.FC<OnboardingWizardProps> = ({ onCancel, on
 
         try {
             // Check plan limits safely (bypass if creating a baby shower or bridal shower)
-            const isBypassLimit = eventType === 'BRIDAL_SHOWER' || eventType === 'BABY_SHOWER';
+            const isBypassLimit = eventType === 'BRIDAL_SHOWER' || (eventType as any) === 'BABY_SHOWER';
 
             if (!isBypassLimit && userProfile?.plan !== 'Business' && userProfile?.plan !== 'Corporate') {
                 const plan = userProfile?.plan || 'Essencial';

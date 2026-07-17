@@ -7,7 +7,7 @@ export const AdminRoute: React.FC<{ children: React.ReactNode }> = ({ children }
   const { user, loading } = useFirebase();
   const location = useLocation();
 
-  const adminEmail = import.meta.env.VITE_ADMIN_EMAIL || 'antoniosalvador522@gmail.com';
+  const adminEmail = (import.meta as any).env.VITE_ADMIN_EMAIL || 'antoniosalvador522@gmail.com';
   const isAdmin = user?.email?.toLowerCase() === 'antoniosalvador522@gmail.com' || user?.email === adminEmail;
   
   React.useEffect(() => {

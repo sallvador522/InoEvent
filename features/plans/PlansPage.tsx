@@ -117,6 +117,7 @@ import { copyToClipboard } from "../../lib/clipboard";
 export const PlansPage: React.FC = () => {
   const navigate = useNavigate();
   const { user, userProfile } = useFirebase();
+  const [isProcessing, setIsProcessing] = useState(false);
   const [whatsappModal, setWhatsappModal] = useState<{
     name: string;
     price: string;
@@ -126,6 +127,46 @@ export const PlansPage: React.FC = () => {
   const handleCopy = (text: string) => {
     copyToClipboard(text);
     toast.success("Copiado!");
+  };
+
+  const handleInstantActivation = async () => {
+    if (!user || !whatsappModal) return;
+    setIsProcessing(true);
+    const transactionId = `TX_${Math.random().toString(36).substring(2, 10).toUpperCase()}`;
+    const amount = whatsappModal.name === 'Premium' ? 20000 : whatsappModal.name === 'Business' ? 45000 : 7500;
+    
+    try {
+      const origin = window.location.origin;
+      const response = await fetch(`${origin}/api/payments/confirm`, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json'
+        },
+        body: JSON.stringify({
+          transactionId,
+          amount,
+          userId: user.uid,
+          planName: whatsappModal.name
+        })
+      });
+      
+      if (!response.ok) {
+        const errorData = await response.json().catch(() => ({}));
+        throw new Error(errorData.error || `Erro de ativação: status ${response.status}`);
+      }
+      
+      toast.success(`Plano ${whatsappModal.name} ativado com sucesso instantaneamente! 🎉`);
+      setWhatsappModal(null);
+      // Refresh after a brief delay to reflect upgrades across views
+      setTimeout(() => {
+        window.location.reload();
+      }, 1500);
+    } catch (err: any) {
+      console.error(err);
+      toast.error(err.message || 'Falha na ativação automática do plano');
+    } finally {
+      setIsProcessing(false);
+    }
   };
 
   const confirmPlanSelection = (plan: any) => {
@@ -279,7 +320,7 @@ export const PlansPage: React.FC = () => {
             return (
               <motion.div
                 key={plan.name}
-                variants={itemVariants}
+                variants={itemVariants as any}
                 whileHover={{ y: -8, scale: 1.02 }}
                 className={`relative rounded-3xl p-[1px] overflow-hidden group w-full ${plan.popular ? "z-10" : "z-0 lg:mt-6"}`}
               >
@@ -419,11 +460,42 @@ export const PlansPage: React.FC = () => {
               </div>
 
               <div className="bg-blue-50 border border-blue-100 rounded-2xl p-4 mb-6">
-                <p className="text-sm text-blue-800 leading-relaxed font-medium">
+                <p className="text-xs text-blue-800 leading-relaxed font-medium">
                   Para concluir o seu pedido, fale com um dos nossos agentes
-                  autorizados via WhatsApp. A sua subscrição será activa
-                  de imediato.
+                  autorizados via WhatsApp ou use o nosso simulador de ativação digital abaixo.
                 </p>
+              </div>
+
+              {/* Automated Secure Activation Feature */}
+              <div className="bg-gradient-to-br from-indigo-50 to-purple-50 border border-purple-100 rounded-2xl p-4 mb-6 relative overflow-hidden shadow-sm">
+                <div className="absolute -top-12 -right-12 w-24 h-24 bg-purple-200/40 rounded-full blur-2xl pointer-events-none"></div>
+                <div className="flex items-start gap-3 mb-3">
+                  <div className="w-8 h-8 rounded-lg bg-purple-600 text-white flex items-center justify-center shrink-0 shadow-md">
+                    <Gem size={16} />
+                  </div>
+                  <div>
+                    <h4 className="text-xs font-bold text-slate-800">Ativação Digital Instantânea</h4>
+                    <p className="text-[10px] text-slate-500 mt-0.5">Ative o seu plano de imediato via simulador integrado de pagamento seguro.</p>
+                  </div>
+                </div>
+                
+                <button
+                  type="button"
+                  onClick={handleInstantActivation}
+                  disabled={isProcessing}
+                  className="w-full bg-purple-600 hover:bg-purple-700 disabled:bg-purple-300 text-white py-2.5 rounded-xl font-bold text-xs transition-all shadow-md shadow-purple-200 flex items-center justify-center gap-2"
+                >
+                  {isProcessing ? (
+                    <span className="flex items-center gap-1">
+                      <span className="w-3.5 h-3.5 border-2 border-white border-t-transparent rounded-full animate-spin"></span>
+                      Processando Transação...
+                    </span>
+                  ) : (
+                    <>
+                      <CheckCircle2 size={14} /> Ativar Plano de Imediato (Simulador)
+                    </>
+                  )}
+                </button>
               </div>
 
               <div className="bg-slate-50 border border-slate-200/80 rounded-2xl p-4 space-y-3 mb-4">

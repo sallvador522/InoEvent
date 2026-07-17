@@ -1,13 +1,69 @@
 import 'dotenv/config';
 import express from 'express';
+import rateLimit from 'express-rate-limit';
 import path from 'path';
 import crypto from 'crypto';
 import cors from 'cors';
+import helmet from 'helmet';
 import fs from 'fs';
 import admin from 'firebase-admin';
+import { logger } from './lib/logger';
 const firebaseConfig = JSON.parse(fs.readFileSync(path.join(process.cwd(), 'firebase-applet-config.json'), 'utf8'));
 
 const app = express();
+
+const keyGenerator = (req: express.Request) => {
+  return req.headers.authorization || req['ip'] || (req.socket as any).remoteAddress || 'unknown';
+};
+
+const aiRateLimiter = rateLimit({
+  windowMs: 15 * 60 * 1000, // 15 minutes
+  max: 15,
+  message: { error: 'Muitas requisições para a IA. Tente novamente mais tarde.' },
+  keyGenerator,
+  standardHeaders: true,
+  legacyHeaders: false,
+});
+
+
+
+const apiRateLimiter = rateLimit({
+  windowMs: 15 * 60 * 1000, // 15 minutes
+  max: 300,
+  message: { error: 'Muitas requisições da mesma origem. Tente novamente mais tarde.' },
+  keyGenerator,
+  standardHeaders: true,
+  legacyHeaders: false,
+});
+
+const rsvpRateLimiter = rateLimit({
+  windowMs: 60 * 60 * 1000, // 1 hour
+  max: 100,
+  message: { error: 'Muitas confirmações a partir deste dispositivo.' },
+  keyGenerator,
+  standardHeaders: true,
+  legacyHeaders: false,
+});
+
+// Security headers
+app.use(helmet({
+  contentSecurityPolicy: {
+    directives: {
+      defaultSrc: ["'self'"],
+      scriptSrc: ["'self'", "'unsafe-inline'", "'unsafe-eval'", "https://maps.googleapis.com", "https://cdn.tailwindcss.com", "https://www.googletagmanager.com"],
+      styleSrc: ["'self'", "'unsafe-inline'", "https://fonts.googleapis.com"],
+      fontSrc: ["'self'", "https://fonts.gstatic.com", "data:"],
+      imgSrc: ["'self'", "data:", "blob:", "https:", "http:"],
+      connectSrc: ["'self'", "https://firebasestorage.googleapis.com", "https://firestore.googleapis.com", "https://identitytoolkit.googleapis.com", "https://securetoken.googleapis.com", "https://*.googleapis.com", "wss://*.firebaseio.com", "https://*.google-analytics.com", "https://www.google-analytics.com"],
+      frameSrc: ["'self'", "https://maps.googleapis.com", "https://www.youtube.com"],
+      frameAncestors: ["'self'", "https://*.google.com", "https://*.googleusercontent.com", "https://*.run.app"],
+    }
+  },
+  crossOriginEmbedderPolicy: false,
+  crossOriginOpenerPolicy: false,
+  crossOriginResourcePolicy: false,
+  frameguard: false
+}));
 app.set('trust proxy', true);
 const PORT = 3000;
 
@@ -20,7 +76,7 @@ app.use((req, res, next) => {
 
   if (!isLocal && !isCloudRun && !isMainProd && host) {
     const targetUrl = `https://www.inoevent.online${req.originalUrl}`;
-    console.log(`Redirecting request from host "${host}" to target URL: ${targetUrl}`);
+    logger.info(`Redirecionando tráfego do host "${host}" para domínio de produção: ${targetUrl}`, { category: 'ROUTER' });
     return res.redirect(301, targetUrl);
   }
   next();
@@ -39,15 +95,21 @@ try {
       const dbInstance = admin.firestore();
       dbInstance.settings({ databaseId: dbId });
     } catch (settingsError) {
-      console.warn("Falling back to standard firestore initialization:", settingsError);
+      logger.warn("Revertendo para inicialização padrão do Firestore devido a erro de configuração:", {
+        category: 'DATABASE',
+        data: settingsError
+      });
       admin.firestore();
     }
   } else {
     admin.firestore();
   }
-  console.log("Firebase Admin Firestore initialized successfully");
+  logger.success("SDK do Firebase Admin Firestore inicializado com sucesso.", { category: 'DATABASE' });
 } catch (error) {
-  console.error("Error initializing Firebase Admin SDK:", error);
+  logger.error("Erro crítico ao inicializar SDK do Firebase Admin:", {
+    category: 'DATABASE',
+    data: error
+  });
 }
 
 // Helper to fetch event details safely
@@ -85,12 +147,27 @@ async function getEventDetails(eventId: string) {
         return parsedData;
     }
   } catch (error) {
-    console.error(`Error fetching event details for ID ${eventId}:`, error);
+    logger.error(`Erro ao buscar detalhes do evento ID ${eventId}:`, { category: 'DATABASE', data: error });
   }
   return null;
 }
 
-app.use(cors());
+const corsOptions = {
+  origin: function (origin, callback) {
+    if (!origin) return callback(null, true);
+    if (
+      origin.includes('.run.app') || 
+      origin.includes('localhost') || 
+      origin.includes('127.0.0.1') || 
+      origin === 'https://www.inoevent.online' || 
+      origin === 'https://inoevent.online'
+    ) {
+      return callback(null, true);
+    }
+    return callback(new Error('Origin not allowed by CORS'));
+  }
+};
+app.use(cors(corsOptions));
 // For webhooks, we need the raw body if verifying signatures, but JSON parser is easier 
 // if it's already an object. We'll capture raw body for HMAC verification.
 app.use(express.json({
@@ -117,7 +194,21 @@ app.get('/robots.txt', (req, res) => {
 });
 
 // Generate bespoke invitation description during onboarding
-app.post('/api/generate-description', async (req, res) => {
+app.post('/api/generate-description', aiRateLimiter, async (req, res) => {
+  const authHeader = req.headers.authorization;
+  if (!authHeader || !authHeader.startsWith('Bearer ')) {
+    return res.status(401).json({ error: 'Não autorizado. Token não fornecido.' });
+  }
+
+  const idToken = authHeader.split('Bearer ')[1];
+  try {
+    const decodedToken = await admin.auth().verifyIdToken(idToken);
+    // Optionally fetch user plan to enforce limit (already handled by rate limit + frontend mostly, but good for security)
+  } catch (error) {
+    logger.error("Erro na verificação do token ao gerar descrição:", { category: 'AUTH', data: error });
+    return res.status(401).json({ error: 'Não autorizado. Token inválido.' });
+  }
+
   const { eventType, title, date, style } = req.body;
   if (!eventType || !title) {
     return res.status(400).json({ error: 'Missing eventType or title parameter' });
@@ -148,132 +239,452 @@ Apenas retorne o parágrafo de introdução (máximo 3 frases), escrito em Portu
 
     res.json({ text: response.text?.trim() || '' });
   } catch (error: any) {
-    console.error('Gemini error during description creation:', error);
+    logger.error('Erro no Gemini ao criar descrição do evento:', { category: 'AI', data: error });
     res.status(500).json({ error: error.message });
   }
 });
 
-// Create payment
-app.post('/api/payments/create', async (req, res) => {
-  const { amount, externalId, client, items, metadata } = req.body;
-  if (!amount || !externalId) {
-    return res.status(400).json({ error: 'Missing amount or externalId' });
-  }
-  
-  if (!process.env.PLINQPAY_API_KEY) {
-     console.error("PLINQPAY_API_KEY is not set in environment variables!");
+// Smart Assistant Chat Proxy Route
+app.post('/api/smart-assistant/chat', aiRateLimiter, async (req, res) => {
+  const authHeader = req.headers.authorization;
+  if (!authHeader || !authHeader.startsWith('Bearer ')) {
+    return res.status(401).json({ error: 'Não autorizado. Token não fornecido.' });
   }
 
-  const payload = {
-    externalId,
-    callbackUrl: req.hostname === 'localhost' ? 'https://eof9eaf5r5pftid.m.pipedream.net' : `https://${req.hostname}/api/webhooks/plinqpay`,
-    method: 'REFERENCE',
-    client: {
-      name: client?.name || 'Cliente',
-      email: client?.email || 'cliente@exemplo.com',
-      phone: client?.phone || '+244923000000'
-    },
-    items,
-    amount
-  };
+  const idToken = authHeader.split('Bearer ')[1];
+  try {
+    await admin.auth().verifyIdToken(idToken);
+  } catch (error) {
+    logger.error("Falha ao verificar token de autenticação no assistente inteligente:", { category: 'AUTH', data: error });
+    return res.status(401).json({ error: 'Não autorizado. Token inválido.' });
+  }
+
+  const { event, guests, messages, input } = req.body;
+  if (!event || !guests || !messages || !input) {
+    return res.status(400).json({ error: 'Missing required parameters: event, guests, messages, or input' });
+  }
+
+  const key = process.env.GEMINI_API_KEY;
+  if (!key) {
+    return res.status(500).json({ error: 'Chave de API do Gemini não configurada no servidor' });
+  }
 
   try {
-    console.log('Sending to PlinqPay:', JSON.stringify(payload, null, 2));
-    const response = await fetch('https://api.plinqpay.com/v1/transaction', {
-      method: 'POST',
-      headers: {
-         'Content-Type': 'application/json',
-         'api-key': process.env.PLINQPAY_API_KEY || ''
-      },
-      body: JSON.stringify(payload)
+    const { GoogleGenAI } = await import('@google/genai');
+    const ai = new GoogleGenAI({ apiKey: key });
+
+    const systemInstruction = `Você é um assessor de eventos expert e profissional para a plataforma InoEvents.
+Você está ajudando o anfitrião do evento "${event.title}" (Tipo: ${event.type}).
+O evento acontecerá no dia ${event.date} às ${event.time} em ${event.location}.
+O evento tem ${guests.length} convidados cadastrados no momento. 
+Convidados confirmados: ${guests.filter((g: any) => g.status === 'CONFIRMED').length}.
+Convidados recusados: ${guests.filter((g: any) => g.status === 'DECLINED').length}.
+Pendentes: ${guests.filter((g: any) => g.status === 'PENDING').length}.
+Convidados que já entraram (check-in): ${guests.filter((g: any) => g.checkedIn).length}.
+
+Responda sempre em PT-BR de forma clara, prestativa e amigável.
+Seja conciso mas muito direto e útil.
+Se o usuário pedir para gerar uma mensagem de convite, crie algo muito bem escrito. Baseado no tipo do evento (Casamento, Aniversário, Corporativo, etc).`;
+
+    const history = messages.map((m: any) => `${m.role === 'assistant' ? 'AI' : 'User'}: ${m.content}`).join('\n');
+    const prompt = `${history}\nUser: ${input.trim()}\nAI:`;
+
+    const response = await ai.models.generateContent({
+      model: 'gemini-3.5-flash',
+      contents: prompt,
+      config: {
+        systemInstruction: systemInstruction,
+        temperature: 0.7,
+      }
     });
 
-    const data = await response.json();
-    if (!response.ok) {
-       console.error('PlinqPay API Error:', JSON.stringify(data, null, 2));
-
-       // Handle specific PlinqPay unverified account error
-       const messageStr = Array.isArray(data.message) ? data.message.join(', ') : (data.message || '');
-       if (messageStr.includes('Verifica a sua conta') || messageStr.includes('excutar esta acção')) {
-           return res.status(200).json({
-               success: true,
-               data: {
-                   entity: '99999',
-                   reference: '000000000',
-                   amount: amount
-               },
-               _devNote: 'MOCK gerado pois a conta PlinqPay fornecida não está verificada (KYC pendente).'
-           });
-       }
-
-       const errorMessage = messageStr || data.error || 'Erro no pagamento';
-       return res.status(response.status).json({ error: errorMessage, details: data });
-    }
-    
-    // Save pending transaction removed, the client will do it
-    res.json(data);
+    res.json({ text: response.text || "Desculpe, ocorreu um erro." });
   } catch (error: any) {
-    console.error('Error creating PlinqPay payment:', error);
+    logger.error('Erro no Gemini durante o chat com o assistente inteligente:', { category: 'AI', data: error });
     res.status(500).json({ error: error.message });
   }
 });
 
-// In-memory store to pass webhook data to the client polling
-const paymentWebhooks = new Map<string, any>();
+// Smart Assistant Booster Proxy Route
+app.post('/api/smart-assistant/booster', aiRateLimiter, async (req, res) => {
+  const authHeader = req.headers.authorization;
+  if (!authHeader || !authHeader.startsWith('Bearer ')) {
+    return res.status(401).json({ error: 'Não autorizado. Token não fornecido.' });
+  }
 
-// Webhook for PlinqPay
-app.post('/api/webhooks/plinqpay', async (req, res) => {
-  const payload = req.body;
-  const secretKey = process.env.PLINQPAY_SECRET_KEY || '';
-
-  const sign = payload.signature || payload.sign;
-  const payloadToVerify = {
-    externalId: payload.externalId || payload.externId,
-    amount: payload.amount,
-    method: payload.method,
-    callbackUrl: payload.callbackUrl,
-  };
-
-  const canonical = JSON.stringify(payloadToVerify);
+  const idToken = authHeader.split('Bearer ')[1];
   try {
-    if (secretKey && sign) {
-        const expectedSign = crypto
-          .createHmac('sha256', secretKey)
-          .update(canonical, 'utf8')
-          .digest('base64');
-        const isValid = crypto.timingSafeEqual(Buffer.from(expectedSign), Buffer.from(sign));
-        if (!isValid) {
-          console.error('Invalid HMAC webhook');
-          return res.status(401).json({ error: 'Invalid HMAC signature' });
-        }
-    }
-  } catch(e) {
-    console.error("Error validating HMAC", e);
+    await admin.auth().verifyIdToken(idToken);
+  } catch (error) {
+    logger.error("Erro na verificação do token ao acessar booster assistente:", { category: 'AUTH', data: error });
+    return res.status(401).json({ error: 'Não autorizado. Token inválido.' });
   }
 
-  // Store the new status for the frontend
-  const extId = payload.externalId || payload.externId;
-  if (extId) {
-     paymentWebhooks.set(extId, payload);
+  const { event, guests } = req.body;
+  if (!event || !guests) {
+    return res.status(400).json({ error: 'Missing required parameters: event or guests' });
   }
-  
-  res.send('OK');
+
+  const key = process.env.GEMINI_API_KEY;
+  if (!key) {
+    return res.status(500).json({ error: 'Chave de API do Gemini não configurada no servidor' });
+  }
+
+  try {
+    const { GoogleGenAI, Type } = await import('@google/genai');
+    const ai = new GoogleGenAI({ apiKey: key });
+
+    const systemInstruction = `Você é o mecanismo inteligente InoAI Smart Booster para a plataforma InoEvents.
+Seu dever é analisar a lista de convidados para o evento "${event.title}" e identificar "RSVPs Críticos" que necessitam de intervenção ou contato imediato do organizador.
+
+Considere as regras para definir um RSVP como Crítico:
+1. Convidados pendentes (status === 'PENDING') com telefone cadastrado e nenhuma confirmação.
+2. Convidados que recusaram (status === 'DECLINED') mas que possuem papel estratégico (como familiares próximos).
+3. Convidados confirmados (status === 'CONFIRMED') mas com inconsistências (acompanhantes não discriminados ou dúvidas pendentes).
+4. Grupos pendentes de grande porte (para estimativa correta de buffet).
+
+Você deve retornar obrigatoriamente um objeto JSON no formato do esquema fornecido.
+Forneça insights de alto nível no campo 'overallInsights' e recomende os próximos passos estratégicos no campo 'nextSteps'.
+Crie mensagens de contato (draftMessage) personalizadas, amigáveis, gentis e persuasivas em português do Brasil, prontas para WhatsApp ou E-mail.`;
+
+    const responseSchema = {
+      type: Type.OBJECT,
+      properties: {
+        criticalGuests: {
+          type: Type.ARRAY,
+          items: {
+            type: Type.OBJECT,
+            properties: {
+              name: { type: Type.STRING, description: "Nome completo do convidado" },
+              phone: { type: Type.STRING, description: "Telefone do convidado" },
+              status: { type: Type.STRING, description: "PENDING, CONFIRMED ou DECLINED" },
+              severity: { type: Type.STRING, description: "Nível de gravidade/criticidade: HIGH, MEDIUM ou LOW" },
+              reason: { type: Type.STRING, description: "Motivo que torna esta confirmação crítica" },
+              actionPlan: { type: Type.STRING, description: "O que o organizador deve sugerir ou fazer" },
+              draftMessage: { type: Type.STRING, description: "Mensagem personalizada no tom adequado para o convidado" }
+            },
+            required: ["name", "phone", "status", "severity", "reason", "actionPlan", "draftMessage"]
+          }
+        },
+        overallInsights: { type: Type.STRING, description: "Visão estratégica de confirmações de presença do evento" },
+        urgencyRating: { type: Type.INTEGER, description: "Grau geral de urgência para contato (1 a 5)" },
+        nextSteps: {
+          type: Type.ARRAY,
+          items: { type: Type.STRING },
+          description: "Próximos passos imediatos sugeridos"
+        }
+      },
+      required: ["criticalGuests", "overallInsights", "urgencyRating", "nextSteps"]
+    };
+
+    const guestsData = guests.map((g: any) => ({
+      name: g.name,
+      phone: g.phone || 'Não fornecido',
+      status: g.status,
+      adults: g.adults || 1,
+      children: g.children || 0,
+      message: g.message || ''
+    }));
+
+    const prompt = `Analise os seguintes convidados do evento "${event.title}" (Data: ${event.date}):
+${JSON.stringify(guestsData, null, 2)}
+Gere o relatório completo respeitando o esquema JSON.`;
+
+    const response = await ai.models.generateContent({
+      model: 'gemini-3.5-flash',
+      contents: prompt,
+      config: {
+        systemInstruction: systemInstruction,
+        responseMimeType: "application/json",
+        responseSchema: responseSchema,
+        temperature: 0.1,
+      }
+    });
+
+    res.json(JSON.parse(response.text?.trim() || "{}"));
+  } catch (error: any) {
+    logger.error('Erro no Gemini durante a análise do booster:', { category: 'AI', data: error });
+    res.status(500).json({ error: error.message });
+  }
 });
 
-// Status checking endpoint for the frontend
-app.get('/api/payments/status', async (req, res) => {
+
+
+// --- Security API Endpoints for Guests (Fixing Data Leak) ---
+import { getFirestore } from 'firebase-admin/firestore';
+
+app.get('/api/events/:id/guests', apiRateLimiter, async (req, res) => {
+    const { id } = req.params;
+    const { token } = req.query;
+    try {
+        const db = getFirestore();
+        const eventDoc = await db.collection('events').doc(id).get();
+        if (!eventDoc.exists || eventDoc.data()?.clientToken !== token) {
+            return res.status(403).json({ error: 'Unauthorized' });
+        }
+        const guestsSnap = await db.collection('events').doc(id).collection('guests').get();
+        const guests = guestsSnap.docs.map(doc => ({ id: doc.id, ...doc.data() }));
+        res.json({ guests });
+    } catch (err) {
+        logger.error(`Erro ao buscar convidados para o evento ${id}:`, { category: 'DATABASE', data: err });
+        res.status(500).json({ error: 'Server error' });
+    }
+});
+
+app.post('/api/events/:id/rsvp', express.json(), rsvpRateLimiter, async (req, res) => {
+    const { id } = req.params;
+    const { phone, guestData } = req.body;
+    try {
+        const db = getFirestore();
+        const eventRef = db.collection('events').doc(id);
+        const eventDoc = await eventRef.get();
+        if (!eventDoc.exists) return res.status(404).json({ error: 'Not found' });
+        
+        const event = eventDoc.data();
+        const plan = event?.plan || 'Essencial';
+        const limit = plan === 'Essencial' ? 100 : Infinity;
+        
+        const guestsRef = eventRef.collection('guests');
+        
+        // Count guests
+        const countSnap = await guestsRef.count().get();
+        if (countSnap.data().count >= limit) {
+            return res.status(400).json({ error: 'O limite de convidados para este evento foi atingido.' });
+        }
+        
+        // Check duplicate
+        if (phone) {
+            const normalizedPhone = phone.trim().replace(/[\s\-()]/g, "");
+            const phoneQuery = await guestsRef.where('phone', '==', normalizedPhone).get();
+            const phoneQueryRaw = await guestsRef.where('phone', '==', phone.trim()).get();
+            if (!phoneQuery.empty || !phoneQueryRaw.empty) {
+                return res.status(400).json({ error: 'Este número de WhatsApp já confirmou presença neste evento.' });
+            }
+        }
+        
+        const newGuestRef = guestsRef.doc();
+        await newGuestRef.set({
+            ...guestData,
+            createdAt: new Date().toISOString()
+        });
+        
+        res.json({ success: true, guestId: newGuestRef.id });
+    } catch (err) {
+        logger.error(`Erro ao processar RSVP no evento ${id}:`, { category: 'DATABASE', data: err });
+        res.status(500).json({ error: 'Server error' });
+    }
+});
+
+app.get('/api/events/:id/rsvp-status', apiRateLimiter, async (req, res) => {
+    const { id } = req.params;
+    const { phone } = req.query;
+    if (!phone) return res.status(400).json({ error: 'Missing phone' });
+    try {
+        const db = getFirestore();
+        const guestsRef = db.collection('events').doc(id).collection('guests');
+        const normalizedPhone = (phone as string).trim().replace(/[\s\-()]/g, "");
+        const snap = await guestsRef.where('phone', '==', normalizedPhone).get();
+        
+        if (snap.empty) {
+            return res.status(404).json({ error: 'Nenhuma confirmação encontrada para este número.' });
+        }
+        const guestDoc = snap.docs[0];
+        const guestData = { id: guestDoc.id, ...guestDoc.data() } as any;
+        
+        if (guestData.tableId) {
+            const tableSnap = await db.collection('events').doc(id).collection('tables').doc(guestData.tableId).get();
+            if (tableSnap.exists) {
+                guestData.tableName = tableSnap.data()?.name;
+            }
+        }
+        
+        res.json({ guest: guestData });
+    } catch (err) {
+        logger.error(`Erro ao consultar status do rsvp para o evento ${id}:`, { category: 'DATABASE', data: err });
+        res.status(500).json({ error: 'Server error' });
+    }
+});
+
+// Global in-memory cache for webhooks and concurrency locks to prevent race conditions
+const paymentWebhooks = new Map<string, any>();
+const activeTransactionLocks = new Set<string>();
+
+// Status checking endpoint for the frontend (with Firestore backup persistence check)
+app.get('/api/payments/status', apiRateLimiter, async (req, res) => {
    const externalId = req.query.externalId as string;
    if (!externalId) return res.status(400).json({ error: 'Missing externalId' });
 
+   // 1. Check in-memory status cache
    const webhookData = paymentWebhooks.get(externalId);
    if (webhookData) {
-      res.json({ status: webhookData.status, data: webhookData });
-      if (webhookData.status === 'SUCCESS' || webhookData.status === 'FAILED') {
-         // paymentWebhooks.delete(externalId); // Don't delete immediately so frontend can get it
-      }
-   } else {
-      res.json({ status: 'PENDING' });
+      return res.json({ status: webhookData.status, data: webhookData });
    }
+
+   // 2. Backup persistence check: Query Firestore to recover state in case of server restart
+   try {
+      const db = getFirestore();
+      const txDoc = await db.collection('transactions').doc(externalId).get();
+      if (txDoc.exists) {
+          const txData = txDoc.data();
+          const restoredStatus = txData?.status || 'SUCCESS';
+          return res.json({ 
+              status: restoredStatus, 
+              data: { 
+                  status: restoredStatus, 
+                  planName: txData?.planName, 
+                  amount: txData?.amount, 
+                  userId: txData?.ownerId, 
+                  eventId: txData?.eventId 
+              } 
+          });
+      }
+   } catch (err) {
+      logger.error('Erro de backup na verificação de status do pagamento:', { category: 'PAYMENT', data: err });
+   }
+
+   return res.json({ status: 'PENDING' });
+});
+
+// Secure endpoint to confirm payment and upgrade plans, preventing race conditions
+app.post('/api/payments/confirm', express.json(), apiRateLimiter, async (req, res) => {
+    const { transactionId, amount, userId, eventId, planName } = req.body;
+
+    if (!transactionId) {
+        return res.status(400).json({ error: 'Falta o transactionId' });
+    }
+    if (!planName) {
+        return res.status(400).json({ error: 'Falta o planName' });
+    }
+
+    // 1. In-Memory Concurrency Lock to prevent concurrent race conditions on the same transaction ID
+    if (activeTransactionLocks.has(transactionId)) {
+        console.warn(`[Lock] Pagamento ${transactionId} já está a ser processado concurrently.`);
+        return res.status(409).json({ error: 'Este pagamento está a ser processado neste momento. Por favor, aguarde.' });
+    }
+
+    // Acquire lock
+    activeTransactionLocks.add(transactionId);
+    console.log(`[Lock] Adquirido lock para o pagamento ${transactionId}`);
+
+    try {
+        const db = getFirestore();
+        
+        // 2. Database level atomic transaction using Firestore Transactions
+        const result = await db.runTransaction(async (transaction) => {
+            const txDocRef = db.collection('transactions').doc(transactionId);
+            const txDoc = await transaction.get(txDocRef);
+
+            // Idempotency check: if transaction is already processed, return existing status
+            if (txDoc.exists) {
+                console.log(`[Idempotency] Transação ${transactionId} já foi processada.`);
+                return { success: true, alreadyProcessed: true, plan: txDoc.data()?.planName };
+            }
+
+            // Upgrade Event if eventId is provided
+            if (eventId) {
+                const eventRef = db.collection('events').doc(eventId);
+                const eventDoc = await transaction.get(eventRef);
+                if (eventDoc.exists) {
+                    transaction.update(eventRef, {
+                        plan: planName,
+                        updatedAt: new Date().toISOString()
+                    });
+                    console.log(`[Upgrade] Plano do evento ${eventId} atualizado para ${planName}`);
+                }
+            }
+
+            // Upgrade User if userId is provided
+            if (userId) {
+                const userRef = db.collection('users').doc(userId);
+                const userDoc = await transaction.get(userRef);
+                if (userDoc.exists) {
+                    const date = new Date();
+                    date.setMonth(date.getMonth() + 1); // 1 month validity
+                    transaction.update(userRef, {
+                        plan: planName,
+                        planExpiresAt: planName === 'Essencial' ? null : date.toISOString(),
+                        updatedAt: new Date().toISOString()
+                    });
+                    console.log(`[Upgrade] Plano do utilizador ${userId} atualizado para ${planName}`);
+                    
+                    // Add notification atomically inside the transaction
+                    const notifRef = userRef.collection('notifications').doc();
+                    transaction.set(notifRef, {
+                        title: 'Plano Ativado com Sucesso! 🎉',
+                        message: `O seu acesso ao plano ${planName} foi ativado com sucesso. Aproveite todas as funcionalidades exclusivas!`,
+                        createdAt: new Date().toISOString(),
+                        read: false,
+                        type: 'plan_upgrade'
+                    });
+                }
+            }
+
+            // Create Transaction record atomically
+            transaction.set(txDocRef, {
+                ownerId: userId || 'anonymous',
+                amount: amount || 0,
+                type: 'CREDIT',
+                description: `Upgrade de Plano para ${planName} (Tx: ${transactionId})`,
+                date: new Date().toISOString(),
+                eventId: eventId || null,
+                planName: planName,
+                status: 'SUCCESS'
+            });
+
+            return { success: true, alreadyProcessed: false, plan: planName };
+        });
+
+        // Store status in cache for status endpoint
+        paymentWebhooks.set(transactionId, { status: 'SUCCESS', planName, amount, userId, eventId });
+
+        return res.json(result);
+    } catch (err: any) {
+        logger.error(`[Payment Error] Falha ao processar pagamento ${transactionId}:`, { category: 'PAYMENT', data: err });
+        paymentWebhooks.set(transactionId, { status: 'FAILED', error: err.message });
+        return res.status(500).json({ error: 'Erro de transação no servidor', details: err.message });
+    } finally {
+        // Release lock
+        activeTransactionLocks.delete(transactionId);
+        logger.info(`[Lock] Lock libertado para o pagamento ${transactionId}`, { category: 'PAYMENT' });
+    }
+});
+
+// Authoritative Plan Verification Route
+app.get('/api/events/:id/verify-plan', apiRateLimiter, async (req, res) => {
+    const { id } = req.params;
+    try {
+        const db = getFirestore();
+        const eventDoc = await db.collection('events').doc(id).get();
+        if (!eventDoc.exists) {
+            return res.status(404).json({ error: 'Evento não encontrado' });
+        }
+        
+        const eventData = eventDoc.data();
+        const plan = eventData?.plan || 'Essencial';
+        const isBlocked = eventData?.isBlocked || false;
+        
+        // Define authoritative feature support lists per plan
+        const features = {
+            rsvpLimit: plan === 'Essencial' ? 100 : plan === 'Premium' ? 500 : Infinity,
+            backgroundMusic: plan !== 'Essencial',
+            customDomain: plan !== 'Essencial' && plan !== 'Free',
+            tableMaps: plan !== 'Essencial' && plan !== 'Free',
+            guestBook: plan !== 'Essencial' && plan !== 'Free',
+            whiteLabel: plan !== 'Essencial' && plan !== 'Free',
+            staffAccess: plan === 'Business' || plan === 'Corporate',
+        };
+
+        return res.json({
+            eventId: id,
+            plan,
+            isBlocked,
+            features,
+            verifiedAt: new Date().toISOString()
+        });
+    } catch (err) {
+        logger.error('Erro ao verificar plano de forma autoritativa:', { category: 'PAYMENT', data: err });
+        return res.status(500).json({ error: 'Erro ao verificar plano no servidor' });
+    }
 });
 
 // Dynamic Open Graph / SEO support for plans page (to help AI and LLMs read pricing)
@@ -322,7 +733,7 @@ app.get('/plans', async (req, res, next) => {
     res.setHeader('Content-Type', 'text/html');
     return res.send(html);
   } catch (err) {
-    console.error('Error in /plans SEO route:', err);
+    logger.error('Erro na rota SEO de planos (/plans):', { category: 'SEO', data: err });
     return next();
   }
 });
@@ -370,7 +781,7 @@ app.get('/invite/:id', async (req, res, next) => {
            return next();
         }
       } catch(e) {
-         console.error('Fallback fetch failed', e);
+         logger.error('Falha no fallback de busca HTML na rota SEO do convite:', { category: 'SEO', data: e });
          return next();
       }
     }
@@ -417,10 +828,26 @@ app.get('/invite/:id', async (req, res, next) => {
     
     res.setHeader('Content-Type', 'text/html');
     return res.send(html);
-  } catch (err) {
-    console.error('Error in serveInvitationWithSEO route:', err);
+  } catch (err: any) {
+    logger.error('Erro na rota serveInvitationWithSEO:', { category: 'SEO', data: err });
     return next();
   }
+});
+
+// Global Express Uncaught Exception Error Handler
+app.use((err: any, req: express.Request, res: express.Response, next: express.NextFunction) => {
+  logger.error(`Exceção Express não capturada: ${err.message || String(err)}`, {
+    category: 'SYSTEM',
+    data: {
+      stack: err.stack,
+      url: req.originalUrl,
+      method: req.method,
+      ip: req.ip
+    }
+  });
+  res.status(500).json({
+    error: 'Ocorreu um erro inesperado no servidor. A equipa de engenharia foi notificada.'
+  });
 });
 
 async function startServer() {
@@ -440,7 +867,7 @@ async function startServer() {
   }
 
   app.listen(PORT, '0.0.0.0', () => {
-    console.log(`Server is running on port ${PORT}`);
+    logger.success(`Servidor do InoEvents em execução na porta ${PORT}`, { category: 'SYSTEM' });
   });
 }
 

@@ -6,6 +6,7 @@ import { ProtectedRoute } from './components/ProtectedRoute';
 import { AdminRoute } from './components/AdminRoute';
 import { WhatsAppSupport } from './components/WhatsAppSupport';
 import { AnalyticsTracker } from './components/AnalyticsTracker';
+import { ErrorBoundary } from './components/ErrorBoundary';
 
 // Lazy-loaded pages to reduce initial bundle size and optimize Core Web Vitals for mobile users
 const LandingPage = lazy(() => import('./features/landing/LandingPage').then(m => ({ default: m.LandingPage })));
@@ -57,7 +58,7 @@ const AnimatedRoutes: React.FC = () => {
   
   return (
     <AnimatePresence mode="wait">
-      <Routes location={location} key={location.pathname}>
+      <Routes location={location} /* key={location.pathname} */>
         <Route path="/" element={<PageWrapper><LandingPage /></PageWrapper>} />
         <Route path="/templates" element={<PageWrapper><TemplateGalleryPage /></PageWrapper>} />
         <Route path="/terms" element={<PageWrapper><TermsPage /></PageWrapper>} />
@@ -110,14 +111,14 @@ const AnimatedRoutes: React.FC = () => {
 
 const App: React.FC = () => {
   return (
-    <>
+    <ErrorBoundary>
       <Toaster position="top-center" />
       <Router>
         <AnalyticsTracker />
         <AnimatedRoutes />
         <WhatsAppSupport />
       </Router>
-    </>
+    </ErrorBoundary>
   );
 };
 

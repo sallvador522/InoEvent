@@ -46,11 +46,11 @@ service cloud.firestore {
     }
 
     match /users/{userId} {
-      allow get: if true;
+      allow get: if isOwner(userId) || isAdmin() || (isSignedIn() && exists(/databases/$(database)/documents/users/$(request.auth.uid)));
       allow list: if isAdmin();
       allow create: if isOwner(userId) && isValidUser(incoming()) && incoming().uid == request.auth.uid;
       allow update: if isAdmin() || (isOwner(userId) && 
-                       request.resource.data.diff(resource.data).affectedKeys().hasOnly(['plan', 'whiteLabelName', 'whiteLabelLogo', 'updatedAt', 'planExpiresAt']) &&
+                       request.resource.data.diff(resource.data).affectedKeys().hasOnly(['whiteLabelName', 'whiteLabelLogo', 'updatedAt']) &&
                        request.resource.data.uid == resource.data.uid &&
                        request.resource.data.email == resource.data.email);
 
@@ -62,7 +62,7 @@ service cloud.firestore {
 
     match /events/{eventId} {
       // --- List ---
-      allow list: if (isSignedIn() && resource.data.ownerId == request.auth.uid) || isAdmin();
+      allow list: if (isSignedIn() && (resource.data.ownerId == request.auth.uid || exists(/databases/$(database)/documents/events/$(eventId)/team/$(request.auth.uid)))) || isAdmin();
       
       // --- Get ---
       allow get: if true;
@@ -72,8 +72,7 @@ service cloud.firestore {
       
       // --- Update ---
       allow update: if isValidId(eventId) && resource != null && (
-          (isSignedIn() && resource.data.ownerId == request.auth.uid && isValidEvent(incoming()) && incoming().ownerId == resource.data.ownerId) ||
-          (incoming().diff(existing()).affectedKeys().hasOnly(['gallery'])) ||
+          (isSignedIn() && (resource.data.ownerId == request.auth.uid || exists(/databases/$(database)/documents/events/$(eventId)/team/$(request.auth.uid))) && isValidEvent(incoming()) && incoming().ownerId == resource.data.ownerId) ||
           (isSignedIn() && resource.data.ownerId == request.auth.uid && incoming().diff(existing()).affectedKeys().hasOnly(['clientToken']))
       );
       
@@ -82,7 +81,8 @@ service cloud.firestore {
       
       // --- Contributions Subcollection ---
       match /contributions/{contributionId} {
-        allow read: if true;
+        allow get: if true;
+        allow list: if (isSignedIn() && (get(/databases/$(database)/documents/events/$(eventId)).data.ownerId == request.auth.uid || exists(/databases/$(database)/documents/events/$(eventId)/team/$(request.auth.uid)))) || isAdmin();
         allow create: if true; // Public can create a contribution
       }
       
@@ -93,17 +93,15 @@ service cloud.firestore {
         allow delete: if isSignedIn() && get(/databases/$(database)/documents/events/$(eventId)).data.ownerId == request.auth.uid;
       }
 
-      
-      
       // --- Team Subcollection ---
       match /team/{memberId} {
-        allow read: if true;
+        allow read: if (isSignedIn() && (get(/databases/$(database)/documents/events/$(eventId)).data.ownerId == request.auth.uid || exists(/databases/$(database)/documents/events/$(eventId)/team/$(request.auth.uid)))) || isAdmin();
         allow create, update, delete: if isSignedIn() && get(/databases/$(database)/documents/events/$(eventId)).data.ownerId == request.auth.uid;
       }
 
       // --- Tables Subcollection ---
       match /tables/{tableId} {
-        allow read: if true;
+        allow read: if (isSignedIn() && (get(/databases/$(database)/documents/events/$(eventId)).data.ownerId == request.auth.uid || exists(/databases/$(database)/documents/events/$(eventId)/team/$(request.auth.uid)))) || isAdmin();
         allow create, update, delete: if isSignedIn() && get(/databases/$(database)/documents/events/$(eventId)).data.ownerId == request.auth.uid;
       }
 
@@ -114,19 +112,25 @@ service cloud.firestore {
         allow delete: if isSignedIn() && get(/databases/$(database)/documents/events/$(eventId)).data.ownerId == request.auth.uid;
       }
 
-        // --- Guests Subcollection ---
+      // --- Guests Subcollection ---
       match /guests/{guestId} {
-        allow read: if true; // Public read needed for ClientDashboard and capacity checks without Auth
-
-        // Public can create guest
-        allow create: if isValidId(guestId) && incoming().name is string;
-        // Public can update if they provide the existing phone number
+        // Prevent Data Leak: Public can only GET by specific guestId (for check-in scanner). Public cannot LIST all guests.
+        allow get: if true;
+        allow list: if (isSignedIn() && (get(/databases/$(database)/documents/events/$(eventId)).data.ownerId == request.auth.uid || exists(/databases/$(database)/documents/events/$(eventId)/team/$(request.auth.uid)))) || isAdmin();
+        
+        // Creating guests is now handled by the secure backend API for unauthenticated users.
+        allow create: if (isSignedIn() && get(/databases/$(database)/documents/events/$(eventId)).data.ownerId == request.auth.uid) || isAdmin();
+        
         allow update: if isValidId(guestId) && (
-            (isSignedIn() && get(/databases/$(database)/documents/events/$(eventId)).data.ownerId == request.auth.uid) ||
-            (existing().get('phone', 'none') == incoming().get('phone', 'none')) ||
-            (incoming().get('clientToken', 'invalid') == get(/databases/$(database)/documents/events/$(eventId)).data.clientToken)
+            (isSignedIn() && (get(/databases/$(database)/documents/events/$(eventId)).data.ownerId == request.auth.uid || exists(/databases/$(database)/documents/events/$(eventId)/team/$(request.auth.uid)))) ||
+            isAdmin() ||
+            (
+                incoming().get('clientToken', 'invalid') == get(/databases/$(database)/documents/events/$(eventId)).data.clientToken &&
+                request.resource.data.diff(resource.data).affectedKeys().hasOnly(['checkedIn', 'status', 'checkedInAt', 'clientToken', 'name']) &&
+                incoming().get('name', '') == existing().get('name', '')
+            )
         );
-        allow delete: if isSignedIn() && get(/databases/$(database)/documents/events/$(eventId)).data.ownerId == request.auth.uid;
+        allow delete: if (isSignedIn() && get(/databases/$(database)/documents/events/$(eventId)).data.ownerId == request.auth.uid) || isAdmin();
       }
     }
 

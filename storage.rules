@@ -1,0 +1,45 @@
+rules_version = '2';
+service firebase.storage {
+  match /b/{bucket}/o {
+    // Helpers
+    function isSignedIn() {
+      return request.auth != null;
+    }
+    
+    function isOwner(userId) {
+      return isSignedIn() && request.auth.uid == userId;
+    }
+
+    function isImage() {
+      return request.resource.contentType.matches('image/.*');
+    }
+
+    function isAudio() {
+      return request.resource.contentType.matches('audio/.*');
+    }
+
+    function isValidImageSize() {
+      // Máximo 5MB
+      return request.resource.size < 5 * 1024 * 1024; 
+    }
+
+    function isValidAudioSize() {
+      // Máximo 12MB
+      return request.resource.size < 12 * 1024 * 1024;
+    }
+
+    // Isolamento total por pasta de usuário para uploads de imagens/fotos
+    match /users/{userId}/{allPaths=**} {
+      allow read: if true;
+      allow write: if isOwner(userId) && isImage() && isValidImageSize();
+    }
+
+    // Regras de segurança robustas para áudio de eventos
+    match /events/{allPaths=**} {
+      allow read: if true;
+      allow create: if isSignedIn() && isAudio() && isValidAudioSize();
+      allow update: if false; // Evita sobrescrever áudios existentes
+      allow delete: if isSignedIn();
+    }
+  }
+}

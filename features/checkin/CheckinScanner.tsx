@@ -142,7 +142,7 @@ export const CheckinScanner: React.FC = () => {
         
         try {
             setScanState({ status: 'processing', message: 'Validando QR Code...' });
-            playScanSound('scan');
+            
             
             const url = new URL(qrData);
             const scannedGuestId = url.searchParams.get('guest');

@@ -111,7 +111,7 @@ export const InlineText: React.FC<InlineTextProps> = ({
   onChange,
   type = 'text',
   className = '',
-  style = {},
+  style = {} as React.CSSProperties,
   placeholder = 'Clique para editar'
 }) => {
   const [isActive, setIsActive] = useState(false);
@@ -276,7 +276,7 @@ export const InlineImage: React.FC<InlineImageProps> = ({
   isEditing,
   onChange,
   className = '',
-  style = {},
+  style = {} as React.CSSProperties,
   aspectRatio
 }) => {
   const fileInputRef = useRef<HTMLInputElement>(null);

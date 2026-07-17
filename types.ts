@@ -41,7 +41,7 @@ export interface DressCode {
 
 export interface EventDetails {
   id: string;
-  type: ThemeType;
+      type: ThemeType;
   layoutMode: LayoutMode; 
   title: string;
   hosts: string;
@@ -66,6 +66,9 @@ export interface EventDetails {
   timeline: TimelineItem[];
   mapImage?: string;
   gallery?: Array<string | { id: string; url: string; likes: number }>;
+  plan?: string;
+  ownerId?: string;
+  createdAt?: string;
   themeColor?: string;
   
   hiddenSections?: string[];
@@ -81,6 +84,14 @@ export interface EventDetails {
   footerMessage?: string;
   welcomeMessage?: string;
   editableContent?: Record<string, string>;
+  isBlocked?: boolean;
+  scheduledBlockDate?: string;
+  draftData?: any;
+  isPublished?: boolean;
+  dailyAccesses?: Record<string, number>;
+  accessCount?: number;
+  blockedTitle?: string;
+  blockedMessage?: string;
 }
 
 export interface ThemeConfig {

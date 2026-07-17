@@ -1,7 +1,6 @@
 import React, { useState, useRef, useEffect } from 'react';
 import { Bot, Send, User, Sparkles, Loader2, ShieldAlert, MailCheck, Bell, Settings2, ArrowRight, RefreshCw, CheckCircle, MessageSquare, Clock, AlertTriangle, Copy, Check, ExternalLink } from 'lucide-react';
 import { motion, AnimatePresence } from 'framer-motion';
-import { GoogleGenAI, Type } from '@google/genai';
 import { addDoc, collection } from 'firebase/firestore';
 import { db } from '../../components/FirebaseProvider';
 import { useFirebase } from '../../components/FirebaseProvider';
@@ -88,34 +87,27 @@ export const SmartAssistant: React.FC<SmartAssistantProps> = ({ event, guests })
         setIsLoading(true);
 
         try {
-            const ai = new GoogleGenAI({ apiKey: process.env.GEMINI_API_KEY });
-            
-            const systemInstruction = `Você é um assessor de eventos expert e profissional para a plataforma InoEvents.
-Você está ajudando o anfitrião do evento "${event.title}" (Tipo: ${event.type}).
-O evento acontecerá no dia ${event.date} às ${event.time} em ${event.location}.
-O evento tem ${guests.length} convidados cadastrados no momento. 
-Convidados confirmados: ${guests.filter(g => g.status === 'CONFIRMED').length}.
-Convidados recusados: ${guests.filter(g => g.status === 'DECLINED').length}.
-Pendentes: ${guests.filter(g => g.status === 'PENDING').length}.
-Convidados que já entraram (check-in): ${guests.filter(g => g.checkedIn).length}.
-
-Responda sempre em PT-BR de forma clara, prestativa e amigável.
-Seja conciso mas muito direto e útil.
-Se o usuário pedir para gerar uma mensagem de convite, crie algo muito bem escrito. Baseado no tipo do evento (Casamento, Aniversário, Corporativo, etc).`;
-
-            const history = messages.map(m => `${m.role === 'assistant' ? 'AI' : 'User'}: ${m.content}`).join('\n');
-            const prompt = `${history}\nUser: ${userMsg}\nAI:`;
-
-            const response = await ai.models.generateContent({
-                model: 'gemini-3.5-flash',
-                contents: prompt,
-                config: {
-                    systemInstruction: systemInstruction,
-                    temperature: 0.7,
-                }
+            const token = user ? await user.getIdToken() : '';
+            const res = await fetch('/api/smart-assistant/chat', {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/json',
+                    'Authorization': `Bearer ${token}`
+                },
+                body: JSON.stringify({
+                    event,
+                    guests,
+                    messages,
+                    input: userMsg
+                })
             });
 
-            setMessages(prev => [...prev, { role: 'assistant', content: response.text || "Desculpe, ocorreu um erro." }]);
+            if (!res.ok) {
+                throw new Error('Falha ao comunicar com o assistente inteligente.');
+            }
+
+            const data = await res.json();
+            setMessages(prev => [...prev, { role: 'assistant', content: data.text || "Desculpe, ocorreu um erro." }]);
         } catch (error) {
             console.error("AI Error:", error);
             setMessages(prev => [...prev, { role: 'assistant', content: "Desculpe, não consegui processar o seu pedido agora. Tente novamente mais tarde." }]);
@@ -145,79 +137,27 @@ Se o usuário pedir para gerar uma mensagem de convite, crie algo muito bem escr
         }, 1500);
 
         try {
-            const ai = new GoogleGenAI({ apiKey: process.env.GEMINI_API_KEY });
-
-            const systemInstruction = `Você é o mecanismo inteligente InoAI Smart Booster para a plataforma InoEvents.
-Seu dever é analisar a lista de convidados para o evento "${event.title}" e identificar "RSVPs Críticos" que necessitam de intervenção ou contato imediato do organizador.
-
-Considere as regras para definir um RSVP como Crítico:
-1. Convidados pendentes (status === 'PENDING') com telefone cadastrado e nenhuma confirmação.
-2. Convidados que recusaram (status === 'DECLINED') mas que possuem papel estratégico (como familiares próximos).
-3. Convidados confirmados (status === 'CONFIRMED') mas com inconsistências (acompanhantes não discriminados ou dúvidas pendentes).
-4. Grupos pendentes de grande porte (para estimativa correta de buffet).
-
-Você deve retornar obrigatoriamente um objeto JSON no formato do esquema fornecido.
-Forneça insights de alto nível no campo 'overallInsights' e recomende os próximos passos estratégicos no campo 'nextSteps'.
-Crie mensagens de contato (draftMessage) personalizadas, amigáveis, gentis e persuasivas em português do Brasil, prontas para WhatsApp ou E-mail.`;
-
-            const responseSchema = {
-                type: Type.OBJECT,
-                properties: {
-                    criticalGuests: {
-                        type: Type.ARRAY,
-                        items: {
-                            type: Type.OBJECT,
-                            properties: {
-                                name: { type: Type.STRING, description: "Nome completo do convidado" },
-                                phone: { type: Type.STRING, description: "Telefone do convidado" },
-                                status: { type: Type.STRING, description: "PENDING, CONFIRMED ou DECLINED" },
-                                severity: { type: Type.STRING, description: "Nível de gravidade/criticidade: HIGH, MEDIUM ou LOW" },
-                                reason: { type: Type.STRING, description: "Motivo que torna esta confirmação crítica" },
-                                actionPlan: { type: Type.STRING, description: "O que o organizador deve sugerir ou fazer" },
-                                draftMessage: { type: Type.STRING, description: "Mensagem personalizada no tom adequado para o convidado" }
-                            },
-                            required: ["name", "phone", "status", "severity", "reason", "actionPlan", "draftMessage"]
-                        }
-                    },
-                    overallInsights: { type: Type.STRING, description: "Visão estratégica de confirmações de presença do evento" },
-                    urgencyRating: { type: Type.INTEGER, description: "Grau geral de urgência para contato (1 a 5)" },
-                    nextSteps: {
-                        type: Type.ARRAY,
-                        items: { type: Type.STRING },
-                        description: "Próximos passos imediatos sugeridos"
-                    }
+            const token = user ? await user.getIdToken() : '';
+            const res = await fetch('/api/smart-assistant/booster', {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/json',
+                    'Authorization': `Bearer ${token}`
                 },
-                required: ["criticalGuests", "overallInsights", "urgencyRating", "nextSteps"]
-            };
-
-            const guestsData = guests.map(g => ({
-                name: g.name,
-                phone: g.phone || 'Não fornecido',
-                status: g.status,
-                adults: g.adults || 1,
-                children: g.children || 0,
-                message: g.message || ''
-            }));
-
-            const prompt = `Analise os seguintes convidados do evento "${event.title}" (Data: ${event.date}):
-${JSON.stringify(guestsData, null, 2)}
-Gere o relatório completo respeitando o esquema JSON.`;
-
-            const response = await ai.models.generateContent({
-                model: 'gemini-3.5-flash',
-                contents: prompt,
-                config: {
-                    systemInstruction: systemInstruction,
-                    responseMimeType: "application/json",
-                    responseSchema: responseSchema,
-                    temperature: 0.1,
-                }
+                body: JSON.stringify({
+                    event,
+                    guests
+                })
             });
+
+            if (!res.ok) {
+                throw new Error('Falha ao processar análise inteligente.');
+            }
+
+            const report: BoosterReport = await res.json();
 
             clearInterval(interval);
             
-            const rawText = response.text || "{}";
-            const report: BoosterReport = JSON.parse(rawText.trim());
             setBoosterReport(report);
             localStorage.setItem(`inoai_booster_report_${event.id}`, JSON.stringify(report));
 

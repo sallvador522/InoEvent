@@ -6,6 +6,7 @@ import React, { useState, useEffect, useRef } from "react";
 import { createPortal } from "react-dom";
 import { useParams, useNavigate, Link } from "react-router-dom";
 import { motion, AnimatePresence } from "framer-motion";
+import { Joyride, STATUS } from "react-joyride";
 import { getEventById, EVENTS } from "../../mockData";
 import {
   EventDetails,
@@ -27,7 +28,7 @@ import {
   query,
   where,
   getDocs,
-  onSnapshot,
+  onSnapshot, increment,
 } from "firebase/firestore";
 import {
   signInWithEmailAndPassword,
@@ -42,6 +43,7 @@ import { QRCodeSVG } from "qrcode.react";
 import { SEO } from "../../components/SEO";
 import { getOptimizedImageUrl, OptimizeImageOptions } from "../../lib/imageOptimizer";
 import { Guestbook } from "./Guestbook";
+import { CheckStatusModal } from "./CheckStatusModal";
 
 // Helper to safely get image source URL from string or custom object and optimize it
 const getImageUrl = (img: any, options: OptimizeImageOptions = {}): string => {
@@ -478,27 +480,63 @@ const InvitationView: React.FC = () => {
   const navigate = useNavigate();
   const { user, userProfile } = useFirebase();
 
+  // URL Params and Core Editing Flags (Declared first so states and hooks can refer to them)
+  const editParam = new URLSearchParams(window.location.search).get("edit") === "true";
+  const isNew = new URLSearchParams(window.location.search).get("new") === "true";
+  const isTemplate = EVENTS.some((e) => e.id === id);
+
   // Load event either from Firestore custom URL or template static mockup
   const [event, setEvent] = useState<EventDetails | null>(() => {
-    return getEventById(id || "") || null;
+    return (getEventById(id || "") as any) || null;
   });
   const [localEvent, setLocalEvent] = useState<EventDetails | null>(null);
   const [firebaseLoading, setFirebaseLoading] = useState(true);
   const [networkError, setNetworkError] = useState<string | null>(null);
   const [isRSVPOpen, setRSVPOpen] = useState(false);
+  const [isCheckStatusOpen, setCheckStatusOpen] = useState(false);
   const [isBannerCollapsed, setIsBannerCollapsed] = useState(true);
   const [isOpenCover, setIsOpenCover] = useState(() => {
-    const isEdit = new URLSearchParams(window.location.search).get("edit") === "true";
-    return isEdit;
+    return editParam;
   });
 
-  // Workspace visual management variables: enforce security check so only authorized owners can edit saved invitations
-  const editParam = new URLSearchParams(window.location.search).get("edit") === "true";
-  const isNew = new URLSearchParams(window.location.search).get("new") === "true" ;
-  const isTemplate = EVENTS.some((e) => e.id === id);
   const isOwner = !!(user && event && event.ownerId === user.uid);
   const canEdit = !firebaseLoading && !!user && (isTemplate || !!isNew || isOwner);
   const isEditing = editParam && canEdit;
+
+  // Tour State (Clean & Single Declaration)
+  const [runTour, setRunTour] = useState(() => {
+    return editParam && isNew && localStorage.getItem('hasSeenTour') !== 'true';
+  });
+
+  const handleJoyrideCallback = (data: any) => {
+    const { status } = data;
+    const finishedStatuses: string[] = [STATUS.FINISHED, STATUS.SKIPPED];
+    if (finishedStatuses.includes(status)) {
+      setRunTour(false);
+      localStorage.setItem('hasSeenTour', 'true');
+    }
+  };
+
+  const tourSteps = [
+    {
+      target: '.tour-editor-header',
+      content: 'Bem-vindo ao Estúdio de Criação! Aqui no topo você encontra o painel principal para salvar e gerenciar seu convite.',
+      disableBeacon: true,
+    },
+    {
+      target: '.tour-wysiwyg',
+      content: 'Para personalizar, basta clicar em qualquer texto ou imagem! Você edita diretamente na tela e vê o resultado na hora.',
+    },
+    {
+      target: '.tour-save-draft',
+      content: 'Ainda não terminou? Salve como rascunho para continuar depois sem que ninguém veja.',
+    },
+    {
+      target: '.tour-publish',
+      content: 'Tudo pronto? Clique em Publicar para que seus convidados possam acessar e confirmar presença!',
+    }
+  ];
+
   const [sidebarTab, setSidebarTab] = useState<
     "style" | "texts" | "locations" | "timeline" | "gifts" | "save" | "gallery"
   >("style");
@@ -543,10 +581,6 @@ const InvitationView: React.FC = () => {
   useEffect(() => {
     if (firebaseLoading) return;
     
-    const editParam = new URLSearchParams(window.location.search).get("edit") === "true";
-    const isNew = new URLSearchParams(window.location.search).get("new") === "true" ;
-    const isTemplate = EVENTS.some((e) => e.id === id);
-    
     if (editParam) {
       if (!user) {
         toast.error("Por favor, faça login ou crie uma conta para personalizar e editar convites.");
@@ -566,7 +600,7 @@ const InvitationView: React.FC = () => {
         navigate(url.pathname + url.search, { replace: true });
       }
     }
-  }, [event, user, firebaseLoading, id, navigate]);
+  }, [event, user, firebaseLoading, id, navigate, isTemplate, isNew, editParam]);
 
   // Sync loaded event with our free active customizer drafts state
   useEffect(() => {
@@ -580,13 +614,13 @@ const InvitationView: React.FC = () => {
         if (isEditing) {
           // Clone mockup templates to a customizable workspace project
           setLocalEvent({
-            ...staticEvent,
+            ...((staticEvent as any).draftData || staticEvent),
             id: `evt_${Math.random().toString(36).substr(2, 9)}`,
             ownerId: user?.uid || "",
             createdAt: new Date().toISOString(),
           });
         }
-        setEvent(staticEvent);
+        setEvent(staticEvent as unknown as EventDetails);
         setFirebaseLoading(false);
         return;
       }
@@ -608,15 +642,15 @@ const InvitationView: React.FC = () => {
            if (specific) baseTpl = specific;
         }
         const draft = {
-          ...baseTpl,
+          ...(baseTpl as any),
           id: id,
           type: themeParam,
-          layoutMode: templateParam,
+          layoutMode: templateParam as any,
           ownerId: user?.uid || "",
           createdAt: new Date().toISOString(),
         };
-        setLocalEvent(draft);
-        setEvent(draft);
+        setLocalEvent(draft as unknown as EventDetails);
+        setEvent(draft as unknown as EventDetails);
         setFirebaseLoading(false);
         return;
       }
@@ -646,7 +680,7 @@ const InvitationView: React.FC = () => {
                 ) {
                   return prev;
                 }
-                return customEvt;
+                return customEvt as any;
               });
             }
             console.log(
@@ -657,8 +691,8 @@ const InvitationView: React.FC = () => {
             // Check if there is local static mock as a last resort
             const staticEv = getEventById(id);
             if (staticEv) {
-              setEvent(staticEv);
-              if (isEditing) setLocalEvent(staticEv);
+              setEvent(staticEv as unknown as EventDetails);
+              if (isEditing) setLocalEvent(staticEv as unknown as EventDetails);
               setFirebaseLoading(false);
             } else {
               setEvent(null);
@@ -676,8 +710,8 @@ const InvitationView: React.FC = () => {
           // Static mockup fallback
           const staticEv = getEventById(id);
           if (staticEv) {
-            setEvent(staticEv);
-            if (isEditing) setLocalEvent(staticEv);
+            setEvent(staticEv as unknown as EventDetails);
+            if (isEditing) setLocalEvent(staticEv as unknown as EventDetails);
             setFirebaseLoading(false);
           }
         }
@@ -698,11 +732,11 @@ const InvitationView: React.FC = () => {
                 setLocalEvent((prev) => {
                   if (
                     prev &&
-                    JSON.stringify(prev) !== JSON.stringify(customEvt)
+                    JSON.stringify(prev) !== JSON.stringify((customEvt as any).draftData || customEvt)
                   ) {
                     return prev;
                   }
-                  return customEvt;
+                  return (customEvt as any).draftData || customEvt;
                 });
               }
             } else {
@@ -738,12 +772,57 @@ const InvitationView: React.FC = () => {
     };
   }, [id, isEditing, user]);
 
+  // Track Page Views
+  useEffect(() => {
+    if (!isEditing && event && event.id && !(event as any).isTemplate) {
+      const viewedKey = `viewed_${event.id}`;
+      if (!sessionStorage.getItem(viewedKey)) {
+        sessionStorage.setItem(viewedKey, 'true');
+        const today = new Date().toISOString().split('T')[0];
+        const eventRef = doc(db, 'events', event.id);
+        updateDoc(eventRef, {
+          accessCount: increment(1),
+          [`dailyAccesses.${today}`]: increment(1)
+        }).catch(err => console.warn('Failed to track view:', err));
+      }
+    }
+  }, [isEditing, event?.id, (event as any)?.isTemplate]);
+
   if (firebaseLoading) {
     return <PremiumLoader />;
   }
 
   // Active working details is localEvent if editing, else loaded static/saving event
   const activeEvent = isEditing ? localEvent || event : event;
+
+  // Premium Checks
+  const isPremium = isTemplate || isEditing || (activeEvent && (activeEvent as any).plan && ((activeEvent as any).plan === 'Premium' || (activeEvent as any).plan === 'Business' || (activeEvent as any).plan === 'Corporate'));
+
+  // Check if event is blocked
+  const isPast30Days = activeEvent?.isoDate ? (new Date().getTime() - new Date(activeEvent.isoDate).getTime()) > 30 * 24 * 60 * 60 * 1000 : false;
+  const isTemporarilyBlocked = !isEditing && !isTemplate && activeEvent && (
+    activeEvent.isBlocked || activeEvent.isPublished === false || 
+    (activeEvent.scheduledBlockDate && new Date(activeEvent.scheduledBlockDate) <= new Date()) ||
+    (((activeEvent as any).plan === 'Essencial' || !(activeEvent as any).plan) && isPast30Days)
+  );
+
+  if (isTemporarilyBlocked) {
+    return (
+      <div className="min-h-screen bg-slate-50 flex flex-col items-center justify-center p-6 text-slate-800 font-sans text-center">
+        <div className="bg-white border border-slate-200 p-8 rounded-3xl max-w-md shadow-2xl">
+          <div className="w-16 h-16 bg-red-50 text-red-500 rounded-full flex items-center justify-center mx-auto mb-6">
+            <svg xmlns="http://www.w3.org/2000/svg" className="h-8 w-8" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 15v2m-6 4h12a2 2 0 002-2v-6a2 2 0 00-2-2H6a2 2 0 00-2 2v6a2 2 0 002 2zm10-10V7a4 4 0 00-8 0v4h8z" />
+            </svg>
+          </div>
+          <h2 className="text-2xl font-bold mb-4">{activeEvent.blockedTitle || "Convite Indisponível"}</h2>
+          <p className="text-slate-500 mb-8 leading-relaxed">
+            {activeEvent.blockedMessage || "Este convite encontra-se temporariamente bloqueado ou expirou. Por favor, contacte os anfitriões para mais informações."}
+          </p>
+        </div>
+      </div>
+    );
+  }
   if (!activeEvent) {
     if (networkError) {
       return (
@@ -885,6 +964,51 @@ const InvitationView: React.FC = () => {
     };
     updateField("gifts", [...list, item]);
     toast.success("Item de lista de presentes adicionado!");
+  };
+
+
+  // Save as Draft
+  const handleSaveDraft = async () => {
+    if (!localEvent) return;
+    if (!user) {
+      toast.error("Crie uma conta ou faça login para poder salvar!");
+      setIsAuthOpen(true);
+      return;
+    }
+    if (!localEvent.title || localEvent.title.trim().length === 0) {
+      toast.error("Informe um título para o convite.");
+      return;
+    }
+    setIsSaving(true);
+    const toastId = toast.loading("Salvando rascunho...");
+    try {
+      const eventRef = doc(db, "events", localEvent.id);
+      const snap = await getDoc(eventRef);
+      const isNewSave = !snap.exists();
+
+      if (isNewSave) {
+        // Just create the document directly, it's unpublished until they click 'Publicar'
+        const savedPayload = {
+          ...localEvent,
+          ownerId: user.uid,
+          updatedAt: new Date().toISOString(),
+          draftData: localEvent,
+          isPublished: false
+        };
+        await setDoc(eventRef, savedPayload);
+      } else {
+        await updateDoc(eventRef, {
+          draftData: localEvent,
+          updatedAt: new Date().toISOString(),
+        });
+      }
+      toast.success("Rascunho salvo com sucesso!", { id: toastId });
+    } catch (err) {
+      console.error(err);
+      toast.error("Erro ao salvar rascunho.", { id: toastId });
+    } finally {
+      setIsSaving(false);
+    }
   };
 
   // Master billing and save operation
@@ -1050,6 +1174,11 @@ const InvitationView: React.FC = () => {
   };
 
   const addGalleryImage = () => {
+    const plan = userProfile?.plan || 'Essencial';
+    if (plan === 'Essencial' && (localEvent?.gallery?.length || 0) >= 10) {
+      toast.error("A Galeria Básica permite até 10 fotos. Faça upgrade para adicionar mais!");
+      return;
+    }
     setLocalEvent((prev) => {
       if (!prev) return null;
       const list = prev.gallery || [];
@@ -1065,6 +1194,7 @@ const InvitationView: React.FC = () => {
   const layoutProps = {
     event: proxiedEvent,
     onRSVP: () => setRSVPOpen(true),
+    onCheckStatus: () => setCheckStatusOpen(true),
     guestName,
     isEditing,
     isOpenCover,
@@ -1093,7 +1223,50 @@ const InvitationView: React.FC = () => {
 
   if (isEditing) {
     return (
+      
       <div className="min-h-screen bg-slate-900 text-slate-100 flex flex-col font-sans relative">
+        <Joyride
+          steps={tourSteps}
+          run={runTour}
+          continuous={true}
+          
+          
+          
+          styles={{
+            options: {
+              primaryColor: '#3B82F6',
+              textColor: '#334155',
+              zIndex: 10000,
+            },
+            tooltip: {
+              borderRadius: '16px',
+              fontFamily: 'Inter, sans-serif',
+              padding: '24px',
+            },
+            buttonNext: {
+              borderRadius: '8px',
+              fontWeight: 600,
+              fontSize: '14px',
+              padding: '8px 16px',
+            },
+            buttonBack: {
+              marginRight: '8px',
+              color: '#64748B',
+            },
+            buttonSkip: {
+              color: '#94A3B8',
+              fontSize: '14px',
+            }
+          } as any}
+          locale={{
+            back: 'Anterior',
+            close: 'Fechar',
+            last: 'Entendi!',
+            next: 'Próximo',
+            skip: 'Pular Tour'
+          }}
+        />
+
         <SEO 
           title={`Editando: ${activeEvent?.title || "Novo Convite"}`} 
           description="Personalize seu convite digital premium de alta costura com RSVP, cronograma, galeria e muito mais."
@@ -1101,7 +1274,7 @@ const InvitationView: React.FC = () => {
         />
         {/* TOP FLOATING HEADER / ACTIONS (RETRACTABLE LUXURY BAR) */}
         <div
-          className={`fixed top-4 left-1/2 -translate-x-1/2 z-[60] transition-all duration-500 ease-in-out ${isEditorBarExpanded ? "w-[95%] md:w-fit max-w-[95vw] md:max-w-4xl translate-y-0" : "w-auto -translate-y-2 hover:translate-y-0"}`}
+          className={`tour-editor-header fixed top-4 left-1/2 -translate-x-1/2 z-[60] transition-all duration-500 ease-in-out ${isEditorBarExpanded ? "w-[95%] md:w-fit max-w-[95vw] md:max-w-4xl translate-y-0" : "w-auto -translate-y-2 hover:translate-y-0"}`}
         >
           <div className="bg-[#0F1419]/95 backdrop-blur-xl border border-[#BF9B30]/30 rounded-full p-2 pr-3 flex items-center justify-between gap-3 shadow-[0_10px_40px_rgba(0,0,0,0.5)]">
             {/* Logo & Toggle */}
@@ -1162,9 +1335,17 @@ const InvitationView: React.FC = () => {
 
               <button
                 type="button"
+                onClick={handleSaveDraft}
+                disabled={isSaving}
+                className="tour-save-draft px-3 md:px-4 py-2 bg-slate-200 hover:bg-slate-300 text-slate-800 text-[9px] md:text-xs font-bold uppercase tracking-widest rounded-full transition-all cursor-pointer whitespace-nowrap active:scale-95 disabled:opacity-50 shrink-0"
+              >
+                Salvar Rascunho
+              </button>
+              <button
+                type="button"
                 onClick={handleSaveWorkspace}
                 disabled={isSaving}
-                className="px-3 md:px-5 py-2 bg-[#BF9B30] hover:bg-white text-[#0F1419] text-[9px] md:text-xs font-bold uppercase tracking-widest rounded-full shadow-[0_0_20px_rgba(191,155,48,0.3)] flex items-center gap-1 transition-all cursor-pointer whitespace-nowrap active:scale-95 disabled:opacity-50 shrink-0"
+                className="tour-publish px-3 md:px-5 py-2 bg-[#BF9B30] hover:bg-white text-[#0F1419] text-[9px] md:text-xs font-bold uppercase tracking-widest rounded-full shadow-[0_0_20px_rgba(191,155,48,0.3)] flex items-center gap-1 transition-all cursor-pointer whitespace-nowrap active:scale-95 disabled:opacity-50 shrink-0"
               >
                 {isSaving ? (
                   <>
@@ -1176,7 +1357,7 @@ const InvitationView: React.FC = () => {
                     <span className="material-symbols-outlined text-[14px]">
                       cloud_upload
                     </span>
-                    <span>Publicar</span>
+                    <span>Publicar Alterações</span>
                   </>
                 )}
               </button>
@@ -1196,14 +1377,14 @@ const InvitationView: React.FC = () => {
         </div>
 
         {/* FULL SCREEN WYSIWYG CANVAS */}
-        <div className="flex-1 overflow-y-auto bg-slate-100/90 relative pb-36 px-2 md:px-6 bg-[radial-gradient(#cbd5e1_1px,transparent_1px)] [background-size:20px_20px]">
-          <TocaPlayer
+        <div className="tour-wysiwyg flex-1 overflow-y-auto bg-slate-100/90 relative pb-36 px-2 md:px-6 bg-[radial-gradient(#cbd5e1_1px,transparent_1px)] [background-size:20px_20px]">
+          {isPremium && <TocaPlayer
             trackName={localEvent?.musicTrack || activeEvent.musicTrack}
             isDark={
               localEvent?.layoutMode === "LUXURY" ||
               localEvent?.layoutMode === "INDUSTRIAL"
             }
-          />
+          />}
 
           {localEvent?.layoutMode === "CLASSIC" && (
             <ClassicLayout {...layoutProps} />
@@ -1483,7 +1664,7 @@ const InvitationView: React.FC = () => {
                               className="relative aspect-square rounded-xl overflow-hidden group bg-[#1A2026] border border-[#BF9B30]/20"
                             >
                               <img
-                                src={img}
+                                src={typeof img === 'string' ? img : (img as any).url}
                                 className="w-full h-full object-cover"
                               />
                               <div className="absolute inset-0 bg-black/60 opacity-0 group-hover:opacity-100 transition-opacity flex items-center justify-center gap-1.5 p-1">
@@ -2134,13 +2315,13 @@ const InvitationView: React.FC = () => {
         description={activeEvent.description || "Você foi convidado para o nosso evento especial! Veja os detalhes, localizações e confirme sua presença (RSVP)."}
         image={getImageUrl(activeEvent.heroImage)}
       />
-      <TocaPlayer
+      {isPremium && <TocaPlayer
         trackName={activeEvent.musicTrack}
         isDark={
           activeEvent.layoutMode === "LUXURY" ||
           activeEvent.layoutMode === "INDUSTRIAL"
         }
-      />
+      />}
 
       {/* Dynamic Layout Rendering */}
       {activeEvent.layoutMode === "CLASSIC" && (
@@ -2226,6 +2407,14 @@ const InvitationView: React.FC = () => {
         </div>
       )}
 
+      
+        {/* Check Status Modal */}
+        <CheckStatusModal
+          isOpen={isCheckStatusOpen}
+          onClose={() => setCheckStatusOpen(false)}
+          event={activeEvent}
+        />
+
       {/* Shared RSVP Modal */}
       <BottomSheet
         isOpen={isRSVPOpen}
@@ -2242,7 +2431,7 @@ const InvitationView: React.FC = () => {
         }
       >
         <RSVPForm
-          event={event || staticEvent}
+          event={activeEvent}
           onClose={() => setRSVPOpen(false)}
         />
       </BottomSheet>
@@ -2785,7 +2974,8 @@ const EditableSectionWrapper: React.FC<{
 const ClassicLayout: React.FC<{
   event: EventDetails;
   onRSVP: () => void;
-  guestName: string;
+  onCheckStatus?: () => void;
+guestName: string;
   isEditing?: boolean;
   onEditSection?: (section: any) => void;
   updateField?: (field: string, value: any) => void;
@@ -2798,12 +2988,13 @@ const ClassicLayout: React.FC<{
 }> = ({
   event,
   onRSVP,
-  isEditing,
+  onCheckStatus, isEditing,
   onEditSection,
   updateField,
   deleteTimelineItem,
   updateTimelineItem,
 }) => {
+  const isPremium = isEditing || (event && EVENTS.some((e) => e.id === event.id)) || (event && (event as any).plan && ((event as any).plan === "Premium" || (event as any).plan === "Business" || (event as any).plan === "Corporate"));
   return (
     <div className="min-h-screen bg-slate-50 font-serif pb-28">
       {/* Formal Header */}
@@ -3014,6 +3205,7 @@ const ClassicLayout: React.FC<{
                         list[0] = { ...list[0], description: newVal };
                       } else {
                         list[0] = {
+                          type: "IBAN",
                           title: "Presente",
                           description: newVal,
                           value: "",
@@ -3090,7 +3282,7 @@ const ClassicLayout: React.FC<{
                     className="aspect-square relative rounded-xl overflow-hidden shadow-sm group"
                   >
                     <EditableImageWrapper
-                      src={img}
+                      src={typeof img === 'string' ? img : (img as any).url}
                       onChange={(newVal) =>
                         updateField?.(
                           "gallery",
@@ -3122,6 +3314,7 @@ const ClassicLayout: React.FC<{
         >
           {getRSVPText(event.type)}
         </button>
+          {onCheckStatus && <button onClick={onCheckStatus} className="mt-4 sm:mt-0 sm:ml-4 bg-transparent border border-current opacity-70 hover:opacity-100 py-4 px-12 rounded-full font-bold uppercase tracking-widest text-sm transition-colors w-full sm:w-auto">Meu Convite</button>}
       </div>
     </div>
   );
@@ -3134,6 +3327,7 @@ const ClassicLayout: React.FC<{
 const ModernLayout: React.FC<{
   event: EventDetails;
   onRSVP: () => void;
+  onCheckStatus?: () => void;
   guestName: string;
   isEditing?: boolean;
   onEditSection?: (section: any) => void;
@@ -3150,6 +3344,7 @@ const ModernLayout: React.FC<{
 }> = ({
   event,
   onRSVP,
+  onCheckStatus,
   guestName,
   isEditing,
   onEditSection,
@@ -3160,6 +3355,7 @@ const ModernLayout: React.FC<{
   deleteGalleryImage,
   updateTimelineItem,
 }) => {
+  const isPremium = isEditing || (event && EVENTS.some((e) => e.id === event.id)) || (event && (event as any).plan && ((event as any).plan === "Premium" || (event as any).plan === "Business" || (event as any).plan === "Corporate"));
   // Ethereal Color Palette
   const accentText = "text-[#8A817C]"; // Taupe gray
   const darkText = "text-[#2C2C2C]";
@@ -3492,11 +3688,7 @@ const ModernLayout: React.FC<{
                   if (list[0]) {
                     list[0] = { ...list[0], description: newVal };
                   } else {
-                    list[0] = {
-                      title: "Presente",
-                      description: newVal,
-                      value: "",
-                    };
+                    list[0] = { type: "IBAN", title: "Presente", description: newVal, value: "" };
                   }
                   updateField?.("gifts", list);
                 }}
@@ -3558,7 +3750,7 @@ const ModernLayout: React.FC<{
                 className="aspect-square relative group/gallery-item overflow-hidden"
               >
                 <EditableImageWrapper
-                  src={img}
+                  src={typeof img === 'string' ? img : (img as any).url}
                   onChange={(newVal) => updateGalleryImage?.(i, newVal)}
                   isEditing={isEditing}
                   className="w-full h-full"
@@ -3598,6 +3790,7 @@ const ModernLayout: React.FC<{
         >
           <span>{getRSVPText(event.type)}</span>
         </button>
+          {onCheckStatus && <button onClick={onCheckStatus} className="mt-4 sm:mt-0 sm:ml-4 bg-transparent border border-current opacity-70 hover:opacity-100 py-4 px-12 rounded-full font-bold uppercase tracking-widest text-sm transition-colors w-full sm:w-auto">Meu Convite</button>}
       </div>
     </div>
   );
@@ -3610,6 +3803,7 @@ const ModernLayout: React.FC<{
 const GardenLayout: React.FC<{
   event: EventDetails;
   onRSVP: () => void;
+  onCheckStatus?: () => void;
   guestName: string;
   isEditing?: boolean;
   onEditSection?: (section: any) => void;
@@ -3626,6 +3820,7 @@ const GardenLayout: React.FC<{
 }> = ({
   event,
   onRSVP,
+  onCheckStatus,
   guestName,
   isEditing,
   onEditSection,
@@ -3636,6 +3831,7 @@ const GardenLayout: React.FC<{
   deleteGalleryImage,
   updateTimelineItem,
 }) => {
+  const isPremium = isEditing || (event && EVENTS.some((e) => e.id === event.id)) || (event && (event as any).plan && ((event as any).plan === "Premium" || (event as any).plan === "Business" || (event as any).plan === "Corporate"));
   const accentColor = "text-[#5D6D55]"; // Sage green
   const accentBg = "bg-[#5D6D55]";
 
@@ -3990,11 +4186,7 @@ const GardenLayout: React.FC<{
                   if (newGifts[0]) {
                     newGifts[0] = { ...newGifts[0], description: newVal };
                   } else {
-                    newGifts[0] = {
-                      title: "Presentes",
-                      value: "",
-                      description: newVal,
-                    };
+                    newGifts[0] = { type: "IBAN", title: "Presentes", value: "", description: newVal, };
                   }
                   updateField?.("gifts", newGifts);
                 }}
@@ -4061,6 +4253,7 @@ const GardenLayout: React.FC<{
 const RusticLayout: React.FC<{
   event: EventDetails;
   onRSVP: () => void;
+  onCheckStatus?: () => void;
   guestName: string;
   isEditing?: boolean;
   onEditSection?: (section: any) => void;
@@ -4077,6 +4270,7 @@ const RusticLayout: React.FC<{
 }> = ({
   event,
   onRSVP,
+  onCheckStatus,
   guestName,
   isEditing,
   onEditSection,
@@ -4087,6 +4281,7 @@ const RusticLayout: React.FC<{
   deleteGalleryImage,
   updateTimelineItem,
 }) => {
+  const isPremium = isEditing || (event && EVENTS.some((e) => e.id === event.id)) || (event && (event as any).plan && ((event as any).plan === "Premium" || (event as any).plan === "Business" || (event as any).plan === "Corporate"));
   const warmText = "text-[#5D4037]"; // Dark warm brown
   const lightText = "text-[#8D6E63]"; // Lighter brown
   const bgPaper = "bg-[#FDF5E6]"; // Old Lace / Paper
@@ -4207,6 +4402,7 @@ const RusticLayout: React.FC<{
             >
               Ver Mapa
             </button>
+          {onCheckStatus && <button onClick={onCheckStatus} className="mt-4 sm:mt-0 sm:ml-4 bg-transparent border border-current opacity-70 hover:opacity-100 py-4 px-12 rounded-full font-bold uppercase tracking-widest text-sm transition-colors w-full sm:w-auto">Meu Convite</button>}
           </div>
           <div className="w-full md:w-1/3 aspect-square rounded-2xl overflow-hidden">
             <img
@@ -4358,6 +4554,7 @@ const RusticLayout: React.FC<{
         >
           {getRSVPText(event.type)}
         </button>
+          {onCheckStatus && <button onClick={onCheckStatus} className="mt-4 sm:mt-0 sm:ml-4 bg-transparent border border-current opacity-70 hover:opacity-100 py-4 px-12 rounded-full font-bold uppercase tracking-widest text-sm transition-colors w-full sm:w-auto">Meu Convite</button>}
       </div>
     </div>
   );
@@ -4369,6 +4566,7 @@ const RusticLayout: React.FC<{
 const IndustrialLayout: React.FC<{
   event: EventDetails;
   onRSVP: () => void;
+  onCheckStatus?: () => void;
   guestName: string;
   isEditing?: boolean;
   onEditSection?: (section: any) => void;
@@ -4385,6 +4583,7 @@ const IndustrialLayout: React.FC<{
 }> = ({
   event,
   onRSVP,
+  onCheckStatus,
   guestName,
   isEditing,
   onEditSection,
@@ -4395,6 +4594,7 @@ const IndustrialLayout: React.FC<{
   deleteGalleryImage,
   updateTimelineItem,
 }) => {
+  const isPremium = isEditing || (event && EVENTS.some((e) => e.id === event.id)) || (event && (event as any).plan && ((event as any).plan === "Premium" || (event as any).plan === "Business" || (event as any).plan === "Corporate"));
   return (
     <div className="min-h-screen bg-[#111] text-white font-display pb-32 selection:bg-white selection:text-black">
       {/* HERO: Full Typographic */}
@@ -4652,11 +4852,7 @@ const IndustrialLayout: React.FC<{
                   if (newGifts[0]) {
                     newGifts[0] = { ...newGifts[0], description: newVal };
                   } else {
-                    newGifts[0] = {
-                      title: "Presentes",
-                      value: "",
-                      description: newVal,
-                    };
+                    newGifts[0] = { type: "IBAN", title: "Presentes", value: "", description: newVal, };
                   }
                   updateField?.("gifts", newGifts);
                 }}
@@ -4730,7 +4926,7 @@ const IndustrialLayout: React.FC<{
                   className="aspect-square relative group/gallery-item overflow-hidden bg-white/5 border border-white/10"
                 >
                   <EditableImageWrapper
-                    src={img}
+                    src={typeof img === 'string' ? img : (img as any).url}
                     onChange={(newVal) =>
                       updateField?.(
                         "gallery",
@@ -4790,6 +4986,7 @@ const SectionTitle: React.FC<{ title: string }> = ({ title }) => (
 const LuxuryLayout: React.FC<{
   event: EventDetails;
   onRSVP: () => void;
+  onCheckStatus?: () => void;
   guestName: string;
   isEditing?: boolean;
   onEditSection?: (section: any) => void;
@@ -4806,6 +5003,7 @@ const LuxuryLayout: React.FC<{
 }> = ({
   event,
   onRSVP,
+  onCheckStatus,
   guestName,
   isEditing,
   onEditSection,
@@ -4816,6 +5014,7 @@ const LuxuryLayout: React.FC<{
   deleteGalleryImage,
   updateTimelineItem,
 }) => {
+  const isPremium = isEditing || (event && EVENTS.some((e) => e.id === event.id)) || (event && (event as any).plan && ((event as any).plan === "Premium" || (event as any).plan === "Business" || (event as any).plan === "Corporate"));
   const [copiedKey, setCopiedKey] = useState<string | null>(null);
 
   const handleCopy = (val: string) => {
@@ -5201,6 +5400,7 @@ const LuxuryLayout: React.FC<{
 const BridalShowerLayout: React.FC<{
   event: EventDetails;
   onRSVP: () => void;
+  onCheckStatus?: () => void;
   guestName: string;
   isEditing?: boolean;
   onEditSection?: (section: any) => void;
@@ -5217,6 +5417,7 @@ const BridalShowerLayout: React.FC<{
 }> = ({
   event,
   onRSVP,
+  onCheckStatus,
   guestName,
   isEditing,
   onEditSection,
@@ -5227,6 +5428,7 @@ const BridalShowerLayout: React.FC<{
   deleteGalleryImage,
   updateTimelineItem,
 }) => {
+  const isPremium = isEditing || (event && EVENTS.some((e) => e.id === event.id)) || (event && (event as any).plan && ((event as any).plan === "Premium" || (event as any).plan === "Business" || (event as any).plan === "Corporate"));
   const isMinimal = event.layoutMode === "BRIDAL_MINIMAL";
   const isTropical = event.layoutMode === "BRIDAL_TROPICAL";
   const isBeauty = event.layoutMode === "BRIDAL_BEAUTY";
@@ -5424,11 +5626,10 @@ const BridalShowerLayout: React.FC<{
                       const updatedGifts = [...(event.gifts || [])];
                       if (updatedGifts[0]) {
                         updatedGifts[0] = {
-                          ...updatedGifts[0],
-                          description: newVal,
-                        };
+                          ...updatedGifts[0], description: newVal, };
                       } else {
                         updatedGifts[0] = {
+                          type: "IBAN",
                           title: "Lista de Presentes",
                           description: newVal,
                           value: "",
@@ -5549,6 +5750,7 @@ const BridalShowerLayout: React.FC<{
 const BabyShowerLayout: React.FC<{
   event: EventDetails;
   onRSVP: () => void;
+  onCheckStatus?: () => void;
   guestName: string;
   isEditing?: boolean;
   onEditSection?: (section: any) => void;
@@ -5565,6 +5767,7 @@ const BabyShowerLayout: React.FC<{
 }> = ({
   event,
   onRSVP,
+  onCheckStatus,
   guestName,
   isEditing,
   onEditSection,
@@ -5574,6 +5777,7 @@ const BabyShowerLayout: React.FC<{
   updateGalleryImage,
   deleteGalleryImage,
 }) => {
+  const isPremium = isEditing || (event && EVENTS.some((e) => e.id === event.id)) || (event && (event as any).plan && ((event as any).plan === "Premium" || (event as any).plan === "Business" || (event as any).plan === "Corporate"));
   const isBoy = event.layoutMode === "BABY_BOY";
   const isGirl = event.layoutMode === "BABY_GIRL";
 
@@ -5938,6 +6142,7 @@ const BabyShowerLayout: React.FC<{
 const LimintsoGoldLayout: React.FC<{
   event: EventDetails;
   onRSVP: () => void;
+  onCheckStatus?: () => void;
   guestName?: string;
   isEditing?: boolean;
   isOpenCover?: boolean;
@@ -5953,6 +6158,7 @@ const LimintsoGoldLayout: React.FC<{
 }> = ({
   event,
   onRSVP,
+  onCheckStatus,
   isEditing,
   isOpenCover,
   setIsOpenCover,
@@ -5960,6 +6166,7 @@ const LimintsoGoldLayout: React.FC<{
   deleteTimelineItem,
   updateTimelineItem,
 }) => {
+  const isPremium = isEditing || (event && EVENTS.some((e) => e.id === event.id)) || (event && (event as any).plan && ((event as any).plan === "Premium" || (event as any).plan === "Business" || (event as any).plan === "Corporate"));
   const [localIsOpen, setLocalIsOpen] = useState(isEditing ? true : false);
   const isOpen = isOpenCover !== undefined ? isOpenCover : localIsOpen;
   const setIsOpen = setIsOpenCover !== undefined ? setIsOpenCover : setLocalIsOpen;
@@ -6491,7 +6698,7 @@ const LimintsoGoldLayout: React.FC<{
             <div className="w-12 h-[1px] bg-[#dcb349]/30 mx-auto mt-4" />
           </div>
 
-          <Guestbook eventId={event.id} layoutMode={event.layoutMode} />
+          {isPremium && <Guestbook eventId={event.id} layoutMode={event.layoutMode} />}
         </FadeInSection>
       </div>
 
@@ -6564,7 +6771,7 @@ const LimintsoGoldLayout: React.FC<{
 
       {/* FOOTER */}
       <footer className="text-center py-12 text-[10px] text-slate-400 tracking-wider font-sans uppercase">
-        <p>© 2025 {event.title} • Criado com InoEvents</p>
+        {!isPremium ? <p>© 2025 {event.title} • Criado com InoEvents</p> : <p>© 2025 {event.title}</p>}
       </footer>
     </div>
   );
@@ -6576,6 +6783,7 @@ const LimintsoGoldLayout: React.FC<{
 const LimintsoMeLayout: React.FC<{
   event: EventDetails;
   onRSVP: () => void;
+  onCheckStatus?: () => void;
   guestName?: string;
   isEditing?: boolean;
   isOpenCover?: boolean;
@@ -6591,6 +6799,7 @@ const LimintsoMeLayout: React.FC<{
 }> = ({
   event,
   onRSVP,
+  onCheckStatus,
   isEditing,
   isOpenCover,
   setIsOpenCover,
@@ -6599,6 +6808,7 @@ const LimintsoMeLayout: React.FC<{
   updateTimelineItem,
   guestName,
 }) => {
+  const isPremium = isEditing || (event && EVENTS.some((e) => e.id === event.id)) || (event && (event as any).plan && ((event as any).plan === "Premium" || (event as any).plan === "Business" || (event as any).plan === "Corporate"));
   const [localIsOpen, setLocalIsOpen] = useState(isEditing ? true : false);
   const isOpen = isOpenCover !== undefined ? isOpenCover : localIsOpen;
   const setIsOpen = setIsOpenCover !== undefined ? setIsOpenCover : setLocalIsOpen;
@@ -7221,7 +7431,7 @@ const LimintsoMeLayout: React.FC<{
                 <div className="w-12 h-[1px] bg-[#E9BE5D]/30 mx-auto" />
               </div>
 
-              <Guestbook eventId={event.id} layoutMode={event.layoutMode} />
+              {isPremium && <Guestbook eventId={event.id} layoutMode={event.layoutMode} />}
             </FadeInSection>
           </div>
 
@@ -7246,7 +7456,7 @@ const LimintsoMeLayout: React.FC<{
                         className="aspect-square relative rounded-2xl overflow-hidden shadow-sm group border border-stone-100 bg-stone-50"
                       >
                         <EditableImageWrapper
-                          src={url}
+                          src={typeof url === 'string' ? url : (url as any).url}
                           onChange={(newVal) =>
                             updateField?.(
                               "gallery",
@@ -7341,7 +7551,7 @@ const LimintsoMeLayout: React.FC<{
 
       {/* FOOTER */}
       <footer className="text-center py-12 text-[10px] text-slate-400 tracking-wider font-sans uppercase">
-        <p>© 2025 {event.title} • Criado com InoEvents</p>
+        {!isPremium ? <p>© 2025 {event.title} • Criado com InoEvents</p> : <p>© 2025 {event.title}</p>}
       </footer>
     </div>
   );
@@ -7370,9 +7580,24 @@ const RSVPForm: React.FC<{ event: EventDetails; onClose: () => void }> = ({
     name: string;
   } | null>(null);
 
+  const sanitizeInput = (val: string): string => {
+    if (!val) return "";
+    // Remove HTML tags, javascript: protocols, and escape dangerous characters
+    let clean = val.replace(/<[^>]*>/g, "").trim();
+    // Strip javascript: pseudo-protocol to prevent protocol-based XSS
+    clean = clean.replace(/javascript:/gi, "");
+    // Strip onxxx event handlers (e.g., onload, onerror, onclick)
+    clean = clean.replace(/\bon[a-z]+\s*=\s*("[^"]*"|'[^']*'|[^\s>]*)/gi, "");
+    return clean;
+  };
+
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
-    if (!name.trim()) {
+    const cleanName = sanitizeInput(name);
+    const cleanMessage = sanitizeInput(message);
+    const cleanDietary = sanitizeInput(dietaryRestrictions);
+
+    if (!cleanName) {
       toast.error("Por favor, informe seu nome completo.");
       return;
     }
@@ -7384,57 +7609,35 @@ const RSVPForm: React.FC<{ event: EventDetails; onClose: () => void }> = ({
     setLoading(true);
     const toastId = toast.loading("Verificando...");
     try {
-      const guestsCollection = collection(db, "events", event.id, "guests");
-
-      // Check RSVP Limit based on Plan
-      const plan = event.plan || "Essencial";
-      const limit = plan === "Essencial" ? 100 : Infinity;
-      const allGuestsSnapshot = await getDocs(query(guestsCollection));
-      if (allGuestsSnapshot.size >= limit) {
-        toast.error("O limite de convidados para este evento foi atingido.", {
-          id: toastId,
-        });
-        setLoading(false);
-        return;
-      }
-
-      // Normalize phone to remove spaces, dashes, etc for comparison (keeps + if provided)
-      const normalizedPhone = phone.trim().replace(/[\s\-()]/g, "");
-
-      // First query by the normalized phone (in case we save it normalized later)
-      const q = query(guestsCollection, where("phone", "==", normalizedPhone));
-      const querySnapshot = await getDocs(q);
-
-      // Fallback: also check against the raw input just in case old data wasn't normalized
-      const qRaw = query(guestsCollection, where("phone", "==", phone.trim()));
-      const querySnapshotRaw = await getDocs(qRaw);
-
-      if (!querySnapshot.empty || !querySnapshotRaw.empty) {
-        toast.error(
-          "Este número de WhatsApp já confirmou presença neste evento.",
-          { id: toastId },
-        );
-        setLoading(false);
-        return;
-      }
-
-      toast.loading("Enviando sua confirmação...", { id: toastId });
-      const guestRef = doc(guestsCollection);
-
-      await setDoc(guestRef, {
-        id: guestRef.id,
-        name: name.trim(),
-        phone: normalizedPhone, // save normalized to ensure future queries match
+            const normalizedPhone = phone.trim().replace(/[\s\-()]/g, "");
+      const guestData = {
+        name: cleanName,
+        phone: normalizedPhone,
         status: status === "yes" ? "CONFIRMED" : "DECLINED",
         adults: status === "yes" ? companions + 1 : 0,
         children: 0,
-        message: message.trim(),
-        dietaryRestrictions: dietaryRestrictions.trim(),
+        message: cleanMessage,
+        dietaryRestrictions: cleanDietary,
         checkedIn: false,
-        createdAt: new Date().toISOString(),
-        updatedAt: new Date().toISOString(),
+      };
+
+      const res = await fetch(`/api/events/${event.id}/rsvp`, {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+        },
+        body: JSON.stringify({ phone, guestData }),
       });
 
+      if (!res.ok) {
+        const errData = await res.json().catch(() => ({}));
+        toast.error(errData.error || "Erro ao confirmar presença.", { id: toastId });
+        setLoading(false);
+        return;
+      }
+      
+      const data = await res.json();
+      const guestId = data.guestId;
       toast.success(
         status === "yes"
           ? "Sua presença foi confirmada com sucesso!"
@@ -7443,7 +7646,7 @@ const RSVPForm: React.FC<{ event: EventDetails; onClose: () => void }> = ({
       );
 
       if (status === "yes") {
-        setSuccessData({ id: guestRef.id, name: name.trim() });
+        setSuccessData({ id: guestId, name: name.trim() });
       } else {
         onClose();
       }

@@ -35,7 +35,7 @@ export const Guestbook: React.FC<{ eventId: string; layoutMode?: string }> = ({ 
             // Filter messages based on moderation
             const visibleMsgs = msgs.filter(m => {
                 // If it is pending or hidden, hide it from the public view
-                if (m.status === 'PENDING' || m.status === 'HIDDEN') {
+                if ((m as any).status === 'PENDING' || (m as any).status === 'HIDDEN') {
                     return false;
                 }
                 return true; // Approved or legacy (undefined status) are visible
@@ -46,9 +46,23 @@ export const Guestbook: React.FC<{ eventId: string; layoutMode?: string }> = ({ 
         return () => unsubscribe();
     }, [eventId]);
 
+    const sanitizeInput = (val: string): string => {
+        if (!val) return '';
+        // Remove HTML tags, javascript: protocols, and escape dangerous characters
+        let clean = val.replace(/<[^>]*>/g, '').trim();
+        // Strip javascript: pseudo-protocol to prevent protocol-based XSS
+        clean = clean.replace(/javascript:/gi, "");
+        // Strip onxxx event handlers (e.g., onload, onerror, onclick)
+        clean = clean.replace(/\bon[a-z]+\s*=\s*("[^"]*"|'[^']*'|[^\s>]*)/gi, "");
+        return clean;
+    };
+
     const handleSubmit = async (e: React.FormEvent) => {
         e.preventDefault();
-        if (!newMessage.trim() || !authorName.trim()) {
+        const cleanMessage = sanitizeInput(newMessage);
+        const cleanName = sanitizeInput(authorName);
+
+        if (!cleanMessage || !cleanName) {
             toast.error('Preencha seu nome e a mensagem.');
             return;
         }
@@ -56,8 +70,8 @@ export const Guestbook: React.FC<{ eventId: string; layoutMode?: string }> = ({ 
         setLoading(true);
         try {
             await addDoc(collection(db, 'events', eventId, 'messages'), {
-                author: authorName,
-                text: newMessage,
+                author: cleanName,
+                text: cleanMessage,
                 status: moderationEnabled ? 'PENDING' : 'APPROVED',
                 createdAt: serverTimestamp(),
             });

@@ -32,7 +32,7 @@ export const Navbar: React.FC = () => {
     }
   }, [mobileMenuOpen]);
   
-  const isAdmin = user?.email?.toLowerCase() === 'antoniosalvador522@gmail.com' || user?.email === import.meta.env.VITE_ADMIN_EMAIL;
+  const isAdmin = user?.email?.toLowerCase() === 'antoniosalvador522@gmail.com' || user?.email === (import.meta as any).env.VITE_ADMIN_EMAIL;
 
   useEffect(() => {
     if (!user) {

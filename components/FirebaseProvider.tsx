@@ -3,6 +3,7 @@ import { initializeApp } from 'firebase/app';
 import { getAuth, GoogleAuthProvider, onAuthStateChanged, User, signOut } from 'firebase/auth';
 import { getFirestore, doc, onSnapshot, getDocFromServer, initializeFirestore, setLogLevel, updateDoc, enableIndexedDbPersistence } from 'firebase/firestore';
 import firebaseConfig from '../firebase-applet-config.json';
+import { logger } from '../lib/logger';
 
 const app = initializeApp(firebaseConfig);
 export const auth = getAuth(app);
@@ -14,15 +15,15 @@ export const db = initializeFirestore(app, {
 if (typeof window !== 'undefined') {
   enableIndexedDbPersistence(db)
     .then(() => {
-      console.log('[InoEvents Offline Sync] Persistência do cache local do Firestore ativada.');
+      logger.success('Persistência do cache local do Firestore ativada com sucesso.', { category: 'DATABASE' });
     })
     .catch((err) => {
       if (err.code === 'failed-precondition') {
-        console.warn('[InoEvents Offline Sync] Múltiplas abas abertas, persistência ativada em apenas uma delas.');
+        logger.warn('Múltiplas abas abertas, persistência ativada em apenas uma delas.', { category: 'DATABASE', data: err });
       } else if (err.code === 'unimplemented') {
-        console.warn('[InoEvents Offline Sync] Navegador sem suporte para persistência do Firestore.');
+        logger.warn('Navegador sem suporte para persistência do Firestore.', { category: 'DATABASE', data: err });
       } else {
-        console.error('[InoEvents Offline Sync] Falha ao configurar persistência offline do Firestore:', err);
+        logger.error('Falha ao configurar persistência offline do Firestore.', { category: 'DATABASE', data: err });
       }
     });
 }
@@ -86,12 +87,18 @@ export function handleFirestoreError(error: unknown, operationType: OperationTyp
     path
   };
 
-  console.error('Firestore Error: ', JSON.stringify(errInfo));
-
   if (isNetworkOrOffline) {
-    console.warn(`[InoEvents Offline Sync] Operação Firestore em modo offline (${operationType} em ${path}). O aplicativo continuará a funcionar usando cache.`);
+    logger.warn(`Operação Firestore em modo offline (${operationType} em ${path}). O aplicativo continuará a funcionar usando cache local.`, {
+      category: 'DATABASE',
+      data: errInfo
+    });
     return;
   }
+
+  logger.error(`Falha na operação Firestore [${operationType.toUpperCase()}] em [${path || 'unknown_path'}]: ${errorMessage}`, {
+    category: 'DATABASE',
+    data: errInfo
+  });
 
   throw new Error(JSON.stringify(errInfo));
 }
@@ -123,7 +130,7 @@ const getCachedProfile = () => {
     const cached = localStorage.getItem('ino_events_profile_cache');
     if (cached) return JSON.parse(cached);
   } catch (e) {
-    console.debug('[InoEvents] Erro ao ler cache de perfil', e);
+    logger.debug('Erro ao ler cache de perfil', { category: 'SYSTEM', data: e });
   }
   return null;
 };
@@ -136,8 +143,14 @@ export const FirebaseProvider: React.FC<{ children: React.ReactNode }> = ({ chil
 
   useEffect(() => {
     if (typeof window === 'undefined') return;
-    const handleOnline = () => setIsOnline(true);
-    const handleOffline = () => setIsOnline(false);
+    const handleOnline = () => {
+      setIsOnline(true);
+      logger.success('Dispositivo restabeleceu ligação à Internet.', { category: 'SYSTEM' });
+    };
+    const handleOffline = () => {
+      setIsOnline(false);
+      logger.warn('Dispositivo offline. Ativando cache offline do Firestore.', { category: 'SYSTEM' });
+    };
     window.addEventListener('online', handleOnline);
     window.addEventListener('offline', handleOffline);
     return () => {
@@ -150,14 +163,16 @@ export const FirebaseProvider: React.FC<{ children: React.ReactNode }> = ({ chil
     const unsubscribe = onAuthStateChanged(auth, (user) => {
       if (user) {
         localStorage.setItem('ino_events_user_cache', JSON.stringify({ uid: user.uid, email: user.email, displayName: user.displayName, photoURL: user.photoURL, isAnonymous: user.isAnonymous, emailVerified: user.emailVerified }));
+        logger.info(`Utilizador autenticado com sucesso: ${user.email}`, { category: 'AUTH' });
       } else {
         localStorage.removeItem('ino_events_user_cache');
         localStorage.removeItem('ino_events_profile_cache');
+        logger.info('Utilizador não autenticado ou sessão encerrada.', { category: 'AUTH' });
       }
       setUser(user);
       setLoading(false);
     }, (error) => {
-      console.warn('Auth State Error (Normal for iframe previews): ', error);
+      logger.warn('Erro na monitorização de estado da Auth (Normal em previews do iframe):', { category: 'AUTH', data: error });
       localStorage.removeItem('ino_events_user_cache');
       localStorage.removeItem('ino_events_profile_cache');
       setUser(null);
@@ -178,9 +193,8 @@ export const FirebaseProvider: React.FC<{ children: React.ReactNode }> = ({ chil
         if (uData.plan && uData.plan !== 'Essencial' && uData.plan !== 'Free' && uData.planExpiresAt) {
           const expiresAtDate = new Date(uData.planExpiresAt);
           if (expiresAtDate < new Date()) {
-             console.warn("Plan expired, changing to Essencial");
+             logger.warn('O plano premium do utilizador expirou, revertendo para Essencial de forma segura.', { category: 'AUTH' });
              uData = { ...uData, plan: 'Essencial', planExpiresAt: null };
-             updateDoc(doc(db, 'users', snapshot.id), { plan: 'Essencial', planExpiresAt: null }).catch(console.error);
           }
         }
         localStorage.setItem('ino_events_profile_cache', JSON.stringify(uData));

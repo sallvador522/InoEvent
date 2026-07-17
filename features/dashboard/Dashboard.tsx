@@ -760,7 +760,14 @@ export const Dashboard = () => {
                     </button>
                     <div className="flex flex-col">
                         <span className="text-xs font-bold text-slate-400 uppercase tracking-wider">Painel do Evento</span>
-                        <h1 className="text-lg font-serif font-bold text-brand-blue leading-tight truncate max-w-[200px] md:max-w-md">{event.title}</h1>
+                        <div className="flex items-center gap-2">
+                            <h1 className="text-lg font-serif font-bold text-brand-blue leading-tight truncate max-w-[200px] md:max-w-md">{event.title}</h1>
+                            {event.isPublished === false ? (
+                                <span className="bg-amber-100 text-amber-700 text-[10px] uppercase font-bold px-2 py-0.5 rounded-full border border-amber-200">Rascunho</span>
+                            ) : (
+                                <span className="bg-emerald-100 text-emerald-700 text-[10px] uppercase font-bold px-2 py-0.5 rounded-full border border-emerald-200">Publicado</span>
+                            )}
+                        </div>
                     </div>
                 </div>
                 <div className="flex items-center gap-2">
@@ -1079,7 +1086,7 @@ export const Dashboard = () => {
                                                             });
                                                             added++;
                                                         } catch (err) {
-                                                            console.error("Error importing row", row, err);
+                                                            console.error("Error importing row");
                                                         }
                                                     }
                                                 }
@@ -1430,6 +1437,46 @@ export const Dashboard = () => {
                                         )}
                                     </div>
                                 </div>
+
+                                {/* Access Tracking Area Chart */}
+                                <div className="bg-white p-6 rounded-3xl border border-slate-100 shadow-sm flex flex-col justify-between">
+                                    <div>
+                                        <h4 className="font-bold text-slate-700 mb-2">Visitas & Acessos</h4>
+                                        <p className="text-xs text-slate-400 mb-6 font-medium">Quantidade de acessos à página do convite por dia.</p>
+                                    </div>
+                                    <div className="h-64 relative">
+                                        {event?.dailyAccesses && Object.keys(event.dailyAccesses).length > 0 ? (
+                                            <ResponsiveContainer width="100%" height="100%">
+                                                <AreaChart data={Object.entries(event.dailyAccesses || {})
+                                                    .sort((a, b) => new Date(a[0]).getTime() - new Date(b[0]).getTime())
+                                                    .map(([date, count]) => ({
+                                                        date: new Date(date).toLocaleDateString('pt-BR', { day: '2-digit', month: '2-digit' }),
+                                                        visitas: count
+                                                    }))
+                                                }>
+                                                    <defs>
+                                                        <linearGradient id="colorVisitas" x1="0" y1="0" x2="0" y2="1">
+                                                            <stop offset="5%" stopColor="#3b82f6" stopOpacity={0.2}/>
+                                                            <stop offset="95%" stopColor="#3b82f6" stopOpacity={0}/>
+                                                        </linearGradient>
+                                                    </defs>
+                                                    <CartesianGrid strokeDasharray="3 3" vertical={false} stroke="#E2E8F0" />
+                                                    <XAxis dataKey="date" axisLine={false} tickLine={false} tick={{ fontSize: 11, fill: '#64748B' }} />
+                                                    <YAxis axisLine={false} tickLine={false} tick={{ fontSize: 11, fill: '#64748B' }} allowDecimals={false} />
+                                                    <RechartsTooltip 
+                                                        contentStyle={{ borderRadius: '12px', border: 'none', boxShadow: '0 10px 15px -3px rgb(0 0 0 / 0.1)' }}
+                                                    />
+                                                    <Area type="monotone" dataKey="visitas" stroke="#3b82f6" fillOpacity={1} fill="url(#colorVisitas)" strokeWidth={3} />
+                                                </AreaChart>
+                                            </ResponsiveContainer>
+                                        ) : (
+                                            <div className="w-full h-full flex flex-col items-center justify-center text-slate-400 text-xs font-semibold bg-slate-50 rounded-2xl p-4 text-center">
+                                                <span>Ainda não há dados de acessos para exibir.</span>
+                                            </div>
+                                        )}
+                                    </div>
+                                </div>
+
                             </div>
                         </div>
                     )}
@@ -1546,6 +1593,103 @@ export const Dashboard = () => {
                         )}
 
 
+
+                         
+                         <div className="bg-white border border-slate-100 rounded-3xl p-6 shadow-sm">
+                            <div className="flex justify-between items-center mb-4">
+                                <h3 className="font-bold text-slate-800">Acesso & Partilha</h3>
+                                {event?.isBlocked && (
+                                    <span className="bg-red-100 text-red-600 text-[10px] font-bold px-2 py-0.5 rounded-full uppercase tracking-wider">Bloqueado</span>
+                                )}
+                            </div>
+                            <div className="flex flex-col gap-4 text-sm">
+                                <button 
+                                    onClick={() => {
+                                        const link = `${getPublicOrigin()}/invite/${event.id}`;
+                                        copyToClipboard(link);
+                                        toast.success("Link do convite copiado!");
+                                    }}
+                                    disabled={event?.isBlocked}
+                                    className={`w-full py-2.5 rounded-xl font-bold flex items-center justify-center gap-2 transition-colors ${event?.isBlocked ? 'bg-slate-100 text-slate-400 cursor-not-allowed' : 'bg-brand-blue text-white hover:bg-brand-blue/90 shadow-md'}`}
+                                >
+                                    <Copy size={16} /> Copiar Link
+                                </button>
+                                
+                                <div className="pt-2 border-t border-slate-100 flex flex-col gap-3">
+                                    <div className="flex items-center justify-between">
+                                        <span className="font-medium text-slate-700">Bloquear Convite</span>
+                                        <button 
+                                            onClick={async () => {
+                                                const newStatus = !event?.isBlocked;
+                                                try {
+                                                    await updateDoc(doc(db, 'events', event.id), { isBlocked: newStatus });
+                                                    toast.success(newStatus ? "Convite bloqueado com sucesso." : "Convite desbloqueado.");
+                                                } catch(err) {
+                                                    toast.error("Erro ao alterar bloqueio.");
+                                                }
+                                            }}
+                                            className={`relative inline-flex h-6 w-11 items-center rounded-full transition-colors ${event?.isBlocked ? 'bg-red-500' : 'bg-slate-200'}`}
+                                        >
+                                            <span className={`inline-block h-4 w-4 transform rounded-full bg-white transition-transform ${event?.isBlocked ? 'translate-x-6' : 'translate-x-1'}`} />
+                                        </button>
+                                    </div>
+
+                                    <div className="flex flex-col gap-1.5">
+                                        <label className="text-xs text-slate-500 font-medium">Agendar Bloqueio Automático</label>
+                                        <input 
+                                            type="datetime-local" 
+                                            value={event?.scheduledBlockDate || ''}
+                                            onChange={async (e) => {
+                                                const val = e.target.value;
+                                                try {
+                                                    await updateDoc(doc(db, 'events', event.id), { scheduledBlockDate: val });
+                                                    toast.success("Data de bloqueio agendada!");
+                                                } catch(err) {
+                                                    toast.error("Erro ao agendar bloqueio.");
+                                                }
+                                            }}
+                                            className="w-full bg-slate-50 border border-slate-200 rounded-lg px-3 py-2 text-slate-700 text-xs focus:outline-none focus:border-brand-blue"
+                                        />
+                                    </div>
+
+                                    <div className="flex flex-col gap-1.5 mt-2">
+                                        <label className="text-xs text-slate-500 font-medium">Título da Mensagem de Bloqueio (Opcional)</label>
+                                        <input 
+                                            type="text" 
+                                            placeholder="Ex: Convite Indisponível"
+                                            value={event?.blockedTitle || ''}
+                                            onChange={(e) => setEvent({...event, blockedTitle: e.target.value})}
+                                            onBlur={async (e) => {
+                                                try {
+                                                    await updateDoc(doc(db, 'events', event.id), { blockedTitle: e.target.value });
+                                                } catch(err) {
+                                                    toast.error("Erro ao salvar o título.");
+                                                }
+                                            }}
+                                            className="w-full bg-slate-50 border border-slate-200 rounded-lg px-3 py-2 text-slate-700 text-xs focus:outline-none focus:border-brand-blue"
+                                        />
+                                    </div>
+                                    <div className="flex flex-col gap-1.5 mt-2">
+                                        <label className="text-xs text-slate-500 font-medium">Mensagem de Bloqueio (Opcional)</label>
+                                        <textarea 
+                                            placeholder="Ex: Este convite expirou..."
+                                            value={event?.blockedMessage || ''}
+                                            rows={2}
+                                            onChange={(e) => setEvent({...event, blockedMessage: e.target.value})}
+                                            onBlur={async (e) => {
+                                                try {
+                                                    await updateDoc(doc(db, 'events', event.id), { blockedMessage: e.target.value });
+                                                } catch(err) {
+                                                    toast.error("Erro ao salvar a mensagem.");
+                                                }
+                                            }}
+                                            className="w-full bg-slate-50 border border-slate-200 rounded-lg px-3 py-2 text-slate-700 text-xs focus:outline-none focus:border-brand-blue resize-none"
+                                        />
+                                    </div>
+
+                                </div>
+                            </div>
+                         </div>
 
                          <div className="bg-white border border-slate-100 rounded-3xl p-6 shadow-sm">
                             <h3 className="font-bold text-slate-800 mb-4">Informações</h3>
@@ -1792,7 +1936,7 @@ export const Dashboard = () => {
                 )}
             </AnimatePresence>
 
-            <SupportModal isOpen={supportOpen} onClose={() => setSupportOpen(false)} />
+            <SupportModal isOpen={supportOpen} onClose={() => setSupportOpen(false)} userPlan={event?.plan} />
 
             {/* Export Modal */}
             <AnimatePresence>

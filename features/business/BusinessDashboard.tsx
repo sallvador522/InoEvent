@@ -295,7 +295,7 @@ export const BusinessDashboard: React.FC = () => {
                                          <Link to={`/dashboard/${event.id}`} className="font-bold text-brand-blue flex items-center gap-1">
                                             Acessar Painel <ArrowRight size={14} />
                                          </Link>
-                                         <Button variant="outline" size="sm" onClick={(e) => { e.preventDefault(); window.open(`/invite/${event.id}`, '_blank'); }} className="h-8 shadow-sm">
+                                         <Button variant="outline" onClick={(e) => { e.preventDefault(); window.open(`/invite/${event.id}`, '_blank'); }} className="h-8 shadow-sm">
                                             <ExternalLink size={14} className="mr-1.5" /> Ver Convite
                                          </Button>
                                      </div>

@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { EventDetails, Guest } from '../../types';
+import { EventDetails } from '../../types';
 import { collection, query, onSnapshot, doc, updateDoc, setDoc, deleteDoc } from 'firebase/firestore';
 import { db } from '../../components/FirebaseProvider';
 import { toast } from 'react-hot-toast';
@@ -10,11 +10,12 @@ interface Table {
     capacity: number;
 }
 
-export const TableManager: React.FC<{ event: EventDetails; guests: Guest[] }> = ({ event, guests }) => {
+export const TableManager: React.FC<{ event: EventDetails; guests: any[] }> = ({ event, guests }) => {
     const [tables, setTables] = useState<Table[]>([]);
     const [loading, setLoading] = useState(false);
     const [newTableName, setNewTableName] = useState('');
     const [newTableCapacity, setNewTableCapacity] = useState<number | string>(8);
+    const [tableToDelete, setTableToDelete] = useState<Table | null>(null);
 
     useEffect(() => {
         if (!event?.id) return;
@@ -53,8 +54,7 @@ export const TableManager: React.FC<{ event: EventDetails; guests: Guest[] }> = 
     };
 
     const handleDeleteTable = async (tableId: string) => {
-        if (!window.confirm('Tem certeza que deseja apagar esta mesa? Os convidados não serão apagados.')) return;
-        
+        setTableToDelete(null);
         try {
             const guestsInTable = guests.filter(g => (g as any).tableId === tableId);
             for (const g of guestsInTable) {
@@ -67,6 +67,26 @@ export const TableManager: React.FC<{ event: EventDetails; guests: Guest[] }> = 
         } catch(error) {
             console.error(error);
             toast.error('Erro ao apagar mesa.');
+        }
+    };
+
+    
+    const moveGuestToTable = async (guestId: string, tableId: string | null) => {
+        if (tableId) {
+            const table = tables.find(t => t.id === tableId);
+            const currentCount = guests.filter(g => (g as any).tableId === tableId).length;
+            if (table && currentCount >= table.capacity) {
+                toast.error(`A mesa ${table.name} já está cheia!`);
+                return;
+            }
+        }
+        try {
+            const guestRef = doc(db, `events/${event.id}/guests`, guestId);
+            await updateDoc(guestRef, { tableId: tableId });
+            toast.success('Convidado movido com sucesso.');
+        } catch (error) {
+            console.error(error);
+            toast.error('Erro ao mover convidado.');
         }
     };
 
@@ -145,7 +165,21 @@ export const TableManager: React.FC<{ event: EventDetails; guests: Guest[] }> = 
                                             <p className="text-sm font-medium text-slate-700 truncate w-full">{guest.name}</p>
                                             <p className="text-xs text-slate-400">{guest.phone || 'Sem contato'}</p>
                                         </div>
-                                        <span className="material-symbols-outlined text-slate-300 text-sm">drag_indicator</span>
+                                        <div className="relative flex items-center">
+                                            <select 
+                                                className="absolute inset-0 w-full h-full opacity-0 cursor-pointer"
+                                                value=""
+                                                onChange={(e) => moveGuestToTable(guest.id, e.target.value)}
+                                            >
+                                                <option value="" disabled>Atribuir mesa...</option>
+                                                {tables.map(t => (
+                                                    <option key={t.id} value={t.id}>{t.name}</option>
+                                                ))}
+                                            </select>
+                                            <button className="bg-white border border-slate-200 text-slate-600 px-3 py-1.5 rounded-lg text-xs font-medium flex items-center gap-1 shadow-sm hover:bg-slate-50 transition-colors">
+                                                <span className="material-symbols-outlined text-[14px]">swap_horiz</span> <span className="hidden sm:inline">Mover</span>
+                                            </button>
+                                        </div>
                                     </div>
                                 ))
                             )}
@@ -213,7 +247,7 @@ export const TableManager: React.FC<{ event: EventDetails; guests: Guest[] }> = 
                                                 {tableGuests.length} / {table.capacity}
                                             </span>
                                             <button 
-                                                onClick={() => handleDeleteTable(table.id)}
+                                                onClick={() => setTableToDelete(table)}
                                                 className="text-slate-300 hover:text-red-500 transition-colors"
                                             >
                                                 <span className="material-symbols-outlined text-[18px]">delete</span>
@@ -238,12 +272,24 @@ export const TableManager: React.FC<{ event: EventDetails; guests: Guest[] }> = 
                                                         {guest.name.charAt(0)}
                                                     </div>
                                                     <p className="text-xs font-medium text-slate-700 truncate flex-1">{guest.name}</p>
-                                                    <button 
-                                                        onClick={() => {
-                                                            const guestRef = doc(db, `events/${event.id}/guests`, guest.id);
-                                                            updateDoc(guestRef, { tableId: null }).catch(console.error);
-                                                        }}
-                                                        className="text-slate-300 hover:text-red-500 transition-colors p-1"
+                                                    <div className="relative flex items-center ml-auto mr-2">
+                                                        <select 
+                                                            className="absolute inset-0 w-full h-full opacity-0 cursor-pointer"
+                                                            value={table.id}
+                                                            onChange={(e) => moveGuestToTable(guest.id, e.target.value || null)}
+                                                        >
+                                                            <option value="">Remover da mesa</option>
+                                                            {tables.map(t => (
+                                                                <option key={t.id} value={t.id}>{t.name}</option>
+                                                            ))}
+                                                        </select>
+                                                        <button className="text-slate-400 hover:text-brand-blue transition-colors p-1 flex items-center justify-center rounded-md hover:bg-slate-50">
+                                                            <span className="material-symbols-outlined text-[14px]">swap_horiz</span>
+                                                        </button>
+                                                    </div>
+                                                    <button
+                                                        onClick={() => moveGuestToTable(guest.id, null)}
+                                                        className="text-slate-300 hover:text-red-500 transition-colors p-1 flex items-center justify-center rounded-md hover:bg-red-50"
                                                     >
                                                         <span className="material-symbols-outlined text-[14px]">close</span>
                                                     </button>
@@ -264,6 +310,34 @@ export const TableManager: React.FC<{ event: EventDetails; guests: Guest[] }> = 
                     </div>
                 </div>
             </div>
+            {/* Delete Confirmation Modal */}
+            {tableToDelete && (
+                <div className="fixed inset-0 bg-slate-900/40 backdrop-blur-sm z-50 flex items-center justify-center p-4">
+                    <div className="bg-white rounded-3xl p-6 w-full max-w-sm shadow-xl animate-in fade-in zoom-in-95 duration-200">
+                        <div className="w-12 h-12 rounded-full bg-red-100 flex items-center justify-center text-red-600 mb-4 mx-auto">
+                            <span className="material-symbols-outlined text-2xl">warning</span>
+                        </div>
+                        <h3 className="text-xl font-bold text-center text-slate-800 mb-2">Apagar Mesa?</h3>
+                        <p className="text-center text-slate-500 mb-6 text-sm">
+                            Tem certeza que deseja apagar a mesa "{tableToDelete.name}"? Os convidados não serão apagados, apenas removidos desta mesa.
+                        </p>
+                        <div className="flex gap-3">
+                            <button 
+                                onClick={() => setTableToDelete(null)}
+                                className="flex-1 px-4 py-3 bg-slate-100 hover:bg-slate-200 text-slate-700 font-bold rounded-xl transition-colors text-sm"
+                            >
+                                Cancelar
+                            </button>
+                            <button 
+                                onClick={() => handleDeleteTable(tableToDelete.id)}
+                                className="flex-1 px-4 py-3 bg-red-600 hover:bg-red-700 text-white font-bold rounded-xl transition-colors text-sm shadow-md shadow-red-200"
+                            >
+                                Apagar Mesa
+                            </button>
+                        </div>
+                    </div>
+                </div>
+            )}
         </div>
     );
 };

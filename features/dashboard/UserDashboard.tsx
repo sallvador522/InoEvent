@@ -581,7 +581,7 @@ export const UserDashboard: React.FC = () => {
                           </Link>
                           <Button
                             variant="outline"
-                            size="sm"
+                           
                             onClick={(e) => {
                               e.preventDefault();
                               window.open(`/invite/${event.id}`, "_blank");

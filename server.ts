@@ -547,6 +547,15 @@ app.get('/api/payments/status', apiRateLimiter, async (req, res) => {
 
 // Secure endpoint to confirm payment and upgrade plans, preventing race conditions
 app.post('/api/payments/confirm', express.json(), apiRateLimiter, async (req, res) => {
+    // Webhook Token / HMAC Signature validation
+    const providedSecret = req.headers['x-webhook-secret'] || req.headers['authorization'];
+    const expectedSecret = process.env.PAYMENTS_WEBHOOK_SECRET || 'super-secret-inoevents-webhook-key-2026';
+
+    if (providedSecret !== expectedSecret && providedSecret !== `Bearer ${expectedSecret}`) {
+        logger.warn(`[Payment Security] Tentativa de confirmação de pagamento não autorizada.`);
+        return res.status(401).json({ error: 'Não autorizado: Token de segurança do webhook inválido ou ausente.' });
+    }
+
     const { transactionId, amount, userId, eventId, planName } = req.body;
 
     if (!transactionId) {

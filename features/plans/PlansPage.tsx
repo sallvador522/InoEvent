@@ -129,46 +129,6 @@ export const PlansPage: React.FC = () => {
     toast.success("Copiado!");
   };
 
-  const handleInstantActivation = async () => {
-    if (!user || !whatsappModal) return;
-    setIsProcessing(true);
-    const transactionId = `TX_${Math.random().toString(36).substring(2, 10).toUpperCase()}`;
-    const amount = whatsappModal.name === 'Premium' ? 20000 : whatsappModal.name === 'Business' ? 45000 : 7500;
-    
-    try {
-      const origin = window.location.origin;
-      const response = await fetch(`${origin}/api/payments/confirm`, {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json'
-        },
-        body: JSON.stringify({
-          transactionId,
-          amount,
-          userId: user.uid,
-          planName: whatsappModal.name
-        })
-      });
-      
-      if (!response.ok) {
-        const errorData = await response.json().catch(() => ({}));
-        throw new Error(errorData.error || `Erro de ativação: status ${response.status}`);
-      }
-      
-      toast.success(`Plano ${whatsappModal.name} ativado com sucesso instantaneamente! 🎉`);
-      setWhatsappModal(null);
-      // Refresh after a brief delay to reflect upgrades across views
-      setTimeout(() => {
-        window.location.reload();
-      }, 1500);
-    } catch (err: any) {
-      console.error(err);
-      toast.error(err.message || 'Falha na ativação automática do plano');
-    } finally {
-      setIsProcessing(false);
-    }
-  };
-
   const confirmPlanSelection = (plan: any) => {
     if (!user) {
       toast.custom(
@@ -230,8 +190,8 @@ export const PlansPage: React.FC = () => {
     if (!whatsappModal || !user) return;
 
     const messageText = whatsappModal.name === "Business"
-      ? `Olá! Gostaria de subscrever ao Plano ${whatsappModal.name.toUpperCase()} para a minha agência.\n\nID da Plataforma: ${user.uid}\nE-mail: ${user.email || "Não informado"}`
-      : `Olá! Gostaria de comprar o Convite ${whatsappModal.name.toUpperCase()} por ${whatsappModal.price}.\n\nID da Plataforma: ${user.uid}\nE-mail: ${user.email || "Não informado"}\n\nEstou em contacto para concluir o pagamento do meu evento. Obrigado!`;
+      ? `Olá! Gostaria de subscrever ao Plano ${whatsappModal.name.toUpperCase()} para a minha agência.\n\nID da Plataforma: ${user.uid}\nE-mail: ${user.email || "Não informado"}\n\nEstou em contacto para concluir o pagamento do meu plano. Obrigado!`
+      : `Olá! Gostaria de comprar o Plano ${whatsappModal.name.toUpperCase()} por ${whatsappModal.price}.\n\nID da Plataforma: ${user.uid}\nE-mail: ${user.email || "Não informado"}\n\nEstou em contacto para concluir o pagamento do meu plano. Obrigado!`;
 
     const cleanNumber = whatsappNumber.replace(/\D/g, "");
     const url = `https://wa.me/${cleanNumber}?text=${encodeURIComponent(messageText)}`;
@@ -440,184 +400,105 @@ export const PlansPage: React.FC = () => {
               initial={{ opacity: 0, scale: 0.95, y: 20 }}
               animate={{ opacity: 1, scale: 1, y: 0 }}
               exit={{ opacity: 0, scale: 0.95, y: 20 }}
-              className="bg-white rounded-3xl p-6 md:p-8 max-w-md w-full relative z-10 shadow-2xl flex flex-col border border-slate-100"
+              className="bg-white rounded-3xl p-5 md:p-6 max-w-sm w-full relative z-10 shadow-2xl flex flex-col border border-slate-100 max-h-[90vh] overflow-y-auto"
             >
-              <div className="flex justify-between items-start mb-6">
+              <div className="flex justify-between items-start mb-4">
                 <div>
-                  <span className="text-brand-blue font-bold tracking-widest text-[10px] uppercase mb-1 block">
+                  <span className="text-brand-blue font-bold tracking-widest text-[10px] uppercase mb-0.5 block">
                     Concluir no WhatsApp
                   </span>
-                  <h3 className="text-2xl font-bold text-slate-900 tracking-tight">
+                  <h3 className="text-xl font-bold text-slate-900 tracking-tight">
                     Activar {whatsappModal.name}
                   </h3>
                 </div>
                 <button
                   onClick={() => setWhatsappModal(null)}
-                  className="text-slate-400 hover:text-slate-600 transition-colors bg-slate-50 hover:bg-slate-100 p-2 rounded-full"
+                  className="text-slate-400 hover:text-slate-600 transition-colors bg-slate-50 hover:bg-slate-100 p-1.5 rounded-full"
                 >
-                  <X size={20} />
+                  <X size={18} />
                 </button>
               </div>
 
-              <div className="bg-blue-50 border border-blue-100 rounded-2xl p-4 mb-6">
-                <p className="text-xs text-blue-800 leading-relaxed font-medium">
-                  Para concluir o seu pedido, fale com um dos nossos agentes
-                  autorizados via WhatsApp ou use o nosso simulador de ativação digital abaixo.
+              <div className="bg-emerald-50/60 border border-emerald-100/80 rounded-2xl p-3.5 mb-4">
+                <p className="text-[11px] text-emerald-800 leading-relaxed font-medium">
+                  Escolha um operador abaixo. Você será redirecionado para o WhatsApp com uma mensagem personalizada com o seu ID para que o administrador ative o seu plano de imediato.
                 </p>
               </div>
 
-              {/* Automated Secure Activation Feature */}
-              <div className="bg-gradient-to-br from-indigo-50 to-purple-50 border border-purple-100 rounded-2xl p-4 mb-6 relative overflow-hidden shadow-sm">
-                <div className="absolute -top-12 -right-12 w-24 h-24 bg-purple-200/40 rounded-full blur-2xl pointer-events-none"></div>
-                <div className="flex items-start gap-3 mb-3">
-                  <div className="w-8 h-8 rounded-lg bg-purple-600 text-white flex items-center justify-center shrink-0 shadow-md">
-                    <Gem size={16} />
-                  </div>
-                  <div>
-                    <h4 className="text-xs font-bold text-slate-800">Ativação Digital Instantânea</h4>
-                    <p className="text-[10px] text-slate-500 mt-0.5">Ative o seu plano de imediato via simulador integrado de pagamento seguro.</p>
-                  </div>
-                </div>
-                
-                <button
-                  type="button"
-                  onClick={handleInstantActivation}
-                  disabled={isProcessing}
-                  className="w-full bg-purple-600 hover:bg-purple-700 disabled:bg-purple-300 text-white py-2.5 rounded-xl font-bold text-xs transition-all shadow-md shadow-purple-200 flex items-center justify-center gap-2"
-                >
-                  {isProcessing ? (
-                    <span className="flex items-center gap-1">
-                      <span className="w-3.5 h-3.5 border-2 border-white border-t-transparent rounded-full animate-spin"></span>
-                      Processando Transação...
-                    </span>
-                  ) : (
-                    <>
-                      <CheckCircle2 size={14} /> Ativar Plano de Imediato (Simulador)
-                    </>
-                  )}
-                </button>
-              </div>
-
-              <div className="bg-slate-50 border border-slate-200/80 rounded-2xl p-4 space-y-3 mb-4">
-                <div className="flex justify-between items-center pb-2 border-b border-slate-200/50">
-                  <span className="text-xs text-slate-500 uppercase tracking-wider font-semibold">
+              <div className="bg-slate-50 border border-slate-100 rounded-2xl p-4 space-y-2.5 mb-4">
+                <div className="flex justify-between items-center pb-2 border-b border-slate-200/40">
+                  <span className="text-[10px] text-slate-500 uppercase tracking-wider font-semibold">
                     Artigo
                   </span>
-                  <span className="text-sm font-bold text-slate-800">
+                  <span className="text-xs font-bold text-slate-800">
                     {whatsappModal.name}
                   </span>
                 </div>
                 {whatsappModal.billingCycle && (
-                  <div className="flex justify-between items-center pb-2 border-b border-slate-200/50">
-                    <span className="text-xs text-slate-500 uppercase tracking-wider font-semibold">
+                  <div className="flex justify-between items-center pb-2 border-b border-slate-200/40">
+                    <span className="text-[10px] text-slate-500 uppercase tracking-wider font-semibold">
                       Faturação
                     </span>
-                    <span className="text-sm font-bold text-slate-800">
+                    <span className="text-xs font-bold text-slate-800">
                       {whatsappModal.billingCycle === "annual"
                         ? "Anual"
                         : "Mensal"}
                     </span>
                   </div>
                 )}
-                <div className="flex justify-between items-center pb-2 border-b border-slate-200/50">
-                  <span className="text-xs text-slate-500 uppercase tracking-wider font-semibold">
+                <div className="flex justify-between items-center pb-2 border-b border-slate-200/40">
+                  <span className="text-[10px] text-slate-500 uppercase tracking-wider font-semibold">
                     Valor
                   </span>
-                  <span className="text-sm font-bold text-slate-900">
+                  <span className="text-xs font-bold text-slate-900">
                     {whatsappModal.price}
                   </span>
                 </div>
-                <div className="flex justify-between items-center gap-4">
+                <div className="flex justify-between items-center gap-3 pt-0.5">
                   <div className="min-w-0 flex-1">
-                    <span className="text-[10px] text-slate-400 uppercase tracking-wider block">
+                    <span className="text-[9px] text-slate-400 uppercase tracking-wider block">
                       ID da Plataforma
                     </span>
-                    <span className="text-xs font-mono font-bold text-slate-800 truncate block">
+                    <span className="text-xs font-mono font-bold text-slate-700 truncate block">
                       {user?.uid}
                     </span>
                   </div>
                   <button
                     onClick={() => user && handleCopy(user.uid)}
-                    className="p-1 px-2.5 bg-white text-slate-500 hover:text-brand-blue hover:bg-slate-50 border border-slate-200 shadow-sm rounded-lg text-xs font-bold transition-all flex items-center gap-1 shrink-0"
+                    className="p-1 px-2.5 bg-white text-slate-500 hover:text-brand-blue hover:bg-slate-50 border border-slate-200 shadow-sm rounded-lg text-[10px] font-bold transition-all flex items-center gap-1 shrink-0 cursor-pointer"
                   >
-                    <Copy size={12} /> Copiar
+                    <Copy size={11} /> Copiar
                   </button>
                 </div>
               </div>
 
-              {/* Manual Payment Information (Angola IBAN details) */}
-              <div className="p-4 bg-slate-50 border border-slate-200 rounded-2xl text-xs space-y-3 mb-6">
-                <h4 className="font-bold text-slate-800 flex items-center gap-1.5 uppercase tracking-wide text-[10px]">
-                  <span className="material-symbols-outlined text-[13px] text-brand-blue">
-                    account_balance
-                  </span>
-                  Nossos dados bancários (Angola)
-                </h4>
-
-                <div className="space-y-2 pt-1">
-                  <div className="bg-white p-2 rounded-lg border border-slate-100 relative">
-                    <p className="font-bold text-slate-700 text-[10px]">
-                      INDEV (BAI)
-                    </p>
-                    <p className="font-mono text-[10px] text-slate-500 mt-0.5 truncate pr-16 select-all">
-                      IBAN: AO06.0040.0000.4930.2919.1011.8
-                    </p>
-                    <button
-                      onClick={() => handleCopy("AO06004000004930291910118")}
-                      className="absolute right-2 top-1/2 -translate-y-1/2 text-[10px] font-bold text-brand-blue bg-blue-50 hover:bg-blue-100 p-1 px-2 rounded cursor-pointer"
-                    >
-                      Copiar
-                    </button>
-                  </div>
-
-                  <div className="bg-white p-2 rounded-lg border border-slate-100 relative">
-                    <p className="font-bold text-slate-700 text-[10px]">
-                      INDEV (BFA)
-                    </p>
-                    <p className="font-mono text-[10px] text-slate-500 mt-0.5 truncate pr-16 select-all">
-                      IBAN: AO06.0006.0000.3129.8492.1012.3
-                    </p>
-                    <button
-                      onClick={() => handleCopy("AO06000600003129849210123")}
-                      className="absolute right-2 top-1/2 -translate-y-1/2 text-[10px] font-bold text-brand-blue bg-blue-50 hover:bg-blue-100 p-1 px-2 rounded cursor-pointer"
-                    >
-                      Copiar
-                    </button>
-                  </div>
-                </div>
-                <p className="text-[10px] text-slate-400 font-medium">
-                  Anexe o comprovativo da transferência ou depósito no chat do
-                  WhatsApp para aprovação imediata.
-                </p>
-              </div>
-
-              <div className="space-y-3">
-                <p className="text-xs text-slate-400 font-bold uppercase tracking-wider mb-2">
-                  Selecione o número de suporte:
+              <div className="space-y-2">
+                <p className="text-[10px] text-slate-400 font-bold uppercase tracking-wider mb-1">
+                  Selecione um operador de suporte:
                 </p>
 
                 <button
                   onClick={() => handleOpenWhatsApp("952815430")}
-                  className="w-full bg-emerald-500 hover:bg-emerald-600 text-white rounded-xl py-3.5 px-4 font-bold text-sm transition-all duration-200 flex items-center justify-between shadow-lg shadow-emerald-500/10 hover:shadow-emerald-500/20 hover:-translate-y-0.5 active:translate-y-0 select-none cursor-pointer"
+                  className="w-full bg-emerald-500 hover:bg-emerald-600 text-white rounded-xl py-3 px-3.5 font-bold text-xs transition-all duration-200 flex items-center justify-between shadow-lg shadow-emerald-500/10 hover:shadow-emerald-500/20 select-none cursor-pointer"
                 >
                   <span className="flex items-center gap-2">
-                    <MessageSquare size={18} className="animate-pulse" />
+                    <MessageSquare size={16} className="animate-pulse" />
                     WhatsApp (952 815 430)
                   </span>
-                  <span className="bg-white/20 text-white text-[10px] font-black uppercase px-2 py-0.5 rounded-full tracking-wide">
+                  <span className="bg-white/20 text-white text-[9px] font-black uppercase px-2 py-0.5 rounded-full tracking-wide">
                     Canal 1
                   </span>
                 </button>
 
                 <button
                   onClick={() => handleOpenWhatsApp("939384315")}
-                  className="w-full bg-emerald-500 hover:bg-emerald-600 text-white rounded-xl py-3.5 px-4 font-bold text-sm transition-all duration-200 flex items-center justify-between shadow-lg shadow-emerald-500/10 hover:shadow-emerald-500/20 hover:-translate-y-0.5 active:translate-y-0 select-none cursor-pointer"
+                  className="w-full bg-emerald-500 hover:bg-emerald-600 text-white rounded-xl py-3 px-3.5 font-bold text-xs transition-all duration-200 flex items-center justify-between shadow-lg shadow-emerald-500/10 hover:shadow-emerald-500/20 select-none cursor-pointer"
                 >
                   <span className="flex items-center gap-2">
-                    <MessageSquare size={18} className="animate-pulse" />
+                    <MessageSquare size={16} className="animate-pulse" />
                     WhatsApp (939 384 315)
                   </span>
-                  <span className="bg-white/20 text-white text-[10px] font-black uppercase px-2 py-0.5 rounded-full tracking-wide">
+                  <span className="bg-white/20 text-white text-[9px] font-black uppercase px-2 py-0.5 rounded-full tracking-wide">
                     Canal 2
                   </span>
                 </button>

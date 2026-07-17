@@ -8,6 +8,9 @@ import { SEO } from '../../components/SEO';
 import { FAQSection } from './FAQSection';
 import { SupportModal } from '../../components/SupportModal';
 import { EVENTS } from '../../mockData';
+import { X, Copy, MessageSquare } from 'lucide-react';
+import toast from 'react-hot-toast';
+import { copyToClipboard } from '../../lib/clipboard';
 
 // Create a motion component from the React Router Link
 const MotionLink = motion(Link);
@@ -29,6 +32,83 @@ export const LandingPage: React.FC = () => {
   const [currentTestimonialIndex, setCurrentTestimonialIndex] = useState(0);
   const [supportOpen, setSupportOpen] = useState(false);
   const [showTypeModal, setShowTypeModal] = useState(false);
+  const [whatsappModal, setWhatsappModal] = useState<{
+    name: string;
+    price: string;
+    billingCycle?: "monthly" | "annual";
+  } | null>(null);
+
+  const handleCopy = (text: string) => {
+    copyToClipboard(text);
+    toast.success("Copiado!");
+  };
+
+  const confirmPlanSelection = (planName: string, price: string, billingCycle?: "monthly" | "annual") => {
+    if (!user) {
+      toast.custom(
+        (t) => (
+          <div
+            className={`${t.visible ? "animate-enter" : "animate-leave"} max-w-sm w-full bg-white shadow-[0_8px_30px_rgb(0,0,0,0.12)] rounded-xl flex flex-col border border-slate-100 overflow-hidden relative z-[9999]`}
+          >
+            <div className="p-4">
+              <h3 className="font-bold text-slate-900 mb-1">
+                Acesso Necessário
+              </h3>
+              <p className="text-sm text-slate-500">
+                Você precisa entrar na sua conta para escolher um plano.
+              </p>
+            </div>
+            <div className="flex border-t border-slate-100">
+              <button
+                onClick={() => toast.dismiss(t.id)}
+                className="flex-1 px-4 py-3 text-sm font-bold text-slate-500 hover:bg-slate-50 transition-colors"
+              >
+                Cancelar
+              </button>
+              <div className="w-px bg-slate-100" />
+              <button
+                onClick={() => {
+                  toast.dismiss(t.id);
+                  navigate("/auth");
+                }}
+                className="flex-1 px-4 py-3 text-sm font-bold text-brand-blue hover:bg-slate-50 transition-colors"
+              >
+                Fazer Login
+              </button>
+            </div>
+          </div>
+        ),
+        { duration: 5000 },
+      );
+      return;
+    }
+
+    const currentPlan = userProfile?.plan || "Essencial";
+
+    if (currentPlan === planName) {
+      toast.error(`Você já possui o plano ${planName} ativo na sua conta.`);
+      return;
+    }
+
+    setWhatsappModal({
+      name: planName,
+      price,
+      billingCycle,
+    });
+  };
+
+  const handleOpenWhatsApp = (whatsappNumber: string) => {
+    if (!whatsappModal || !user) return;
+
+    const messageText = whatsappModal.name === "Business"
+      ? `Olá! Gostaria de subscrever ao Plano ${whatsappModal.name.toUpperCase()} para a minha agência.\n\nID da Plataforma: ${user.uid}\nE-mail: ${user.email || "Não informado"}\n\nEstou em contacto para concluir o pagamento do meu plano. Obrigado!`
+      : `Olá! Gostaria de comprar o Plano ${whatsappModal.name.toUpperCase()} por ${whatsappModal.price}.\n\nID da Plataforma: ${user.uid}\nE-mail: ${user.email || "Não informado"}\n\nEstou em contacto para concluir o pagamento do meu plano. Obrigado!`;
+
+    const cleanNumber = whatsappNumber.replace(/\D/g, "");
+    const url = `https://wa.me/${cleanNumber}?text=${encodeURIComponent(messageText)}`;
+    window.open(url, "_blank", "noopener,noreferrer");
+    setWhatsappModal(null);
+  };
   
   const navigate = useNavigate();
   const location = useLocation();
@@ -290,7 +370,7 @@ export const LandingPage: React.FC = () => {
                        <span>Ativo até 30 dias após o evento</span>
                     </li>
                  </ul>
-                 <button className="w-full py-3 rounded-full border border-slate-200 text-slate-700 font-bold text-xs uppercase tracking-wider hover:bg-slate-50 hover:border-slate-300 transition-colors">
+                 <button onClick={() => confirmPlanSelection("Essencial", "7.500 Kz")} className="w-full py-3 rounded-full border border-slate-200 text-slate-700 font-bold text-xs uppercase tracking-wider hover:bg-slate-50 hover:border-slate-300 transition-colors cursor-pointer">
                     Escolher Essencial
                  </button>
               </div>
@@ -332,7 +412,7 @@ export const LandingPage: React.FC = () => {
                        <span>Domínio Personalizado (.com)</span>
                     </li>
                  </ul>
-                 <button className="w-full py-3 rounded-full bg-gradient-to-r from-[#DFB135] to-[#A07B18] text-white font-bold text-xs uppercase tracking-wider hover:from-[#EABF45] hover:to-[#B38B20] shadow-[0_4px_14px_rgba(197,160,40,0.35)] transition-all hover:-translate-y-0.5 border border-[#F3CD68]/30">
+                 <button onClick={() => confirmPlanSelection("Premium", "20.000 Kz")} className="w-full py-3 rounded-full bg-gradient-to-r from-[#DFB135] to-[#A07B18] text-white font-bold text-xs uppercase tracking-wider hover:from-[#EABF45] hover:to-[#B38B20] shadow-[0_4px_14px_rgba(197,160,40,0.35)] transition-all hover:-translate-y-0.5 border border-[#F3CD68]/30 cursor-pointer">
                     Criar Convite Premium
                  </button>
               </div>
@@ -369,7 +449,7 @@ export const LandingPage: React.FC = () => {
                        <span>Suporte VIP Prioritário</span>
                     </li>
                  </ul>
-                 <button className="w-full py-3 rounded-full bg-transparent border border-[#DFB135] text-[#DFB135] font-bold text-xs uppercase tracking-wider hover:bg-[#DFB135] hover:text-[#0A0A0A] transition-all relative z-10">
+                 <button onClick={() => confirmPlanSelection("Business", "45.000 Kz", "monthly")} className="w-full py-3 rounded-full bg-transparent border border-[#DFB135] text-[#DFB135] font-bold text-xs uppercase tracking-wider hover:bg-[#DFB135] hover:text-[#0A0A0A] transition-all relative z-10 cursor-pointer">
                     Assinar Plano B2B
                  </button>
               </div>
@@ -604,6 +684,129 @@ export const LandingPage: React.FC = () => {
               </div>
             </motion.div>
           </motion.div>
+        )}
+      </AnimatePresence>
+
+      {/* WhatsApp Activation Modal */}
+      <AnimatePresence>
+        {whatsappModal && (
+          <div className="fixed inset-0 z-[110] flex items-center justify-center p-4">
+            <motion.div
+              initial={{ opacity: 0 }}
+              animate={{ opacity: 1 }}
+              exit={{ opacity: 0 }}
+              onClick={() => setWhatsappModal(null)}
+              className="absolute inset-0 bg-slate-900/60 backdrop-blur-md"
+            />
+            <motion.div
+              initial={{ opacity: 0, scale: 0.95, y: 20 }}
+              animate={{ opacity: 1, scale: 1, y: 0 }}
+              exit={{ opacity: 0, scale: 0.95, y: 20 }}
+              className="bg-white rounded-3xl p-5 md:p-6 max-w-sm w-full relative z-10 shadow-2xl flex flex-col border border-slate-100 max-h-[90vh] overflow-y-auto text-left"
+            >
+              <div className="flex justify-between items-start mb-4">
+                <div>
+                  <span className="text-brand-blue font-bold tracking-widest text-[10px] uppercase mb-0.5 block">
+                    Concluir no WhatsApp
+                  </span>
+                  <h3 className="text-xl font-bold text-slate-900 tracking-tight">
+                    Activar {whatsappModal.name}
+                  </h3>
+                </div>
+                <button
+                  onClick={() => setWhatsappModal(null)}
+                  className="text-slate-400 hover:text-slate-600 transition-colors bg-slate-50 hover:bg-slate-100 p-1.5 rounded-full cursor-pointer"
+                >
+                  <X size={18} />
+                </button>
+              </div>
+
+              <div className="bg-emerald-50/60 border border-emerald-100/80 rounded-2xl p-3.5 mb-4">
+                <p className="text-[11px] text-emerald-800 leading-relaxed font-medium">
+                  Escolha um operador abaixo. Você será redirecionado para o WhatsApp com uma mensagem personalizada com o seu ID para que o administrador ative o seu plano de imediato.
+                </p>
+              </div>
+
+              <div className="bg-slate-50 border border-slate-100 rounded-2xl p-4 space-y-2.5 mb-4">
+                <div className="flex justify-between items-center pb-2 border-b border-slate-200/40">
+                  <span className="text-[10px] text-slate-500 uppercase tracking-wider font-semibold">
+                    Artigo
+                  </span>
+                  <span className="text-xs font-bold text-slate-800">
+                    {whatsappModal.name}
+                  </span>
+                </div>
+                {whatsappModal.billingCycle && (
+                  <div className="flex justify-between items-center pb-2 border-b border-slate-200/40">
+                    <span className="text-[10px] text-slate-500 uppercase tracking-wider font-semibold">
+                      Faturação
+                    </span>
+                    <span className="text-xs font-bold text-slate-800">
+                      {whatsappModal.billingCycle === "annual"
+                        ? "Anual"
+                        : "Mensal"}
+                    </span>
+                  </div>
+                )}
+                <div className="flex justify-between items-center pb-2 border-b border-slate-200/40">
+                  <span className="text-[10px] text-slate-500 uppercase tracking-wider font-semibold">
+                    Valor
+                  </span>
+                  <span className="text-xs font-bold text-slate-900">
+                    {whatsappModal.price}
+                  </span>
+                </div>
+                <div className="flex justify-between items-center gap-3 pt-0.5">
+                  <div className="min-w-0 flex-1">
+                    <span className="text-[9px] text-slate-400 uppercase tracking-wider block">
+                      ID da Plataforma
+                    </span>
+                    <span className="text-xs font-mono font-bold text-slate-700 truncate block">
+                      {user?.uid}
+                    </span>
+                  </div>
+                  <button
+                    onClick={() => user && handleCopy(user.uid)}
+                    className="p-1 px-2.5 bg-white text-slate-500 hover:text-brand-blue hover:bg-slate-50 border border-slate-200 shadow-sm rounded-lg text-[10px] font-bold transition-all flex items-center gap-1 shrink-0 cursor-pointer"
+                  >
+                    <Copy size={11} /> Copiar
+                  </button>
+                </div>
+              </div>
+
+              <div className="space-y-2">
+                <p className="text-[10px] text-slate-400 font-bold uppercase tracking-wider mb-1">
+                  Selecione um operador de suporte:
+                </p>
+
+                <button
+                  onClick={() => handleOpenWhatsApp("952815430")}
+                  className="w-full bg-emerald-500 hover:bg-emerald-600 text-white rounded-xl py-3 px-3.5 font-bold text-xs transition-all duration-200 flex items-center justify-between shadow-lg shadow-emerald-500/10 hover:shadow-emerald-500/20 select-none cursor-pointer"
+                >
+                  <span className="flex items-center gap-2">
+                    <MessageSquare size={16} className="animate-pulse" />
+                    WhatsApp (952 815 430)
+                  </span>
+                  <span className="bg-white/20 text-white text-[9px] font-black uppercase px-2 py-0.5 rounded-full tracking-wide">
+                    Canal 1
+                  </span>
+                </button>
+
+                <button
+                  onClick={() => handleOpenWhatsApp("939384315")}
+                  className="w-full bg-emerald-500 hover:bg-emerald-600 text-white rounded-xl py-3 px-3.5 font-bold text-xs transition-all duration-200 flex items-center justify-between shadow-lg shadow-emerald-500/10 hover:shadow-emerald-500/20 select-none cursor-pointer"
+                >
+                  <span className="flex items-center gap-2">
+                    <MessageSquare size={16} className="animate-pulse" />
+                    WhatsApp (939 384 315)
+                  </span>
+                  <span className="bg-white/20 text-white text-[9px] font-black uppercase px-2 py-0.5 rounded-full tracking-wide">
+                    Canal 2
+                  </span>
+                </button>
+              </div>
+            </motion.div>
+          </div>
         )}
       </AnimatePresence>
 

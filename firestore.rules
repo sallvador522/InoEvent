@@ -68,12 +68,27 @@ service cloud.firestore {
       allow get: if true;
       
       // --- Create ---
-      allow create: if isSignedIn() && isValidId(eventId) && isValidEvent(incoming()) && incoming().ownerId == request.auth.uid;
+      allow create: if isSignedIn() && isValidId(eventId) && isValidEvent(incoming()) && incoming().ownerId == request.auth.uid && (
+        incoming().get('plan', 'Essencial') == 'Essencial' || (
+          exists(/databases/$(database)/documents/users/$(request.auth.uid)) &&
+          incoming().get('plan', 'Essencial') == get(/databases/$(database)/documents/users/$(request.auth.uid)).data.get('plan', 'Essencial')
+        )
+      );
       
       // --- Update ---
       allow update: if isValidId(eventId) && resource != null && (
-          (isSignedIn() && (resource.data.ownerId == request.auth.uid || exists(/databases/$(database)/documents/events/$(eventId)/team/$(request.auth.uid))) && isValidEvent(incoming()) && incoming().ownerId == resource.data.ownerId) ||
-          (isSignedIn() && resource.data.ownerId == request.auth.uid && incoming().diff(existing()).affectedKeys().hasOnly(['clientToken']))
+          (
+            isSignedIn() && 
+            (resource.data.ownerId == request.auth.uid || exists(/databases/$(database)/documents/events/$(eventId)/team/$(request.auth.uid))) && 
+            isValidEvent(incoming()) && 
+            incoming().ownerId == resource.data.ownerId &&
+            incoming().get('plan', 'Essencial') == resource.data.get('plan', 'Essencial')
+          ) ||
+          (
+            isSignedIn() && 
+            resource.data.ownerId == request.auth.uid && 
+            incoming().diff(existing()).affectedKeys().hasOnly(['clientToken'])
+          )
       );
       
       // --- Delete ---

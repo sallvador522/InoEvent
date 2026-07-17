@@ -25,6 +25,7 @@ const AuthPage = lazy(() => import('./features/auth/AuthPage').then(m => ({ defa
 const PlansPage = lazy(() => import('./features/plans/PlansPage').then(m => ({ default: m.PlansPage })));
 const EventCreator = lazy(() => import('./features/invitation/EventCreator').then(m => ({ default: m.EventCreator })));
 const AdminDashboard = lazy(() => import('./features/admin/AdminDashboard').then(m => ({ default: m.AdminDashboard })));
+const NotFound = lazy(() => import('./components/NotFound').then(m => ({ default: m.NotFound })));
 
 // Sleek luxury-styled minimalist loading fallback
 const PageLoader: React.FC = () => (
@@ -104,6 +105,7 @@ const AnimatedRoutes: React.FC = () => {
                 <PageWrapper><AdminDashboard /></PageWrapper>
             </AdminRoute>
         } />
+        <Route path="*" element={<PageWrapper><NotFound /></PageWrapper>} />
       </Routes>
     </AnimatePresence>
   );

@@ -1379,7 +1379,7 @@ const InvitationView: React.FC = () => {
 
         {/* FULL SCREEN WYSIWYG CANVAS */}
         <div className="tour-wysiwyg flex-1 overflow-y-auto bg-slate-100/90 relative pb-36 px-2 md:px-6 bg-[radial-gradient(#cbd5e1_1px,transparent_1px)] [background-size:20px_20px]">
-          {isPremium && <TocaPlayer
+          {<TocaPlayer
             trackName={localEvent?.musicTrack || activeEvent.musicTrack}
             isDark={
               localEvent?.layoutMode === "LUXURY" ||
@@ -2358,7 +2358,7 @@ const InvitationView: React.FC = () => {
         description={activeEvent.description || "Você foi convidado para o nosso evento especial! Veja os detalhes, localizações e confirme sua presença (RSVP)."}
         image={getImageUrl(activeEvent.heroImage)}
       />
-      {isPremium && <TocaPlayer
+      {<TocaPlayer
         trackName={activeEvent.musicTrack}
         isDark={
           activeEvent.layoutMode === "LUXURY" ||

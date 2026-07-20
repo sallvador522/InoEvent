@@ -67,6 +67,7 @@ app.use(helmet({
       fontSrc: ["'self'", "https://fonts.gstatic.com", "data:"],
       imgSrc: ["'self'", "data:", "blob:", "https:", "http:"],
       connectSrc: ["'self'", "https://firebasestorage.googleapis.com", "https://firestore.googleapis.com", "https://identitytoolkit.googleapis.com", "https://securetoken.googleapis.com", "https://*.googleapis.com", "wss://*.firebaseio.com", "https://*.google-analytics.com", "https://www.google-analytics.com"],
+      mediaSrc: ["'self'", "https:", "http:", "data:", "blob:"],
       frameSrc: ["'self'", "https://maps.googleapis.com", "https://www.youtube.com"],
       frameAncestors: ["'self'", "https://*.google.com", "https://*.googleusercontent.com", "https://*.run.app"],
     }

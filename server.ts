@@ -8,7 +8,7 @@ import helmet from 'helmet';
 import fs from 'fs';
 import admin from 'firebase-admin';
 import compression from 'compression';
-import { logger } from './lib/logger';
+import { logger } from './lib/logger.js';
 let firebaseConfig: any = null;
 try {
   firebaseConfig = JSON.parse(fs.readFileSync(path.join(process.cwd(), 'firebase-applet-config.json'), 'utf8'));

@@ -21,3 +21,5 @@ The RSVP text strings (e.g., button text, modal titles) must be dynamic based on
 ## Vite Development Mode vs Production (SEO Routes)
 - **White Screen Fix:** When intercepting routes like `/invite/:id` or `/plans` on the Express server to inject SEO tags, **you must bypass this interception in development mode** (`if (process.env.NODE_ENV !== 'production') return next();`). 
 - **Why?** In development, Vite uses a middleware to inject HMR and client-side modules into `index.html`. If the Express route reads the raw `index.html` and sends it directly (via `fs.readFileSync` and `res.send`), it completely bypasses Vite's transformations, resulting in a white screen because the React scripts are never loaded.
+
+- **Strict ESM Imports (ERR_MODULE_NOT_FOUND):** Because `package.json` specifies `"type": "module"`, any local relative imports in server-side TypeScript files (such as `server.ts` or `api/index.ts`) **must** include the `.js` extension, even if the file is physically a `.ts` file. Example: `import { logger } from './lib/logger.js';`. Failing to include `.js` will cause a 500 `FUNCTION_INVOCATION_FAILED` crash on Vercel.

@@ -3,6 +3,7 @@ import ReactDOM from 'react-dom/client';
 import App from './App';
 import { FirebaseProvider } from './components/FirebaseProvider';
 import { HelmetProvider } from 'react-helmet-async';
+import './index.css';
 
 // Register Service Worker for offline capabilities and caching
 if ('serviceWorker' in navigator) {

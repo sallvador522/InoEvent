@@ -8,6 +8,75 @@ import { Button } from '../../components/ui/Button';
 import { QRScanner } from '../../components/QRScanner';
 import { playScanSound } from '../../lib/sound';
 
+
+const ConfettiBurst: React.FC<{ count?: number }> = ({ count = 30 }) => {
+    const colors = ['#10B981', '#3B82F6', '#F59E0B', '#EF4444', '#EC4899', '#8B5CF6', '#34D399'];
+    return (
+        <div className="absolute inset-0 pointer-events-none overflow-hidden flex items-center justify-center z-50">
+            {Array.from({ length: count }).map((_, i) => {
+                const angle = (i / count) * 360 + Math.random() * 20;
+                const distance = 80 + Math.random() * 140;
+                const radian = (angle * Math.PI) / 180;
+                const x = Math.cos(radian) * distance;
+                const y = Math.sin(radian) * distance;
+                const rotation = Math.random() * 360;
+                const size = 6 + Math.random() * 10;
+                const delay = Math.random() * 0.12;
+                const color = colors[Math.floor(Math.random() * colors.length)];
+
+                return (
+                    <motion.div
+                        key={i}
+                        initial={{ scale: 0, x: 0, y: 0, opacity: 1, rotate: 0 }}
+                        animate={{
+                            scale: [0, 1.2, 0.8, 0],
+                            x: x,
+                            y: y,
+                            rotate: rotation + 180,
+                            opacity: [1, 1, 0.8, 0]
+                        }}
+                        transition={{
+                            duration: 1.3,
+                            ease: "easeOut",
+                            delay: delay
+                        }}
+                        className="absolute rounded-sm"
+                        style={{
+                            width: size,
+                            height: size,
+                            backgroundColor: color,
+                        }}
+                    />
+                );
+            })}
+        </div>
+    );
+};
+
+const AnimatedCheckmark: React.FC<{ className?: string }> = ({ className = "w-10 h-10 text-emerald-500" }) => (
+    <svg
+        className={className}
+        viewBox="0 0 24 24"
+        fill="none"
+        stroke="currentColor"
+        strokeWidth="3.5"
+        strokeLinecap="round"
+        strokeLinejoin="round"
+    >
+        <motion.path
+            initial={{ pathLength: 0, opacity: 0 }}
+            animate={{ pathLength: 1, opacity: 1 }}
+            transition={{
+                type: "spring",
+                stiffness: 130,
+                damping: 14,
+                delay: 0.15
+            }}
+            d="M20 6L9 17l-5-5"
+        />
+    </svg>
+);
+
 export const CheckinScanner: React.FC = () => {
     const { id } = useParams();
     const [searchParams] = useSearchParams();
@@ -262,32 +331,65 @@ export const CheckinScanner: React.FC = () => {
                                 <AnimatePresence>
                                     {scanState.status !== 'idle' && (
                                         <motion.div 
-                                            initial={{ opacity: 0, scale: 0.95 }}
+                                            initial={{ opacity: 0, scale: 0.9 }}
                                             animate={{ opacity: 1, scale: 1 }}
-                                            exit={{ opacity: 0 }}
-                                            className={`absolute inset-0 flex flex-col items-center justify-center text-white p-6 text-center backdrop-blur-md z-10 font-bold text-xl ${
-                                                scanState.status === 'success' ? 'bg-green-500/95' :
-                                                scanState.status === 'already_scanned' ? 'bg-yellow-500/95' :
-                                                scanState.status === 'error' ? 'bg-red-500/95' :
+                                            exit={{ opacity: 0, scale: 0.95 }}
+                                            className={`absolute inset-0 flex flex-col items-center justify-center text-white p-6 text-center backdrop-blur-lg z-10 font-bold text-xl ${
+                                                scanState.status === 'success' ? 'bg-emerald-500/95' :
+                                                scanState.status === 'already_scanned' ? 'bg-amber-500/95' :
+                                                scanState.status === 'error' ? 'bg-rose-500/95' :
                                                 'bg-brand-blue/95'
                                             }`}
                                         >
-                                            <div className="mb-2">
-                                                {scanState.status === 'success' && <CheckCircle2 size={56} className="mx-auto drop-shadow-md" />}
-                                                {scanState.status === 'already_scanned' && <Clock size={56} className="mx-auto drop-shadow-md" />}
-                                                {scanState.status === 'processing' && <div className="w-14 h-14 border-4 border-white border-t-transparent rounded-full animate-spin mx-auto" />}
-                                                {scanState.status === 'error' && <XCircle size={56} className="mx-auto drop-shadow-md" />}
-                                            </div>
-                                            <p className="drop-shadow-md">{scanState.message}</p>
+                                            {scanState.status === 'success' && <ConfettiBurst count={25} />}
+                                            
+                                            <motion.div 
+                                                initial={{ scale: 0, rotate: -20 }}
+                                                animate={{ scale: 1, rotate: 0 }}
+                                                transition={{ type: "spring", stiffness: 200, damping: 14, delay: 0.1 }}
+                                                className="mb-4"
+                                            >
+                                                {scanState.status === 'success' && (
+                                                    <div className="w-20 h-20 bg-white/20 rounded-full flex items-center justify-center border-2 border-white shadow-lg">
+                                                        <AnimatedCheckmark className="w-12 h-12 text-white" />
+                                                    </div>
+                                                )}
+                                                {scanState.status === 'already_scanned' && (
+                                                    <div className="w-20 h-20 bg-white/20 rounded-full flex items-center justify-center border-2 border-white shadow-lg">
+                                                        <Clock size={40} className="text-white drop-shadow-md" />
+                                                    </div>
+                                                )}
+                                                {scanState.status === 'processing' && (
+                                                    <div className="w-16 h-16 border-4 border-white border-t-transparent rounded-full animate-spin mx-auto" />
+                                                )}
+                                                {scanState.status === 'error' && (
+                                                    <div className="w-20 h-20 bg-white/20 rounded-full flex items-center justify-center border-2 border-white shadow-lg">
+                                                        <XCircle size={40} className="text-white drop-shadow-md" />
+                                                    </div>
+                                                )}
+                                            </motion.div>
+                                            <motion.p 
+                                                initial={{ opacity: 0, y: 10 }}
+                                                animate={{ opacity: 1, y: 0 }}
+                                                transition={{ delay: 0.2 }}
+                                                className="drop-shadow-md text-2xl font-black tracking-tight"
+                                            >
+                                                {scanState.message}
+                                            </motion.p>
                                             {scanState.guestName && (
-                                                <div className="mt-4">
+                                                <motion.div 
+                                                    initial={{ opacity: 0, y: 15 }}
+                                                    animate={{ opacity: 1, y: 0 }}
+                                                    transition={{ delay: 0.3 }}
+                                                    className="mt-4"
+                                                >
                                                     <p className="text-xl font-bold opacity-100 drop-shadow-md">{scanState.guestName}</p>
                                                     {scanState.companions !== undefined && (
-                                                        <p className="text-sm font-medium opacity-90 drop-shadow-sm bg-black/20 rounded-full px-4 py-1 mt-2 inline-block">
+                                                        <p className="text-sm font-semibold opacity-90 drop-shadow-sm bg-black/30 rounded-full px-5 py-1.5 mt-2.5 inline-block border border-white/10">
                                                             Pessoas: {1 + scanState.companions}
                                                         </p>
                                                     )}
-                                                </div>
+                                                </motion.div>
                                             )}
                                         </motion.div>
                                     )}
@@ -364,15 +466,79 @@ export const CheckinScanner: React.FC = () => {
                 )}
 
                 {status === 'success' && (
-                    <div className="flex flex-col items-center">
-                        <div className="w-20 h-20 bg-emerald-50 text-emerald-500 rounded-full flex items-center justify-center mb-6">
-                            <CheckCircle size={40} />
-                        </div>
-                        <h2 className="text-2xl font-bold text-slate-800 mb-2">Acesso Liberado</h2>
-                        <p className="text-emerald-600 font-bold text-lg mb-2">{guestName}</p>
-                        <p className="text-slate-500 text-sm mb-8">{message}</p>
-                        <Button fullWidth onClick={() => navigate(`/dashboard/${id}`)}>Ir para Dashboard</Button>
-                    </div>
+                    <motion.div 
+                        initial="hidden"
+                        animate="visible"
+                        variants={{
+                            hidden: { opacity: 0 },
+                            visible: {
+                                opacity: 1,
+                                transition: {
+                                    staggerChildren: 0.15,
+                                    delayChildren: 0.1
+                                }
+                            }
+                        }}
+                        className="flex flex-col items-center relative overflow-hidden"
+                    >
+                        <ConfettiBurst count={30} />
+                        
+                        <motion.div 
+                            variants={{
+                                hidden: { scale: 0, rotate: -30 },
+                                visible: { 
+                                    scale: 1, 
+                                    rotate: 0,
+                                    transition: { type: "spring", stiffness: 220, damping: 14 } 
+                                }
+                            }}
+                            className="w-24 h-24 bg-emerald-50 border-2 border-emerald-500 text-emerald-500 rounded-full flex items-center justify-center mb-6 shadow-md shadow-emerald-500/10"
+                        >
+                            <AnimatedCheckmark className="w-12 h-12 text-emerald-500" />
+                        </motion.div>
+                        
+                        <motion.h2 
+                            variants={{
+                                hidden: { opacity: 0, y: 15 },
+                                visible: { opacity: 1, y: 0, transition: { type: "spring", damping: 15 } }
+                            }}
+                            className="text-3xl font-black text-slate-800 tracking-tight mb-2"
+                        >
+                            Acesso Liberado
+                        </motion.h2>
+                        
+                        <motion.p 
+                            variants={{
+                                hidden: { opacity: 0, y: 15 },
+                                visible: { opacity: 1, y: 0, transition: { type: "spring", damping: 15 } }
+                            }}
+                            className="text-emerald-600 font-extrabold text-xl mb-2 drop-shadow-sm"
+                        >
+                            {guestName}
+                        </motion.p>
+                        
+                        <motion.p 
+                            variants={{
+                                hidden: { opacity: 0, y: 15 },
+                                visible: { opacity: 1, y: 0, transition: { type: "spring", damping: 15 } }
+                            }}
+                            className="text-slate-500 text-sm mb-8 font-medium leading-relaxed max-w-xs"
+                        >
+                            {message}
+                        </motion.p>
+                        
+                        <motion.div 
+                            variants={{
+                                hidden: { opacity: 0, y: 15 },
+                                visible: { opacity: 1, y: 0, transition: { type: "spring", damping: 15 } }
+                            }}
+                            className="w-full"
+                        >
+                            <Button fullWidth onClick={() => navigate(`/dashboard/${id}`)}>
+                                Ir para Dashboard
+                            </Button>
+                        </motion.div>
+                    </motion.div>
                 )}
 
                 {status === 'error' && (

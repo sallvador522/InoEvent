@@ -1,0 +1,32 @@
+@import "tailwindcss";
+
+@theme {
+  --color-brand-blue: #1B365D;
+  --color-primary: #C5A028;
+  --color-background-light: #FFFFFF;
+  --color-background-dark: #1B365D;
+  --color-surface-light: #F8FAFC;
+  --color-surface-dark: #0F172A;
+
+  --color-wedding-gold: #C5A028;
+  --color-wedding-cream: #FFFFFF;
+  --color-bday-neon: #7B2CBF;
+  --color-bday-dark: #0F0F16;
+  --color-corp-blue: #1B365D;
+  --color-corp-gray: #F4F5F7;
+
+  --font-display: "Inter", sans-serif;
+  --font-serif: "Playfair Display", serif;
+  --font-script: "Pinyon Script", cursive;
+  --font-wedding: "Playfair Display", serif;
+  --font-bday: "Montserrat", sans-serif;
+  --font-corp: "Inter", sans-serif;
+
+  --animate-pulse-slow: pulse 3s cubic-bezier(0.4, 0, 0.6, 1) infinite;
+  --animate-fade-in-down: fadeInDown 0.8s ease-out forwards;
+
+  @keyframes fadeInDown {
+    0% { opacity: 0; transform: translateY(-20px); }
+    100% { opacity: 1; transform: translateY(0); }
+  }
+}

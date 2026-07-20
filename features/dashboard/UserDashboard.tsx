@@ -10,6 +10,7 @@ import {
   deleteDoc,
   onSnapshot,
   orderBy,
+  limit
 } from "firebase/firestore";
 import { getStorage, ref, deleteObject } from "firebase/storage";
 import {
@@ -124,7 +125,7 @@ export const UserDashboard: React.FC = () => {
       if (!user) return;
       try {
         const eventsRef = collection(db, "events");
-        const q = query(eventsRef, where("ownerId", "==", user.uid));
+        const q = query(eventsRef, where("ownerId", "==", user.uid), limit(50));
         const snap = await getDocs(q);
         const eventsList = snap.docs.map((d) => ({ id: d.id, ...d.data() }));
         setEvents(eventsList);
@@ -631,86 +632,106 @@ export const UserDashboard: React.FC = () => {
             </div>
 
             {notifications.length === 0 ? (
-              <div className="bg-white border border-slate-200 rounded-3xl p-12 text-center flex flex-col items-center justify-center">
-                <p className="text-slate-500 mb-2 font-medium">
-                  Sua caixa de entrada está limpa!
+              <motion.div 
+                initial={{ opacity: 0, scale: 0.95 }}
+                animate={{ opacity: 1, scale: 1 }}
+                className="bg-white/50 backdrop-blur-xl border border-white/20 shadow-[0_8px_30px_rgb(0,0,0,0.04)] rounded-3xl p-16 text-center flex flex-col items-center justify-center relative overflow-hidden"
+              >
+                <div className="absolute inset-0 bg-gradient-to-br from-brand-blue/5 to-purple-500/5 opacity-50"></div>
+                <div className="w-20 h-20 bg-gradient-to-tr from-slate-100 to-white shadow-inner rounded-full flex items-center justify-center mb-6 relative z-10">
+                  <BellOff size={32} className="text-slate-300" />
+                </div>
+                <h3 className="text-xl font-bold text-slate-800 mb-2 relative z-10">Caixa de Entrada Limpa</h3>
+                <p className="text-slate-500 max-w-sm relative z-10">
+                  Não há novas mensagens ou actualizações no momento. Quando algo importante acontecer, avisaremos aqui.
                 </p>
-                <p className="text-xs text-slate-400">
-                  Não há novas mensagens ou actualizações de suporte no momento.
-                </p>
-              </div>
+              </motion.div>
             ) : (
-              <div className="space-y-3">
-                {notifications.map((notif) => (
-                  <div
-                    key={notif.id}
-                    onClick={(e) =>
-                      !notif.read && handleMarkAsRead(notif.id, e)
-                    }
-                    className={`p-5 rounded-2xl border transition-all flex justify-between items-start gap-4 ${
-                      notif.read
-                        ? "bg-white border-slate-100 opacity-75"
-                        : "bg-white border-brand-blue/30 shadow-sm shadow-brand-blue/5 hover:border-brand-blue/40 cursor-pointer"
-                    }`}
-                  >
-                    <div className="flex gap-4">
-                      <div
-                        className={`w-10 h-10 rounded-xl flex items-center justify-center shrink-0 ${
-                          notif.read
-                            ? "bg-slate-50 text-slate-400"
-                            : "bg-blue-50 text-brand-blue"
-                        }`}
-                      >
-                        <span className="material-symbols-outlined text-[18px]">
-                          {notif.type === "plan_upgrade"
-                            ? "stars"
-                            : "notifications"}
-                        </span>
-                      </div>
-                      <div>
-                        <div className="flex items-center gap-2 flex-wrap">
-                          <h4 className="font-bold text-slate-800 text-sm">
-                            {notif.title || "Notificação InoEvents"}
-                          </h4>
-                          {!notif.read && (
-                            <span className="bg-brand-blue/10 text-brand-blue text-[9px] font-black uppercase px-2 py-0.5 rounded-full tracking-wider">
-                              Nova
-                            </span>
+              <motion.div 
+                initial="hidden"
+                animate="show"
+                variants={{
+                  hidden: { opacity: 0 },
+                  show: {
+                    opacity: 1,
+                    transition: { staggerChildren: 0.05 }
+                  }
+                }}
+                className="space-y-4"
+              >
+                <AnimatePresence>
+                  {notifications.map((notif) => (
+                    <motion.div
+                      key={notif.id}
+                      layout
+                      initial={{ opacity: 0, y: 10 }}
+                      animate={{ opacity: 1, y: 0 }}
+                      exit={{ opacity: 0, scale: 0.95 }}
+                      whileHover={{ y: -2 }}
+                      onClick={(e) =>
+                        !notif.read && handleMarkAsRead(notif.id, e)
+                      }
+                      className={`group p-5 sm:p-6 rounded-3xl border transition-all duration-300 flex justify-between items-start gap-4 relative overflow-hidden ${
+                        notif.read
+                          ? "bg-white/60 border-slate-100/50 opacity-75 backdrop-blur-md"
+                          : "bg-white/80 border-brand-blue/20 shadow-[0_8px_30px_rgb(0,0,0,0.06)] hover:shadow-[0_8px_30px_rgb(0,0,0,0.12)] hover:border-brand-blue/40 cursor-pointer backdrop-blur-xl"
+                      }`}
+                    >
+                      {!notif.read && (
+                        <div className="absolute top-0 left-0 w-1 h-full bg-gradient-to-b from-brand-blue to-purple-500"></div>
+                      )}
+                      <div className="flex gap-4 sm:gap-6 relative z-10 w-full">
+                        <div
+                          className={`w-12 h-12 sm:w-14 sm:h-14 rounded-2xl flex items-center justify-center shrink-0 shadow-inner transition-transform duration-500 group-hover:scale-105 ${
+                            notif.read
+                              ? "bg-gradient-to-br from-slate-50 to-slate-100 text-slate-400"
+                              : "bg-gradient-to-br from-blue-50 to-indigo-50 text-brand-blue"
+                          }`}
+                        >
+                          {notif.type === "plan_upgrade" ? (
+                            <Gem size={22} className={!notif.read ? "animate-pulse" : ""} />
+                          ) : (
+                            <Bell size={22} />
                           )}
                         </div>
-                        <p className="text-xs text-slate-600 mt-1 leading-relaxed">
-                          {notif.message}
-                        </p>
-                        <span className="text-[10px] text-slate-400 mt-2 block font-medium">
-                          {notif.createdAt
-                            ? new Date(notif.createdAt).toLocaleString()
-                            : "N/A"}
-                        </span>
+                        <div className="flex-1">
+                          <div className="flex items-center justify-between gap-2 flex-wrap mb-1.5">
+                            <h4 className={`font-bold text-base ${notif.read ? 'text-slate-700' : 'text-slate-900'}`}>
+                              {notif.title || "Notificação InoEvents"}
+                            </h4>
+                            <span className="text-[11px] text-slate-400 font-medium tracking-wide">
+                              {notif.createdAt
+                                ? new Date(notif.createdAt).toLocaleDateString('pt-BR', { day: '2-digit', month: 'short', hour: '2-digit', minute: '2-digit' })
+                                : "N/A"}
+                            </span>
+                          </div>
+                          <p className={`text-sm leading-relaxed ${notif.read ? 'text-slate-500' : 'text-slate-600'}`}>
+                            {notif.message}
+                          </p>
+                          {!notif.read && (
+                            <div className="mt-4 flex items-center">
+                              <span className="inline-flex items-center gap-1.5 bg-brand-blue/10 text-brand-blue text-[10px] font-bold uppercase px-2.5 py-1 rounded-full tracking-wider">
+                                <span className="w-1.5 h-1.5 rounded-full bg-brand-blue animate-pulse"></span>
+                                Nova Atualização
+                              </span>
+                            </div>
+                          )}
+                        </div>
                       </div>
-                    </div>
-                    <div className="flex gap-2 shrink-0">
-                      {!notif.read && (
+                      
+                      <div className="flex gap-2 shrink-0 relative z-20">
                         <button
-                          onClick={(e) => handleMarkAsRead(notif.id, e)}
-                          className="p-1.5 hover:bg-slate-50 text-slate-400 hover:text-brand-blue rounded-lg transition-colors cursor-pointer"
-                          title="Marcar como lida"
+                          onClick={(e) => handleDeleteNotification(notif.id, e)}
+                          className="w-8 h-8 rounded-full hover:bg-red-50 text-slate-300 hover:text-red-500 flex items-center justify-center transition-colors"
+                          title="Eliminar"
                         >
-                          <span className="material-symbols-outlined text-sm">
-                            done
-                          </span>
+                          <Trash2 size={16} />
                         </button>
-                      )}
-                      <button
-                        onClick={(e) => handleDeleteNotification(notif.id, e)}
-                        className="p-1.5 hover:bg-red-50 text-slate-400 hover:text-red-500 rounded-lg transition-colors cursor-pointer"
-                        title="Eliminar"
-                      >
-                        <Trash2 size={14} />
-                      </button>
-                    </div>
-                  </div>
-                ))}
-              </div>
+                      </div>
+                    </motion.div>
+                  ))}
+                </AnimatePresence>
+              </motion.div>
             )}
           </div>
         )}

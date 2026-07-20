@@ -493,6 +493,7 @@ const InvitationView: React.FC = () => {
   const [firebaseLoading, setFirebaseLoading] = useState(true);
   const [networkError, setNetworkError] = useState<string | null>(null);
   const [isRSVPOpen, setRSVPOpen] = useState(false);
+  const [hasOpened, setHasOpened] = useState(false);
   const [isCheckStatusOpen, setCheckStatusOpen] = useState(false);
   const [isBannerCollapsed, setIsBannerCollapsed] = useState(true);
   const [isOpenCover, setIsOpenCover] = useState(() => {
@@ -2310,6 +2311,48 @@ const InvitationView: React.FC = () => {
 
   return (
     <>
+      {/* WELCOME ENVELOPE OVERLAY */}
+      <AnimatePresence>
+        {!hasOpened && !isEditing && (
+          <motion.div
+            initial={{ opacity: 1 }}
+            exit={{ opacity: 0, y: -50 }}
+            transition={{ duration: 0.8, ease: "easeInOut" }}
+            className="fixed inset-0 z-[9999] flex flex-col items-center justify-center bg-slate-900 text-white"
+            style={{
+               backgroundImage: 'linear-gradient(rgba(0,0,0,0.6), rgba(0,0,0,0.8)), url(' + getImageUrl(activeEvent.heroImage) + ')',
+               backgroundSize: 'cover',
+               backgroundPosition: 'center',
+            }}
+          >
+            <motion.div 
+              initial={{ scale: 0.9, opacity: 0 }}
+              animate={{ scale: 1, opacity: 1 }}
+              transition={{ delay: 0.2, duration: 0.8 }}
+              className="text-center px-6 flex flex-col items-center max-w-md"
+            >
+              <span className="material-symbols-outlined text-5xl mb-6 text-brand-gold opacity-80">mail</span>
+              <h1 className="font-serif text-3xl md:text-5xl mb-4 font-bold leading-tight">{activeEvent.title}</h1>
+              <p className="text-slate-300 mb-10 font-sans text-sm md:text-base tracking-widest uppercase">
+                Você tem um convite
+              </p>
+              <button 
+                  onClick={() => {
+                      setHasOpened(true);
+                      // Trigger audio play if TocaPlayer didn't autoplay
+                      const audioEls = document.getElementsByTagName('audio');
+                      for (let i = 0; i < audioEls.length; i++) {
+                          audioEls[i].play().catch(e => console.log('Audio play failed on open', e));
+                      }
+                  }}
+                  className="bg-white text-slate-900 px-12 py-4 rounded-full font-bold uppercase tracking-widest text-sm hover:scale-105 transition-transform shadow-2xl"
+              >
+                  Abrir Convite
+              </button>
+            </motion.div>
+          </motion.div>
+        )}
+      </AnimatePresence>
       <SEO 
         title={activeEvent.title || "Convite Especial"} 
         description={activeEvent.description || "Você foi convidado para o nosso evento especial! Veja os detalhes, localizações e confirme sua presença (RSVP)."}
@@ -3314,7 +3357,7 @@ guestName: string;
         >
           {getRSVPText(event.type)}
         </button>
-          {onCheckStatus && <button onClick={onCheckStatus} className="mt-4 sm:mt-0 sm:ml-4 bg-transparent border border-current opacity-70 hover:opacity-100 py-4 px-12 rounded-full font-bold uppercase tracking-widest text-sm transition-colors w-full sm:w-auto">Meu Convite</button>}
+          {onCheckStatus && <button onClick={onCheckStatus} className="mt-4 sm:mt-0 sm:ml-4 bg-white text-slate-900 border border-slate-200 shadow-lg hover:bg-slate-50 py-4 px-12 rounded-full font-bold uppercase tracking-widest text-sm transition-all w-full sm:w-auto">Meu Convite</button>}
       </div>
     </div>
   );
@@ -3790,7 +3833,7 @@ const ModernLayout: React.FC<{
         >
           <span>{getRSVPText(event.type)}</span>
         </button>
-          {onCheckStatus && <button onClick={onCheckStatus} className="mt-4 sm:mt-0 sm:ml-4 bg-transparent border border-current opacity-70 hover:opacity-100 py-4 px-12 rounded-full font-bold uppercase tracking-widest text-sm transition-colors w-full sm:w-auto">Meu Convite</button>}
+          {onCheckStatus && <button onClick={onCheckStatus} className="mt-4 sm:mt-0 sm:ml-4 bg-white text-slate-900 border border-slate-200 shadow-lg hover:bg-slate-50 py-4 px-12 rounded-full font-bold uppercase tracking-widest text-sm transition-all w-full sm:w-auto">Meu Convite</button>}
       </div>
     </div>
   );
@@ -4402,7 +4445,7 @@ const RusticLayout: React.FC<{
             >
               Ver Mapa
             </button>
-          {onCheckStatus && <button onClick={onCheckStatus} className="mt-4 sm:mt-0 sm:ml-4 bg-transparent border border-current opacity-70 hover:opacity-100 py-4 px-12 rounded-full font-bold uppercase tracking-widest text-sm transition-colors w-full sm:w-auto">Meu Convite</button>}
+          {onCheckStatus && <button onClick={onCheckStatus} className="mt-4 sm:mt-0 sm:ml-4 bg-white text-slate-900 border border-slate-200 shadow-lg hover:bg-slate-50 py-4 px-12 rounded-full font-bold uppercase tracking-widest text-sm transition-all w-full sm:w-auto">Meu Convite</button>}
           </div>
           <div className="w-full md:w-1/3 aspect-square rounded-2xl overflow-hidden">
             <img
@@ -4554,7 +4597,7 @@ const RusticLayout: React.FC<{
         >
           {getRSVPText(event.type)}
         </button>
-          {onCheckStatus && <button onClick={onCheckStatus} className="mt-4 sm:mt-0 sm:ml-4 bg-transparent border border-current opacity-70 hover:opacity-100 py-4 px-12 rounded-full font-bold uppercase tracking-widest text-sm transition-colors w-full sm:w-auto">Meu Convite</button>}
+          {onCheckStatus && <button onClick={onCheckStatus} className="mt-4 sm:mt-0 sm:ml-4 bg-white text-slate-900 border border-slate-200 shadow-lg hover:bg-slate-50 py-4 px-12 rounded-full font-bold uppercase tracking-widest text-sm transition-all w-full sm:w-auto">Meu Convite</button>}
       </div>
     </div>
   );
@@ -7558,6 +7601,74 @@ const LimintsoMeLayout: React.FC<{
 };
 
 // ============================================================================
+const ConfettiBurst: React.FC<{ count?: number }> = ({ count = 30 }) => {
+  const colors = ['#10B981', '#3B82F6', '#F59E0B', '#EF4444', '#EC4899', '#8B5CF6', '#34D399'];
+  return (
+    <div className="absolute inset-0 pointer-events-none overflow-hidden flex items-center justify-center z-50">
+      {Array.from({ length: count }).map((_, i) => {
+        const angle = (i / count) * 360 + Math.random() * 20;
+        const distance = 80 + Math.random() * 140;
+        const radian = (angle * Math.PI) / 180;
+        const x = Math.cos(radian) * distance;
+        const y = Math.sin(radian) * distance;
+        const rotation = Math.random() * 360;
+        const size = 6 + Math.random() * 10;
+        const delay = Math.random() * 0.12;
+        const color = colors[Math.floor(Math.random() * colors.length)];
+
+        return (
+          <motion.div
+            key={i}
+            initial={{ scale: 0, x: 0, y: 0, opacity: 1, rotate: 0 }}
+            animate={{
+              scale: [0, 1.2, 0.8, 0],
+              x: x,
+              y: y,
+              rotate: rotation + 180,
+              opacity: [1, 1, 0.8, 0],
+            }}
+            transition={{
+              duration: 1.3,
+              ease: "easeOut",
+              delay: delay,
+            }}
+            className="absolute rounded-sm"
+            style={{
+              width: size,
+              height: size,
+              backgroundColor: color,
+            }}
+          />
+        );
+      })}
+    </div>
+  );
+};
+
+const AnimatedCheckmark: React.FC<{ className?: string }> = ({ className = "w-10 h-10 text-emerald-500" }) => (
+  <svg
+    className={className}
+    viewBox="0 0 24 24"
+    fill="none"
+    stroke="currentColor"
+    strokeWidth="3.5"
+    strokeLinecap="round"
+    strokeLinejoin="round"
+  >
+    <motion.path
+      initial={{ pathLength: 0, opacity: 0 }}
+      animate={{ pathLength: 1, opacity: 1 }}
+      transition={{
+        type: "spring",
+        stiffness: 130,
+        damping: 14,
+        delay: 0.15,
+      }}
+      d="M20 6L9 17l-5-5"
+    />
+  </svg>
+);
+
 const RSVPForm: React.FC<{ event: EventDetails; onClose: () => void }> = ({
   event,
   onClose,
@@ -7688,20 +7799,78 @@ const RSVPForm: React.FC<{ event: EventDetails; onClose: () => void }> = ({
 
   if (successData) {
     return (
-      <div
-        className={`flex flex-col items-center justify-center space-y-6 py-6 ${isLuxury ? "text-white" : "text-slate-800"}`}
+      <motion.div
+        initial="hidden"
+        animate="visible"
+        variants={{
+          hidden: { opacity: 0, scale: 0.95 },
+          visible: {
+            opacity: 1,
+            scale: 1,
+            transition: {
+              staggerChildren: 0.12,
+              delayChildren: 0.1,
+            },
+          },
+        }}
+        className={`flex flex-col items-center justify-center py-6 relative overflow-hidden ${
+          isLuxury ? "text-white" : "text-slate-800"
+        }`}
       >
-        <div className="w-16 h-16 bg-green-100 text-green-600 rounded-full flex items-center justify-center mb-2">
-          <span className="material-symbols-outlined text-3xl">check</span>
-        </div>
-        <h3 className="text-xl font-bold text-center">Presença Confirmada!</h3>
-        <p
-          className={`text-sm text-center max-w-xs ${isLuxury ? "text-gray-400" : "text-slate-500"}`}
+        <ConfettiBurst count={30} />
+
+        <motion.div
+          variants={{
+            hidden: { scale: 0, rotate: -45 },
+            visible: { 
+              scale: 1, 
+              rotate: 0,
+              transition: { type: "spring", stiffness: 200, damping: 14 } 
+            }
+          }}
+          className={`w-20 h-20 rounded-full flex items-center justify-center mb-6 shadow-md ${
+            isLuxury 
+              ? "bg-[#BF9B30]/10 border-2 border-[#BF9B30]/40 text-[#BF9B30]" 
+              : "bg-emerald-50 border-2 border-emerald-500/20 text-emerald-500"
+          }`}
         >
-          Muito obrigado, {successData.name}! Guarde este QR Code, ele será seu
-          passe de entrada no dia do evento.
-        </p>
-        <div className="p-4 bg-white border border-slate-200 rounded-2xl shadow-sm">
+          <AnimatedCheckmark className={`w-10 h-10 ${isLuxury ? "text-[#BF9B30]" : "text-emerald-500"}`} />
+        </motion.div>
+
+        <motion.h3 
+          variants={{
+            hidden: { opacity: 0, y: 15 },
+            visible: { opacity: 1, y: 0, transition: { type: "spring", damping: 15 } }
+          }}
+          className="text-2xl font-black text-center tracking-tight mb-2"
+        >
+          Presença Confirmada!
+        </motion.h3>
+
+        <motion.p
+          variants={{
+            hidden: { opacity: 0, y: 15 },
+            visible: { opacity: 1, y: 0, transition: { type: "spring", damping: 15 } }
+          }}
+          className={`text-sm text-center max-w-xs mb-6 px-2 leading-relaxed ${
+            isLuxury ? "text-gray-300" : "text-slate-500"
+          }`}
+        >
+          Muito obrigado, <span className="font-semibold">{successData.name}</span>! Guarde este QR Code, ele será seu passe de entrada no dia do evento.
+        </motion.p>
+
+        <motion.div
+          variants={{
+            hidden: { opacity: 0, scale: 0.9, y: 20 },
+            visible: { 
+              opacity: 1, 
+              scale: 1, 
+              y: 0,
+              transition: { type: "spring", stiffness: 150, damping: 18 } 
+            }
+          }}
+          className="p-5 bg-white border border-slate-100 rounded-[28px] shadow-[0_12px_40px_rgba(0,0,0,0.06)] mb-8 flex flex-col items-center justify-center"
+        >
           <QRCodeSVG
             id="qr-code-svg"
             value={`guest=${successData.id}`}
@@ -7709,14 +7878,22 @@ const RSVPForm: React.FC<{ event: EventDetails; onClose: () => void }> = ({
             level="H"
             includeMargin={true}
           />
-        </div>
-        <div className="flex gap-3 w-full mt-4">
+          <span className="text-[10px] text-slate-400 font-mono tracking-wider mt-3 uppercase">Passe de Entrada</span>
+        </motion.div>
+
+        <motion.div
+          variants={{
+            hidden: { opacity: 0, y: 15 },
+            visible: { opacity: 1, y: 0, transition: { type: "spring", damping: 15 } }
+          }}
+          className="flex gap-3 w-full max-w-xs mt-2"
+        >
           <button
             onClick={handleDownloadQR}
-            className={`flex-1 py-3 rounded-xl font-bold text-sm transition-colors flex items-center justify-center gap-2 ${
+            className={`flex-1 py-3.5 rounded-2xl font-bold text-sm transition-all active:scale-[0.98] flex items-center justify-center gap-2 ${
               isLuxury
-                ? "bg-transparent border border-[#BF9B30] text-[#BF9B30] hover:bg-[#BF9B30]/10"
-                : "bg-white border border-slate-200 text-brand-blue hover:bg-slate-50"
+                ? "bg-transparent border-2 border-[#BF9B30] text-[#BF9B30] hover:bg-[#BF9B30]/10"
+                : "bg-white border border-slate-200 text-brand-blue hover:bg-slate-50 shadow-sm"
             }`}
           >
             <span className="material-symbols-outlined text-sm">download</span>
@@ -7724,16 +7901,16 @@ const RSVPForm: React.FC<{ event: EventDetails; onClose: () => void }> = ({
           </button>
           <button
             onClick={onClose}
-            className={`flex-1 py-3 rounded-xl font-bold text-sm transition-colors ${
+            className={`flex-1 py-3.5 rounded-2xl font-bold text-sm transition-all active:scale-[0.98] ${
               isLuxury
-                ? "bg-[#BF9B30] text-black hover:bg-[#BF9B30]/90"
-                : "bg-slate-900 text-white hover:bg-slate-800"
+                ? "bg-[#BF9B30] text-black hover:bg-[#BF9B30]/90 shadow-md"
+                : "bg-slate-900 text-white hover:bg-slate-800 shadow-md"
             }`}
           >
             Fechar
           </button>
-        </div>
-      </div>
+        </motion.div>
+      </motion.div>
     );
   }
 

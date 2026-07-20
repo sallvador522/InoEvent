@@ -1,7 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { Navbar } from '../../components/Navbar';
 import { db } from '../../components/FirebaseProvider';
-import { collection, getDocs, query, orderBy, doc, updateDoc, addDoc } from 'firebase/firestore';
+import { collection, getDocs, query, orderBy, doc, updateDoc, addDoc, limit, startAfter } from 'firebase/firestore';
 import { toast } from 'react-hot-toast';
 import { motion, AnimatePresence } from 'framer-motion';
 import { Skeleton } from '../../components/ui/Skeleton';
@@ -35,9 +35,9 @@ export const AdminDashboard: React.FC = () => {
   useEffect(() => {
     const fetchData = async () => {
       try {
-        const usersSnapshot = await getDocs(query(collection(db, 'users')));
-        const eventsSnapshot = await getDocs(query(collection(db, 'events')));
-        const transactionsSnapshot = await getDocs(query(collection(db, 'transactions'), orderBy('date', 'desc')));
+        const usersSnapshot = await getDocs(query(collection(db, 'users'), limit(500)));
+        const eventsSnapshot = await getDocs(query(collection(db, 'events'), limit(500)));
+        const transactionsSnapshot = await getDocs(query(collection(db, 'transactions'), orderBy('date', 'desc'), limit(100)));
         
         let visitsData: any[] = [];
         try {

@@ -24,6 +24,8 @@ const TESTIMONIALS = [
   { text: "Painel de controle excelente para gerir milhares de convidados.", author: "Sérgio Almeida", role: "Organizador Corporate", rating: 5 },
 ];
 
+import { getOptimizedImageUrl } from '../../lib/imageOptimizer';
+
 export const LandingPage: React.FC = () => {
   const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
   const [dashboardOpen, setDashboardOpen] = useState(false);
@@ -192,9 +194,9 @@ export const LandingPage: React.FC = () => {
            >
               <div className="flex items-center gap-3 bg-white/60 backdrop-blur-md border border-slate-200/60 px-4 py-2 rounded-full shadow-sm">
                  <div className="flex -space-x-2">
-                    <img src="https://i.pravatar.cc/100?img=1" className="w-6 h-6 rounded-full border-2 border-white" alt="User" />
-                    <img src="https://i.pravatar.cc/100?img=5" className="w-6 h-6 rounded-full border-2 border-white" alt="User" />
-                    <img src="https://i.pravatar.cc/100?img=9" className="w-6 h-6 rounded-full border-2 border-white" alt="User" />
+                    <img src="https://i.pravatar.cc/100?img=1" className="w-6 h-6 rounded-full border-2 border-white" alt="User" loading="lazy" width="24" height="24" />
+                    <img src="https://i.pravatar.cc/100?img=5" className="w-6 h-6 rounded-full border-2 border-white" alt="User" loading="lazy" width="24" height="24" />
+                    <img src="https://i.pravatar.cc/100?img=9" className="w-6 h-6 rounded-full border-2 border-white" alt="User" loading="lazy" width="24" height="24" />
                  </div>
                  <div className="flex items-center gap-1 text-[#BF9B30]">
                     <span className="material-symbols-outlined text-sm font-bold">star</span>

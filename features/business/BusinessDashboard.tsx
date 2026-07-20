@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { collection, query, where, getDocs, doc, updateDoc, setDoc } from 'firebase/firestore';
+import { collection, query, where, getDocs, doc, updateDoc, setDoc, getCountFromServer } from 'firebase/firestore';
 import { db, handleFirestoreError, OperationType } from '../../components/FirebaseProvider';
 import { useFirebase } from '../../components/FirebaseProvider';
 import { Navbar } from '../../components/Navbar';
@@ -43,26 +43,30 @@ export const BusinessDashboard: React.FC = () => {
                 let checkedInCount = 0;
                 const newChartData: any[] = [];
 
+                // Use Firestore aggregation queries to avoid downloading all guest documents (N+1 query fix)
+                // Note: Firestore count() is much faster and cheaper than getting all documents
                 await Promise.all(eventsList.map(async (ev) => {
-                    const guestsSnap = await getDocs(collection(db, 'events', ev.id, 'guests'));
-                    let evTotal = 0;
-                    let evChecked = 0;
-                    guestsSnap.forEach(g => {
-                        evTotal++;
-                        totalGuestsCount++;
-                        if (g.data().checkedIn) {
-                            evChecked++;
-                            checkedInCount++;
-                        }
-                    });
-                    
-                    const conversionRate = evTotal > 0 ? Math.round((evChecked / evTotal) * 100) : 0;
-                    newChartData.push({
-                        name: ev.title || 'Evento sem título',
-                        convidados: evTotal,
-                        checkins: evChecked,
-                        taxa: conversionRate
-                    });
+                    const guestsColl = collection(db, 'events', ev.id, 'guests');
+                    try {
+                        const totalSnap = await getCountFromServer(guestsColl);
+                        const checkedInSnap = await getCountFromServer(query(guestsColl, where('checkedIn', '==', true)));
+                        
+                        let evTotal = totalSnap.data().count;
+                        let evChecked = checkedInSnap.data().count;
+
+                        totalGuestsCount += evTotal;
+                        checkedInCount += evChecked;
+
+                        const conversionRate = evTotal > 0 ? Math.round((evChecked / evTotal) * 100) : 0;
+                        newChartData.push({
+                            name: ev.title || 'Evento sem título',
+                            convidados: evTotal,
+                            checkins: evChecked,
+                            taxa: conversionRate
+                        });
+                    } catch (err) {
+                        console.error('Error fetching count for event:', ev.id, err);
+                    }
                 }));
 
                 setChartData(newChartData);

@@ -7,10 +7,22 @@ import cors from 'cors';
 import helmet from 'helmet';
 import fs from 'fs';
 import admin from 'firebase-admin';
+import compression from 'compression';
 import { logger } from './lib/logger';
-const firebaseConfig = JSON.parse(fs.readFileSync(path.join(process.cwd(), 'firebase-applet-config.json'), 'utf8'));
+let firebaseConfig: any = null;
+try {
+  firebaseConfig = JSON.parse(fs.readFileSync(path.join(process.cwd(), 'firebase-applet-config.json'), 'utf8'));
+} catch (e) {
+  logger.error('Failed to load firebase-applet-config.json on boot', { category: 'SYSTEM', data: e });
+}
 
 const app = express();
+app.use(compression());
+
+// Bulletproof fallback for Vercel static assets in case Output Directory is misconfigured
+app.use('/assets', express.static(path.join(process.cwd(), 'dist/assets')));
+app.use(express.static(path.join(process.cwd(), 'dist')));
+
 
 const keyGenerator = (req: express.Request) => {
   return req.headers.authorization || req['ip'] || (req.socket as any).remoteAddress || 'unknown';
@@ -86,10 +98,10 @@ app.use((req, res, next) => {
 try {
   if (admin.apps.length === 0) {
     admin.initializeApp({
-      projectId: firebaseConfig.projectId,
+      projectId: firebaseConfig ? firebaseConfig.projectId : process.env.GOOGLE_CLOUD_PROJECT || 'dummy-project',
     });
   }
-  const dbId = firebaseConfig.firestoreDatabaseId;
+  const dbId = firebaseConfig ? firebaseConfig.firestoreDatabaseId : undefined;
   if (dbId && dbId !== '(default)') {
     try {
       const dbInstance = admin.firestore();
@@ -115,8 +127,9 @@ try {
 // Helper to fetch event details safely
 async function getEventDetails(eventId: string) {
   try {
-    const dbId = firebaseConfig.firestoreDatabaseId || '(default)';
-    const url = `https://firestore.googleapis.com/v1/projects/${firebaseConfig.projectId}/databases/${dbId}/documents/events/${eventId}`;
+    const dbId = (firebaseConfig && firebaseConfig.firestoreDatabaseId) ? firebaseConfig.firestoreDatabaseId : '(default)';
+    const projectId = (firebaseConfig && firebaseConfig.projectId) ? firebaseConfig.projectId : process.env.GOOGLE_CLOUD_PROJECT || 'dummy-project';
+    const url = `https://firestore.googleapis.com/v1/projects/${projectId}/databases/${dbId}/documents/events/${eventId}`;
     const res = await fetch(url);
     if (!res.ok) {
         return null;
@@ -710,7 +723,7 @@ app.get('/plans', async (req, res, next) => {
     let foundPath = possiblePaths.find(p => fs.existsSync(p));
     
     if (foundPath) {
-      html = fs.readFileSync(foundPath, 'utf8');
+      html = await fs.promises.readFile(foundPath, 'utf8');
     } else {
       return next();
     }
@@ -777,7 +790,7 @@ app.get('/invite/:id', async (req, res, next) => {
     let foundPath = possiblePaths.find(p => fs.existsSync(p));
     
     if (foundPath) {
-      html = fs.readFileSync(foundPath, 'utf8');
+      html = await fs.promises.readFile(foundPath, 'utf8');
     } else {
       try {
         const isLocal = req.headers.host && req.headers.host.includes('localhost');

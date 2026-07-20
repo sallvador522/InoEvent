@@ -7,6 +7,7 @@ import { AdminRoute } from './components/AdminRoute';
 import { WhatsAppSupport } from './components/WhatsAppSupport';
 import { AnalyticsTracker } from './components/AnalyticsTracker';
 import { ErrorBoundary } from './components/ErrorBoundary';
+import { NotFound } from './components/NotFound';
 
 // Lazy-loaded pages to reduce initial bundle size and optimize Core Web Vitals for mobile users
 const LandingPage = lazy(() => import('./features/landing/LandingPage').then(m => ({ default: m.LandingPage })));
@@ -25,7 +26,6 @@ const AuthPage = lazy(() => import('./features/auth/AuthPage').then(m => ({ defa
 const PlansPage = lazy(() => import('./features/plans/PlansPage').then(m => ({ default: m.PlansPage })));
 const EventCreator = lazy(() => import('./features/invitation/EventCreator').then(m => ({ default: m.EventCreator })));
 const AdminDashboard = lazy(() => import('./features/admin/AdminDashboard').then(m => ({ default: m.AdminDashboard })));
-const NotFound = lazy(() => import('./components/NotFound').then(m => ({ default: m.NotFound })));
 
 // Sleek luxury-styled minimalist loading fallback
 const PageLoader: React.FC = () => (

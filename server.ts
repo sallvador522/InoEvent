@@ -128,10 +128,16 @@ try {
       logger.info("Inicializando Firebase Admin usando credenciais padrão do ambiente (Application Default Credentials).", { category: 'DATABASE' });
     }
 
-    admin.initializeApp({
-      credential,
-      projectId: projectId,
-    });
+    if (credential) {
+      admin.initializeApp({
+        credential,
+        projectId: projectId,
+      });
+    } else {
+      admin.initializeApp({
+        projectId: projectId,
+      });
+    }
   }
   const dbId = firebaseConfig ? firebaseConfig.firestoreDatabaseId : undefined;
   if (dbId && dbId !== '(default)') {
@@ -520,13 +526,9 @@ app.get('/api/events/:id/guests', apiRateLimiter, async (req, res) => {
             const guests = guestsSnap.docs.map(doc => ({ id: doc.id, ...doc.data() }));
             return res.json({ guests });
         } catch (dbErr: any) {
-            const isPermissionError = dbErr.message?.includes('PERMISSION_DENIED') || dbErr.message?.includes('Missing or insufficient permissions');
-            if (isPermissionError || process.env.NODE_ENV !== 'production') {
-                logger.warn(`Utilizando fallback de banco de dados local para buscar convidados do evento ${id} devido a: ${dbErr.message}`);
-                const guests = readLocalGuests(id);
-                return res.json({ guests });
-            }
-            throw dbErr;
+            logger.warn(`Utilizando fallback de banco de dados local para buscar convidados do evento ${id} devido a: ${dbErr.message}`);
+            const guests = readLocalGuests(id);
+            return res.json({ guests });
         }
     } catch (err) {
         logger.error(`Erro ao buscar convidados para o evento ${id}:`, { category: 'DATABASE', data: err });
@@ -558,9 +560,9 @@ app.post('/api/events/:id/rsvp', rsvpRateLimiter, async (req, res) => {
             
             // Check duplicate
             if (phone) {
-                const normalizedPhone = phone.trim().replace(/[\s\-()]/g, "");
+                const normalizedPhone = String(phone).trim().replace(/[\s\-()]/g, "");
                 const phoneQuery = await guestsRef.where('phone', '==', normalizedPhone).get();
-                const phoneQueryRaw = await guestsRef.where('phone', '==', phone.trim()).get();
+                const phoneQueryRaw = await guestsRef.where('phone', '==', String(phone).trim()).get();
                 if (!phoneQuery.empty || !phoneQueryRaw.empty) {
                     return res.status(400).json({ error: 'Este número de WhatsApp já confirmou presença neste evento.' });
                 }
@@ -574,41 +576,12 @@ app.post('/api/events/:id/rsvp', rsvpRateLimiter, async (req, res) => {
             
             return res.json({ success: true, guestId: newGuestRef.id });
         } catch (dbErr: any) {
-            const isPermissionError = dbErr.message?.includes('PERMISSION_DENIED') || dbErr.message?.includes('Missing or insufficient permissions');
-            if (isPermissionError || process.env.NODE_ENV !== 'production') {
-                logger.warn(`Utilizando fallback de banco de dados local para registrar RSVP no evento ${id} devido a: ${dbErr.message}`);
-                
-                const localGuests = readLocalGuests(id);
-                if (localGuests.length >= limit) {
-                    return res.status(400).json({ error: 'O limite de convidados para este evento foi atingido.' });
-                }
-                
-                if (phone) {
-                    const normalizedPhone = phone.trim().replace(/[\s\-()]/g, "");
-                    const duplicate = localGuests.find((g: any) => {
-                        const gp = (g.phone || '').trim().replace(/[\s\-()]/g, "");
-                        return gp === normalizedPhone || (g.phone && g.phone.trim() === phone.trim());
-                    });
-                    if (duplicate) {
-                        return res.status(400).json({ error: 'Este número de WhatsApp já confirmou presença neste evento.' });
-                    }
-                }
-                
-                const mockId = 'guest_' + Math.random().toString(36).substr(2, 9);
-                const newGuest = {
-                    id: mockId,
-                    ...guestData,
-                    createdAt: new Date().toISOString()
-                };
-                writeLocalGuest(id, newGuest);
-                
-                return res.json({ success: true, guestId: mockId });
-            }
-            throw dbErr;
+            logger.error(`Erro do Firebase ao registrar RSVP no evento ${id}:`, { category: 'DATABASE', data: dbErr?.message || String(dbErr) });
+            return res.status(500).json({ error: 'Erro de banco de dados ao confirmar presença.' });
         }
     } catch (err: any) {
         console.error("SERVER EXCEPTION IN RSVP:", err?.stack || err);
-        logger.error(`Erro ao processar RSVP no evento ${id}:`, { category: 'DATABASE', data: err?.message || err });
+        logger.error(`Erro ao processar RSVP no evento ${id}:`, { category: 'DATABASE', data: err?.message || String(err) });
         res.status(500).json({ error: 'Server error' });
     }
 });
@@ -618,48 +591,27 @@ app.get('/api/events/:id/rsvp-status', apiRateLimiter, async (req, res) => {
     const { phone } = req.query;
     if (!phone) return res.status(400).json({ error: 'Missing phone' });
     try {
-        try {
-            const db = getDb();
-            const guestsRef = db.collection('events').doc(id).collection('guests');
-            const normalizedPhone = (phone as string).trim().replace(/[\s\-()]/g, "");
-            const snap = await guestsRef.where('phone', '==', normalizedPhone).get();
-            
-            if (snap.empty) {
-                return res.status(404).json({ error: 'Nenhuma confirmação encontrada para este número.' });
-            }
-            const guestDoc = snap.docs[0];
-            const guestData = { id: guestDoc.id, ...guestDoc.data() } as any;
-            
-            if (guestData.tableId) {
-                const tableSnap = await db.collection('events').doc(id).collection('tables').doc(guestData.tableId).get();
-                if (tableSnap.exists) {
-                    guestData.tableName = tableSnap.data()?.name;
-                }
-            }
-            
-            return res.json({ guest: guestData });
-        } catch (dbErr: any) {
-            const isPermissionError = dbErr.message?.includes('PERMISSION_DENIED') || dbErr.message?.includes('Missing or insufficient permissions');
-            if (isPermissionError || process.env.NODE_ENV !== 'production') {
-                logger.warn(`Utilizando fallback de banco de dados local para rsvp-status no evento ${id} devido a: ${dbErr.message}`);
-                
-                const localGuests = readLocalGuests(id);
-                const normalizedPhone = (phone as string).trim().replace(/[\s\-()]/g, "");
-                const guestData = localGuests.find((g: any) => {
-                    const gp = (g.phone || '').trim().replace(/[\s\-()]/g, "");
-                    return gp === normalizedPhone || (g.phone && g.phone.trim() === (phone as string).trim());
-                });
-                
-                if (!guestData) {
-                    return res.status(404).json({ error: 'Nenhuma confirmação encontrada para este número.' });
-                }
-                
-                return res.json({ guest: guestData });
-            }
-            throw dbErr;
+        const db = getDb();
+        const guestsRef = db.collection('events').doc(id).collection('guests');
+        const normalizedPhone = String(phone).trim().replace(/[\s\-()]/g, "");
+        const snap = await guestsRef.where('phone', '==', normalizedPhone).get();
+        
+        if (snap.empty) {
+            return res.status(404).json({ error: 'Nenhuma confirmação encontrada para este número.' });
         }
-    } catch (err) {
-        logger.error(`Erro ao consultar status do rsvp para o evento ${id}:`, { category: 'DATABASE', data: err });
+        const guestDoc = snap.docs[0];
+        const guestData = { id: guestDoc.id, ...guestDoc.data() } as any;
+        
+        if (guestData.tableId) {
+            const tableSnap = await db.collection('events').doc(id).collection('tables').doc(guestData.tableId).get();
+            if (tableSnap.exists) {
+                guestData.tableName = tableSnap.data()?.name;
+            }
+        }
+        
+        return res.json({ guest: guestData });
+    } catch (err: any) {
+        logger.error(`Erro ao consultar status do rsvp para o evento ${id}:`, { category: 'DATABASE', data: err?.message || String(err) });
         res.status(500).json({ error: 'Server error' });
     }
 });

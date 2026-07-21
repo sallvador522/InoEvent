@@ -8,12 +8,12 @@ import { SEO } from '../../components/SEO';
 import { FAQSection } from './FAQSection';
 import { SupportModal } from '../../components/SupportModal';
 import { EVENTS } from '../../mockData';
-import { X, Copy, MessageSquare } from 'lucide-react';
+import { X, Copy, MessageSquare, QrCode, LayoutDashboard, Gift, Globe, UtensilsCrossed, BookOpen, BarChart3, Bot, ArrowRight, Star, Award, Image as ImageIcon, CheckCircle2, Gem, Sparkles, PartyPopper, Utensils, Cake, Baby, Briefcase } from 'lucide-react';
 import toast from 'react-hot-toast';
 import { copyToClipboard } from '../../lib/clipboard';
 
 // Create a motion component from the React Router Link
-const MotionLink = motion(Link);
+const MotionLink = motion.create(Link);
 
 const TESTIMONIALS = [
   { text: "A melhor plataforma de convites que já usei. Simplesmente elegante.", author: "Maria Silva", role: "Noiva", rating: 5 },
@@ -199,11 +199,11 @@ export const LandingPage: React.FC = () => {
                     <img src="https://i.pravatar.cc/100?img=9" className="w-6 h-6 rounded-full border-2 border-white" alt="User" loading="lazy" width="24" height="24" />
                  </div>
                  <div className="flex items-center gap-1 text-[#BF9B30]">
-                    <span className="material-symbols-outlined text-sm font-bold">star</span>
-                    <span className="material-symbols-outlined text-sm font-bold">star</span>
-                    <span className="material-symbols-outlined text-sm font-bold">star</span>
-                    <span className="material-symbols-outlined text-sm font-bold">star</span>
-                    <span className="material-symbols-outlined text-sm font-bold">star</span>
+                    <Star size={14} className="fill-current" />
+                    <Star size={14} className="fill-current" />
+                    <Star size={14} className="fill-current" />
+                    <Star size={14} className="fill-current" />
+                    <Star size={14} className="fill-current" />
                  </div>
                  <span className="text-xs font-semibold text-slate-600 ml-1">Amado por +10.000 clientes</span>
               </div>
@@ -243,7 +243,7 @@ export const LandingPage: React.FC = () => {
                      className="flex-1 h-12 px-3 sm:px-6 bg-[#1B365D] text-white text-[10px] sm:text-xs font-bold uppercase tracking-wider rounded-full relative overflow-hidden transition-all duration-150 ease-out border-b-4 border-[#10223B] hover:bg-[#224373] hover:-translate-y-[1px] hover:border-b-[5px] hover:shadow-[0_6px_16px_rgba(27,54,93,0.35)] active:translate-y-[3px] active:border-b-[1px] active:shadow-[0_2px_4px_rgba(27,54,93,0.2)] shadow-[0_4px_12px_rgba(27,54,93,0.2),inset_0_1px_0_rgba(255,255,255,0.15)] flex items-center justify-center gap-1.5 group cursor-pointer"
                   >
                      <span className="truncate">Criar Convite</span>
-                     <span className="material-symbols-outlined text-[15px] sm:text-[18px] group-hover:translate-x-0.5 transition-transform shrink-0">arrow_forward</span>
+                     <ArrowRight size={18} className="group-hover:translate-x-0.5 transition-transform shrink-0" />
                   </button>
                   
                   {/* Premium CTA - Order Custom */}
@@ -251,7 +251,7 @@ export const LandingPage: React.FC = () => {
                      onClick={() => setSupportOpen(true)}
                      className="flex-1 h-12 px-3 sm:px-6 bg-gradient-to-b from-[#DFB135] to-[#A07B18] text-white text-[10px] sm:text-xs font-bold uppercase tracking-wider rounded-full relative overflow-hidden transition-all duration-150 ease-out border-b-4 border-[#765B11] hover:from-[#EABF45] hover:to-[#B38B20] hover:-translate-y-[1px] hover:border-b-[5px] hover:shadow-[0_6px_16px_rgba(197,160,40,0.35)] active:translate-y-[3px] active:border-b-[1px] active:shadow-[0_2px_4px_rgba(197,160,40,0.2)] shadow-[0_4px_12px_rgba(197,160,40,0.2),inset_0_1px_0_rgba(255,255,255,0.25)] flex items-center justify-center gap-1.5 group cursor-pointer"
                   >
-                     <span className="material-symbols-outlined text-[15px] sm:text-[18px] text-white shrink-0">workspace_premium</span>
+                     <Award size={18} className="text-white shrink-0" />
                      <span className="truncate">Encomendar VIP</span>
                   </button>
                 </div>
@@ -261,7 +261,7 @@ export const LandingPage: React.FC = () => {
                    to="/templates"
                    className="px-6 py-2.5 border border-slate-200 border-b-[3px] border-b-slate-300 text-slate-500 hover:text-[#1B365D] hover:border-[#1B365D]/40 text-[10px] sm:text-xs font-bold uppercase tracking-wider rounded-full hover:-translate-y-[1px] hover:border-b-4 hover:shadow-md active:translate-y-[2px] active:border-b-[1px] active:shadow-sm transition-all duration-150 flex items-center justify-center gap-1.5 bg-white/60 backdrop-blur-md shadow-sm"
                 >
-                  <span className="material-symbols-outlined text-[15px] sm:text-[16px] text-[#1B365D]">collections</span>
+                  <ImageIcon size={16} className="text-[#1B365D]" />
                   <span>Ver Templates</span>
                 </Link>
               </motion.div>
@@ -289,18 +289,18 @@ export const LandingPage: React.FC = () => {
                           transition={{ repeat: Infinity, duration: 40, ease: "linear" }}
                           className="flex flex-col gap-6"
                        >
-                          <img src={EVENTS[0]?.heroImage || "/bridal-templates/templateCha1.png"} className="rounded-2xl shadow-sm object-cover w-full aspect-[3/4]" alt="Template" loading="lazy" referrerPolicy="no-referrer" />
-                          <img src={EVENTS[1]?.heroImage || "/bridal-templates/templateCha3.png"} className="rounded-2xl shadow-sm object-cover w-full aspect-[3/4]" alt="Template" loading="lazy" referrerPolicy="no-referrer" />
-                          <img src={EVENTS[2]?.heroImage || "/bridal-templates/templateCha1.png"} className="rounded-2xl shadow-sm object-cover w-full aspect-[3/4]" alt="Template" loading="lazy" referrerPolicy="no-referrer" />
+                          <img src="/bridal-templates/templateCha1.png" className="rounded-2xl shadow-sm object-cover w-full aspect-[3/4]" alt="Template" loading="lazy" referrerPolicy="no-referrer" />
+                          <img src="/bridal-templates/templateCha3.png" className="rounded-2xl shadow-sm object-cover w-full aspect-[3/4]" alt="Template" loading="lazy" referrerPolicy="no-referrer" />
+                          <img src="/bridal-templates/templateCha1.png" className="rounded-2xl shadow-sm object-cover w-full aspect-[3/4]" alt="Template" loading="lazy" referrerPolicy="no-referrer" />
                        </motion.div>
                        <motion.div 
                           animate={{ y: ["-50%", "0%"] }}
                           transition={{ repeat: Infinity, duration: 50, ease: "linear" }}
                           className="flex flex-col gap-6 mt-[-50%]"
                        >
-                          <img src={EVENTS[3]?.heroImage || "/bridal-templates/templateCha2.png"} className="rounded-2xl shadow-sm object-cover w-full aspect-[3/4]" alt="Template" loading="lazy" referrerPolicy="no-referrer" />
-                          <img src={EVENTS[4]?.heroImage || "/bridal-templates/templateCha4.png"} className="rounded-2xl shadow-sm object-cover w-full aspect-[3/4]" alt="Template" loading="lazy" referrerPolicy="no-referrer" />
-                          <img src={EVENTS[5]?.heroImage || "/bridal-templates/templateCha2.png"} className="rounded-2xl shadow-sm object-cover w-full aspect-[3/4]" alt="Template" loading="lazy" referrerPolicy="no-referrer" />
+                          <img src="/bridal-templates/templateCha2.png" className="rounded-2xl shadow-sm object-cover w-full aspect-[3/4]" alt="Template" loading="lazy" referrerPolicy="no-referrer" />
+                          <img src="/bridal-templates/templateCha4.png" className="rounded-2xl shadow-sm object-cover w-full aspect-[3/4]" alt="Template" loading="lazy" referrerPolicy="no-referrer" />
+                          <img src="/bridal-templates/templateCha2.png" className="rounded-2xl shadow-sm object-cover w-full aspect-[3/4]" alt="Template" loading="lazy" referrerPolicy="no-referrer" />
                        </motion.div>
                     </div>
                  </div>
@@ -312,7 +312,7 @@ export const LandingPage: React.FC = () => {
                  transition={{ repeat: Infinity, duration: 6, ease: "easeInOut" }}
                  className="absolute left-2 md:left-24 top-12 w-[160px] md:w-[220px] h-[320px] md:h-[420px] bg-white rounded-3xl border-4 md:border-8 border-slate-900 shadow-2xl flex flex-col overflow-hidden z-20"
               >
-                 <img src={EVENTS[3]?.heroImage || "/bridal-templates/templateCha4.png"} className="w-full h-full object-cover" alt="Phone Template Preview" loading="lazy" referrerPolicy="no-referrer" />
+                 <img src="/bridal-templates/templateCha4.png" className="w-full h-full object-cover" alt="Phone Template Preview" loading="lazy" referrerPolicy="no-referrer" />
                  <div className="absolute bottom-4 left-1/2 -translate-x-1/2 w-[80%] bg-white/90 backdrop-blur text-center py-2 rounded-full text-[10px] sm:text-xs font-bold shadow-lg">
                     Confirmar Presença
                  </div>
@@ -325,7 +325,7 @@ export const LandingPage: React.FC = () => {
                  className="absolute right-0 md:right-16 top-24 w-[180px] md:w-[260px] rounded-2xl bg-white/80 backdrop-blur-xl border border-white p-4 shadow-[0_20px_40px_rgba(0,0,0,0.1)] hidden sm:block"
               >
                  <div className="w-12 h-12 rounded-full bg-emerald-100 flex items-center justify-center mb-4 text-emerald-600">
-                    <span className="material-symbols-outlined">check_circle</span>
+                    <CheckCircle2 size={24} />
                  </div>
                  <h4 className="font-bold text-slate-800 mb-1">Presença Confirmada</h4>
                  <p className="text-xs text-slate-500 mb-4">Ana Clara Silva confirmou para o seu Casamento.</p>
@@ -356,19 +356,19 @@ export const LandingPage: React.FC = () => {
                  </div>
                  <ul className="flex flex-col gap-3 mb-8 flex-1">
                     <li className="flex items-center gap-3 text-[13px] text-slate-600">
-                       <span className="material-symbols-outlined text-[18px] text-emerald-500">check_circle</span>
+                       <CheckCircle2 size={18} className="text-emerald-500" />
                        <span>Até 100 convidados (RSVP)</span>
                     </li>
                     <li className="flex items-center gap-3 text-[13px] text-slate-600">
-                       <span className="material-symbols-outlined text-[18px] text-emerald-500">check_circle</span>
+                       <CheckCircle2 size={18} className="text-emerald-500" />
                        <span>Layouts Clássicos</span>
                     </li>
                     <li className="flex items-center gap-3 text-[13px] text-slate-600">
-                       <span className="material-symbols-outlined text-[18px] text-emerald-500">check_circle</span>
+                       <CheckCircle2 size={18} className="text-emerald-500" />
                        <span>Galeria de Fotos Básica</span>
                     </li>
                     <li className="flex items-center gap-3 text-[13px] text-slate-600">
-                       <span className="material-symbols-outlined text-[18px] text-emerald-500">check_circle</span>
+                       <CheckCircle2 size={18} className="text-emerald-500" />
                        <span>Ativo até 30 dias após o evento</span>
                     </li>
                  </ul>
@@ -390,27 +390,27 @@ export const LandingPage: React.FC = () => {
                  </div>
                  <ul className="flex flex-col gap-3 mb-8 flex-1">
                     <li className="flex items-center gap-3 text-[13px] text-blue-50">
-                       <span className="material-symbols-outlined text-[18px] text-[#DFB135]">check_circle</span>
+                       <CheckCircle2 size={18} className="text-[#DFB135]" />
                        <span>Convidados Ilimitados (RSVP)</span>
                     </li>
                     <li className="flex items-center gap-3 text-[13px] text-blue-50">
-                       <span className="material-symbols-outlined text-[18px] text-[#DFB135]">check_circle</span>
+                       <CheckCircle2 size={18} className="text-[#DFB135]" />
                        <span>Layouts Premium & Luxury</span>
                     </li>
                     <li className="flex items-center gap-3 text-[13px] text-blue-50">
-                       <span className="material-symbols-outlined text-[18px] text-[#DFB135]">check_circle</span>
+                       <CheckCircle2 size={18} className="text-[#DFB135]" />
                        <span>TocaPlayer (Música de Fundo)</span>
                     </li>
                     <li className="flex items-center gap-3 text-[13px] text-blue-50">
-                       <span className="material-symbols-outlined text-[18px] text-[#DFB135]">check_circle</span>
+                       <CheckCircle2 size={18} className="text-[#DFB135]" />
                        <span>Sem marca d'água InoEvents</span>
                     </li>
                     <li className="flex items-center gap-3 text-[13px] text-blue-50">
-                       <span className="material-symbols-outlined text-[18px] text-[#DFB135]">check_circle</span>
+                       <CheckCircle2 size={18} className="text-[#DFB135]" />
                        <span>Envio Automático via WhatsApp</span>
                     </li>
                     <li className="flex items-center gap-3 text-[13px] text-blue-50">
-                       <span className="material-symbols-outlined text-[18px] text-[#DFB135]">check_circle</span>
+                       <CheckCircle2 size={18} className="text-[#DFB135]" />
                        <span>Domínio Personalizado (.com)</span>
                     </li>
                  </ul>
@@ -422,11 +422,11 @@ export const LandingPage: React.FC = () => {
               {/* Plan 3: VIP */}
               <div className="flex-1 w-full max-w-sm bg-[#0A0A0A] rounded-3xl p-8 border border-white/10 shadow-[0_8px_30px_rgb(0,0,0,0.12)] flex flex-col relative overflow-hidden group hover:border-white/20 transition-all duration-300">
                  <div className="absolute -top-10 -right-10 p-4 opacity-5 pointer-events-none group-hover:scale-110 transition-transform duration-700">
-                    <span className="material-symbols-outlined text-[150px] text-white">diamond</span>
+                    <Gem size={150} className="text-white" />
                  </div>
                  <h4 className="text-xl font-bold text-white mb-2 relative z-10 flex items-center gap-2">
                    Business 
-                   <span className="material-symbols-outlined text-[18px] text-[#DFB135]">domain</span>
+                   <Globe size={18} className="text-[#DFB135]" />
                  </h4>
                  <p className="text-slate-400 text-[13px] leading-relaxed mb-6 h-10 relative z-10">Software B2B completo para Agências e Cerimonialistas.</p>
                  <div className="mb-6 flex items-baseline gap-1 relative z-10">
@@ -435,19 +435,19 @@ export const LandingPage: React.FC = () => {
                  </div>
                  <ul className="flex flex-col gap-3 mb-8 flex-1 relative z-10">
                     <li className="flex items-center gap-3 text-[13px] text-slate-300">
-                       <span className="material-symbols-outlined text-[18px] text-[#DFB135]">check_circle</span>
+                       <CheckCircle2 size={18} className="text-[#DFB135]" />
                        <span>Eventos ativos ilimitados (∞)</span>
                     </li>
                     <li className="flex items-center gap-3 text-[13px] text-slate-300">
-                       <span className="material-symbols-outlined text-[18px] text-[#DFB135]">check_circle</span>
+                       <CheckCircle2 size={18} className="text-[#DFB135]" />
                        <span>White-label (Sua Marca)</span>
                     </li>
                     <li className="flex items-center gap-3 text-[13px] text-slate-300">
-                       <span className="material-symbols-outlined text-[18px] text-[#DFB135]">check_circle</span>
+                       <CheckCircle2 size={18} className="text-[#DFB135]" />
                        <span>Painel de Gestão B2B</span>
                     </li>
                     <li className="flex items-center gap-3 text-[13px] text-slate-300">
-                       <span className="material-symbols-outlined text-[18px] text-[#DFB135]">check_circle</span>
+                       <CheckCircle2 size={18} className="text-[#DFB135]" />
                        <span>Suporte VIP Prioritário</span>
                     </li>
                  </ul>
@@ -471,42 +471,42 @@ export const LandingPage: React.FC = () => {
           
           <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
             <FeatureCard 
-              icon="qr_code_scanner" 
+              icon={<QrCode size={32} strokeWidth={1.5} />} 
               title="RSVP & QR Code Angola"
               desc="Confirmação de presença digital instantânea com emissão automática de QR Code personalizado para seus convidados em Angola."
             />
             <FeatureCard 
-              icon="dashboard" 
+              icon={<LayoutDashboard size={32} strokeWidth={1.5} />} 
               title="Gestão de Convidados"
               desc="Controle quem vai ao seu casamento ou chá de panela em Luanda e acompanhe as confirmações de presença em tempo real."
             />
             <FeatureCard 
-              icon="redeem" 
+              icon={<Gift size={32} strokeWidth={1.5} />} 
               title="Lista de Presentes com IBAN"
               desc="Insira o seu IBAN de bancos angolanos (BAI, BFA, BIC, SOL, etc.) de forma segura para receber presentes em kwanza (AOA) diretamente na sua conta bancária."
             />
             <FeatureCard 
-              icon="language" 
+              icon={<Globe size={32} strokeWidth={1.5} />} 
               title="Domínio Personalizado"
               desc="Tenha um link exclusivo para o seu evento (ex: oseucasamento.com), garantindo muito mais requinte e exclusividade."
             />
             <FeatureCard 
-              icon="table_restaurant" 
+              icon={<UtensilsCrossed size={32} strokeWidth={1.5} />} 
               title="Mapa das Mesas"
               desc="Organize graficamente onde cada convidado vai sentar e crie uma experiência fluida para a recepção."
             />
             <FeatureCard 
-              icon="menu_book" 
+              icon={<BookOpen size={32} strokeWidth={1.5} />} 
               title="Livro de Assinaturas Digital"
               desc="Um mural onde os convidados podem deixar recados carinhosos, fotos e votos de felicidade para os anfitriões."
             />
             <FeatureCard 
-              icon="bar_chart" 
+              icon={<BarChart3 size={32} strokeWidth={1.5} />} 
               title="Estatísticas em Tempo Real"
               desc="Acompanhe gráficos detalhados de presenças, respostas e presentes através de um painel de organizador completo."
             />
             <FeatureCard 
-              icon="smart_toy" 
+              icon={<Bot size={32} strokeWidth={1.5} />} 
               title="Assistente IA"
               desc="Inteligência Artificial para ajudar a responder a dúvidas dos convidados sobre trajes, localização e presentes."
             />
@@ -567,7 +567,7 @@ export const LandingPage: React.FC = () => {
           <div className="max-w-7xl mx-auto grid grid-cols-1 md:grid-cols-4 gap-12 mb-12">
              <div className="col-span-1 md:col-span-2">
                 <div className="flex items-center gap-2 mb-6">
-                   <span className="material-symbols-outlined text-brand-blue text-2xl" style={{display: 'none'}}>auto_awesome</span><img src="/favicon.ico" alt="InoEvents Logo" className="w-8 h-8 rounded-lg object-contain bg-white/10 p-1 border border-white/10 mr-1" referrerPolicy="no-referrer" />
+                   <Sparkles size={24} className="text-brand-blue" style={{display: "none"}} /><img src="/favicon.ico" alt="InoEvents Logo" className="w-8 h-8 rounded-lg object-contain bg-white/10 p-1 border border-white/10 mr-1" referrerPolicy="no-referrer" />
                    <span className="font-extrabold text-white text-xl tracking-tight">InoEvents</span>
                 </div>
                 <p className="text-slate-400 leading-relaxed max-w-sm mb-6">
@@ -575,7 +575,7 @@ export const LandingPage: React.FC = () => {
                 </p>
                 <div className="flex gap-4">
                    <a href="#" className="w-10 h-10 rounded-full bg-slate-800 flex items-center justify-center hover:bg-brand-blue hover:text-white transition-colors">
-                      <span className="material-symbols-outlined text-[20px]">public</span>
+                      <Globe size={20} />
                    </a>
                 </div>
              </div>
@@ -635,12 +635,12 @@ export const LandingPage: React.FC = () => {
                 onClick={() => setShowTypeModal(false)}
                 className="absolute top-6 right-6 text-slate-400 hover:text-slate-600 p-2 rounded-full hover:bg-slate-100 transition-all cursor-pointer border border-slate-100"
               >
-                <span className="material-symbols-outlined text-[20px] block">close</span>
+                <X size={20} className="block" />
               </button>
 
               <div className="text-center mb-6 shrink-0">
                 <div className="mx-auto w-12 h-12 bg-blue-50 text-brand-blue rounded-xl flex items-center justify-center mb-3">
-                  <span className="material-symbols-outlined text-[28px]">celebration</span>
+                  <PartyPopper size={28} />
                 </div>
                 <h3 className="text-xl md:text-2xl font-serif font-black text-slate-900 mb-1">Que tipo de evento deseja criar?</h3>
                 <p className="text-slate-500 text-xs md:text-sm">Selecione uma das opções abaixo para ver os modelos ideais e personalizados para o seu momento único.</p>
@@ -648,11 +648,11 @@ export const LandingPage: React.FC = () => {
 
               <div className="grid grid-cols-1 gap-3 mb-6 flex-1 min-h-0 overflow-y-auto pr-1">
                 {[
-                  { id: 'wedding', label: 'Casamento', desc: 'União de almas, RSVP detalhado, lista de presentes e IBAN.', icon: 'diamond', color: 'from-amber-500/10 to-amber-600/10 text-amber-600' },
-                  { id: 'bridal', label: 'Chá de Panela', desc: 'Chá de cozinha, presentes práticos e brincadeiras animadas.', icon: 'kitchen', color: 'from-pink-500/10 to-rose-600/10 text-pink-600' },
-                  { id: 'birthday', label: 'Aniversário', desc: 'Comemoração, contagem regressiva e confirmação de presença rápida.', icon: 'cake', color: 'from-purple-500/10 to-indigo-600/10 text-purple-600' },
-                  { id: 'baby', label: 'Chá de Bebê', desc: 'Boas-vindas calorosas ao novo membro especial da família.', icon: 'child_care', color: 'from-cyan-500/10 to-blue-600/10 text-cyan-600' },
-                  { id: 'corporate', label: 'Evento Corporativo', desc: 'Palestras, conferências, lançamentos e credenciamento ágil.', icon: 'business_center', color: 'from-slate-700/10 to-slate-950/10 text-slate-800' },
+                  { id: 'wedding', label: 'Casamento', desc: 'União de almas, RSVP detalhado, lista de presentes e IBAN.', icon: <Gem size={24} />, color: 'from-amber-500/10 to-amber-600/10 text-amber-600' },
+                  { id: 'bridal', label: 'Chá de Panela', desc: 'Chá de cozinha, presentes práticos e brincadeiras animadas.', icon: <Utensils size={24} />, color: 'from-pink-500/10 to-rose-600/10 text-pink-600' },
+                  { id: 'birthday', label: 'Aniversário', desc: 'Comemoração, contagem regressiva e confirmação de presença rápida.', icon: <Cake size={24} />, color: 'from-purple-500/10 to-indigo-600/10 text-purple-600' },
+                  { id: 'baby', label: 'Chá de Bebê', desc: 'Boas-vindas calorosas ao novo membro especial da família.', icon: <Baby size={24} />, color: 'from-cyan-500/10 to-blue-600/10 text-cyan-600' },
+                  { id: 'corporate', label: 'Evento Corporativo', desc: 'Palestras, conferências, lançamentos e credenciamento ágil.', icon: <Briefcase size={24} />, color: 'from-slate-700/10 to-slate-950/10 text-slate-800' },
                 ].map((item) => (
                   <button
                     key={item.id}
@@ -663,12 +663,12 @@ export const LandingPage: React.FC = () => {
                     className="flex items-center gap-4 p-4 rounded-2xl border border-slate-100 hover:border-slate-300 hover:bg-slate-50/50 text-left transition-all duration-300 group cursor-pointer w-full bg-white"
                   >
                     <div className={`w-12 h-12 rounded-xl bg-gradient-to-br ${item.color} flex items-center justify-center shrink-0`}>
-                      <span className="material-symbols-outlined text-[24px]">{item.icon}</span>
+                      {item.icon}
                     </div>
                     <div className="flex-1">
                       <h4 className="font-bold text-slate-900 text-sm md:text-base group-hover:text-brand-blue transition-colors flex items-center gap-1.5">
                         {item.label}
-                        <span className="material-symbols-outlined text-[16px] opacity-0 group-hover:opacity-100 group-hover:translate-x-1 transition-all">arrow_forward</span>
+                        <ArrowRight size={16} className="opacity-0 group-hover:opacity-100 group-hover:translate-x-1 transition-all" />
                       </h4>
                       <p className="text-slate-500 text-xs mt-0.5 leading-relaxed">{item.desc}</p>
                     </div>
@@ -816,10 +816,10 @@ export const LandingPage: React.FC = () => {
   );
 };
 
-const FeatureCard: React.FC<{ icon: string, title: string, desc: string }> = ({ icon, title, desc }) => (
+const FeatureCard: React.FC<{ icon: React.ReactNode, title: string, desc: string }> = ({ icon, title, desc }) => (
   <div className="bg-white border border-slate-100 p-8 rounded-2xl flex flex-col gap-4 shadow-sm hover:shadow-xl hover:shadow-brand-blue/5 transition-all duration-300 group">
     <div className={`w-14 h-14 rounded-xl flex items-center justify-center shrink-0 bg-blue-50 text-brand-blue group-hover:bg-brand-blue group-hover:text-white transition-colors`}>
-      <span className="material-symbols-outlined text-[32px]">{icon}</span>
+      {icon}
     </div>
     <div className="flex flex-col gap-2">
       <h4 className="text-slate-900 font-bold text-lg">{title}</h4>

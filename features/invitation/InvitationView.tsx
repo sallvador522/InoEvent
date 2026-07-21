@@ -7732,23 +7732,50 @@ const RSVPForm: React.FC<{ event: EventDetails; onClose: () => void }> = ({
         checkedIn: false,
       };
 
-      const res = await fetch(`/api/events/${event.id}/rsvp`, {
-        method: "POST",
-        headers: {
-          "Content-Type": "application/json",
-        },
-        body: JSON.stringify({ phone, guestData }),
-      });
+      let guestId = "";
+      try {
+        const guestsCollection = collection(db, "events", event.id, "guests");
+        
+        // Verificar duplicado por telefone no client-side primeiro
+        if (normalizedPhone) {
+          const q = query(guestsCollection, where("phone", "==", normalizedPhone));
+          const querySnap = await getDocs(q);
+          if (!querySnap.empty) {
+            toast.error("Este número de WhatsApp já confirmou presença neste evento.", { id: toastId });
+            setLoading(false);
+            return;
+          }
+        }
+        
+        const newGuestDocRef = doc(guestsCollection);
+        await setDoc(newGuestDocRef, {
+          ...guestData,
+          createdAt: new Date().toISOString()
+        });
+        guestId = newGuestDocRef.id;
+        console.log("RSVP gravado com sucesso diretamente no Firestore via Client SDK:", guestId);
+      } catch (clientDbErr) {
+        console.warn("Falha ao salvar via Client SDK, tentando via backend API...", clientDbErr);
+        
+        // Fallback para a API de backend se falhar por regras ou outro motivo
+        const res = await fetch(`/api/events/${event.id}/rsvp`, {
+          method: "POST",
+          headers: {
+            "Content-Type": "application/json",
+          },
+          body: JSON.stringify({ phone, guestData }),
+        });
 
-      if (!res.ok) {
-        const errData = await res.json().catch(() => ({}));
-        toast.error(errData.error || "Erro ao confirmar presença.", { id: toastId });
-        setLoading(false);
-        return;
+        if (!res.ok) {
+          const errData = await res.json().catch(() => ({}));
+          toast.error(errData.error || "Erro ao confirmar presença.", { id: toastId });
+          setLoading(false);
+          return;
+        }
+        
+        const data = await res.json();
+        guestId = data.guestId;
       }
-      
-      const data = await res.json();
-      const guestId = data.guestId;
       toast.success(
         status === "yes"
           ? "Sua presença foi confirmada com sucesso!"

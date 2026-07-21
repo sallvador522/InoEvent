@@ -6,17 +6,12 @@
   "start_url": "/?source=pwa",
   "display": "standalone",
   "display_override": ["window-controls-overlay", "standalone", "minimal-ui"],
-  "background_color": "#FFFFFF",
+  "background_color": "#0F172A",
   "theme_color": "#1B365D",
   "orientation": "portrait-primary",
   "dir": "ltr",
   "lang": "pt-AO",
   "icons": [
-    {
-      "src": "/favicon.ico",
-      "sizes": "64x64 32x32 24x24 16x16",
-      "type": "image/x-icon"
-    },
     {
       "src": "/android-chrome-192x192.png",
       "sizes": "192x192",
@@ -47,12 +42,22 @@
     {
       "name": "Painel",
       "url": "/dashboard?source=pwa_shortcut",
-      "description": "Acessar o seu painel de controle"
+      "description": "Acessar o seu painel de controle",
+      "icons": [{ "src": "/android-chrome-192x192.png", "sizes": "192x192" }]
     },
     {
       "name": "Modelos",
       "url": "/templates?source=pwa_shortcut",
-      "description": "Ver galeria de modelos"
+      "description": "Ver galeria de modelos",
+      "icons": [{ "src": "/android-chrome-192x192.png", "sizes": "192x192" }]
+    },
+    {
+      "name": "Criar",
+      "url": "/templates?source=pwa_shortcut&action=create",
+      "description": "Criar novo evento",
+      "icons": [{ "src": "/android-chrome-192x192.png", "sizes": "192x192" }]
     }
-  ]
+  ],
+  "related_applications": [],
+  "prefer_related_applications": false
 }

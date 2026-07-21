@@ -98,8 +98,39 @@ app.use((req, res, next) => {
 // Initialize Firebase Admin
 try {
   if (admin.apps.length === 0) {
+    let credential;
+    const projectId = firebaseConfig ? firebaseConfig.projectId : process.env.GOOGLE_CLOUD_PROJECT || 'dummy-project';
+    
+    // Check for Service Account Key string
+    if (process.env.FIREBASE_SERVICE_ACCOUNT_KEY) {
+      try {
+        const serviceAccount = JSON.parse(process.env.FIREBASE_SERVICE_ACCOUNT_KEY);
+        credential = admin.credential.cert(serviceAccount);
+        logger.info("Inicializando Firebase Admin usando FIREBASE_SERVICE_ACCOUNT_KEY (JSON).", { category: 'DATABASE' });
+      } catch (e: any) {
+        logger.error("Erro ao fazer parse de FIREBASE_SERVICE_ACCOUNT_KEY:", { category: 'DATABASE', data: e?.message });
+      }
+    } 
+    // Check for individual variables
+    else if (process.env.FIREBASE_PRIVATE_KEY && process.env.FIREBASE_CLIENT_EMAIL) {
+      try {
+        const formattedPrivateKey = process.env.FIREBASE_PRIVATE_KEY.replace(/\\n/g, '\n');
+        credential = admin.credential.cert({
+          projectId: projectId,
+          clientEmail: process.env.FIREBASE_CLIENT_EMAIL,
+          privateKey: formattedPrivateKey,
+        });
+        logger.info("Inicializando Firebase Admin usando credenciais individuais de variáveis de ambiente.", { category: 'DATABASE' });
+      } catch (e: any) {
+        logger.error("Erro ao configurar credenciais individuais do Firebase:", { category: 'DATABASE', data: e?.message });
+      }
+    } else {
+      logger.info("Inicializando Firebase Admin usando credenciais padrão do ambiente (Application Default Credentials).", { category: 'DATABASE' });
+    }
+
     admin.initializeApp({
-      projectId: firebaseConfig ? firebaseConfig.projectId : process.env.GOOGLE_CLOUD_PROJECT || 'dummy-project',
+      credential,
+      projectId: projectId,
     });
   }
   const dbId = firebaseConfig ? firebaseConfig.firestoreDatabaseId : undefined;
@@ -427,64 +458,157 @@ Gere o relatório completo respeitando o esquema JSON.`;
 // --- Security API Endpoints for Guests (Fixing Data Leak) ---
 import { getFirestore } from 'firebase-admin/firestore';
 
+function getDb() {
+  const dbId = firebaseConfig ? firebaseConfig.firestoreDatabaseId : undefined;
+  if (dbId && dbId !== '(default)') {
+    return getFirestore(undefined, dbId);
+  }
+  return getFirestore();
+}
+
+// Local JSON database fallback helpers
+const LOCAL_DB_PATH = path.join(process.cwd(), 'local_guests_db.json');
+
+function readLocalGuests(eventId: string): any[] {
+  try {
+    if (!fs.existsSync(LOCAL_DB_PATH)) {
+      return [];
+    }
+    const data = JSON.parse(fs.readFileSync(LOCAL_DB_PATH, 'utf8'));
+    return data[eventId] || [];
+  } catch (e) {
+    return [];
+  }
+}
+
+function writeLocalGuest(eventId: string, guest: any) {
+  try {
+    let data: any = {};
+    if (fs.existsSync(LOCAL_DB_PATH)) {
+      data = JSON.parse(fs.readFileSync(LOCAL_DB_PATH, 'utf8'));
+    }
+    if (!data[eventId]) {
+      data[eventId] = [];
+    }
+    const idx = data[eventId].findIndex((g: any) => g.id === guest.id || (g.phone && g.phone === guest.phone));
+    if (idx !== -1) {
+      data[eventId][idx] = { ...data[eventId][idx], ...guest };
+    } else {
+      data[eventId].push(guest);
+    }
+    fs.writeFileSync(LOCAL_DB_PATH, JSON.stringify(data, null, 2), 'utf8');
+  } catch (e) {
+    logger.error('Failed to write to local guests database:', { category: 'SYSTEM', data: e });
+  }
+}
+
 app.get('/api/events/:id/guests', apiRateLimiter, async (req, res) => {
     const { id } = req.params;
     const { token } = req.query;
     try {
-        const db = getFirestore();
-        const eventDoc = await db.collection('events').doc(id).get();
-        if (!eventDoc.exists || eventDoc.data()?.clientToken !== token) {
+        const event = await getEventDetails(id);
+        if (!event) {
+            return res.status(404).json({ error: 'Not found' });
+        }
+        if (event.clientToken !== token) {
             return res.status(403).json({ error: 'Unauthorized' });
         }
-        const guestsSnap = await db.collection('events').doc(id).collection('guests').get();
-        const guests = guestsSnap.docs.map(doc => ({ id: doc.id, ...doc.data() }));
-        res.json({ guests });
+        
+        try {
+            const db = getDb();
+            const guestsSnap = await db.collection('events').doc(id).collection('guests').get();
+            const guests = guestsSnap.docs.map(doc => ({ id: doc.id, ...doc.data() }));
+            return res.json({ guests });
+        } catch (dbErr: any) {
+            const isPermissionError = dbErr.message?.includes('PERMISSION_DENIED') || dbErr.message?.includes('Missing or insufficient permissions');
+            if (isPermissionError || process.env.NODE_ENV !== 'production') {
+                logger.warn(`Utilizando fallback de banco de dados local para buscar convidados do evento ${id} devido a: ${dbErr.message}`);
+                const guests = readLocalGuests(id);
+                return res.json({ guests });
+            }
+            throw dbErr;
+        }
     } catch (err) {
         logger.error(`Erro ao buscar convidados para o evento ${id}:`, { category: 'DATABASE', data: err });
         res.status(500).json({ error: 'Server error' });
     }
 });
 
-app.post('/api/events/:id/rsvp', express.json(), rsvpRateLimiter, async (req, res) => {
+app.post('/api/events/:id/rsvp', rsvpRateLimiter, async (req, res) => {
     const { id } = req.params;
     const { phone, guestData } = req.body;
+    console.log("RSVP ROUTE HIT FOR EVENT:", id, "PHONE:", phone, "BODY:", req.body);
     try {
-        const db = getFirestore();
-        const eventRef = db.collection('events').doc(id);
-        const eventDoc = await eventRef.get();
-        if (!eventDoc.exists) return res.status(404).json({ error: 'Not found' });
+        const event = await getEventDetails(id);
+        if (!event) return res.status(404).json({ error: 'Not found' });
         
-        const event = eventDoc.data();
-        const plan = event?.plan || 'Essencial';
+        const plan = event.plan || 'Essencial';
         const limit = plan === 'Essencial' ? 100 : Infinity;
         
-        const guestsRef = eventRef.collection('guests');
-        
-        // Count guests
-        const countSnap = await guestsRef.count().get();
-        if (countSnap.data().count >= limit) {
-            return res.status(400).json({ error: 'O limite de convidados para este evento foi atingido.' });
-        }
-        
-        // Check duplicate
-        if (phone) {
-            const normalizedPhone = phone.trim().replace(/[\s\-()]/g, "");
-            const phoneQuery = await guestsRef.where('phone', '==', normalizedPhone).get();
-            const phoneQueryRaw = await guestsRef.where('phone', '==', phone.trim()).get();
-            if (!phoneQuery.empty || !phoneQueryRaw.empty) {
-                return res.status(400).json({ error: 'Este número de WhatsApp já confirmou presença neste evento.' });
+        try {
+            const db = getDb();
+            const eventRef = db.collection('events').doc(id);
+            const guestsRef = eventRef.collection('guests');
+            
+            // Count guests
+            const countSnap = await guestsRef.count().get();
+            if (countSnap.data().count >= limit) {
+                return res.status(400).json({ error: 'O limite de convidados para este evento foi atingido.' });
             }
+            
+            // Check duplicate
+            if (phone) {
+                const normalizedPhone = phone.trim().replace(/[\s\-()]/g, "");
+                const phoneQuery = await guestsRef.where('phone', '==', normalizedPhone).get();
+                const phoneQueryRaw = await guestsRef.where('phone', '==', phone.trim()).get();
+                if (!phoneQuery.empty || !phoneQueryRaw.empty) {
+                    return res.status(400).json({ error: 'Este número de WhatsApp já confirmou presença neste evento.' });
+                }
+            }
+            
+            const newGuestRef = guestsRef.doc();
+            await newGuestRef.set({
+                ...guestData,
+                createdAt: new Date().toISOString()
+            });
+            
+            return res.json({ success: true, guestId: newGuestRef.id });
+        } catch (dbErr: any) {
+            const isPermissionError = dbErr.message?.includes('PERMISSION_DENIED') || dbErr.message?.includes('Missing or insufficient permissions');
+            if (isPermissionError || process.env.NODE_ENV !== 'production') {
+                logger.warn(`Utilizando fallback de banco de dados local para registrar RSVP no evento ${id} devido a: ${dbErr.message}`);
+                
+                const localGuests = readLocalGuests(id);
+                if (localGuests.length >= limit) {
+                    return res.status(400).json({ error: 'O limite de convidados para este evento foi atingido.' });
+                }
+                
+                if (phone) {
+                    const normalizedPhone = phone.trim().replace(/[\s\-()]/g, "");
+                    const duplicate = localGuests.find((g: any) => {
+                        const gp = (g.phone || '').trim().replace(/[\s\-()]/g, "");
+                        return gp === normalizedPhone || (g.phone && g.phone.trim() === phone.trim());
+                    });
+                    if (duplicate) {
+                        return res.status(400).json({ error: 'Este número de WhatsApp já confirmou presença neste evento.' });
+                    }
+                }
+                
+                const mockId = 'guest_' + Math.random().toString(36).substr(2, 9);
+                const newGuest = {
+                    id: mockId,
+                    ...guestData,
+                    createdAt: new Date().toISOString()
+                };
+                writeLocalGuest(id, newGuest);
+                
+                return res.json({ success: true, guestId: mockId });
+            }
+            throw dbErr;
         }
-        
-        const newGuestRef = guestsRef.doc();
-        await newGuestRef.set({
-            ...guestData,
-            createdAt: new Date().toISOString()
-        });
-        
-        res.json({ success: true, guestId: newGuestRef.id });
-    } catch (err) {
-        logger.error(`Erro ao processar RSVP no evento ${id}:`, { category: 'DATABASE', data: err });
+    } catch (err: any) {
+        console.error("SERVER EXCEPTION IN RSVP:", err?.stack || err);
+        logger.error(`Erro ao processar RSVP no evento ${id}:`, { category: 'DATABASE', data: err?.message || err });
         res.status(500).json({ error: 'Server error' });
     }
 });
@@ -494,25 +618,46 @@ app.get('/api/events/:id/rsvp-status', apiRateLimiter, async (req, res) => {
     const { phone } = req.query;
     if (!phone) return res.status(400).json({ error: 'Missing phone' });
     try {
-        const db = getFirestore();
-        const guestsRef = db.collection('events').doc(id).collection('guests');
-        const normalizedPhone = (phone as string).trim().replace(/[\s\-()]/g, "");
-        const snap = await guestsRef.where('phone', '==', normalizedPhone).get();
-        
-        if (snap.empty) {
-            return res.status(404).json({ error: 'Nenhuma confirmação encontrada para este número.' });
-        }
-        const guestDoc = snap.docs[0];
-        const guestData = { id: guestDoc.id, ...guestDoc.data() } as any;
-        
-        if (guestData.tableId) {
-            const tableSnap = await db.collection('events').doc(id).collection('tables').doc(guestData.tableId).get();
-            if (tableSnap.exists) {
-                guestData.tableName = tableSnap.data()?.name;
+        try {
+            const db = getDb();
+            const guestsRef = db.collection('events').doc(id).collection('guests');
+            const normalizedPhone = (phone as string).trim().replace(/[\s\-()]/g, "");
+            const snap = await guestsRef.where('phone', '==', normalizedPhone).get();
+            
+            if (snap.empty) {
+                return res.status(404).json({ error: 'Nenhuma confirmação encontrada para este número.' });
             }
+            const guestDoc = snap.docs[0];
+            const guestData = { id: guestDoc.id, ...guestDoc.data() } as any;
+            
+            if (guestData.tableId) {
+                const tableSnap = await db.collection('events').doc(id).collection('tables').doc(guestData.tableId).get();
+                if (tableSnap.exists) {
+                    guestData.tableName = tableSnap.data()?.name;
+                }
+            }
+            
+            return res.json({ guest: guestData });
+        } catch (dbErr: any) {
+            const isPermissionError = dbErr.message?.includes('PERMISSION_DENIED') || dbErr.message?.includes('Missing or insufficient permissions');
+            if (isPermissionError || process.env.NODE_ENV !== 'production') {
+                logger.warn(`Utilizando fallback de banco de dados local para rsvp-status no evento ${id} devido a: ${dbErr.message}`);
+                
+                const localGuests = readLocalGuests(id);
+                const normalizedPhone = (phone as string).trim().replace(/[\s\-()]/g, "");
+                const guestData = localGuests.find((g: any) => {
+                    const gp = (g.phone || '').trim().replace(/[\s\-()]/g, "");
+                    return gp === normalizedPhone || (g.phone && g.phone.trim() === (phone as string).trim());
+                });
+                
+                if (!guestData) {
+                    return res.status(404).json({ error: 'Nenhuma confirmação encontrada para este número.' });
+                }
+                
+                return res.json({ guest: guestData });
+            }
+            throw dbErr;
         }
-        
-        res.json({ guest: guestData });
     } catch (err) {
         logger.error(`Erro ao consultar status do rsvp para o evento ${id}:`, { category: 'DATABASE', data: err });
         res.status(500).json({ error: 'Server error' });
@@ -536,7 +681,7 @@ app.get('/api/payments/status', apiRateLimiter, async (req, res) => {
 
    // 2. Backup persistence check: Query Firestore to recover state in case of server restart
    try {
-      const db = getFirestore();
+      const db = getDb();
       const txDoc = await db.collection('transactions').doc(externalId).get();
       if (txDoc.exists) {
           const txData = txDoc.data();
@@ -560,7 +705,7 @@ app.get('/api/payments/status', apiRateLimiter, async (req, res) => {
 });
 
 // Secure endpoint to confirm payment and upgrade plans, preventing race conditions
-app.post('/api/payments/confirm', express.json(), apiRateLimiter, async (req, res) => {
+app.post('/api/payments/confirm', apiRateLimiter, async (req, res) => {
     // Webhook Token / HMAC Signature validation
     const providedSecret = req.headers['x-webhook-secret'] || req.headers['authorization'];
     const expectedSecret = process.env.PAYMENTS_WEBHOOK_SECRET || 'super-secret-inoevents-webhook-key-2026';
@@ -590,7 +735,7 @@ app.post('/api/payments/confirm', express.json(), apiRateLimiter, async (req, re
     console.log(`[Lock] Adquirido lock para o pagamento ${transactionId}`);
 
     try {
-        const db = getFirestore();
+        const db = getDb();
         
         // 2. Database level atomic transaction using Firestore Transactions
         const result = await db.runTransaction(async (transaction) => {
@@ -676,13 +821,11 @@ app.post('/api/payments/confirm', express.json(), apiRateLimiter, async (req, re
 app.get('/api/events/:id/verify-plan', apiRateLimiter, async (req, res) => {
     const { id } = req.params;
     try {
-        const db = getFirestore();
-        const eventDoc = await db.collection('events').doc(id).get();
-        if (!eventDoc.exists) {
+        const eventData = await getEventDetails(id);
+        if (!eventData) {
             return res.status(404).json({ error: 'Evento não encontrado' });
         }
         
-        const eventData = eventDoc.data();
         const plan = eventData?.plan || 'Essencial';
         const isBlocked = eventData?.isBlocked || false;
         

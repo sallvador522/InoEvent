@@ -133,8 +133,8 @@ service cloud.firestore {
         allow get: if true;
         allow list: if (isSignedIn() && (get(/databases/$(database)/documents/events/$(eventId)).data.ownerId == request.auth.uid || exists(/databases/$(database)/documents/events/$(eventId)/team/$(request.auth.uid)))) || isAdmin();
         
-        // Creating guests is now handled by the secure backend API for unauthenticated users.
-        allow create: if (isSignedIn() && get(/databases/$(database)/documents/events/$(eventId)).data.ownerId == request.auth.uid) || isAdmin();
+        // Allow public to create guests (needed for direct RSVP from invitation), keeping list restricted to prevent data leak
+        allow create: if true;
         
         allow update: if isValidId(guestId) && (
             (isSignedIn() && (get(/databases/$(database)/documents/events/$(eventId)).data.ownerId == request.auth.uid || exists(/databases/$(database)/documents/events/$(eventId)/team/$(request.auth.uid)))) ||

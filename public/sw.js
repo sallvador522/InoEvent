@@ -1,10 +1,10 @@
 /* eslint-disable no-undef */
-const CACHE_NAME = 'inoevents-v1';
+const CACHE_NAME = 'inoevents-v5';
 const ASSETS_TO_CACHE = [
   '/',
   '/index.html',
   '/favicon.ico',
-  '/site.webmanifest',
+  '/manifest.json',
   '/android-chrome-192x192.png',
   '/android-chrome-512x512.png',
   '/apple-touch-icon.png',

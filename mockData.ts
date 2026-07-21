@@ -136,17 +136,17 @@ Anacanizia Lopes Lima`,
     receptionName: "Copo d'água",
     receptionAddress: "Salão Noblesse, Talatona, Luanda",
     mapLink: "https://maps.google.com/?q=Talatona+Luanda",
-    heroImage: "https://in.limintso.com/wp-content/uploads/2025/08/cav33.jpg",
+    heroImage: "https://images.unsplash.com/photo-1519741497674-611481863552?q=80&w=1200&auto=format&fit=crop",
     description: `I Coríntios 13: 4-7
 Aqui começa o nosso lar, erguido sobre a fé e o amor de Deus.
 Cada passo que damos é promessa de que ele será sempre o alicerce da nossa Família.`,
     musicTrack: "TEEKS - First Time",
     themeColor: "#E9BE5D",
-    mapImage: "https://in.limintso.com/wp-content/uploads/2025/08/marrr11.jpg",
+    mapImage: "https://images.unsplash.com/photo-1522673607200-164d1b6ce486?q=80&w=1200&auto=format&fit=crop",
     gallery: [
-      "https://in.limintso.com/wp-content/uploads/2025/08/mar.jpg",
-      "https://in.limintso.com/wp-content/uploads/2025/08/mar23.jpg",
-      "https://in.limintso.com/wp-content/uploads/2025/08/marb2222.jpg",
+      "https://images.unsplash.com/photo-1583939003579-730e3918a45a?q=80&w=1200&auto=format&fit=crop",
+      "https://images.unsplash.com/photo-1494790108377-be9c29b29330?q=80&w=1200&auto=format&fit=crop",
+      "https://images.unsplash.com/photo-1511285560982-1356c11d4606?q=80&w=1200&auto=format&fit=crop",
     ],
     timeline: [
       {

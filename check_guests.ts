@@ -12,7 +12,7 @@ const sa = {
 };
 
 admin.initializeApp({
-  credential: admin.credential.cert(sa),
+  credential: admin.credential.cert(sa as any),
   projectId: firebaseConfig.projectId
 });
 

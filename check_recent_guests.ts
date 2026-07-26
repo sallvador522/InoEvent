@@ -10,7 +10,7 @@ const sa = {
   "client_email": "firebase-adminsdk-fbsvc@phonic-axle-463023-c2.iam.gserviceaccount.com",
 };
 admin.initializeApp({
-  credential: admin.credential.cert(sa),
+  credential: admin.credential.cert(sa as any),
   projectId: firebaseConfig.projectId
 });
 

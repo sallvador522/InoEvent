@@ -163,21 +163,21 @@ export const LandingPage: React.FC = () => {
   }
 
   return (
-    <div className="min-h-screen relative font-display overflow-x-hidden bg-white">
+    <div className="flex-1 min-h-screen flex flex-col justify-between relative font-display overflow-x-hidden bg-slate-900">
       <SEO 
         title="InoEvents Angola | Convites Digitais de Casamento, Chá de Panela e Gestão de Eventos" 
         description="A plataforma mais elegante de Angola para criar convites digitais de casamento e chás de panela com RSVP online, QR Code de acesso, check-in presencial no evento, lista de convidados e presentes por IBAN."
       />
       
       {/* Background Subtle Gradient */}
-      <div className="fixed inset-0 z-0 pointer-events-none overflow-hidden">
+      <div className="absolute inset-0 z-0 pointer-events-none overflow-hidden">
         <div className="absolute top-[-20%] right-[-10%] w-[70vw] h-[70vw] bg-blue-50/50 rounded-full blur-[100px]" />
         <div className="absolute top-[40%] left-[-10%] w-[50vw] h-[50vw] bg-primary/5 rounded-full blur-[120px]" />
       </div>
 
       <Navbar />
 
-      <main className="relative z-10 flex flex-col gap-0 pb-24">
+      <main className="relative z-10 flex flex-col flex-1 gap-0">
         
         {/* HERO BANNER SECTION (High-Conversion, Spatial UI) */}
         <section className="relative w-full flex flex-col justify-center overflow-hidden bg-[#FDFBF7] pt-24 md:pt-32 pb-20">
@@ -562,8 +562,10 @@ export const LandingPage: React.FC = () => {
         {/* FAQ Section */}
         <FAQSection />
 
-        {/* Footer */}
-        <footer className="px-6 py-16 bg-slate-900 text-slate-400 text-sm border-t border-slate-800">
+      </main>
+
+      {/* Footer */}
+      <footer className="mt-auto px-6 pt-16 pb-32 md:pb-28 bg-slate-900 text-slate-400 text-sm">
           <div className="max-w-7xl mx-auto grid grid-cols-1 md:grid-cols-4 gap-12 mb-12">
              <div className="col-span-1 md:col-span-2">
                 <div className="flex items-center gap-2 mb-6">
@@ -600,14 +602,11 @@ export const LandingPage: React.FC = () => {
              </div>
           </div>
           
-          <div className="max-w-7xl mx-auto pt-8 border-t border-slate-800 flex flex-col md:flex-row justify-between items-center gap-4">
+          <div className="max-w-7xl mx-auto pt-8 flex flex-col md:flex-row justify-between items-center gap-4">
              <p>© {new Date().getFullYear()} InoEvents. Todos os direitos reservados.</p>
              <p className="text-xs">Feito com foco no design e na experiência do usuário.</p>
           </div>
         </footer>
-
-      </main>
-
 
 
       <SupportModal isOpen={supportOpen} onClose={() => setSupportOpen(false)} />

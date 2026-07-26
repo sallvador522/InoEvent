@@ -46,7 +46,7 @@ const PageWrapper = ({ children }: { children: React.ReactNode }) => (
     animate={{ opacity: 1 }}
     exit={{ opacity: 0 }}
     transition={{ duration: 0.3, ease: 'easeOut' }}
-    className="w-full min-h-screen"
+    className="w-full min-h-screen flex flex-col bg-slate-900"
   >
     <Suspense fallback={<PageLoader />}>
       {children}

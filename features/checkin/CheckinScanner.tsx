@@ -212,9 +212,19 @@ export const CheckinScanner: React.FC = () => {
         try {
             setScanState({ status: 'processing', message: 'Validando QR Code...' });
             
-            
-            const url = new URL(qrData);
-            const scannedGuestId = url.searchParams.get('guest');
+            // Extract guest ID from QR data — supports both plain "guest=ID" and full URL formats
+            let scannedGuestId: string | null = null;
+            const plainMatch = qrData.match(/^guest=(.+)$/);
+            if (plainMatch) {
+                scannedGuestId = plainMatch[1];
+            } else {
+                try {
+                    const url = new URL(qrData);
+                    scannedGuestId = url.searchParams.get('guest');
+                } catch {
+                    // Not a URL either — will fall through to the "invalid format" branch below
+                }
+            }
             
             if (scannedGuestId && id) {
                 const guestRef = doc(db, 'events', id, 'guests', scannedGuestId);

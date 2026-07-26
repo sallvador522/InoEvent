@@ -12,6 +12,8 @@
   },
   "dependencies": {
     "@google/genai": "^2.0.0",
+    "@jridgewell/trace-mapping": "^0.3.31",
+    "@types/react-window": "^1.8.8",
     "@vis.gl/react-google-maps": "^1.8.3",
     "@yudiel/react-qr-scanner": "^2.5.1",
     "compression": "^1.8.1",
@@ -40,6 +42,7 @@
     "react-leaflet": "^5.0.0",
     "react-router-dom": "^7.12.0",
     "react-virtuoso": "^4.18.11",
+    "react-window": "^2.3.0",
     "recharts": "^3.8.1"
   },
   "devDependencies": {
@@ -49,9 +52,10 @@
     "@types/cors": "^2.8.19",
     "@types/express": "^5.0.6",
     "@types/leaflet": "^1.9.21",
-    "@types/node": "^22.14.0",
+    "@types/node": "^22.20.1",
     "@typescript-eslint/eslint-plugin": "^8.61.1",
     "@typescript-eslint/parser": "^8.61.1",
+    "@upstash/context7-mcp": "^3.2.5",
     "@vitejs/plugin-react": "^5.0.0",
     "esbuild": "^0.28.0",
     "eslint": "^10.5.0",

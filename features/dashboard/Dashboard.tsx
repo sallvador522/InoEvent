@@ -6,9 +6,7 @@ import { doc, collection, onSnapshot, deleteDoc, updateDoc, setDoc } from 'fireb
 import { getStorage, ref, deleteObject } from 'firebase/storage';
 import { db, handleFirestoreError, OperationType, useFirebase } from '../../components/FirebaseProvider';
 import { QRScanner } from '../../components/QRScanner';
-import { FixedSizeList as List } from 'react-window';
 import { LineChart, Line, XAxis, YAxis, CartesianGrid, Tooltip as RechartsTooltip, ResponsiveContainer, PieChart, Pie, Cell, BarChart, Bar, AreaChart, Area, Legend } from 'recharts';
-import { SmartAssistant } from './SmartAssistant';
 import { playScanSound } from '../../lib/sound';
 import toast from 'react-hot-toast';
 import { SupportModal } from '../../components/SupportModal';
@@ -59,7 +57,7 @@ export const Dashboard = () => {
     const [exportFilter, setExportFilter] = useState<'all' | 'confirmed' | 'pending' | 'declined'>('confirmed');
     const [exportFormat, setExportFormat] = useState<'csv' | 'excel'>('excel');
 
-    const [activeTab, setActiveTab] = useState<'guests' | 'analytics' | 'assistant' | 'gifts' | 'messages' | 'team' | 'premium' | 'tables'>('guests');
+    const [activeTab, setActiveTab] = useState<'guests' | 'analytics' | 'gifts' | 'messages' | 'team' | 'premium' | 'tables'>('guests');
 
     const [pushEnabled, setPushEnabled] = useState(() => {
         if (typeof window !== 'undefined') {
@@ -1018,14 +1016,6 @@ export const Dashboard = () => {
                             <MessageSquare size={16} className={activeTab === 'messages' ? 'text-brand-blue' : 'text-slate-400'} /> Livro de Assinaturas
                         </button>
                     )}
-                    {(event?.plan === 'Corporate' || event?.plan === 'Premium') && (
-                        <button 
-                            onClick={() => setActiveTab('assistant')}
-                            className={`flex-1 md:flex-none justify-center px-4 md:px-6 py-2.5 rounded-xl lg:rounded-full font-bold text-sm transition-all flex items-center gap-2 ${activeTab === 'assistant' ? 'bg-white shadow-sm text-purple-600' : 'text-slate-500 hover:text-slate-700'}`}
-                        >
-                            Assistente IA
-                        </button>
-                    )}
                     {(event?.plan === 'Business' || event?.plan === 'Corporate' || event?.plan === 'Premium') && (
                         <button 
                             onClick={() => setActiveTab('team')}
@@ -1157,66 +1147,55 @@ export const Dashboard = () => {
                             ) : filteredGuests.length === 0 ? (
                                 <div className="p-12 text-center text-slate-500">Nenhum resultado encontrado para "{searchQuery}"</div>
                             ) : (
-                                <div className="divide-y divide-slate-100">
-                                    <List
-                                        height={Math.min(filteredGuests.length * 88, 600)}
-                                        itemCount={filteredGuests.length}
-                                        itemSize={88}
-                                        width="100%"
-                                    >
-                                        {({ index, style }) => {
-                                            const guest = filteredGuests[index];
-                                            return (
-                                                <div style={{...style, borderBottom: '1px solid #f1f5f9'}} key={guest.id}>
-                                                    <div 
-                                                        onClick={() => {
-                                                            setSelectedGuest(guest);
-                                                            setShowGuestDetails(true);
-                                                        }}
-                                                        className="flex items-center justify-between gap-4 p-5 hover:bg-slate-50 transition-colors min-w-0 cursor-pointer h-[88px] box-border"
-                                                    >
-                                                        <div className="flex gap-4 items-center min-w-0">
-                                                            <div className="w-10 h-10 rounded-full bg-slate-100 flex items-center justify-center text-slate-600 font-bold shrink-0">
-                                                                {guest.name?.charAt(0).toUpperCase()}
-                                                            </div>
-                                                            <div className="min-w-0">
-                                                                <p className="font-bold text-slate-800 truncate">{guest.name}</p>
-                                                                <p className="text-sm text-slate-500 flex items-center gap-1 truncate">
-                                                                    <span className="truncate">{guest.phone}</span>
-                                                                    {event?.type !== 'BRIDAL_SHOWER' && (
-                                                                        <>
-                                                                            <span className="opacity-50 mx-1">•</span>
-                                                                            <span className="whitespace-nowrap">{guest.adults || 1} Adulto(s)</span> {guest.children ? <span className="whitespace-nowrap">• {guest.children} Criança(s)</span> : ''}
-                                                                        </>
-                                                                    )}
-                                                                </p>
-                                                            </div>
-                                                        </div>
-                                                        <div className="flex items-center justify-end gap-2 shrink-0">
-                                                            {guest.checkedIn && event?.type !== 'BRIDAL_SHOWER' && (
-                                                                <div className="hidden sm:inline-flex bg-green-100 text-green-700 px-3 py-1.5 rounded-full items-center justify-center text-xs font-bold gap-1 whitespace-nowrap" title="Check-in Realizado">
-                                                                    <CheckCircle2 size={14} /> Check-in
-                                                                </div>
-                                                            )}
-                                                            <div className="hidden sm:block">
-                                                                <StatusBadge status={guest.status} />
-                                                            </div>
-                                                            <button 
-                                                                onClick={(e) => {
-                                                                    e.stopPropagation();
-                                                                    setSelectedGuest(guest);
-                                                                    setShowGuestMenu(true);
-                                                                }}
-                                                                className="text-slate-400 hover:text-brand-blue p-2 rounded-full hover:bg-brand-blue/5 transition-colors z-10"
-                                                            >
-                                                                <MoreHorizontal size={24} />
-                                                            </button>
-                                                        </div>
-                                                    </div>
+                                <div className="divide-y divide-slate-100 max-h-[600px] overflow-y-auto">
+                                    {filteredGuests.map((guest) => (
+                                        <div 
+                                            key={guest.id}
+                                            onClick={() => {
+                                                setSelectedGuest(guest);
+                                                setShowGuestDetails(true);
+                                            }}
+                                            className="flex items-center justify-between gap-4 p-5 hover:bg-slate-50 transition-colors min-w-0 cursor-pointer h-[88px] box-border border-b border-slate-100"
+                                        >
+                                            <div className="flex gap-4 items-center min-w-0">
+                                                <div className="w-10 h-10 rounded-full bg-slate-100 flex items-center justify-center text-slate-600 font-bold shrink-0">
+                                                    {guest.name?.charAt(0).toUpperCase()}
                                                 </div>
-                                            );
-                                        }}
-                                    </List>
+                                                <div className="min-w-0">
+                                                    <p className="font-bold text-slate-800 truncate">{guest.name}</p>
+                                                    <p className="text-sm text-slate-500 flex items-center gap-1 truncate">
+                                                        <span className="truncate">{guest.phone}</span>
+                                                        {event?.type !== 'BRIDAL_SHOWER' && (
+                                                            <>
+                                                                <span className="opacity-50 mx-1">•</span>
+                                                                <span className="whitespace-nowrap">{guest.adults || 1} Adulto(s)</span> {guest.children ? <span className="whitespace-nowrap">• {guest.children} Criança(s)</span> : ''}
+                                                            </>
+                                                        )}
+                                                    </p>
+                                                </div>
+                                            </div>
+                                            <div className="flex items-center justify-end gap-2 shrink-0">
+                                                {guest.checkedIn && event?.type !== 'BRIDAL_SHOWER' && (
+                                                    <div className="hidden sm:inline-flex bg-green-100 text-green-700 px-3 py-1.5 rounded-full items-center justify-center text-xs font-bold gap-1 whitespace-nowrap" title="Check-in Realizado">
+                                                        <CheckCircle2 size={14} /> Check-in
+                                                    </div>
+                                                )}
+                                                <div className="hidden sm:block">
+                                                    <StatusBadge status={guest.status} />
+                                                </div>
+                                                <button 
+                                                    onClick={(e) => {
+                                                        e.stopPropagation();
+                                                        setSelectedGuest(guest);
+                                                        setShowGuestMenu(true);
+                                                    }}
+                                                    className="text-slate-400 hover:text-brand-blue p-2 rounded-full hover:bg-brand-blue/5 transition-colors z-10"
+                                                >
+                                                    <MoreHorizontal size={24} />
+                                                </button>
+                                            </div>
+                                        </div>
+                                    ))}
                                 </div>
                             )}
                         </div>
@@ -1495,13 +1474,6 @@ export const Dashboard = () => {
                             </div>
                         </div>
                     )}
-
-                    {activeTab === 'assistant' && (
-                        <div className="lg:col-span-2 flex flex-col gap-6 min-w-0">
-                            <SmartAssistant event={event} guests={guests} />
-                        </div>
-                    )}
-                    
 
                     {activeTab === 'tables' && (
                         <div className="lg:col-span-2 flex flex-col gap-6 min-w-0">

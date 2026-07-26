@@ -43,7 +43,10 @@ export const ClientDashboard = () => {
                 
                 const eventData = { id: eventSnap.id, ...eventSnap.data() } as any;
                 
-                if (eventData.clientToken !== tokenParam) {
+                const eventToken = (eventData.clientToken || '').toString().trim().toUpperCase();
+                const reqToken = (tokenParam || '').trim().toUpperCase();
+                
+                if (eventData.clientToken && eventToken !== reqToken) {
                     setAuthError("Acesso negado. Token inválido ou ausente.");
                     setLoading(false);
                     return;
@@ -77,26 +80,27 @@ export const ClientDashboard = () => {
                     }
                 }
 
-                // Fetch guests securely via API
-                const fetchGuests = async () => {
-                    try {
-                        const res = await fetch(`/api/events/${id}/guests?token=${tokenParam}`);
-                        if (res.ok) {
-                            const data = await res.json();
-                            setGuests(data.guests || []);
-                        }
-                    } catch (err) {
-                        console.error("Guest fetch error", err);
-                    } finally {
+                // Fetch guests in real-time via Client Web SDK (matching Admin Dashboard) with API fallback
+                const guestsRef = collection(db, 'events', id, 'guests');
+                const unsubscribeGuests = onSnapshot(
+                    guestsRef,
+                    (snapshot) => {
+                        const guestsList = snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() }));
+                        setGuests(guestsList);
                         setLoading(false);
+                    },
+                    (err) => {
+                        console.warn("Client SDK guest fetch warning, using API fallback:", err);
+                        fetch(`/api/events/${id}/guests?token=${tokenParam}`)
+                            .then(res => res.ok ? res.json() : null)
+                            .then(data => { if (data?.guests) setGuests(data.guests); })
+                            .catch(e => console.error("Guest API fallback error", e))
+                            .finally(() => setLoading(false));
                     }
-                };
-                
-                fetchGuests();
-                const interval = setInterval(fetchGuests, 15000); // Polling every 15s
+                );
                 
                 return () => {
-                    clearInterval(interval);
+                    unsubscribeGuests();
                 };
             } catch (err) {
                 console.error("Error fetching event for client", err);

@@ -71,48 +71,6 @@ export const OnboardingWizard: React.FC<OnboardingWizardProps> = ({ onCancel, on
 
     const currentThemesList = isBridalShower ? bridalThemes : weddingThemes;
 
-    // AI Generation integration calling our Express backend endpoint safely
-    const generateAIDescription = async () => {
-        if (!brideName || (!isBridalShower && !groomName)) {
-            toast.error('Por favor, preencha o nome dos protagonistas antes!');
-            return;
-        }
-
-        setIsGeneratingIntro(true);
-        const toastId = toast.loading('InoAI está a redigir o parágrafo perfeito...');
-
-        try {
-            const token = user ? await user.getIdToken() : '';
-            const response = await fetch('/api/generate-description', {
-                method: 'POST',
-                headers: {
-                    'Content-Type': 'application/json',
-                    ...(token ? { 'Authorization': `Bearer ${token}` } : {})
-                },
-                body: JSON.stringify({
-                    eventType,
-                    title: computedTitle,
-                    date: eventDate,
-                    style: layoutMode
-                })
-            });
-
-            if (!response.ok) {
-                throw new Error('Falha na geração de conteúdo');
-            }
-
-            const data = await response.json();
-            setIntroText(data.text || '');
-            toast.success('Prólogo elaborado com sucesso!', { id: toastId });
-        } catch (error) {
-            console.error(error);
-            setIntroText('Para sempre é muito tempo, mas não me importaria de passar ao seu lado. Convidamos você para celebrar este dia tão especial de nossas vidas!');
-            toast.error('Erro na IA. Carregamos um texto alternativo elegante.', { id: toastId });
-        } finally {
-            setIsGeneratingIntro(false);
-        }
-    };
-
     const handleCreateEventDone = async () => {
         if (!eventDate || !brideName) {
             toast.error('Falta data do evento ou nome principal.');
@@ -161,6 +119,7 @@ export const OnboardingWizard: React.FC<OnboardingWizardProps> = ({ onCancel, on
                 layoutMode: layoutMode,
                 ownerId: user!.uid,
                 plan: userProfile?.plan || 'Essencial',
+                clientToken: Math.random().toString(36).substring(2, 8).toUpperCase(),
                 createdAt: new Date().toISOString(),
                 description: introText || 'Estamos muito entusiasmados e ansiosos para celebrar este momento perfeito com você!',
                 locationName: locationName || 'Local de Sonhos',
@@ -209,13 +168,6 @@ export const OnboardingWizard: React.FC<OnboardingWizardProps> = ({ onCancel, on
             }
         }
         setStep(prev => prev + 1);
-        
-        // Auto trigger AI if arriving at step 4
-        if (step === 2 && useAI && !introText) {
-            setTimeout(() => {
-                generateAIDescription();
-            }, 400);
-        }
     };
 
     const prevStep = () => {
@@ -466,29 +418,12 @@ export const OnboardingWizard: React.FC<OnboardingWizardProps> = ({ onCancel, on
                             </div>
 
                             <div className="bg-slate-50 p-5 rounded-2xl border border-slate-150 relative min-h-[130px] flex flex-col justify-between">
-                                {isGeneratingIntro ? (
-                                    <div className="flex flex-col items-center justify-center py-6 text-center">
-                                        <Loader2 size={24} className="animate-spin text-brand-blue mb-2" />
-                                        <p className="text-xs text-slate-400 font-medium animate-pulse">Redigindo mensagem premium...</p>
-                                    </div>
-                                ) : (
-                                    <>
-                                        <textarea 
-                                            value={introText}
-                                            onChange={(e) => setIntroText(e.target.value)}
-                                            placeholder="Ex: Com muita alegria abrimos as portas do nosso coração e convidamos você..."
-                                            className="w-full bg-transparent border-none text-xs text-slate-700 italic leading-relaxed focus:outline-none resize-none h-24 font-medium"
-                                        />
-                                        <div className="flex justify-end pt-2 border-t border-slate-100 mt-2">
-                                            <button
-                                                onClick={generateAIDescription}
-                                                className="bg-purple-100 hover:bg-purple-200 text-purple-700 font-bold text-[10px] px-3.5 py-1.5 rounded-xl transition-all cursor-pointer flex items-center gap-1 shadow-sm"
-                                            >
-                                                <Sparkles size={11} /> Recriar Texto com IA
-                                            </button>
-                                        </div>
-                                    </>
-                                )}
+                                    <textarea 
+                                        value={introText}
+                                        onChange={(e) => setIntroText(e.target.value)}
+                                        placeholder="Ex: Com muita alegria abrimos as portas do nosso coração e convidamos você..."
+                                        className="w-full bg-transparent border-none text-xs text-slate-700 italic leading-relaxed focus:outline-none resize-none h-24 font-medium"
+                                    />
                             </div>
 
                             <div className="flex items-center gap-3 bg-blue-50/20 border border-blue-100/50 p-4 rounded-xl">

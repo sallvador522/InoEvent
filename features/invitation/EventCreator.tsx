@@ -47,7 +47,6 @@ export const EventCreator: React.FC = () => {
 
   const [activeTab, setActiveTab] = useState<'content' | 'timeline' | 'gifts' | 'design'>('content');
   const [isLoading, setIsLoading] = useState(false);
-  const [isAiGenerating, setIsAiGenerating] = useState(false);
   const [showUpgradeModal, setShowUpgradeModal] = useState(false);
   const [attemptedPremiumLayout, setAttemptedPremiumLayout] = useState<string>('');
 
@@ -230,39 +229,6 @@ export const EventCreator: React.FC = () => {
     }
   }, [eventIdParam]);
 
-  // Generate Intro description with server-side AI (Gemini Flash model alias)
-  const handleGenerateAiMessage = async () => {
-    if (!title) {
-      toast.error('Preencha o título do evento para referenciar na IA.');
-      return;
-    }
-    setIsAiGenerating(true);
-    const toastId = toast.loading('Consultando inteligência lírica de Alta Costura...');
-    try {
-      const token = user ? await user.getIdToken() : '';
-      const response = await fetch('/api/generate-description', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json', ...(token ? { 'Authorization': `Bearer ${token}` } : {}) },
-        body: JSON.stringify({
-          eventType: isBridalShower ? 'BRIDAL_SHOWER' : 'WEDDING',
-          title: title,
-          date: date,
-          style: selectedLayout
-        })
-      });
-      const resData = await response.json();
-      if (resData.error) throw new Error(resData.error);
-      
-      setDescription(resData.text || '');
-      toast.success('História gerada com sucesso pela IA!', { id: toastId });
-    } catch (err: any) {
-      console.error(err);
-      toast.error(err.message || 'Erro ao comunicar com o cérebro artificial.', { id: toastId });
-    } finally {
-      setIsAiGenerating(false);
-    }
-  };
-
   const handleAddTimeline = () => {
     if (!newTime || !newTitle) {
       toast.error('Informe ao menos hora e o título da atividade.');
@@ -373,7 +339,7 @@ export const EventCreator: React.FC = () => {
         heroImage: heroImage || getHeroImageUrl(selectedLayout),
         editableContent: editableContent || {},
         ...(mapImage ? { mapImage } : {}),
-        gifts: gifts,
+        clientToken: Math.random().toString(36).substring(2, 8).toUpperCase(),
         createdAt: new Date().toISOString(),
       };
 
@@ -606,17 +572,8 @@ export const EventCreator: React.FC = () => {
                     </div>
 
                     <div className="border-t border-slate-100 pt-6">
-                      <div className="flex items-center justify-between mb-4">
+                      <div className="mb-4">
                         <label className="block text-xs font-bold text-slate-500 uppercase tracking-wider">Texto de Introdução / Boas-Vindas</label>
-                        <button
-                          type="button"
-                          onClick={handleGenerateAiMessage}
-                          disabled={isAiGenerating}
-                          className="flex items-center gap-1 bg-[#FAF4ED] text-[#9A7D63] hover:bg-[#F2E8DC] px-3 py-1 rounded-full text-[10px] font-bold tracking-wider uppercase transition-all"
-                        >
-                          <Sparkles size={11} className={isAiGenerating ? 'animate-spin' : 'animate-pulse'} />
-                          {isAiGenerating ? 'IA poetando...' : 'Reescrever com IA'}
-                        </button>
                       </div>
                       <textarea
                         value={description}

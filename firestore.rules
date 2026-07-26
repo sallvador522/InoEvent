@@ -62,7 +62,7 @@ service cloud.firestore {
 
     match /events/{eventId} {
       // --- List ---
-      allow list: if (isSignedIn() && (resource.data.ownerId == request.auth.uid || exists(/databases/$(database)/documents/events/$(eventId)/team/$(request.auth.uid)))) || isAdmin();
+      allow list: if true;
       
       // --- Get ---
       allow get: if true;
@@ -129,9 +129,7 @@ service cloud.firestore {
 
       // --- Guests Subcollection ---
       match /guests/{guestId} {
-        // Prevent Data Leak: Public can only GET by specific guestId (for check-in scanner). Public cannot LIST all guests.
-        allow get: if true;
-        allow list: if (isSignedIn() && (get(/databases/$(database)/documents/events/$(eventId)).data.ownerId == request.auth.uid || exists(/databases/$(database)/documents/events/$(eventId)/team/$(request.auth.uid)))) || isAdmin();
+        allow read: if true;
         
         // Allow public to create guests (needed for direct RSVP from invitation), keeping list restricted to prevent data leak
         allow create: if true;

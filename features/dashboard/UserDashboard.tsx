@@ -34,6 +34,9 @@ import {
   Award,
   Sparkles,
   Zap,
+  Bell,
+  BellOff,
+  Gem,
 } from "lucide-react";
 import toast from "react-hot-toast";
 import { Navbar } from "../../components/Navbar";

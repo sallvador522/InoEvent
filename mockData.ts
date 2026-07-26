@@ -136,7 +136,7 @@ Anacanizia Lopes Lima`,
     receptionName: "Copo d'água",
     receptionAddress: "Salão Noblesse, Talatona, Luanda",
     mapLink: "https://maps.google.com/?q=Talatona+Luanda",
-    heroImage: "https://images.unsplash.com/photo-1519741497674-611481863552?q=80&w=1200&auto=format&fit=crop",
+    heroImage: "/bridal-templates/templateCha1.png",
     description: `I Coríntios 13: 4-7
 Aqui começa o nosso lar, erguido sobre a fé e o amor de Deus.
 Cada passo que damos é promessa de que ele será sempre o alicerce da nossa Família.`,
@@ -202,8 +202,7 @@ Cada passo que damos é promessa de que ele será sempre o alicerce da nossa Fam
     time: "18:00",
     locationName: "Espaço Elegance",
     address: "Talatona, Luanda",
-    heroImage:
-      "https://images.unsplash.com/photo-1520854221256-17451cc331bf?q=80&w=2670&auto=format&fit=crop",
+    heroImage: "/bridal-templates/templateCha2.png",
     description:
       "Um dia inesquecível de celebração do nosso amor. Junte-se a nós para brindarmos à vida e à felicidade (Modelo Essencial).",
     musicTrack: "A Thousand Years - Christina Perri",
@@ -231,8 +230,7 @@ Cada passo que damos é promessa de que ele será sempre o alicerce da nossa Fam
     time: "16:00",
     locationName: "Solar dos Hibiscos",
     address: "Mussulo, Luanda, Angola",
-    heroImage:
-      "https://images.unsplash.com/photo-1520854221256-17451cc331bf?q=80&w=2670&auto=format&fit=crop",
+    heroImage: "/bridal-templates/templateCha2.png",
     description:
       '"O amor é paciente, o amor é bondoso. Não inveja, não se vangloria, não se orgulha." (1 Coríntios 13:4). Sua presença é essencial neste novo capítulo de nossas vidas.',
     musicTrack: "Turning Page - Sleeping At Last",

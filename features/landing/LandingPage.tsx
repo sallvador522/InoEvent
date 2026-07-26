@@ -194,9 +194,9 @@ export const LandingPage: React.FC = () => {
            >
               <div className="flex items-center gap-3 bg-white/60 backdrop-blur-md border border-slate-200/60 px-4 py-2 rounded-full shadow-sm">
                  <div className="flex -space-x-2">
-                    <img src="https://i.pravatar.cc/100?img=1" className="w-6 h-6 rounded-full border-2 border-white" alt="User" loading="lazy" width="24" height="24" />
-                    <img src="https://i.pravatar.cc/100?img=5" className="w-6 h-6 rounded-full border-2 border-white" alt="User" loading="lazy" width="24" height="24" />
-                    <img src="https://i.pravatar.cc/100?img=9" className="w-6 h-6 rounded-full border-2 border-white" alt="User" loading="lazy" width="24" height="24" />
+                     <img src="https://images.unsplash.com/photo-1534528741775-53994a69daeb?w=100&auto=format&fit=crop&q=80" className="w-6 h-6 rounded-full border-2 border-white object-cover" alt="User" width="24" height="24" />
+                     <img src="https://images.unsplash.com/photo-1507003211169-0a1dd7228f2d?w=100&auto=format&fit=crop&q=80" className="w-6 h-6 rounded-full border-2 border-white object-cover" alt="User" width="24" height="24" />
+                     <img src="https://images.unsplash.com/photo-1494790108377-be9c29b29330?w=100&auto=format&fit=crop&q=80" className="w-6 h-6 rounded-full border-2 border-white object-cover" alt="User" width="24" height="24" />
                  </div>
                  <div className="flex items-center gap-1 text-[#BF9B30]">
                     <span className="material-symbols-outlined text-sm font-bold">star</span>
@@ -289,18 +289,18 @@ export const LandingPage: React.FC = () => {
                           transition={{ repeat: Infinity, duration: 40, ease: "linear" }}
                           className="flex flex-col gap-6"
                        >
-                          <img src={EVENTS[0]?.heroImage || "/bridal-templates/templateCha1.png"} className="rounded-2xl shadow-sm object-cover w-full aspect-[3/4]" alt="Template" loading="lazy" referrerPolicy="no-referrer" />
-                          <img src={EVENTS[1]?.heroImage || "/bridal-templates/templateCha3.png"} className="rounded-2xl shadow-sm object-cover w-full aspect-[3/4]" alt="Template" loading="lazy" referrerPolicy="no-referrer" />
-                          <img src={EVENTS[2]?.heroImage || "/bridal-templates/templateCha1.png"} className="rounded-2xl shadow-sm object-cover w-full aspect-[3/4]" alt="Template" loading="lazy" referrerPolicy="no-referrer" />
+                          <img src="/casalModel.webp" className="rounded-2xl shadow-sm object-cover w-full aspect-[3/4]" alt="Template" />
+                          <img src="/bridal-templates/templateCha3.png" className="rounded-2xl shadow-sm object-cover w-full aspect-[3/4]" alt="Template" />
+                          <img src="/bridal-templates/templateCha1.png" className="rounded-2xl shadow-sm object-cover w-full aspect-[3/4]" alt="Template" />
                        </motion.div>
                        <motion.div 
                           animate={{ y: ["-50%", "0%"] }}
                           transition={{ repeat: Infinity, duration: 50, ease: "linear" }}
                           className="flex flex-col gap-6 mt-[-50%]"
                        >
-                          <img src={EVENTS[3]?.heroImage || "/bridal-templates/templateCha2.png"} className="rounded-2xl shadow-sm object-cover w-full aspect-[3/4]" alt="Template" loading="lazy" referrerPolicy="no-referrer" />
-                          <img src={EVENTS[4]?.heroImage || "/bridal-templates/templateCha4.png"} className="rounded-2xl shadow-sm object-cover w-full aspect-[3/4]" alt="Template" loading="lazy" referrerPolicy="no-referrer" />
-                          <img src={EVENTS[5]?.heroImage || "/bridal-templates/templateCha2.png"} className="rounded-2xl shadow-sm object-cover w-full aspect-[3/4]" alt="Template" loading="lazy" referrerPolicy="no-referrer" />
+                          <img src="/bridal-templates/templateCha2.png" className="rounded-2xl shadow-sm object-cover w-full aspect-[3/4]" alt="Template" />
+                          <img src="/bridal-templates/templateCha4.png" className="rounded-2xl shadow-sm object-cover w-full aspect-[3/4]" alt="Template" />
+                          <img src="/bridal-templates/templateCha2.png" className="rounded-2xl shadow-sm object-cover w-full aspect-[3/4]" alt="Template" />
                        </motion.div>
                     </div>
                  </div>
@@ -312,7 +312,7 @@ export const LandingPage: React.FC = () => {
                  transition={{ repeat: Infinity, duration: 6, ease: "easeInOut" }}
                  className="absolute left-2 md:left-24 top-12 w-[160px] md:w-[220px] h-[320px] md:h-[420px] bg-white rounded-3xl border-4 md:border-8 border-slate-900 shadow-2xl flex flex-col overflow-hidden z-20"
               >
-                 <img src={EVENTS[3]?.heroImage || "/bridal-templates/templateCha4.png"} className="w-full h-full object-cover" alt="Phone Template Preview" loading="lazy" referrerPolicy="no-referrer" />
+                 <img src="/casalModel.webp" className="w-full h-full object-cover" alt="Phone Template Preview" />
                  <div className="absolute bottom-4 left-1/2 -translate-x-1/2 w-[80%] bg-white/90 backdrop-blur text-center py-2 rounded-full text-[10px] sm:text-xs font-bold shadow-lg">
                     Confirmar Presença
                  </div>

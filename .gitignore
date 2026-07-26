@@ -32,3 +32,5 @@ dist-ssr
 .env*.local
 firebase-debug.log
 firebase-debug.*.log
+.gemini/
+mcp.json

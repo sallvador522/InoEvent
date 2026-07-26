@@ -207,7 +207,8 @@ export const CheckinScanner: React.FC = () => {
     }, [status, id]);
 
     const handleScanResult = async (qrData: string) => {
-        if (scanState.status === 'processing') return;
+        // Block all scans while showing any result (success, error, already_scanned, processing)
+        if (scanState.status !== 'idle') return;
         
         try {
             setScanState({ status: 'processing', message: 'Validando QR Code...' });
@@ -268,7 +269,7 @@ export const CheckinScanner: React.FC = () => {
             setScanState({ status: 'error', message: 'QR Code Inválido ou não pertence a este sistema.' });
             playScanSound('error');
         }
-        setTimeout(() => setScanState({ status: 'idle', message: '' }), 3500); // clear after delay
+        // Overlay stays visible until operator taps "Próximo Convidado" — no auto-reset
     };
 
     const handleManualCheckIn = async (guest: any) => {
@@ -400,6 +401,21 @@ export const CheckinScanner: React.FC = () => {
                                                         </p>
                                                     )}
                                                 </motion.div>
+                                            )}
+                                            {/* Manual reset button — operator controls when to scan next */}
+                                            {(scanState.status === 'success' || scanState.status === 'already_scanned' || scanState.status === 'error') && (
+                                                <motion.button
+                                                    initial={{ opacity: 0, y: 20 }}
+                                                    animate={{ opacity: 1, y: 0 }}
+                                                    transition={{ delay: 0.5 }}
+                                                    onClick={() => setScanState({ status: 'idle', message: '' })}
+                                                    className="mt-6 px-8 py-3.5 bg-white/20 hover:bg-white/30 active:scale-[0.96] text-white font-bold text-base rounded-2xl border border-white/30 backdrop-blur-sm transition-all shadow-lg"
+                                                >
+                                                    <span className="flex items-center gap-2">
+                                                        <ScanLine size={18} />
+                                                        Próximo Convidado
+                                                    </span>
+                                                </motion.button>
                                             )}
                                         </motion.div>
                                     )}

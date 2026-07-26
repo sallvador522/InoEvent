@@ -1,7 +1,7 @@
 import React, { createContext, useContext, useEffect, useState } from 'react';
 import { initializeApp } from 'firebase/app';
 import { getAuth, GoogleAuthProvider, onAuthStateChanged, User, signOut } from 'firebase/auth';
-import { getFirestore, doc, onSnapshot, getDocFromServer, initializeFirestore, setLogLevel, updateDoc, enableIndexedDbPersistence } from 'firebase/firestore';
+import { getFirestore, doc, onSnapshot, getDocFromServer, initializeFirestore, setLogLevel, updateDoc, persistentLocalCache, persistentMultipleTabManager } from 'firebase/firestore';
 import firebaseConfig from '../firebase-applet-config.json';
 import { logger } from '../lib/logger';
 
@@ -9,24 +9,10 @@ const app = initializeApp(firebaseConfig);
 export const auth = getAuth(app);
 export const db = initializeFirestore(app, {
   experimentalForceLongPolling: true,
+  localCache: persistentLocalCache({
+    tabManager: persistentMultipleTabManager()
+  })
 }, firebaseConfig.firestoreDatabaseId);
-
-// Enable Firestore Local Cache Offline Persistence
-if (typeof window !== 'undefined') {
-  enableIndexedDbPersistence(db)
-    .then(() => {
-      logger.success('Persistência do cache local do Firestore ativada com sucesso.', { category: 'DATABASE' });
-    })
-    .catch((err) => {
-      if (err.code === 'failed-precondition') {
-        logger.warn('Múltiplas abas abertas, persistência ativada em apenas uma delas.', { category: 'DATABASE', data: err });
-      } else if (err.code === 'unimplemented') {
-        logger.warn('Navegador sem suporte para persistência do Firestore.', { category: 'DATABASE', data: err });
-      } else {
-        logger.error('Falha ao configurar persistência offline do Firestore.', { category: 'DATABASE', data: err });
-      }
-    });
-}
 
 setLogLevel('error');
 

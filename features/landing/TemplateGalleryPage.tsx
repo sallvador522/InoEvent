@@ -8,7 +8,7 @@ import { SEO } from '../../components/SEO';
 import { Skeleton } from '../../components/ui/Skeleton';
 import { getOptimizedImageUrl } from '../../lib/imageOptimizer';
 
-const MotionLink = motion(Link as any) as any;
+const MotionLink = motion.create(Link as any) as any;
 
 const CATEGORIES = [
   { id: 'all', label: 'Todos', icon: 'auto_awesome' },

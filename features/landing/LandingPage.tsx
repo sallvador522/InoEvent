@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 import { Link, useNavigate, useLocation } from 'react-router-dom';
 import { motion, AnimatePresence } from 'framer-motion';
 import { useFirebase, signOut, auth, db, handleFirestoreError, OperationType } from '../../components/FirebaseProvider';
@@ -8,21 +8,13 @@ import { SEO } from '../../components/SEO';
 import { FAQSection } from './FAQSection';
 import { SupportModal } from '../../components/SupportModal';
 import { EVENTS } from '../../mockData';
-import { X, Copy, MessageSquare, QrCode, LayoutDashboard, Gift, Globe, UtensilsCrossed, BookOpen, BarChart3, Bot, ArrowRight, Star, Award, Image as ImageIcon, CheckCircle2, Gem, Sparkles, PartyPopper, Utensils, Cake, Baby, Briefcase } from 'lucide-react';
+import { X, Copy, MessageSquare, ArrowRight, Award, Image as ImageIcon, CheckCircle2, Gem, PartyPopper, Utensils, Cake, Baby, Briefcase } from 'lucide-react';
 import toast from 'react-hot-toast';
 import { copyToClipboard } from '../../lib/clipboard';
+import { PLANS } from '../../config/plans';
 
 // Create a motion component from the React Router Link
 const MotionLink = motion.create(Link);
-
-const TESTIMONIALS = [
-  { text: "A melhor plataforma de convites que já usei. Simplesmente elegante.", author: "Maria Silva", role: "Noiva", rating: 5 },
-  { text: "Meus convidados ficaram maravilhados com a facilidade do RSVP.", author: "João Pereira", role: "Aniversariante", rating: 5 },
-  { text: "Design impecável! O QR code individual facilitou muito a recepção.", author: "Ana Costa", role: "Assessora de Eventos", rating: 5 },
-  { text: "Suporte VIP incrível via WhatsApp. Resolveram tudo em minutos.", author: "Carlos Santos", role: "Produtor B2B", rating: 5 },
-  { text: "Os templates são maravilhosos. O meu casamento ganhou outro nível.", author: "Juliana Mendes", role: "Noiva", rating: 5 },
-  { text: "Painel de controle excelente para gerir milhares de convidados.", author: "Sérgio Almeida", role: "Organizador Corporate", rating: 5 },
-];
 
 import { getOptimizedImageUrl } from '../../lib/imageOptimizer';
 
@@ -31,7 +23,6 @@ export const LandingPage: React.FC = () => {
   const [dashboardOpen, setDashboardOpen] = useState(false);
   const { user, userProfile } = useFirebase();
   const [userEvents, setUserEvents] = useState<any[]>([]);
-  const [currentTestimonialIndex, setCurrentTestimonialIndex] = useState(0);
   const [supportOpen, setSupportOpen] = useState(false);
   const [showTypeModal, setShowTypeModal] = useState(false);
   const [whatsappModal, setWhatsappModal] = useState<{
@@ -39,6 +30,30 @@ export const LandingPage: React.FC = () => {
     price: string;
     billingCycle?: "monthly" | "annual";
   } | null>(null);
+  const typeModalPanelRef = useRef<HTMLDivElement>(null);
+  const waModalPanelRef = useRef<HTMLDivElement>(null);
+  const lastFocusedRef = useRef<HTMLElement | null>(null);
+
+  // Diálogos acessíveis: Escape fecha, scroll do fundo bloqueia, foco entra e volta
+  useEffect(() => {
+    const anyOpen = showTypeModal || whatsappModal !== null;
+    if (!anyOpen) return;
+    lastFocusedRef.current = document.activeElement as HTMLElement | null;
+    document.body.style.overflow = 'hidden';
+    (showTypeModal ? typeModalPanelRef.current : waModalPanelRef.current)?.focus();
+    const onKey = (e: KeyboardEvent) => {
+      if (e.key === 'Escape') {
+        setShowTypeModal(false);
+        setWhatsappModal(null);
+      }
+    };
+    document.addEventListener('keydown', onKey);
+    return () => {
+      document.removeEventListener('keydown', onKey);
+      document.body.style.overflow = '';
+      lastFocusedRef.current?.focus();
+    };
+  }, [showTypeModal, whatsappModal]);
 
   const handleCopy = (text: string) => {
     copyToClipboard(text);
@@ -50,7 +65,7 @@ export const LandingPage: React.FC = () => {
       toast.custom(
         (t) => (
           <div
-            className={`${t.visible ? "animate-enter" : "animate-leave"} max-w-sm w-full bg-white shadow-[0_8px_30px_rgb(0,0,0,0.12)] rounded-xl flex flex-col border border-slate-100 overflow-hidden relative z-[9999]`}
+            className={`${t.visible ? "animate-enter" : "animate-leave"} max-w-sm w-full bg-white shadow-[0_8px_30px_rgb(0,0,0,0.12)] rounded-xl flex flex-col border border-slate-100 overflow-hidden relative z-[80]`}
           >
             <div className="p-4">
               <h3 className="font-bold text-slate-900 mb-1">
@@ -122,13 +137,6 @@ export const LandingPage: React.FC = () => {
   }, [location]);
 
   useEffect(() => {
-    const timer = setInterval(() => {
-      setCurrentTestimonialIndex((prev) => (prev + 1) % TESTIMONIALS.length);
-    }, 5000);
-    return () => clearInterval(timer);
-  }, []);
-
-  useEffect(() => {
     if (!user) {
       setUserEvents([]);
       return;
@@ -163,448 +171,433 @@ export const LandingPage: React.FC = () => {
   }
 
   return (
-    <div className="flex-1 min-h-screen flex flex-col justify-between relative font-display overflow-x-hidden bg-slate-900">
+    <div className="flex-1 min-h-screen flex flex-col justify-between relative font-display overflow-x-hidden bg-[#FDFBF7] text-slate-900">
       <SEO 
         title="InoEvents Angola | Convites Digitais de Casamento, Chá de Panela e Gestão de Eventos" 
         description="A plataforma mais elegante de Angola para criar convites digitais de casamento e chás de panela com RSVP online, QR Code de acesso, check-in presencial no evento, lista de convidados e presentes por IBAN."
       />
-      
-      {/* Background Subtle Gradient */}
-      <div className="absolute inset-0 z-0 pointer-events-none overflow-hidden">
-        <div className="absolute top-[-20%] right-[-10%] w-[70vw] h-[70vw] bg-blue-50/50 rounded-full blur-[100px]" />
-        <div className="absolute top-[40%] left-[-10%] w-[50vw] h-[50vw] bg-primary/5 rounded-full blur-[120px]" />
-      </div>
 
       <Navbar />
 
       <main className="relative z-10 flex flex-col flex-1 gap-0">
         
-        {/* HERO BANNER SECTION (High-Conversion, Spatial UI) */}
-        <section className="relative w-full flex flex-col justify-center overflow-hidden bg-[#FDFBF7] pt-24 md:pt-32 pb-20">
-           {/* Ambient Background Glows */}
-           <div className="absolute top-0 left-1/2 -translate-x-1/2 w-full max-w-4xl h-[400px] bg-brand-blue/10 blur-[120px] rounded-full pointer-events-none" />
-           <div className="absolute top-1/4 right-0 w-[500px] h-[500px] bg-[#BF9B30]/5 blur-[100px] rounded-full pointer-events-none" />
-           
-           {/* Trust Badge Top */}
-           <motion.div 
-             initial={{ opacity: 0, y: 20 }}
-             animate={{ opacity: 1, y: 0 }}
-             transition={{ duration: 0.8, ease: "easeOut", delay: 0.1 }}
-             className="relative z-20 flex justify-center w-full mb-8"
-           >
-              <div className="flex items-center gap-3 bg-white/60 backdrop-blur-md border border-slate-200/60 px-4 py-2 rounded-full shadow-sm">
-                 <div className="flex -space-x-2">
-                     <img src="https://images.unsplash.com/photo-1534528741775-53994a69daeb?w=100&auto=format&fit=crop&q=80" className="w-6 h-6 rounded-full border-2 border-white object-cover" alt="User" width="24" height="24" />
-                     <img src="https://images.unsplash.com/photo-1507003211169-0a1dd7228f2d?w=100&auto=format&fit=crop&q=80" className="w-6 h-6 rounded-full border-2 border-white object-cover" alt="User" width="24" height="24" />
-                     <img src="https://images.unsplash.com/photo-1494790108377-be9c29b29330?w=100&auto=format&fit=crop&q=80" className="w-6 h-6 rounded-full border-2 border-white object-cover" alt="User" width="24" height="24" />
-                 </div>
-                 <div className="flex items-center gap-1 text-[#BF9B30]">
-                    <Star size={14} className="fill-current" />
-                    <Star size={14} className="fill-current" />
-                    <Star size={14} className="fill-current" />
-                    <Star size={14} className="fill-current" />
-                    <Star size={14} className="fill-current" />
-                 </div>
-                 <span className="text-xs font-semibold text-slate-600 ml-1">Amado por +10.000 clientes</span>
-              </div>
-           </motion.div>
+        {/* HERO — banner contínuo atrás de tudo */}
+        <section className="relative w-full flex flex-col overflow-hidden pt-28">
+            {/* Fotografia + véu navy para legibilidade */}
+            <img
+              src="/bannerIno.webp"
+              alt="Casal de noivos ao pôr-do-sol sobre o mar"
+              fetchPriority="high"
+              className="absolute inset-0 h-full w-full object-cover object-[55%_20%] md:object-[50%_25%]"
+            />
+            <div className="absolute inset-0 bg-gradient-to-t from-[#0d1f38]/90 via-[#0d1f38]/35 to-[#0d1f38]/15 pointer-events-none" aria-hidden="true" />
+            {/* Derretido suave para o creme, no fim da composição */}
+            <div className="absolute bottom-0 left-0 right-0 h-40 md:h-52 bg-gradient-to-b from-transparent via-[#FDFBF7]/60 to-[#FDFBF7] pointer-events-none" aria-hidden="true" />
+            {/* Selo quieto */}
+            <motion.div 
+              initial={{ opacity: 0 }}
+              animate={{ opacity: 1 }}
+              transition={{ duration: 0.8, ease: "easeOut", delay: 0.1 }}
+              className="relative z-20 flex justify-center w-full mb-8"
+            >
+               <div className="flex items-center gap-3 px-1 py-2">
+                  <span className="h-px w-8 bg-[var(--color-gold-soft)]/80" />
+                  <span className="text-[11px] font-bold uppercase tracking-[0.22em] text-white/85">Convites digitais · Angola</span>
+                  <span className="h-px w-8 bg-[var(--color-gold-soft)]/80" />
+               </div>
+            </motion.div>
 
-           <div className="relative z-20 max-w-5xl mx-auto px-6 text-center flex flex-col items-center">
+            <div className="relative z-20 max-w-5xl mx-auto px-6 pb-12 md:pb-16 text-center flex flex-col items-center">
               
-              <motion.h1 
-                 initial={{ opacity: 0, y: 30 }}
-                 animate={{ opacity: 1, y: 0 }}
-                 transition={{ duration: 0.9, ease: [0.22, 1, 0.36, 1], delay: 0.2 }}
-                 className="text-5xl md:text-7xl lg:text-[5rem] font-serif font-bold text-slate-900 tracking-tight leading-[1.05] mb-6"
-              >
-                 Convites Digitais em <br className="hidden md:block"/>
-                 <span className="text-transparent bg-clip-text bg-gradient-to-r from-brand-blue to-[#BF9B30] inline-block mt-2">Angola.</span>
-              </motion.h1>
-              
-              <motion.p 
-                 initial={{ opacity: 0, y: 20 }}
-                 animate={{ opacity: 1, y: 0 }}
-                 transition={{ duration: 0.8, ease: "easeOut", delay: 0.4 }}
-                 className="text-lg md:text-xl text-slate-600 max-w-2xl mx-auto leading-relaxed mb-10 font-light text-center"
-              >
-                 Diga adeus ao papel em Luanda e em toda Angola. Impressione os seus convidados com os melhores convites digitais de casamento e chá de panela, confirme presenças por RSVP e receba presentes com facilidade.
-              </motion.p>
+               <motion.h1 
+                  initial={{ opacity: 0, y: 30 }}
+                  animate={{ opacity: 1, y: 0 }}
+                  transition={{ duration: 0.9, ease: [0.22, 1, 0.36, 1], delay: 0.2 }}
+                  className="text-[2.9rem] md:text-7xl lg:text-[5rem] font-serif font-bold text-white tracking-tight leading-[1.02] md:leading-[1.05] mb-6"
+               >
+                  O convite do seu<br />
+                  <span className="italic font-medium text-[var(--color-gold-soft)] inline-block mt-2">grande dia.</span>
+               </motion.h1>
+               
+               <motion.p 
+                  initial={{ opacity: 0, y: 20 }}
+                  animate={{ opacity: 1, y: 0 }}
+                  transition={{ duration: 0.8, ease: "easeOut", delay: 0.4 }}
+                  className="text-lg md:text-xl text-white/85 max-w-xl mx-auto leading-relaxed mb-10 font-light text-center"
+               >
+                  Convites digitais de casamento e chá de panela, com confirmação de presença e lista de presentes — tudo num só link.
+               </motion.p>
                <motion.div 
                  initial={{ opacity: 0, y: 20 }}
                  animate={{ opacity: 1, y: 0 }}
                  transition={{ duration: 0.8, ease: "easeOut", delay: 0.5 }}
                  className="flex flex-col items-center gap-6 w-full max-w-2xl mx-auto px-4"
               >
-                {/* Primary Actions side-by-side */}
-                <div className="flex flex-row items-center justify-center gap-2.5 sm:gap-4 w-full max-w-sm sm:max-w-lg">
-                  {/* Primary CTA - Create */}
-                  <button
+                {/* Primary CTA — 1 dominant action, hierarchy clara */}
+                <div className="flex flex-col items-center gap-3 w-full max-w-sm sm:max-w-lg">
+                   <button
                      onClick={handleCreateEvent}
-                     className="flex-1 h-12 px-3 sm:px-6 bg-[#1B365D] text-white text-[10px] sm:text-xs font-bold uppercase tracking-wider rounded-full relative overflow-hidden transition-all duration-150 ease-out border-b-4 border-[#10223B] hover:bg-[#224373] hover:-translate-y-[1px] hover:border-b-[5px] hover:shadow-[0_6px_16px_rgba(27,54,93,0.35)] active:translate-y-[3px] active:border-b-[1px] active:shadow-[0_2px_4px_rgba(27,54,93,0.2)] shadow-[0_4px_12px_rgba(27,54,93,0.2),inset_0_1px_0_rgba(255,255,255,0.15)] flex items-center justify-center gap-1.5 group cursor-pointer"
+                     className="w-full sm:w-auto h-12 px-8 bg-[#C5A028] text-[#1B365D] text-xs font-bold uppercase tracking-wider rounded-full flex items-center justify-center gap-2 group cursor-pointer hover:bg-[#d4af37] active:scale-[0.97]"
+                     style={{ transition: 'transform 160ms ease-out, background-color 200ms ease' }}
                   >
-                     <span className="truncate">Criar Convite</span>
-                     <ArrowRight size={18} className="group-hover:translate-x-0.5 transition-transform shrink-0" />
+                     <span>Criar Convite</span>
+                     <ArrowRight size={16} className="group-hover:translate-x-0.5 shrink-0" style={{ transition: 'transform 160ms ease-out' }} />
                   </button>
-                  
-                  {/* Premium CTA - Order Custom */}
-                  <button
-                     onClick={() => setSupportOpen(true)}
-                     className="flex-1 h-12 px-3 sm:px-6 bg-gradient-to-b from-[#DFB135] to-[#A07B18] text-white text-[10px] sm:text-xs font-bold uppercase tracking-wider rounded-full relative overflow-hidden transition-all duration-150 ease-out border-b-4 border-[#765B11] hover:from-[#EABF45] hover:to-[#B38B20] hover:-translate-y-[1px] hover:border-b-[5px] hover:shadow-[0_6px_16px_rgba(197,160,40,0.35)] active:translate-y-[3px] active:border-b-[1px] active:shadow-[0_2px_4px_rgba(197,160,40,0.2)] shadow-[0_4px_12px_rgba(197,160,40,0.2),inset_0_1px_0_rgba(255,255,255,0.25)] flex items-center justify-center gap-1.5 group cursor-pointer"
-                  >
-                     <Award size={18} className="text-white shrink-0" />
-                     <span className="truncate">Encomendar VIP</span>
-                  </button>
+
+                  {/* CTAs secundários — alvos 44px, peso visual leve */}
+                  <div className="flex items-center gap-2">
+                    <a
+                       href="#exemplo"
+                       className="min-h-[44px] inline-flex items-center gap-1 px-2 text-[11px] font-semibold text-white/80 hover:text-white"
+                       style={{ transition: 'color 200ms ease' }}
+                    >
+                       <ImageIcon size={13} className="text-white/60" />
+                       Ver um exemplo
+                    </a>
+                    <span className="w-px h-3 bg-white/30" />
+                    <button
+                       onClick={() => setSupportOpen(true)}
+                       className="min-h-[44px] inline-flex items-center gap-1 px-2 text-[11px] font-semibold text-[var(--color-gold-soft)] hover:text-white cursor-pointer"
+                       style={{ transition: 'color 200ms ease' }}
+                    >
+                       <Award size={13} className="shrink-0" />
+                       Pedir ajuda
+                    </button>
+                  </div>
                 </div>
-                
-                {/* Secondary CTA - Gallery */}
-                <Link
-                   to="/templates"
-                   className="px-6 py-2.5 border border-slate-200 border-b-[3px] border-b-slate-300 text-slate-500 hover:text-[#1B365D] hover:border-[#1B365D]/40 text-[10px] sm:text-xs font-bold uppercase tracking-wider rounded-full hover:-translate-y-[1px] hover:border-b-4 hover:shadow-md active:translate-y-[2px] active:border-b-[1px] active:shadow-sm transition-all duration-150 flex items-center justify-center gap-1.5 bg-white/60 backdrop-blur-md shadow-sm"
-                >
-                  <ImageIcon size={16} className="text-[#1B365D]" />
-                  <span>Ver Templates</span>
-                </Link>
               </motion.div>
            </div>
 
-           {/* Hero Floating Mockups / Abstract Product Visualization */}
-           <motion.div 
-             initial={{ opacity: 0, y: 60 }}
-             animate={{ opacity: 1, y: 0 }}
-             transition={{ duration: 1.2, ease: [0.16, 1, 0.3, 1], delay: 0.6 }}
-             className="relative z-10 w-full max-w-5xl mx-auto mt-16 md:mt-24 px-4 h-[350px] md:h-[450px]"
-           >
-              {/* Center Templates Preview Mockup */}
-              <div className="absolute left-1/2 -translate-x-1/2 top-0 w-[90%] md:w-[650px] h-[300px] md:h-[400px] bg-white rounded-t-3xl border border-slate-200 shadow-[0_-10px_50px_rgba(0,0,0,0.05)] overflow-hidden flex flex-col">
-                 <div className="h-10 bg-slate-50 border-b border-slate-100 flex items-center px-4 gap-2 shrink-0 z-10">
-                    <div className="w-3 h-3 rounded-full bg-slate-300"></div>
-                    <div className="w-3 h-3 rounded-full bg-slate-300"></div>
-                    <div className="w-3 h-3 rounded-full bg-slate-300"></div>
-                 </div>
-                 <div className="flex-1 bg-slate-50 p-4 md:p-6 overflow-hidden relative">
-                    <div className="absolute inset-0 bg-gradient-to-b from-slate-50 via-transparent to-slate-50 z-10 pointer-events-none"></div>
-                    <div className="grid grid-cols-2 gap-6 h-full relative z-0">
-                       <motion.div 
-                          animate={{ y: ["0%", "-50%"] }}
-                          transition={{ repeat: Infinity, duration: 40, ease: "linear" }}
-                          className="flex flex-col gap-6"
-                       >
-                          <img src="/casalModel.webp" className="rounded-2xl shadow-sm object-cover w-full aspect-[3/4]" alt="Template" />
-                          <img src="/bridal-templates/templateCha3.png" className="rounded-2xl shadow-sm object-cover w-full aspect-[3/4]" alt="Template" />
-                          <img src="/bridal-templates/templateCha1.png" className="rounded-2xl shadow-sm object-cover w-full aspect-[3/4]" alt="Template" />
-                       </motion.div>
-                       <motion.div 
-                          animate={{ y: ["-50%", "0%"] }}
-                          transition={{ repeat: Infinity, duration: 50, ease: "linear" }}
-                          className="flex flex-col gap-6 mt-[-50%]"
-                       >
-                          <img src="/bridal-templates/templateCha2.png" className="rounded-2xl shadow-sm object-cover w-full aspect-[3/4]" alt="Template" />
-                          <img src="/bridal-templates/templateCha4.png" className="rounded-2xl shadow-sm object-cover w-full aspect-[3/4]" alt="Template" />
-                          <img src="/bridal-templates/templateCha2.png" className="rounded-2xl shadow-sm object-cover w-full aspect-[3/4]" alt="Template" />
-                       </motion.div>
-                    </div>
-                 </div>
-              </div>
+            {/* Composição por cima do banner — painel de templates + telemóvel + confirmação */}
+            <motion.div
+              id="exemplo"
+              initial={{ opacity: 0, y: 40 }}
+              animate={{ opacity: 1, y: 0 }}
+              transition={{ duration: 1, ease: [0.22, 1, 0.36, 1], delay: 0.6 }}
+              className="relative z-10 w-full max-w-5xl mx-auto px-4 h-[420px] md:h-[500px] scroll-mt-28"
+            >
+               {/* Painel central de templates com desfile automático */}
+               <div className="absolute left-1/2 -translate-x-1/2 top-0 w-[92%] md:w-[620px] h-[340px] md:h-[420px] bg-[#FFFDF8] rounded-t-3xl border border-[#C5A028]/30 border-b-0 shadow-[0_-10px_50px_rgba(27,54,93,0.08)] overflow-hidden flex flex-col">
+                  <div className="h-1.5 bg-[#C5A028]/70 shrink-0 z-10" />
+                  <div className="flex-1 p-4 md:p-6 overflow-hidden relative">
+                     <div className="absolute inset-0 bg-gradient-to-b from-[#FFFDF8] via-transparent to-[#FFFDF8] z-10 pointer-events-none" />
+                     <div className="grid grid-cols-2 gap-6 h-full relative z-0">
+                        <motion.div
+                           animate={{ y: ["0%", "-50%"] }}
+                           transition={{ repeat: Infinity, duration: 18, ease: "linear" }}
+                           className="flex flex-col gap-6 will-change-transform"
+                        >
+                           <img src="/casalModel.webp" className="rounded-2xl shadow-sm object-cover w-full aspect-[3/4]" alt="Convite de casamento" />
+                           <img src="/bridal-templates/templateCha3.png" className="rounded-2xl shadow-sm object-cover w-full aspect-[3/4]" alt="Convite de chá de panela" />
+                           <img src="/bridal-templates/templateCha1.png" className="rounded-2xl shadow-sm object-cover w-full aspect-[3/4]" alt="Convite de chá de panela" />
+                        </motion.div>
+                        <motion.div
+                           animate={{ y: ["-50%", "0%"] }}
+                           transition={{ repeat: Infinity, duration: 22, ease: "linear" }}
+                           className="flex flex-col gap-6 mt-[-50%] will-change-transform"
+                        >
+                           <img src="/bridal-templates/templateCha2.png" className="rounded-2xl shadow-sm object-cover w-full aspect-[3/4]" alt="Convite de chá de panela" />
+                           <img src="/bridal-templates/templateCha4.png" className="rounded-2xl shadow-sm object-cover w-full aspect-[3/4]" alt="Convite de chá de panela" />
+                           <img src="/bridal-templates/templateCha1.png" className="rounded-2xl shadow-sm object-cover w-full aspect-[3/4]" alt="Convite de chá de panela" />
+                        </motion.div>
+                     </div>
+                  </div>
+               </div>
 
-              {/* Left Overlay Phone Mockup */}
-              <motion.div 
-                 animate={{ y: [0, -10, 0] }}
-                 transition={{ repeat: Infinity, duration: 6, ease: "easeInOut" }}
-                 className="absolute left-2 md:left-24 top-12 w-[160px] md:w-[220px] h-[320px] md:h-[420px] bg-white rounded-3xl border-4 md:border-8 border-slate-900 shadow-2xl flex flex-col overflow-hidden z-20"
-              >
-                 <img src="/casalModel.webp" className="w-full h-full object-cover" alt="Phone Template Preview" />
-                 <div className="absolute bottom-4 left-1/2 -translate-x-1/2 w-[80%] bg-white/90 backdrop-blur text-center py-2 rounded-full text-[10px] sm:text-xs font-bold shadow-lg">
-                    Confirmar Presença
-                 </div>
-              </motion.div>
+               {/* Telemóvel da noiva */}
+               <motion.div
+                  animate={{ y: [0, -10, 0] }}
+                  transition={{ repeat: Infinity, duration: 6, ease: "easeInOut" }}
+                  className="absolute left-2 md:left-24 top-12 w-[160px] md:w-[220px] h-[320px] md:h-[400px] bg-white rounded-3xl border-4 md:border-8 border-[#1B365D] shadow-2xl flex flex-col overflow-hidden z-20"
+               >
+                  <img src="/casalModel.webp" className="w-full h-full object-cover" alt="Convite visto no telemóvel" />
+                  <div className="absolute bottom-4 left-1/2 -translate-x-1/2 w-[80%] bg-white/90 backdrop-blur text-center py-2 rounded-full text-[10px] sm:text-xs font-bold text-[#1B365D] shadow-lg">
+                     Confirmar Presença
+                  </div>
+               </motion.div>
 
-              {/* Right Overlay Event Card */}
-              <motion.div 
-                 animate={{ y: [0, 8, 0] }}
-                 transition={{ repeat: Infinity, duration: 5, ease: "easeInOut", delay: 1 }}
-                 className="absolute right-0 md:right-16 top-24 w-[180px] md:w-[260px] rounded-2xl bg-white/80 backdrop-blur-xl border border-white p-4 shadow-[0_20px_40px_rgba(0,0,0,0.1)] hidden sm:block"
-              >
-                 <div className="w-12 h-12 rounded-full bg-emerald-100 flex items-center justify-center mb-4 text-emerald-600">
-                    <CheckCircle2 size={24} />
-                 </div>
-                 <h4 className="font-bold text-slate-800 mb-1">Presença Confirmada</h4>
-                 <p className="text-xs text-slate-500 mb-4">Ana Clara Silva confirmou para o seu Casamento.</p>
-                 <div className="text-xs font-bold text-brand-blue bg-blue-50 py-2 px-3 rounded-lg text-center">
-                    Ver Lista (142/200)
-                 </div>
-              </motion.div>
-           </motion.div>
+               {/* Cartão de confirmação */}
+               <motion.div
+                  animate={{ y: [0, 8, 0] }}
+                  transition={{ repeat: Infinity, duration: 5, ease: "easeInOut", delay: 1 }}
+                  className="absolute right-0 md:right-16 top-24 w-[180px] md:w-[260px] rounded-2xl bg-[#FFFDF8] border border-[#C5A028]/30 p-4 shadow-[0_20px_40px_rgba(27,54,93,0.12)] hidden sm:block"
+               >
+                  <div className="w-12 h-12 rounded-full bg-emerald-100 flex items-center justify-center mb-4 text-emerald-600">
+                     <CheckCircle2 size={24} />
+                  </div>
+                  <h4 className="font-serif font-bold text-[#1B365D] mb-1">Presença Confirmada</h4>
+                  <p className="text-xs text-slate-500 font-light mb-4">Os convidados confirmam na página e entram na lista.</p>
+                  <div className="text-xs font-bold text-[#1B365D] bg-[#C5A028]/15 py-2 px-3 rounded-lg text-center">
+                     Ver lista de presenças
+                  </div>
+               </motion.div>
+            </motion.div>
         </section>
+
+        {/* Legenda — já no creme */}
+        <div className="bg-[#FDFBF7] flex items-center justify-center gap-3 text-center px-6 py-8">
+           <span className="h-px w-8 bg-[#C5A028]/60" />
+           <span className="text-sm text-slate-500 font-light">
+              O catálogo em montra.
+              <Link to="/templates" className="ml-2 text-xs font-bold uppercase tracking-[0.18em] text-[#1B365D] hover:text-[#8a6d1c] whitespace-nowrap" style={{ transition: 'color 200ms ease' }}>
+                 Ver todos →
+              </Link>
+           </span>
+           <span className="h-px w-8 bg-[#C5A028]/60" />
+        </div>
 
         {/* Pricing Section (New) */}
-        <section id="pricing" className="px-6 py-20 w-full relative z-20">
+        <section id="pricing" className="px-6 py-16 md:py-24 w-full relative z-20">
           <div className="max-w-6xl mx-auto">
-            <div className="text-center max-w-2xl mx-auto mb-16">
-              <span className="text-[#C5A028] font-bold tracking-widest text-[10px] sm:text-xs uppercase mb-2 block">Investimento</span>
-              <h3 className="text-3xl md:text-5xl font-serif font-bold text-slate-900 mb-4">Planos que cabem no seu sonho</h3>
-              <p className="text-slate-500 text-sm md:text-base font-light">Escolha a solução perfeita para tornar o seu evento inesquecível com a elegância que você merece.</p>
+            <div className="text-center max-w-2xl mx-auto mb-14">
+              <h2 className="text-3xl md:text-[2.75rem] font-serif font-bold text-[#1B365D] tracking-tight leading-[1.1] mb-4">Um plano para cada <span className="italic font-medium text-[#8a6d1c]">celebração</span></h2>
+              <p className="text-slate-600 font-light">Pagamento único por evento. Sem mensalidades para noivos.</p>
             </div>
             
-            <div className="flex flex-col md:flex-row items-center md:items-stretch justify-center gap-6 lg:gap-8">
+            <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-4 items-stretch justify-center gap-6">
               {/* Plan 1: Essencial */}
-              <div className="flex-1 w-full max-w-sm bg-white rounded-3xl p-8 border border-slate-100 shadow-[0_8px_30px_rgb(0,0,0,0.04)] hover:shadow-[0_8px_30px_rgb(0,0,0,0.08)] transition-all duration-300 flex flex-col relative group">
-                 <h4 className="text-xl font-bold text-slate-800 mb-2">Essencial</h4>
-                 <p className="text-slate-500 text-[13px] leading-relaxed mb-6 h-10">Prático, rápido e acessível. Ideal para pequenos eventos.</p>
-                 <div className="mb-6 flex items-baseline gap-1">
-                    <span className="text-4xl font-bold text-slate-900">7.500</span>
-                    <span className="text-slate-500 text-sm font-medium">AOA / evento</span>
-                 </div>
+              <div className="w-full bg-[#FFFDF8] rounded-2xl p-8 border border-[#C5A028]/30 flex flex-col relative" style={{ transition: 'border-color 200ms ease, box-shadow 200ms ease' }}>
+                  <h4 className="font-serif text-2xl font-bold text-[#1B365D] mb-1">Essencial</h4>
+                  <p className="text-slate-500 text-[13px] font-light leading-relaxed mb-6">Para festas íntimas, sem complicações.</p>
+                  <div className="mb-2 flex items-baseline gap-1">
+                     <span className="text-4xl font-serif font-bold text-slate-900" style={{ fontVariantNumeric: 'tabular-nums' }}>{PLANS.essential.price.toLocaleString('pt-AO')}</span>
+                     <span className="text-slate-500 text-sm font-medium">Kz / evento</span>
+                  </div>
+                  <p className="text-xs text-slate-500 font-light mb-6">Válido por {PLANS.essential.validityDays} dias · Até {PLANS.essential.guestLimit} convidados</p>
                  <ul className="flex flex-col gap-3 mb-8 flex-1">
-                    <li className="flex items-center gap-3 text-[13px] text-slate-600">
-                       <CheckCircle2 size={18} className="text-emerald-500" />
-                       <span>Até 100 convidados (RSVP)</span>
-                    </li>
-                    <li className="flex items-center gap-3 text-[13px] text-slate-600">
-                       <CheckCircle2 size={18} className="text-emerald-500" />
-                       <span>Layouts Clássicos</span>
-                    </li>
-                    <li className="flex items-center gap-3 text-[13px] text-slate-600">
-                       <CheckCircle2 size={18} className="text-emerald-500" />
-                       <span>Galeria de Fotos Básica</span>
-                    </li>
-                    <li className="flex items-center gap-3 text-[13px] text-slate-600">
-                       <CheckCircle2 size={18} className="text-emerald-500" />
-                       <span>Ativo até 30 dias após o evento</span>
-                    </li>
-                 </ul>
-                 <button onClick={() => confirmPlanSelection("Essencial", "7.500 Kz")} className="w-full py-3 rounded-full border border-slate-200 text-slate-700 font-bold text-xs uppercase tracking-wider hover:bg-slate-50 hover:border-slate-300 transition-colors cursor-pointer">
-                    Escolher Essencial
-                 </button>
-              </div>
+                     <li className="flex items-center gap-3 text-[13px] text-slate-600">
+                        <CheckCircle2 size={18} className="text-[#C5A028] shrink-0" />
+                        <span>Até 100 convidados</span>
+                     </li>
+                     <li className="flex items-center gap-3 text-[13px] text-slate-600">
+                        <CheckCircle2 size={18} className="text-[#C5A028] shrink-0" />
+                        <span>Temas clássicos</span>
+                     </li>
+                      <li className="flex items-center gap-3 text-[13px] text-slate-600">
+                         <CheckCircle2 size={18} className="text-[#C5A028] shrink-0" />
+                         <span>Galeria de fotos</span>
+                      </li>
+                      <li className="flex items-center gap-3 text-[13px] text-slate-600">
+                         <CheckCircle2 size={18} className="text-[#C5A028] shrink-0" />
+                         <span>QR do evento e contagem regressiva</span>
+                      </li>
+                  </ul>
+                  <button
+                     onClick={() => confirmPlanSelection("Essencial", "7.500 Kz")}
+                     className="w-full py-3.5 rounded-full border border-[#1B365D]/30 text-[#1B365D] font-bold text-xs uppercase tracking-wider hover:bg-[#1B365D] hover:text-white active:scale-[0.97] cursor-pointer"
+                     style={{ transition: 'transform 160ms ease-out, background-color 200ms ease, color 200ms ease' }}
+                  >
+                     Escolher Essencial
+                  </button>
+               </div>
               
               {/* Plan 2: Premium (Highlighted) */}
-              <div className="flex-1 w-full max-w-sm bg-gradient-to-b from-[#1B365D] to-[#10223B] rounded-3xl p-8 shadow-2xl relative flex flex-col transform md:-translate-y-4 border border-[#2A4B7C]">
-                 <div className="absolute top-0 left-1/2 -translate-x-1/2 -translate-y-1/2 bg-gradient-to-r from-[#DFB135] to-[#A07B18] text-white text-[10px] font-bold uppercase tracking-wider py-1 px-4 rounded-full shadow-md border border-[#F3CD68]/30">
-                    Mais Escolhido
-                 </div>
-                 <h4 className="text-xl font-bold text-white mb-2">Premium</h4>
-                 <p className="text-blue-200/80 text-[13px] leading-relaxed mb-6 h-10">Requinte, exclusividade e sem limites para o seu grande dia.</p>
-                 <div className="mb-6 flex items-baseline gap-1">
-                    <span className="text-4xl font-bold text-white">20.000</span>
-                    <span className="text-blue-300 text-sm font-medium">AOA / evento</span>
-                 </div>
-                 <ul className="flex flex-col gap-3 mb-8 flex-1">
-                    <li className="flex items-center gap-3 text-[13px] text-blue-50">
-                       <CheckCircle2 size={18} className="text-[#DFB135]" />
-                       <span>Convidados Ilimitados (RSVP)</span>
-                    </li>
-                    <li className="flex items-center gap-3 text-[13px] text-blue-50">
-                       <CheckCircle2 size={18} className="text-[#DFB135]" />
-                       <span>Layouts Premium & Luxury</span>
-                    </li>
-                    <li className="flex items-center gap-3 text-[13px] text-blue-50">
-                       <CheckCircle2 size={18} className="text-[#DFB135]" />
-                       <span>TocaPlayer (Música de Fundo)</span>
-                    </li>
-                    <li className="flex items-center gap-3 text-[13px] text-blue-50">
-                       <CheckCircle2 size={18} className="text-[#DFB135]" />
-                       <span>Sem marca d'água InoEvents</span>
-                    </li>
-                    <li className="flex items-center gap-3 text-[13px] text-blue-50">
-                       <CheckCircle2 size={18} className="text-[#DFB135]" />
-                       <span>Envio Automático via WhatsApp</span>
-                    </li>
-                    <li className="flex items-center gap-3 text-[13px] text-blue-50">
-                       <CheckCircle2 size={18} className="text-[#DFB135]" />
-                       <span>Domínio Personalizado (.com)</span>
-                    </li>
-                 </ul>
-                 <button onClick={() => confirmPlanSelection("Premium", "20.000 Kz")} className="w-full py-3 rounded-full bg-gradient-to-r from-[#DFB135] to-[#A07B18] text-white font-bold text-xs uppercase tracking-wider hover:from-[#EABF45] hover:to-[#B38B20] shadow-[0_4px_14px_rgba(197,160,40,0.35)] transition-all hover:-translate-y-0.5 border border-[#F3CD68]/30 cursor-pointer">
-                    Criar Convite Premium
-                 </button>
-              </div>
+              <div className="w-full bg-[#1B365D] rounded-2xl p-8 relative flex flex-col xl:-translate-y-3 border border-[#1B365D]">
+                  <div className="absolute top-0 left-1/2 -translate-x-1/2 -translate-y-1/2 bg-[#C5A028] text-white text-[10px] font-bold uppercase tracking-[0.14em] py-1 px-4 rounded-full whitespace-nowrap">
+                     O mais escolhido
+                  </div>
+                  <h4 className="font-serif text-2xl font-bold text-white mb-1">Premium</h4>
+                  <p className="text-blue-200/70 text-[13px] font-light leading-relaxed mb-6">O grande dia, sem limites nem marca.</p>
+                  <div className="mb-2 flex items-baseline gap-1">
+                     <span className="text-4xl font-serif font-bold text-white" style={{ fontVariantNumeric: 'tabular-nums' }}>{PLANS.premium.price.toLocaleString('pt-AO')}</span>
+                     <span className="text-blue-200/70 text-sm font-medium">Kz / evento</span>
+                  </div>
+                  <p className="text-xs text-blue-200/60 font-light mb-6">Válido por {PLANS.premium.validityDays} dias · Até {PLANS.premium.guestLimit} convidados</p>
+                  <ul className="flex flex-col gap-3 mb-8 flex-1">
+                     <li className="flex items-center gap-3 text-[13px] text-blue-50">
+                        <CheckCircle2 size={18} className="text-[#C5A028] shrink-0" />
+                        <span>Até {PLANS.premium.guestLimit} convidados</span>
+                     </li>
+                     <li className="flex items-center gap-3 text-[13px] text-blue-50">
+                        <CheckCircle2 size={18} className="text-[#C5A028] shrink-0" />
+                        <span>Temas premium e luxury</span>
+                     </li>
+                     <li className="flex items-center gap-3 text-[13px] text-blue-50">
+                        <CheckCircle2 size={18} className="text-[#C5A028] shrink-0" />
+                        <span>Música de fundo no convite</span>
+                     </li>
+                     <li className="flex items-center gap-3 text-[13px] text-blue-50">
+                        <CheckCircle2 size={18} className="text-[#C5A028] shrink-0" />
+                        <span>Sem marca InoEvents</span>
+                     </li>
+                     <li className="flex items-center gap-3 text-[13px] text-blue-50">
+                        <CheckCircle2 size={18} className="text-[#C5A028] shrink-0" />
+                        <span>Partilha por WhatsApp</span>
+                     </li>
+                     <li className="flex items-center gap-3 text-[13px] text-blue-50">
+                        <CheckCircle2 size={18} className="text-[#C5A028] shrink-0" />
+                        <span>Mapa das mesas e livro de assinaturas</span>
+                     </li>
+                  </ul>
+                 <button
+                     onClick={() => confirmPlanSelection("Premium", "15.000 Kz")}
+                     className="w-full py-3.5 rounded-full bg-[#C5A028] text-[#1B365D] font-bold text-xs uppercase tracking-wider hover:bg-[#d4af37] active:scale-[0.97] cursor-pointer"
+                     style={{ transition: 'transform 160ms ease-out, background-color 200ms ease' }}
+                  >
+                     Criar Convite Premium
+                  </button>
+               </div>
               
               {/* Plan 3: VIP */}
-              <div className="flex-1 w-full max-w-sm bg-[#0A0A0A] rounded-3xl p-8 border border-white/10 shadow-[0_8px_30px_rgb(0,0,0,0.12)] flex flex-col relative overflow-hidden group hover:border-white/20 transition-all duration-300">
-                 <div className="absolute -top-10 -right-10 p-4 opacity-5 pointer-events-none group-hover:scale-110 transition-transform duration-700">
-                    <Gem size={150} className="text-white" />
-                 </div>
-                 <h4 className="text-xl font-bold text-white mb-2 relative z-10 flex items-center gap-2">
-                   Business 
-                   <Globe size={18} className="text-[#DFB135]" />
-                 </h4>
-                 <p className="text-slate-400 text-[13px] leading-relaxed mb-6 h-10 relative z-10">Software B2B completo para Agências e Cerimonialistas.</p>
-                 <div className="mb-6 flex items-baseline gap-1 relative z-10">
-                    <span className="text-3xl font-bold text-white leading-[1.2]">45.000</span>
-                    <span className="text-[#DFB135] text-sm font-medium">AOA / mês</span>
-                 </div>
-                 <ul className="flex flex-col gap-3 mb-8 flex-1 relative z-10">
-                    <li className="flex items-center gap-3 text-[13px] text-slate-300">
-                       <CheckCircle2 size={18} className="text-[#DFB135]" />
-                       <span>Eventos ativos ilimitados (∞)</span>
-                    </li>
-                    <li className="flex items-center gap-3 text-[13px] text-slate-300">
-                       <CheckCircle2 size={18} className="text-[#DFB135]" />
-                       <span>White-label (Sua Marca)</span>
-                    </li>
-                    <li className="flex items-center gap-3 text-[13px] text-slate-300">
-                       <CheckCircle2 size={18} className="text-[#DFB135]" />
-                       <span>Painel de Gestão B2B</span>
-                    </li>
-                    <li className="flex items-center gap-3 text-[13px] text-slate-300">
-                       <CheckCircle2 size={18} className="text-[#DFB135]" />
-                       <span>Suporte VIP Prioritário</span>
-                    </li>
-                 </ul>
-                 <button onClick={() => confirmPlanSelection("Business", "45.000 Kz", "monthly")} className="w-full py-3 rounded-full bg-transparent border border-[#DFB135] text-[#DFB135] font-bold text-xs uppercase tracking-wider hover:bg-[#DFB135] hover:text-[#0A0A0A] transition-all relative z-10 cursor-pointer">
-                    Assinar Plano B2B
-                 </button>
-              </div>
+              <div className="w-full bg-[#FFFDF8] rounded-2xl p-8 border border-[#C5A028]/30 flex flex-col relative" style={{ transition: 'border-color 200ms ease, box-shadow 200ms ease' }}>
+                  <h4 className="font-serif text-2xl font-bold text-[#1B365D] mb-1">VIP</h4>
+                  <p className="text-slate-500 text-[13px] font-light leading-relaxed mb-6">Receção com check-in e endereço próprio.</p>
+                  <div className="mb-2 flex items-baseline gap-1">
+                     <span className="text-4xl font-serif font-bold text-slate-900" style={{ fontVariantNumeric: 'tabular-nums' }}>{PLANS.vip.price.toLocaleString('pt-AO')}</span>
+                     <span className="text-slate-500 text-sm font-medium">Kz / evento</span>
+                  </div>
+                  <p className="text-xs text-slate-500 font-light mb-6">Válido por {PLANS.vip.validityDays} dias · Até {PLANS.vip.guestLimit} convidados</p>
+                  <ul className="flex flex-col gap-3 mb-8 flex-1">
+                     <li className="flex items-center gap-3 text-[13px] text-slate-600">
+                        <CheckCircle2 size={18} className="text-[#C5A028] shrink-0" />
+                        <span>Tudo do Premium</span>
+                     </li>
+                     <li className="flex items-center gap-3 text-[13px] text-slate-600">
+                        <CheckCircle2 size={18} className="text-[#C5A028] shrink-0" />
+                        <span>QR individual e check-in à entrada</span>
+                     </li>
+                     <li className="flex items-center gap-3 text-[13px] text-slate-600">
+                        <CheckCircle2 size={18} className="text-[#C5A028] shrink-0" />
+                        <span>Acompanhantes e lembretes</span>
+                     </li>
+                     <li className="flex items-center gap-3 text-[13px] text-slate-600">
+                        <CheckCircle2 size={18} className="text-[#C5A028] shrink-0" />
+                        <span>Domínio personalizado</span>
+                     </li>
+                     <li className="flex items-center gap-3 text-[13px] text-slate-600">
+                        <CheckCircle2 size={18} className="text-[#C5A028] shrink-0" />
+                        <span>Suporte prioritário</span>
+                     </li>
+                  </ul>
+                  <button
+                     onClick={() => confirmPlanSelection("VIP", `${PLANS.vip.price.toLocaleString('pt-AO')} Kz`)}
+                     className="w-full py-3.5 rounded-full border border-[#1B365D]/30 text-[#1B365D] font-bold text-xs uppercase tracking-wider hover:bg-[#1B365D] hover:text-white active:scale-[0.97] cursor-pointer"
+                     style={{ transition: 'transform 160ms ease-out, background-color 200ms ease, color 200ms ease' }}
+                  >
+                     Escolher VIP
+                  </button>
+               </div>
+
+                {/* Plan 4: Business */}
+              <div className="w-full bg-[#FFFDF8] rounded-2xl p-8 border border-[#C5A028]/30 flex flex-col relative" style={{ transition: 'border-color 200ms ease, box-shadow 200ms ease' }}>
+                  <h4 className="font-serif text-2xl font-bold text-[#1B365D] mb-1 flex items-center gap-2">
+                    Business
+                    <Briefcase size={18} className="text-[#C5A028]" />
+                  </h4>
+                  <p className="text-slate-500 text-[13px] font-light leading-relaxed mb-6">Para agências e cerimonialistas, todos os meses.</p>
+                  <div className="mb-2 flex items-baseline gap-1">
+                     <span className="text-3xl font-serif font-bold text-slate-900 leading-[1.2]" style={{ fontVariantNumeric: 'tabular-nums' }}>{PLANS.business.price.toLocaleString('pt-AO')}</span>
+                     <span className="text-slate-500 text-sm font-medium">Kz / mês</span>
+                  </div>
+                  <p className="text-xs text-slate-500 font-light mb-6">Eventos ilimitados · sem fidelização</p>
+                 <ul className="flex flex-col gap-3 mb-8 flex-1">
+                     <li className="flex items-center gap-3 text-[13px] text-slate-600">
+                        <CheckCircle2 size={18} className="text-[#C5A028] shrink-0" />
+                        <span>Eventos ilimitados</span>
+                     </li>
+                     <li className="flex items-center gap-3 text-[13px] text-slate-600">
+                        <CheckCircle2 size={18} className="text-[#C5A028] shrink-0" />
+                        <span>Com a marca da sua agência</span>
+                     </li>
+                     <li className="flex items-center gap-3 text-[13px] text-slate-600">
+                        <CheckCircle2 size={18} className="text-[#C5A028] shrink-0" />
+                        <span>Painel para os seus clientes</span>
+                     </li>
+                     <li className="flex items-center gap-3 text-[13px] text-slate-600">
+                        <CheckCircle2 size={18} className="text-[#C5A028] shrink-0" />
+                        <span>Suporte prioritário</span>
+                     </li>
+                  </ul>
+                  <button
+                     onClick={() => confirmPlanSelection("Business", "39.900 Kz", "monthly")}
+                     className="w-full py-3.5 rounded-full border border-[#1B365D]/30 text-[#1B365D] font-bold text-xs uppercase tracking-wider hover:bg-[#1B365D] hover:text-white active:scale-[0.97] cursor-pointer"
+                     style={{ transition: 'transform 160ms ease-out, background-color 200ms ease, color 200ms ease' }}
+                  >
+                     Falar sobre o Business
+                   </button>
+                </div>
             </div>
           </div>
         </section>
 
-        {/* Templates CTA Section (Removed) */}
-
-        {/* Features Section */}
-        <section id="features" className="px-6 flex flex-col gap-10 max-w-5xl mx-auto w-full pt-8 pb-12">
-          <div className="flex flex-col gap-4 text-center max-w-2xl mx-auto">
-            <span className="text-primary font-bold tracking-widest text-xs uppercase">Tecnologia & Design</span>
-            <h3 className="text-3xl md:text-4xl font-serif font-bold text-brand-blue">Funcionalidades Premium</h3>
-            <p className="text-slate-500">Tudo o que você precisa para gerenciar seu evento com classe e eficiência.</p>
-          </div>
-          
-          <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
-            <FeatureCard 
-              icon={<QrCode size={32} strokeWidth={1.5} />} 
-              title="RSVP & QR Code Angola"
-              desc="Confirmação de presença digital instantânea com emissão automática de QR Code personalizado para seus convidados em Angola."
-            />
-            <FeatureCard 
-              icon={<LayoutDashboard size={32} strokeWidth={1.5} />} 
-              title="Gestão de Convidados"
-              desc="Controle quem vai ao seu casamento ou chá de panela em Luanda e acompanhe as confirmações de presença em tempo real."
-            />
-            <FeatureCard 
-              icon={<Gift size={32} strokeWidth={1.5} />} 
-              title="Lista de Presentes com IBAN"
-              desc="Insira o seu IBAN de bancos angolanos (BAI, BFA, BIC, SOL, etc.) de forma segura para receber presentes em kwanza (AOA) diretamente na sua conta bancária."
-            />
-            <FeatureCard 
-              icon={<Globe size={32} strokeWidth={1.5} />} 
-              title="Domínio Personalizado"
-              desc="Tenha um link exclusivo para o seu evento (ex: oseucasamento.com), garantindo muito mais requinte e exclusividade."
-            />
-            <FeatureCard 
-              icon={<UtensilsCrossed size={32} strokeWidth={1.5} />} 
-              title="Mapa das Mesas"
-              desc="Organize graficamente onde cada convidado vai sentar e crie uma experiência fluida para a recepção."
-            />
-            <FeatureCard 
-              icon={<BookOpen size={32} strokeWidth={1.5} />} 
-              title="Livro de Assinaturas Digital"
-              desc="Um mural onde os convidados podem deixar recados carinhosos, fotos e votos de felicidade para os anfitriões."
-            />
-            <FeatureCard 
-              icon={<BarChart3 size={32} strokeWidth={1.5} />} 
-              title="Estatísticas em Tempo Real"
-              desc="Acompanhe gráficos detalhados de presenças, respostas e presentes através de um painel de organizador completo."
-            />
-            <FeatureCard 
-              icon={<Bot size={32} strokeWidth={1.5} />} 
-              title="Assistente IA"
-              desc="Inteligência Artificial para ajudar a responder a dúvidas dos convidados sobre trajes, localização e presentes."
-            />
+        {/* Como funciona — três gestos */}
+        <section id="features" className="px-6 py-16 md:py-24 w-full">
+          <div className="max-w-3xl mx-auto">
+            <h2 className="text-3xl md:text-[2.75rem] font-serif font-bold text-[#1B365D] tracking-tight leading-[1.1] mb-4">
+              Do link ao <span className="italic font-medium text-[#8a6d1c]">sim</span>, em três gestos.
+            </h2>
+            <p className="text-slate-600 font-light text-lg leading-relaxed mb-12">
+              Sem papel, sem listas em cadernos, sem telefonemas a confirmar um a um.
+            </p>
+            <ol className="flex flex-col">
+              <li className="grid grid-cols-[auto_minmax(0,1fr)] gap-6 py-8 border-t border-[#C5A028]/30">
+                <span className="font-serif italic text-2xl text-[#8a6d1c] leading-none pt-1">I.</span>
+                <div>
+                  <h3 className="font-serif font-bold text-xl text-slate-900 mb-2">Partilhe o link</h3>
+                  <p className="text-slate-600 font-light leading-relaxed">Do painel, envie o convite a cada convidado por WhatsApp com uma mensagem pronta a acompanhar.</p>
+                </div>
+              </li>
+              <li className="grid grid-cols-[auto_minmax(0,1fr)] gap-6 py-8 border-t border-[#C5A028]/30">
+                <span className="font-serif italic text-2xl text-[#8a6d1c] leading-none pt-1">II.</span>
+                <div>
+                  <h3 className="font-serif font-bold text-xl text-slate-900 mb-2">Confirmam na página</h3>
+                  <p className="text-slate-600 font-light leading-relaxed">Cada convidado abre o link e confirma presença; nos planos avançados recebe um código QR individual.</p>
+                </div>
+              </li>
+              <li className="grid grid-cols-[auto_minmax(0,1fr)] gap-6 py-8 border-t border-b border-[#C5A028]/30">
+                <span className="font-serif italic text-2xl text-[#8a6d1c] leading-none pt-1">III.</span>
+                <div>
+                  <h3 className="font-serif font-bold text-xl text-slate-900 mb-2">Receba no dia</h3>
+                  <p className="text-slate-600 font-light leading-relaxed">Check-in à entrada com a câmara, presentes por IBAN registados e mesas organizadas.</p>
+                </div>
+              </li>
+            </ol>
+            <p className="mt-10 text-sm text-slate-500 leading-relaxed font-light">
+              <span className="font-bold text-slate-700">Incluído conforme o plano:</span> galeria de fotos, música de fundo, livro de assinaturas, mapa das mesas, estatísticas do evento, domínio próprio e assistente de criação.
+            </p>
           </div>
         </section>
 
-        {/* Social Proof Gallery */}
-        <section className="py-24 overflow-hidden bg-brand-blue relative">
-          <div className="absolute inset-0 bg-[url('https://www.transparenttextures.com/patterns/cubes.png')] opacity-10"></div>
-          
-          <div className="relative z-10 max-w-7xl mx-auto px-6 mb-16 text-center">
-             <span className="inline-flex items-center gap-2 px-3 py-1 rounded-full bg-blue-500/20 text-blue-200 text-sm font-medium mb-6">
-                 <span className="relative flex h-2 w-2">
-                    <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-blue-400 opacity-75"></span>
-                    <span className="relative inline-flex rounded-full h-2 w-2 bg-blue-500"></span>
-                 </span>
-                 Mais de 10.000 Eventos Realizados
-             </span>
-             <h2 className="text-4xl md:text-6xl font-script text-white mb-4">O que dizem os nossos clientes</h2>
-             <p className="text-blue-100 max-w-2xl mx-auto text-lg backdrop-blur-sm">Experiências inesquecíveis partilhadas por quem confia no InoEvents.</p>
-          </div>
-
-          <div className="relative z-10 font-sans w-full max-w-[100vw] overflow-x-hidden">
-             <motion.div 
-               className="flex gap-6 w-max px-4"
-               animate={{ x: ["0%", "-50%"] }}
-               transition={{ repeat: Infinity, ease: "linear", duration: 40 }}
-               whileHover={{ animationPlayState: 'paused' } as any}
-             >
-                 {[...TESTIMONIALS, ...TESTIMONIALS].map((testimonial, idx) => (
-                     <div key={idx} className="w-[350px] md:w-[450px] flex-shrink-0 bg-white/5 backdrop-blur-md border border-white/10 p-8 rounded-3xl cursor-grab active:cursor-grabbing hover:bg-white/10 transition-colors">
-                         <div className="flex gap-1 mb-6 text-[#BF9B30]">
-                             {[...Array(testimonial.rating)].map((_, i) => (
-                                 <svg key={i} className="w-5 h-5 fill-current" viewBox="0 0 24 24"><path d="M12 17.27L18.18 21L16.54 13.97L22 9.24L14.81 8.63L12 2L9.19 8.63L2 9.24L7.46 13.97L5.82 21L12 17.27Z"/></svg>
-                             ))}
-                         </div>
-                         <p className="text-white text-lg font-light leading-relaxed mb-8 font-serif">"{testimonial.text}"</p>
-                         <div className="flex items-center gap-4 mt-auto">
-                             <div className="w-12 h-12 bg-gradient-to-br from-[#BF9B30] to-yellow-600 rounded-full flex items-center justify-center text-white font-bold text-lg shadow-lg">
-                                 {testimonial.author.charAt(0)}
-                             </div>
-                             <div>
-                                 <h4 className="text-white font-bold tracking-wide">{testimonial.author}</h4>
-                                 <p className="text-blue-200 text-sm">{testimonial.role}</p>
-                             </div>
-                         </div>
-                     </div>
-                 ))}
-             </motion.div>
+        {/* Vozes — duas citações quietas */}
+        <section className="px-6 py-16 md:py-24 w-full" aria-label="Depoimentos">
+          <h2 className="sr-only">O que dizem os noivos</h2>
+          <div className="max-w-4xl mx-auto grid grid-cols-1 md:grid-cols-2 gap-10 md:gap-14">
+            <figure>
+              <blockquote className="font-serif text-2xl leading-snug text-[#1B365D]">“Os templates são maravilhosos. O meu casamento ganhou outro nível.”</blockquote>
+              <figcaption className="mt-4 text-sm text-slate-500 font-light">Juliana M. — Noiva</figcaption>
+            </figure>
+            <figure className="md:pt-12">
+              <blockquote className="font-serif text-2xl leading-snug text-[#1B365D]">“A melhor plataforma de convites que já usei. Simplesmente elegante.”</blockquote>
+              <figcaption className="mt-4 text-sm text-slate-500 font-light">Maria S. — Noiva</figcaption>
+            </figure>
           </div>
         </section>
 
         {/* FAQ Section */}
-        <FAQSection />
+        <FAQSection preview />
 
       </main>
 
-      {/* Footer */}
-      <footer className="mt-auto px-6 pt-16 pb-32 md:pb-28 bg-slate-900 text-slate-400 text-sm">
-          <div className="max-w-7xl mx-auto grid grid-cols-1 md:grid-cols-4 gap-12 mb-12">
-             <div className="col-span-1 md:col-span-2">
-                <div className="flex items-center gap-2 mb-6">
-                   <Sparkles size={24} className="text-brand-blue" style={{display: "none"}} /><img src="/favicon.ico" alt="InoEvents Logo" className="w-8 h-8 rounded-lg object-contain bg-white/10 p-1 border border-white/10 mr-1" referrerPolicy="no-referrer" />
-                   <span className="font-extrabold text-white text-xl tracking-tight">InoEvents</span>
-                </div>
-                <p className="text-slate-400 leading-relaxed max-w-sm mb-6">
-                   Transformando a forma como você convida e gere eventos. Tecnologias de elite para memoráveis recepções.
-                </p>
-                <div className="flex gap-4">
-                   <a href="#" className="w-10 h-10 rounded-full bg-slate-800 flex items-center justify-center hover:bg-brand-blue hover:text-white transition-colors">
-                      <Globe size={20} />
-                   </a>
-                </div>
-             </div>
-             
-             <div>
-                 <h4 className="text-white font-bold mb-6 tracking-wide">Produto</h4>
-                 <ul className="space-y-4">
-                     <li><Link to="/plans" className="hover:text-white transition-colors">Planos & Preços</Link></li>
-                     <li><a href="#features" className="hover:text-white transition-colors">Funcionalidades</a></li>
-                     <li><Link to="/b2b" className="hover:text-white transition-colors">Soluções Corporativas</Link></li>
-                     <li><Link to="/about" className="hover:text-white transition-colors">Sobre Nós</Link></li>
-                 </ul>
-             </div>
-
-             <div>
-                 <h4 className="text-white font-bold mb-6 tracking-wide">Legal</h4>
-                 <ul className="space-y-4">
-                     <li><Link to="/terms" className="hover:text-white transition-colors">Termos de Serviço</Link></li>
-                     <li><Link to="/privacy" className="hover:text-white transition-colors">Políticas de Privacidade</Link></li>
-                     <li><a href="#" onClick={(e) => { e.preventDefault(); setSupportOpen(true); }} className="hover:text-white transition-colors cursor-pointer">Suporte</a></li>
-                 </ul>
-             </div>
-          </div>
-          
-          <div className="max-w-7xl mx-auto pt-8 flex flex-col md:flex-row justify-between items-center gap-4">
-             <p>© {new Date().getFullYear()} InoEvents. Todos os direitos reservados.</p>
-             <p className="text-xs">Feito com foco no design e na experiência do usuário.</p>
+      {/* Fecho — colofão */}
+      <footer className="px-6 pt-16 md:pt-20 pb-10 text-sm border-t border-[#C5A028]/30">
+          <div className="max-w-3xl mx-auto text-center flex flex-col items-center gap-6">
+              <p className="font-serif text-3xl md:text-4xl text-[#1B365D] tracking-tight leading-tight">O vosso dia merece um <span className="italic font-medium text-[#8a6d1c]">convite à altura.</span></p>
+              <button
+                 onClick={handleCreateEvent}
+                 className="h-12 px-8 bg-[#1B365D] text-white text-xs font-bold uppercase tracking-wider rounded-full cursor-pointer hover:bg-[#224373] active:scale-[0.97]"
+                 style={{ transition: 'transform 160ms ease-out, background-color 200ms ease' }}
+              >
+                 Criar Convite
+              </button>
+              <nav className="flex flex-wrap items-center justify-center gap-x-4 gap-y-1 text-[13px] text-slate-500 [&>a]:min-h-[44px] [&>a]:inline-flex [&>a]:items-center [&>a]:px-1" aria-label="Rodapé">
+                 <Link to="/templates" className="hover:text-slate-900" style={{ transition: 'color 200ms ease' }}>Templates</Link>
+                 <Link to="/plans" className="hover:text-slate-900" style={{ transition: 'color 200ms ease' }}>Planos</Link>
+                 <Link to="/about" className="hover:text-slate-900" style={{ transition: 'color 200ms ease' }}>Sobre Nós</Link>
+                 <Link to="/terms" className="hover:text-slate-900" style={{ transition: 'color 200ms ease' }}>Termos</Link>
+                 <Link to="/privacy" className="hover:text-slate-900" style={{ transition: 'color 200ms ease' }}>Privacidade</Link>
+                 <a href="https://wa.me/244952815430" target="_blank" rel="noopener noreferrer" className="hover:text-slate-900" style={{ transition: 'color 200ms ease' }}>WhatsApp</a>
+              </nav>
+              <p className="text-xs text-slate-500 font-light">© {new Date().getFullYear()} InoEvents · Feito em Luanda, Angola</p>
           </div>
         </footer>
 
@@ -621,11 +614,16 @@ export const LandingPage: React.FC = () => {
             className="fixed inset-0 z-[100] flex items-center justify-center p-4 bg-slate-900/60 backdrop-blur-md"
           >
             <motion.div
-              initial={{ scale: 0.95, y: 20 }}
-              animate={{ scale: 1, y: 0 }}
-              exit={{ scale: 0.95, y: 20 }}
-              transition={{ type: "spring", duration: 0.5 }}
-              className="bg-white rounded-[2.5rem] p-6 md:p-8 max-w-lg w-full max-h-[90vh] md:max-h-[85vh] flex flex-col shadow-2xl border border-slate-100 relative overflow-hidden text-left"
+              ref={typeModalPanelRef}
+              role="dialog"
+              aria-modal="true"
+              aria-label="Escolher tipo de evento"
+              tabIndex={-1}
+              initial={{ scale: 0.95, opacity: 0 }}
+              animate={{ scale: 1, opacity: 1 }}
+              exit={{ scale: 0.95, opacity: 0, transition: { duration: 0.15 } }}
+              transition={{ type: "spring", duration: 0.4, bounce: 0.15 }}
+              className="bg-white rounded-[2.5rem] p-6 md:p-8 max-w-lg w-full max-h-[90vh] md:max-h-[85vh] flex flex-col shadow-2xl border border-slate-100 relative overflow-hidden text-left outline-none"
             >
               {/* Decorative design details */}
               <div className="absolute top-0 left-0 w-full h-2 bg-gradient-to-r from-brand-blue to-[#BF9B30]" />
@@ -700,10 +698,16 @@ export const LandingPage: React.FC = () => {
               className="absolute inset-0 bg-slate-900/60 backdrop-blur-md"
             />
             <motion.div
-              initial={{ opacity: 0, scale: 0.95, y: 20 }}
-              animate={{ opacity: 1, scale: 1, y: 0 }}
-              exit={{ opacity: 0, scale: 0.95, y: 20 }}
-              className="bg-white rounded-3xl p-5 md:p-6 max-w-sm w-full relative z-10 shadow-2xl flex flex-col border border-slate-100 max-h-[90vh] overflow-y-auto text-left"
+              ref={waModalPanelRef}
+              role="dialog"
+              aria-modal="true"
+              aria-label="Ativar plano via WhatsApp"
+              tabIndex={-1}
+              initial={{ scale: 0.95, opacity: 0 }}
+              animate={{ scale: 1, opacity: 1 }}
+              exit={{ scale: 0.95, opacity: 0, transition: { duration: 0.15 } }}
+              transition={{ type: "spring", duration: 0.4, bounce: 0.15 }}
+              className="bg-white rounded-3xl p-5 md:p-6 max-w-sm w-full relative z-10 shadow-2xl flex flex-col border border-slate-100 max-h-[90vh] overflow-y-auto text-left outline-none"
             >
               <div className="flex justify-between items-start mb-4">
                 <div>
@@ -785,7 +789,7 @@ export const LandingPage: React.FC = () => {
                   className="w-full bg-emerald-500 hover:bg-emerald-600 text-white rounded-xl py-3 px-3.5 font-bold text-xs transition-all duration-200 flex items-center justify-between shadow-lg shadow-emerald-500/10 hover:shadow-emerald-500/20 select-none cursor-pointer"
                 >
                   <span className="flex items-center gap-2">
-                    <MessageSquare size={16} className="animate-pulse" />
+                    <MessageSquare size={16} />
                     WhatsApp (952 815 430)
                   </span>
                   <span className="bg-white/20 text-white text-[9px] font-black uppercase px-2 py-0.5 rounded-full tracking-wide">
@@ -798,7 +802,7 @@ export const LandingPage: React.FC = () => {
                   className="w-full bg-emerald-500 hover:bg-emerald-600 text-white rounded-xl py-3 px-3.5 font-bold text-xs transition-all duration-200 flex items-center justify-between shadow-lg shadow-emerald-500/10 hover:shadow-emerald-500/20 select-none cursor-pointer"
                 >
                   <span className="flex items-center gap-2">
-                    <MessageSquare size={16} className="animate-pulse" />
+                    <MessageSquare size={16} />
                     WhatsApp (939 384 315)
                   </span>
                   <span className="bg-white/20 text-white text-[9px] font-black uppercase px-2 py-0.5 rounded-full tracking-wide">
@@ -814,15 +818,3 @@ export const LandingPage: React.FC = () => {
     </div>
   );
 };
-
-const FeatureCard: React.FC<{ icon: React.ReactNode, title: string, desc: string }> = ({ icon, title, desc }) => (
-  <div className="bg-white border border-slate-100 p-8 rounded-2xl flex flex-col gap-4 shadow-sm hover:shadow-xl hover:shadow-brand-blue/5 transition-all duration-300 group">
-    <div className={`w-14 h-14 rounded-xl flex items-center justify-center shrink-0 bg-blue-50 text-brand-blue group-hover:bg-brand-blue group-hover:text-white transition-colors`}>
-      {icon}
-    </div>
-    <div className="flex flex-col gap-2">
-      <h4 className="text-slate-900 font-bold text-lg">{title}</h4>
-      <p className="text-slate-500 text-sm leading-relaxed">{desc}</p>
-    </div>
-  </div>
-);

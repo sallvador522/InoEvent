@@ -10,6 +10,8 @@ import { Router } from 'express';
 import { getDb, getEventDetails, readLocalGuests, writeLocalGuest, fetchFirestoreGuestsWebSDK } from '../lib/firebase-admin.js';
 import { apiRateLimiter, rsvpRateLimiter } from '../middleware/index.js';
 import { logger } from '../../lib/logger.js';
+import { normalizePlanId, getGuestLimit, getPlanConfig } from '../../config/plans.js';
+import { isEventExpired } from '../lib/entitlements.js';
 
 const router = Router();
 
@@ -69,18 +71,41 @@ router.post('/api/events/:id/rsvp', rsvpRateLimiter, async (req, res) => {
         const event = await getEventDetails(id);
         if (!event) return res.status(404).json({ error: 'Not found' });
         
-        const plan = event.plan || 'Essencial';
-        const limit = plan === 'Essencial' ? 100 : Infinity;
+        // §6, §7, §8 — validação centralizada (não hardcode)
+        const planId = normalizePlanId((event as any).planId || (event as any).plan || 'essential');
+        const planConfig = getPlanConfig(planId);
+        const limit = getGuestLimit(planId);
+        // Expiração server-side (§8) — não confiar só no frontend
+        if (isEventExpired(event as any)) {
+            return res.status(403).json({ 
+                error: 'Este convite expirou. Contacte o organizador para renovar.',
+                code: 'EVENT_EXPIRED',
+                plan: planId,
+                expiresAt: (event as any).expiresAt || null
+            });
+        }
+        // Bloqueio manual
+        if ((event as any).isBlocked) {
+            return res.status(403).json({ error: (event as any).blockedMessage || 'Convite temporariamente indisponível.', code: 'EVENT_BLOCKED' });
+        }
         
         try {
             const db = getDb();
             const eventRef = db.collection('events').doc(id);
             const guestsRef = eventRef.collection('guests');
             
-            // Count guests
+            // Count guests — §7 limite centralizado
             const countSnap = await guestsRef.count().get();
             if (countSnap.data().count >= limit) {
-                return res.status(400).json({ error: 'O limite de convidados para este evento foi atingido.' });
+                const msg = limit === Infinity ? 'Limite atingido.' : `Atingiu o limite de ${limit} convidados do plano ${planConfig.name}. Faça upgrade para continuar.`;
+                return res.status(400).json({ 
+                    error: msg,
+                    code: 'GUEST_LIMIT_REACHED',
+                    plan: planId,
+                    limit,
+                    current: countSnap.data().count,
+                    upgradeTo: planId === 'essential' ? 'premium' : planId === 'premium' ? 'vip' : 'business'
+                });
             }
             
             // Check duplicate
@@ -107,7 +132,14 @@ router.post('/api/events/:id/rsvp', rsvpRateLimiter, async (req, res) => {
                 
                 const localGuests = readLocalGuests(id);
                 if (localGuests.length >= limit) {
-                    return res.status(400).json({ error: 'O limite de convidados para este evento foi atingido.' });
+                    const msg = limit === Infinity ? 'Limite atingido.' : `Atingiu o limite de ${limit} convidados do plano ${planConfig.name}. Faça upgrade para continuar.`;
+                    return res.status(400).json({ 
+                        error: msg,
+                        code: 'GUEST_LIMIT_REACHED',
+                        plan: planId,
+                        limit,
+                        current: localGuests.length
+                    });
                 }
                 
                 if (phone) {

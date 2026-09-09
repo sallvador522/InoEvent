@@ -13,10 +13,7 @@ const MotionLink = motion.create(Link as any) as any;
 const CATEGORIES = [
   { id: 'all', label: 'Todos', icon: 'auto_awesome' },
   { id: 'wedding', label: 'Casamento', icon: 'diamond' },
-  { id: 'bridal', label: 'Chá de Panela', icon: 'kitchen' }, 
-  { id: 'birthday', label: 'Aniversário', icon: 'cake' },
-  { id: 'baby', label: 'Chá de Bebê', icon: 'child_care' },
-  { id: 'corporate', label: 'Corporativo', icon: 'business_center' },
+  { id: 'bridal', label: 'Chá de Panela', icon: 'kitchen' },
 ];
 
 export const TemplateGalleryPage: React.FC = () => {
@@ -38,13 +35,10 @@ export const TemplateGalleryPage: React.FC = () => {
     }, [selectedCategory]);
 
     const filteredEvents = EVENTS.filter(event => {
-        if (selectedCategory === 'all') return true;
+        if (selectedCategory === 'all') return event.type === ThemeType.WEDDING || event.type === ThemeType.BRIDAL_SHOWER;
         if (selectedCategory === 'wedding') return event.type === ThemeType.WEDDING;
         if (selectedCategory === 'bridal') return event.type === ThemeType.BRIDAL_SHOWER;
-        if (selectedCategory === 'birthday') return event.type === ThemeType.BIRTHDAY;
-        if (selectedCategory === 'baby') return event.type === ThemeType.BABY_SHOWER;
-        if (selectedCategory === 'corporate') return event.type === ThemeType.CORPORATE;
-        return true;
+        return false;
     });
 
     const getBadgeConfig = (type: ThemeType) => {
@@ -121,7 +115,7 @@ export const TemplateGalleryPage: React.FC = () => {
                             </div>
                         ))}
                     </div>
-                ) : filteredEvents.length > 0 && ['all', 'wedding', 'bridal', 'baby'].includes(selectedCategory) ? (
+                ) : filteredEvents.length > 0 && ['all', 'wedding', 'bridal'].includes(selectedCategory) ? (
                     <div className="grid grid-cols-3 gap-3 md:gap-6 pb-20 max-w-5xl mx-auto">
                         {filteredEvents.map((event, index) => {
                             const badge = getBadgeConfig(event.type);

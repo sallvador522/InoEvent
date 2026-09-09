@@ -1,3 +1,4 @@
+/* Hallmark · pre-emit critique: P5 H5 E5 S4 R5 V5 · macrostructure: Workbench · theme: Linen · genre: editorial */
 import React, { useState } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
 import { HelpCircle, ChevronDown, Sparkles, Sliders, Eye, Heart, BellRing, QrCode } from 'lucide-react';
@@ -12,7 +13,7 @@ interface FAQItem {
 const FAQ_ITEMS: FAQItem[] = [
   {
     q: "Como criar convites digitais online?",
-    a: "Criar convites digitais na InoEvents é simples e rápido. Basta criar a sua conta, escolher o plano ideal (Essencial, Premium ou Business) e selecionar um template do nosso catálogo. Depois, preencha os dados do evento (data, local, etc) e ative ferramentas como confirmação de presença (RSVP) e lista de presentes. Por fim, publique e partilhe o link exclusivo com os seus convidados via WhatsApp.",
+    a: "Criar convites digitais na InoEvents é simples e rápido. Basta criar a sua conta, escolher o plano ideal (Essencial, Premium, VIP ou Business) e selecionar um template do nosso catálogo. Depois, preencha os dados do evento (data, local, etc) e ative ferramentas como confirmação de presença (RSVP) e lista de presentes. Por fim, publique e partilhe o link exclusivo com os seus convidados via WhatsApp — eles abrem o link e confirmam na página.",
     category: "features",
     icon: Sparkles
   },
@@ -36,13 +37,13 @@ const FAQ_ITEMS: FAQItem[] = [
   },
   {
     q: "É possível configurar uma lista de presentes ou contribuições?",
-    a: "Sim, de forma integrada e muito elegante! No painel de controle, pode criar uma lista de presentes virtuais (cotas engraçadas, lua de mel, etc.). Os convidados selecionam o presente e realizam o pagamento seguro de forma automática via Multicaixa Express (com geração de Entidade e Referência) ou podem copiar diretamente os seus dados bancários (IBAN/Conta) para transferência manual, livre de taxas abusivas de terceiros.",
+    a: "Sim, de forma integrada e muito elegante! No painel de controle, pode criar uma lista de presentes virtuais (cotas engraçadas, lua de mel, etc.) com valores em Kwanza. Os convidados escolhem o presente na página e fazem a transferência por IBAN (BAI, BFA, BIC, SOL, etc.), e o painel regista cada contribuição recebida para acompanhar tudo num só lugar.",
     category: "features",
     icon: Heart
   },
   {
     q: "Como funciona o rastreamento em tempo real e o check-in dos convidados?",
-    a: "Cada convidado que confirma presença recebe um código QR personalizável e exclusivo no seu bilhete virtual. No dia do evento, a sua equipe de recepcionistas ou cerimonialistas pode utilizar a nossa câmara de check-in em tempo real no dashboard para escanear os códigos. O status do bilhete é marcado imediatamente na lista de presença.",
+    a: "Cada convidado recebe o link do convite por WhatsApp e confirma presença na página. Nos planos avançados (VIP e Business), cada convidado tem um código QR individual no bilhete virtual. No dia do evento, a sua equipa de receção usa a câmara de check-in para escanear os códigos e o status é marcado de imediato na lista de presença.",
     category: "tracking",
     icon: QrCode
   },
@@ -54,17 +55,32 @@ const FAQ_ITEMS: FAQItem[] = [
   },
   {
     q: "Dá para ocultar a marca d'água InoEvents e usar marca própria?",
-    a: "Sim. Ao escolher os planos Premium, Business ou Corporate, ganha acesso às funcionalidades de White-Label. Pode remover toda a marca d'água da nossa plataforma e definir o seu próprio nome personalizado no rodapé dos convites.",
+    a: "Sim. No plano Premium remove a marca d'água da InoEvents dos convites. No plano Business (para agências e cerimonialistas), vai além: coloca a sua própria marca no rodapé dos convites dos seus clientes (white-label).",
     category: "features",
     icon: Eye
   }
 ];
 
-export const FAQSection: React.FC = () => {
+const categoryMeta: Record<string, { label: string; accent: string; dot: string }> = {
+  all: { label: 'Todas as Dúvidas', accent: 'border-brand-blue', dot: 'bg-brand-blue' },
+  customization: { label: 'Personalização & Design', accent: 'border-amber-500', dot: 'bg-amber-500' },
+  tracking: { label: 'Controle de Convidados & QR', accent: 'border-emerald-500', dot: 'bg-emerald-500' },
+  features: { label: 'Lista de Presentes & Extras', accent: 'border-pink-500', dot: 'bg-pink-500' },
+};
+
+const getCategoryAccent = (cat: string) => {
+  if (cat === 'customization') return 'border-amber-500 bg-amber-50 text-amber-700';
+  if (cat === 'tracking') return 'border-emerald-500 bg-emerald-50 text-emerald-700';
+  return 'border-pink-500 bg-pink-50 text-pink-700';
+};
+
+export const FAQSection: React.FC<{ preview?: boolean }> = ({ preview = false }) => {
   const [activeIndex, setActiveIndex] = useState<number | null>(null);
   const [activeTab, setActiveTab] = useState<'all' | 'customization' | 'tracking' | 'features'>('all');
+  const [expanded, setExpanded] = useState(false);
 
-  const filteredItems = FAQ_ITEMS.filter(item => {
+  const baseItems = preview && !expanded ? FAQ_ITEMS.slice(0, 4) : FAQ_ITEMS;
+  const filteredItems = baseItems.filter(item => {
     if (activeTab === 'all') return true;
     return item.category === activeTab;
   });
@@ -90,134 +106,213 @@ export const FAQSection: React.FC = () => {
   };
 
   return (
-    <section className="py-28 px-6 bg-slate-50/50 relative border-t border-b border-slate-100" id="faq">
+    <section className="py-16 sm:py-20 lg:py-24 px-4 sm:px-6 bg-[#FDFBF7] relative border-t border-[#C5A028]/30 overflow-x-clip" id="faq" style={{ overflowWrap: 'anywhere' }}>
       <script
         type="application/ld+json"
         dangerouslySetInnerHTML={{ __html: JSON.stringify(faqSchema) }}
       />
-      {/* Background elements */}
-      <div className="absolute inset-0 z-0 overflow-hidden pointer-events-none">
-        <div className="absolute top-1/4 left-1/10 w-96 h-96 bg-blue-100/30 rounded-full blur-3xl" />
-        <div className="absolute bottom-1/4 right-1/10 w-96 h-96 bg-emerald-100/20 rounded-full blur-3xl" />
-      </div>
 
-      <div className="max-w-4xl mx-auto relative z-10">
-        
-        {/* Section Header */}
-        <div className="text-center mb-16">
-          <span className="text-xs font-extrabold tracking-widest text-brand-blue bg-blue-50/85 px-4 py-2 rounded-full uppercase inline-block mb-4 shadow-sm border border-blue-100/60">
-            Dúvidas Frequentes
-          </span>
-          <h2 className="text-3xl md:text-5xl font-extrabold tracking-tight text-slate-900 mb-6 font-serif">
-            Ainda tem dúvidas? <br className="hidden sm:inline" />
-            <span className="bg-gradient-to-r from-brand-blue to-emerald-600 bg-clip-text text-transparent">Nós respondemos.</span>
-          </h2>
-          <p className="text-slate-500 text-lg max-w-xl mx-auto">
-            Consulte as respostas para as principais dúvidas sobre criação, personalização de design, RSVP móvel e rastreamento de convidados.
-          </p>
-        </div>
+      <div className="max-w-[1280px] mx-auto">
+        {/* Workbench layout: left sticky intro, right content */}
+        <div className="grid grid-cols-1 lg:grid-cols-[380px_minmax(0,1fr)] gap-10 lg:gap-14 xl:gap-20 items-start">
+          
+          {/* LEFT - Sticky editorial */}
+          <div className="lg:sticky lg:top-28 self-start min-w-0">
+            <span className="inline-flex items-center gap-2 text-[10px] font-black tracking-[0.18em] text-brand-blue bg-blue-50 border border-blue-100 px-3 py-1.5 rounded-full uppercase">
+              <span className="w-1.5 h-1.5 rounded-full bg-brand-blue animate-pulse" />
+              Dúvidas Frequentes
+            </span>
+            
+            <h2 className="mt-5 text-[28px] sm:text-[32px] lg:text-[38px] font-serif font-bold tracking-tight text-slate-900 leading-[0.95] overflow-wrap-anywhere min-w-0" style={{ overflowWrap: 'anywhere' }}>
+              Ainda tem<br />
+              dúvidas?<br />
+              <span className="text-brand-blue">Nós respondemos.</span>
+            </h2>
+            
+            <p className="mt-4 text-[14px] sm:text-[15px] leading-[1.6] text-slate-600 max-w-[36ch]">
+              Respostas directas sobre criação, design, RSVP e gestão de convidados — sem enrolar.
+            </p>
 
-        {/* Tab Filter buttons */}
-        <div className="flex flex-wrap items-center justify-center gap-2 mb-12 p-1.5 bg-slate-100/80 backdrop-blur-sm rounded-2xl max-w-2xl mx-auto border border-slate-200/50">
-          {categories.map((cat) => (
-            <button
-              key={cat.id}
-              onClick={() => {
-                setActiveTab(cat.id as any);
-                setActiveIndex(null);
-              }}
-              className={`px-4 py-2.5 rounded-xl text-xs font-bold transition-all duration-200 cursor-pointer ${
-                activeTab === cat.id
-                  ? 'bg-white text-slate-900 shadow-md shadow-slate-900/5'
-                  : 'text-slate-500 hover:text-slate-800 hover:bg-slate-50'
-              }`}
-            >
-              {cat.label}
-            </button>
-          ))}
-        </div>
+            <div className="mt-6 flex items-center gap-3 text-xs">
+              <span className="inline-flex items-center gap-1.5 font-bold text-slate-700">
+                <span className="w-7 h-7 rounded-full bg-slate-900 text-white flex items-center justify-center text-[11px] font-black">{FAQ_ITEMS.length}</span>
+                perguntas
+              </span>
+              <span className="w-px h-4 bg-slate-200" />
+              <span className="text-slate-500">4 categorias</span>
+              <span className="w-px h-4 bg-slate-200" />
+              <span className="text-slate-500">Actualizado hoje</span>
+            </div>
 
-        {/* Accordion List */}
-        <div className="space-y-4">
-          <AnimatePresence mode="popLayout">
-            {filteredItems.map((item, idx) => {
-              const originalIndex = FAQ_ITEMS.findIndex(f => f.q === item.q);
-              const isOpen = activeIndex === originalIndex;
-              const Icon = item.icon;
+            {/* Desktop CTA - stays in left column on Workbench */}
+            <div className="hidden lg:flex mt-8 p-5 rounded-2xl bg-slate-50 border border-slate-200 flex-col gap-3">
+              <div className="flex items-center gap-2.5">
+                <span className="w-8 h-8 rounded-xl bg-white border border-slate-200 flex items-center justify-center">
+                  <HelpCircle size={16} className="text-brand-blue" />
+                </span>
+                <span className="text-sm font-bold text-slate-900">Precisa de ajuda humana?</span>
+              </div>
+              <p className="text-xs leading-relaxed text-slate-600">
+                A nossa equipa cria layouts, importa listas em massa e configura IBAN/QR em minutos.
+              </p>
+              <a
+                href="https://wa.me/244952815430?text=Ol%C3%A1%20InoEvents%21%20Tenho%20d%C3%BAvidas%20sobre%20o%20meu%20evento"
+                target="_blank"
+                rel="noreferrer"
+                className="inline-flex items-center justify-center gap-1.5 bg-[#1B365D] hover:bg-[#122a4a] active:scale-[0.98] text-white font-bold text-xs px-4 py-2.5 rounded-xl transition-all"
+              >
+                Falar no WhatsApp <span aria-hidden>→</span>
+              </a>
+            </div>
+          </div>
 
-              return (
-                <motion.div
-                  key={originalIndex}
-                  layout="position"
-                  initial={{ opacity: 0, y: 15 }}
-                  animate={{ opacity: 1, y: 0 }}
-                  exit={{ opacity: 0, y: -15 }}
-                  transition={{ duration: 0.25, ease: "easeOut" }}
-                  className={`bg-white border rounded-2xl overflow-hidden transition-all duration-300 ${
-                    isOpen 
-                      ? 'border-brand-blue/30 shadow-xl shadow-brand-blue/5 md:scale-[1.01]' 
-                      : 'border-slate-200/70 hover:border-slate-300 shadow-sm'
-                  }`}
-                >
-                  <button
-                    onClick={() => setActiveIndex(isOpen ? null : originalIndex)}
-                    className="w-full flex items-center justify-between p-6/5 text-left outline-none select-none cursor-pointer p-6"
-                  >
-                    <div className="flex items-center gap-4">
-                      <div className={`w-10 h-10 rounded-xl flex items-center justify-center transition-all ${
-                        isOpen ? 'bg-blue-50 text-brand-blue' : 'bg-slate-50 text-slate-400 group-hover:text-slate-600'
-                      }`}>
-                        <Icon size={18} />
-                      </div>
-                      <span className="font-bold text-slate-800 text-sm md:text-base pr-4">
-                        {item.q}
-                      </span>
-                    </div>
-                    
-                    <div className={`w-8 h-8 rounded-full bg-slate-50 flex items-center justify-center text-slate-400 transition-transform duration-300 ${
-                      isOpen ? 'rotate-180 bg-blue-50 text-brand-blue' : ''
-                    }`}>
-                      <ChevronDown size={16} />
-                    </div>
-                  </button>
-
-                  <AnimatePresence initial={false}>
-                    {isOpen && (
-                      <motion.div
-                        initial={{ height: 0, opacity: 0 }}
-                        animate={{ height: "auto", opacity: 1 }}
-                        exit={{ height: 0, opacity: 0 }}
-                        transition={{ duration: 0.25, ease: "easeInOut" }}
+          {/* RIGHT - Tabs + Accordion */}
+          <div className="min-w-0">
+            {/* Tab bar - single line scroll on mobile, no wrap */}
+            <div className="relative -mx-4 sm:mx-0">
+              <div className="flex items-center gap-1.5 sm:gap-2 overflow-x-auto no-scrollbar snap-x snap-mandatory px-4 sm:px-0 pb-2 sm:pb-0 scroll-smooth" style={{ scrollbarWidth: 'none' }}>
+                <div className="flex items-center gap-1.5 sm:gap-2 p-1 bg-slate-100 rounded-2xl border border-slate-200/60 shrink-0">
+                  {categories.map((cat) => {
+                    const isActive = activeTab === cat.id;
+                    return (
+                      <button
+                        key={cat.id}
+                        onClick={() => {
+                          setActiveTab(cat.id as any);
+                          setActiveIndex(null);
+                        }}
+                        className={`px-3.5 sm:px-4 py-2 rounded-xl text-xs font-bold whitespace-nowrap snap-start transition-all duration-200 cursor-pointer shrink-0 ${
+                          isActive
+                            ? 'bg-white text-slate-900 shadow-sm border border-slate-200'
+                            : 'text-slate-600 hover:text-slate-900 hover:bg-white/60'
+                        }`}
                       >
-                        <div className="px-6 pb-6 pl-20 pr-10 text-xs md:text-sm text-slate-600 leading-relaxed border-t border-slate-50 pt-4">
-                          {item.a}
+                        {cat.label}
+                      </button>
+                    );
+                  })}
+                </div>
+                <span className="hidden sm:inline-flex items-center gap-1.5 text-[11px] font-bold text-slate-500 whitespace-nowrap shrink-0 ml-2">
+                  <span className={`w-2 h-2 rounded-full ${categoryMeta[activeTab].dot}`} />
+                  {filteredItems.length} {filteredItems.length === 1 ? 'resposta' : 'respostas'}
+                </span>
+              </div>
+              {/* fade hint on mobile */}
+              <div className="sm:hidden pointer-events-none absolute right-0 top-0 bottom-2 w-8 bg-gradient-to-l from-[#FDFBF7] to-transparent" />
+            </div>
+            <div className="sm:hidden mt-2 flex items-center gap-1.5 text-[11px] font-bold text-slate-500 px-1">
+              <span className={`w-2 h-2 rounded-full ${categoryMeta[activeTab].dot}`} />
+              {filteredItems.length} {filteredItems.length === 1 ? 'resposta' : 'respostas'} • deslize para ver categorias
+            </div>
+
+            {/* Accordion */}
+            <div className="mt-6 space-y-3">
+              <AnimatePresence mode="popLayout">
+                {filteredItems.map((item) => {
+                  const originalIndex = FAQ_ITEMS.findIndex(f => f.q === item.q);
+                  const isOpen = activeIndex === originalIndex;
+                  const Icon = item.icon;
+                  const accent = getCategoryAccent(item.category);
+
+                  return (
+                    <motion.div
+                      key={originalIndex}
+                      layout="position"
+                      initial={{ opacity: 0, y: 8 }}
+                      animate={{ opacity: 1, y: 0 }}
+                      exit={{ opacity: 0, y: -8 }}
+                      transition={{ duration: 0.2, ease: "easeOut" }}
+                      className={`group bg-white border rounded-2xl overflow-hidden transition-all duration-200 ${
+                        isOpen
+                          ? `border-l-4 ${categoryMeta[item.category].accent} shadow-lg shadow-slate-900/5`
+                          : 'border-slate-200 hover:border-slate-300 hover:shadow-md'
+                      }`}
+                    >
+                      <button
+                        onClick={() => setActiveIndex(isOpen ? null : originalIndex)}
+                        className="w-full flex items-start sm:items-center justify-between gap-3 sm:gap-4 text-left outline-none select-none cursor-pointer p-4 sm:p-5"
+                      >
+                        <div className="flex items-start gap-3 sm:gap-3.5 min-w-0 flex-1">
+                          <span className={`hidden sm:flex w-9 h-9 rounded-xl border flex items-center justify-center shrink-0 transition-colors ${isOpen ? accent : 'bg-slate-50 border-slate-200 text-slate-500'}`}>
+                            <Icon size={16} />
+                          </span>
+                          <div className="min-w-0 flex-1">
+                            <div className="flex items-center gap-2 mb-1 sm:hidden">
+                              <span className={`w-6 h-6 rounded-lg border flex items-center justify-center shrink-0 ${isOpen ? accent : 'bg-slate-50 border-slate-200 text-slate-500'}`}>
+                                <Icon size={12} />
+                              </span>
+                              <span className="text-[10px] font-black tracking-widest uppercase text-slate-400">
+                                {String(originalIndex + 1).padStart(2, '0')} • {item.category === 'customization' ? 'Design' : item.category === 'tracking' ? 'Convidados' : 'Presentes'}
+                              </span>
+                            </div>
+                            <span className="block font-bold text-slate-900 text-[14px] sm:text-[15px] leading-[1.35] pr-1" style={{ overflowWrap: 'anywhere' }}>
+                              {item.q}
+                            </span>
+                            <span className="hidden sm:block text-[11px] font-medium text-slate-500 mt-1">
+                              {item.category === 'customization' ? 'Personalização' : item.category === 'tracking' ? 'Check-in & QR' : 'Presentes & White-label'} • toque para expandir
+                            </span>
+                          </div>
                         </div>
-                      </motion.div>
-                    )}
-                  </AnimatePresence>
-                </motion.div>
-              );
-            })}
-          </AnimatePresence>
-        </div>
+                        
+                        <span className={`w-8 h-8 rounded-full border flex items-center justify-center shrink-0 transition-all duration-200 mt-0.5 sm:mt-0 ${isOpen ? 'bg-brand-blue border-brand-blue text-white rotate-180' : 'bg-white border-slate-200 text-slate-500 group-hover:border-slate-300 group-hover:text-slate-700'}`}>
+                          <ChevronDown size={16} />
+                        </span>
+                      </button>
 
-        {/* Bottom CTA within FAQ */}
-        <div className="mt-16 text-center bg-white border border-slate-200/60 p-8 rounded-3xl shadow-sm max-w-2xl mx-auto flex flex-col items-center">
-          <HelpCircle size={28} className="text-emerald-500 mb-3" />
-          <h4 className="text-base font-bold text-slate-800 mb-1">Tem alguma dúvida específica para o seu evento?</h4>
-          <p className="text-xs text-slate-500 mb-5 leading-relaxed max-w-md">
-            A nossa equipa técnica está pronta para criar layouts personalizados, carregar listas de convidados em massa ou resolver qualquer integração especial.
-          </p>
-          <a
-            href="https://wa.me/244912000000?text=Ol%C3%A1!%20Tenho%20d%C3%BAvidas%20sobre%20a%20personaliza%C3%A7%C3%A3o%20e%20recursos%20do%20InoEvents..."
-            target="_blank"
-            rel="noreferrer"
-            className="inline-flex items-center gap-2 bg-emerald-500 hover:bg-emerald-600 active:scale-95 text-white font-bold text-xs px-6 py-3 rounded-xl transition-all shadow-lg shadow-emerald-500/10 cursor-pointer"
-          >
-            Falar pelo WhatsApp
-          </a>
-        </div>
+                      <AnimatePresence initial={false}>
+                        {isOpen && (
+                          <motion.div
+                            initial={{ height: 0, opacity: 0 }}
+                            animate={{ height: "auto", opacity: 1 }}
+                            exit={{ height: 0, opacity: 0 }}
+                            transition={{ duration: 0.22, ease: "easeInOut" }}
+                          >
+                            <div className="mx-4 sm:mx-5 mb-4 sm:mb-5 rounded-xl bg-slate-50 border border-slate-100 px-4 sm:px-5 py-4 text-[13px] sm:text-[14px] leading-[1.65] text-slate-700">
+                              {item.a}
+                            </div>
+                          </motion.div>
+                        )}
+                      </AnimatePresence>
+                    </motion.div>
+                  );
+                })}
+              </AnimatePresence>
+            </div>
 
+            {preview && !expanded && (
+              <div className="mt-6 text-center">
+                <button
+                  onClick={() => setExpanded(true)}
+                  className="inline-flex items-center gap-2 text-xs font-bold uppercase tracking-[0.18em] text-[#1B365D] border-b border-[#C5A028]/60 pb-1 hover:text-[#8a6d1c] cursor-pointer"
+                  style={{ transition: 'color 200ms ease' }}
+                >
+                  Ver todas as {FAQ_ITEMS.length} dúvidas
+                </button>
+              </div>
+            )}
+
+            {/* Mobile CTA - only on small */}
+            <div className="lg:hidden mt-8 p-5 rounded-2xl bg-slate-50 border border-slate-200 flex flex-col gap-3">
+              <div className="flex items-center gap-2.5">
+                <span className="w-8 h-8 rounded-xl bg-white border border-slate-200 flex items-center justify-center">
+                  <HelpCircle size={16} className="text-brand-blue" />
+                </span>
+                <span className="text-sm font-bold text-slate-900">Fale com a equipa</span>
+              </div>
+              <p className="text-xs leading-relaxed text-slate-600">
+                Criamos layouts, importamos listas e configuramos pagamentos no mesmo dia.
+              </p>
+              <a
+                href="https://wa.me/244952815430?text=Ol%C3%A1%20InoEvents%21%20Tenho%20d%C3%BAvidas%20sobre%20o%20meu%20evento"
+                target="_blank"
+                rel="noreferrer"
+                className="inline-flex items-center justify-center gap-1.5 bg-[#1B365D] hover:bg-[#122a4a] active:scale-[0.98] text-white font-bold text-xs px-4 py-3 rounded-xl transition-all"
+              >
+                Falar no WhatsApp <span aria-hidden>→</span>
+              </a>
+            </div>
+          </div>
+        </div>
       </div>
     </section>
   );

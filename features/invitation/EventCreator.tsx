@@ -2,6 +2,7 @@ import React, { useState, useEffect } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
 import { useNavigate, useLocation } from 'react-router-dom';
 import { useFirebase, db } from '../../components/FirebaseProvider';
+import { getGuestLimit, normalizePlanId, getPlanConfig, canUseFeature, getEventCreationLimit, isBusinessPlan } from '../../lib/entitlements';
 import { doc, getDoc, setDoc, updateDoc, collection, query, where, getDocs } from 'firebase/firestore';
 import toast from 'react-hot-toast';
 import { 
@@ -288,7 +289,7 @@ export const EventCreator: React.FC = () => {
     try {
       // PREMIUM LAYOUT RULE: Check if selecting a premium layout on an Essencial plan
       const isPremiumLayout = ['LUXURY', 'GARDEN', 'RUSTIC', 'INDUSTRIAL', 'LIMINTSO_GOLD', 'LIMINTSO_ME'].includes(selectedLayout);
-      const isUserEssencial = userProfile?.plan === 'Essencial' || !userProfile?.plan;
+      const isUserEssencial = !canUseFeature(userProfile?.plan, 'premium_themes');
       if (isPremiumLayout && isUserEssencial) {
         toast.dismiss(toastId);
         setAttemptedPremiumLayout(selectedLayout === 'LUXURY' ? 'Luxo de Realeza' : selectedLayout === 'LIMINTSO_GOLD' ? 'Ouro Imperial' : selectedLayout === 'LIMINTSO_ME' ? 'Nobreza de Luanda' : selectedLayout === 'GARDEN' ? 'Jardim Encantado' : selectedLayout === 'RUSTIC' ? 'Rústico / Natural' : 'Industrial Loft');
@@ -298,10 +299,8 @@ export const EventCreator: React.FC = () => {
       }
 
       // BILLING RULE: Check plan limit when creating a NEW invitation (only if not baby shower and not bridal shower)
-      if (!isEditingExisting && !isBabyShower && !isBridalShower && userProfile?.plan !== 'Business' && userProfile?.plan !== 'Corporate') {
-        const plan = userProfile?.plan || 'Essencial';
-        let limit = 2;
-        if (plan === 'Premium') limit = 5;
+      if (!isEditingExisting && !isBabyShower && !isBridalShower && !isBusinessPlan(userProfile?.plan)) {
+        const plan = normalizePlanId(userProfile?.plan); const limit = getEventCreationLimit(plan);
 
         const eventsRef = collection(db, 'events');
         const q = query(eventsRef, where("ownerId", "==", user.uid));
@@ -322,6 +321,15 @@ export const EventCreator: React.FC = () => {
 
       const computedFormType = isBabyShower ? 'BABY_SHOWER' : isBridalShower ? 'BRIDAL_SHOWER' : 'WEDDING';
 
+      const normalizedPlan = normalizePlanId(userProfile?.plan || 'essential');
+      const expiresAtDate = (() => {
+        try {
+          const daysMap: Record<string, number> = { essential: 90, premium: 180, vip: 365, business: 365 };
+          const d = daysMap[normalizedPlan] ?? 90;
+          if (!isFinite(d)) return null;
+          const dt = new Date(); dt.setDate(dt.getDate() + d); return dt.toISOString();
+        } catch { return null; }
+      })();
       const savePayload: any = {
         id: activeEventId,
         title: title,
@@ -330,7 +338,13 @@ export const EventCreator: React.FC = () => {
         type: computedFormType,
         layoutMode: selectedLayout,
         ownerId: user.uid,
-        plan: userProfile?.plan || 'Essencial',
+        plan: normalizedPlan, // canónico minúsculo — legado normalizado
+        planId: normalizedPlan,
+        status: 'active',
+        billingStatus: 'pending',
+        expiresAt: expiresAtDate,
+        publishedAt: new Date().toISOString(),
+        addons: {},
         description: description,
         locationName: locationName,
         address: address,
@@ -341,6 +355,7 @@ export const EventCreator: React.FC = () => {
         ...(mapImage ? { mapImage } : {}),
         clientToken: Math.random().toString(36).substring(2, 8).toUpperCase(),
         createdAt: new Date().toISOString(),
+        updatedAt: new Date().toISOString(),
       };
 
       // Handle conditional parameters
@@ -1180,7 +1195,7 @@ export const EventCreator: React.FC = () => {
               )}
 
               <p className="text-slate-600 text-sm leading-relaxed mb-6">
-                O modelo selecionado é um design premium exclusivo. Com o acesso <strong className="text-slate-900">Premium (Pagamento Único)</strong> por apenas <strong className="text-amber-600">20.000 Kz</strong>, o seu convite ganha recursos incomparáveis:
+                O modelo selecionado é um design premium exclusivo. Com o acesso <strong className="text-slate-900">Premium (Pagamento Único)</strong> por apenas <strong className="text-amber-600">15.000 Kz</strong>, o seu convite ganha recursos incomparáveis:
               </p>
 
               {/* Premium features checklist */}
@@ -1195,7 +1210,7 @@ export const EventCreator: React.FC = () => {
                 </div>
                 <div className="flex items-start gap-2.5 text-xs text-slate-700">
                   <Check className="text-amber-600 mt-0.5 flex-shrink-0" size={14} />
-                  <span><strong>RSVP Ilimitado</strong>: receba todos os convidados sem qualquer barreira ou teto.</span>
+                  <span><strong>RSVP até 300 convidados</strong>: confirmações com gestão individual e QR.</span>
                 </div>
                 <div className="flex items-start gap-2.5 text-xs text-slate-700">
                   <Check className="text-amber-600 mt-0.5 flex-shrink-0" size={14} />
@@ -1207,14 +1222,14 @@ export const EventCreator: React.FC = () => {
               <div className="flex flex-col gap-2.5">
                 <a
                   href={`https://wa.me/244952815430?text=${encodeURIComponent(
-                    `Olá! Estou na plataforma InoEvents a criar o meu convite e gostaria de comprar o acesso PREMIUM por 20.000 Kz para o modelo "${attemptedPremiumLayout || 'Luxo'}"!\n\nID: ${user?.uid || 'Não autenticado'}\nE-mail: ${user?.email || 'Sem e-mail'}`
+                    `Olá! Estou na plataforma InoEvents a criar o meu convite e gostaria de comprar o acesso PREMIUM por 15.000 Kz para o modelo "${attemptedPremiumLayout || 'Luxo'}"!\n\nID: ${user?.uid || 'Não autenticado'}\nE-mail: ${user?.email || 'Sem e-mail'}`
                   )}`}
                   target="_blank"
                   rel="noopener noreferrer"
                   className="w-full bg-slate-900 hover:bg-slate-800 text-white font-bold py-3.5 px-4 rounded-2xl transition-all shadow-lg hover:scale-[1.01] active:scale-95 text-sm flex items-center justify-center gap-2 cursor-pointer"
                 >
                   <Gem size={16} className="text-amber-400" />
-                  Adquirir Acesso Premium (20.000 Kz)
+                  Adquirir Acesso Premium (15.000 Kz)
                 </a>
 
                 <button

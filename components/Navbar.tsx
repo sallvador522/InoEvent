@@ -118,7 +118,7 @@ export const Navbar: React.FC = () => {
       <nav className="sticky top-0 z-50 w-full bg-brand-blue/95 backdrop-blur-md text-white shadow-lg shadow-brand-blue/10 px-4 md:px-6 py-3.5 flex items-center justify-between transition-all border-b border-white/5">
         <div className="flex items-center gap-2 md:gap-3 flex-shrink-0">
           <Link to="/" className="flex items-center gap-2 md:gap-3 group">
-            <img src="/favicon.ico" alt="InoEvents" className="w-8 h-8 md:w-9 md:h-9 rounded-xl object-contain border border-white/10 bg-white/5 p-1 shadow-md group-hover:scale-105 transition-all duration-300" referrerPolicy="no-referrer" />
+            <img src="/android-chrome-512x512.png" alt="InoEvents" className="w-8 h-8 md:w-9 md:h-9 rounded-xl object-contain border border-white/10 bg-white/5 p-1 shadow-md group-hover:scale-105 transition-all duration-300" referrerPolicy="no-referrer" />
             <span className="text-white text-base md:text-lg font-sans font-extrabold tracking-tight hidden sm:block bg-gradient-to-r from-white via-blue-50 to-white/95 bg-clip-text text-transparent">
               InoEvents
             </span>
@@ -392,7 +392,7 @@ export const Navbar: React.FC = () => {
           >
             <div className="flex justify-between items-center mb-8">
               <Link to="/" onClick={() => setMobileMenuOpen(false)} className="w-10 h-10 rounded-xl overflow-hidden border border-slate-100 shadow-sm flex items-center justify-center bg-white">
-                <img src="/favicon.ico" alt="InoEvents Logo" className="w-8 h-8 object-contain" referrerPolicy="no-referrer" />
+                <img src="/android-chrome-512x512.png" alt="InoEvents Logo" className="w-8 h-8 object-contain" referrerPolicy="no-referrer" />
               </Link>
               <button 
                 onClick={() => setMobileMenuOpen(false)}

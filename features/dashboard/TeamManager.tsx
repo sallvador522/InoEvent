@@ -2,6 +2,7 @@ import React, { useState, useEffect } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
 import { collection, doc, onSnapshot, setDoc, deleteDoc, updateDoc } from 'firebase/firestore';
 import { db, handleFirestoreError, OperationType } from '../../components/FirebaseProvider';
+import { getGuestLimit, normalizePlanId, getPlanConfig, canUseFeature, isBusinessPlan } from '../../lib/entitlements';
 import { Users2, Shield, UserPlus, Trash2, Link2, Check, Copy, AlertCircle, Sparkles, CheckCircle2 } from 'lucide-react';
 import toast from 'react-hot-toast';
 
@@ -36,7 +37,7 @@ export const TeamManager: React.FC<TeamManagerProps> = ({ event }) => {
     const [copiedId, setCopiedId] = useState<string | null>(null);
 
     // Limit check by Plan
-    const maxMembers = eventPlan === 'Corporate' ? Infinity : eventPlan === 'Business' ? 10 : 3;
+    const maxMembers = isBusinessPlan(eventPlan) ? 10 : 3;
 
     useEffect(() => {
         if (!eventId) return;

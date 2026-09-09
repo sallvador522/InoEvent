@@ -24,6 +24,8 @@ import './server/lib/firebase-admin.js';
 // --- Route Modules ---
 import rsvpRoutes from './server/routes/rsvp.js';
 import seoRoutes from './server/routes/seo.js';
+import ordersRoutes from './server/routes/orders.js';
+import subscriptionsRoutes from './server/routes/subscriptions.js';
 
 // --- Express App ---
 const app = express();
@@ -118,6 +120,8 @@ app.get('/robots.txt', (_req, res) => {
 // --- Mount Route Modules ---
 app.use(seoRoutes);      // SEO routes BEFORE API (they intercept /plans and /invite/:id)
 app.use(rsvpRoutes);      // /api/events/:id/guests, /api/events/:id/rsvp, /api/events/:id/rsvp-status
+app.use(ordersRoutes);    // /api/orders, /api/events/:id/order, /api/events/:id/upgrade, /api/events/:id/renew, /api/webhooks/payment
+app.use(subscriptionsRoutes); // /api/subscriptions/*
 
 // --- Global Error Handler ---
 app.use((err: any, req: express.Request, res: express.Response, _next: express.NextFunction) => {

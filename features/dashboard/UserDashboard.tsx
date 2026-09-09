@@ -17,8 +17,9 @@ import {
   db,
   handleFirestoreError,
   OperationType,
+  useFirebase,
 } from "../../components/FirebaseProvider";
-import { useFirebase } from "../../components/FirebaseProvider";
+import { getGuestLimit, normalizePlanId, getPlanConfig, canUseFeature, getEventCreationLimit } from "../../lib/entitlements";
 import { Link, useNavigate } from "react-router-dom";
 import { Button } from "../../components/ui/Button";
 import {
@@ -270,10 +271,7 @@ export const UserDashboard: React.FC = () => {
   }
 
   const handleCreateEvent = () => {
-    const plan = userProfile?.plan || "Essencial";
-    let limit = 2;
-    if (plan === "Premium") limit = 5;
-    if (plan === "Business" || plan === "Corporate") limit = Infinity;
+    const plan = normalizePlanId(userProfile?.plan); const limit = getEventCreationLimit(plan);
 
     // Filter out baby showers and bridal showers from checking limits
     const paidEvents = events.filter((e: any) => e.type !== "BABY_SHOWER" && e.type !== "BRIDAL_SHOWER");

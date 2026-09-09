@@ -1,7 +1,7 @@
 import React, { lazy, Suspense } from 'react';
 import { BrowserRouter as Router, Routes, Route, useLocation } from 'react-router-dom';
 import { Toaster } from 'react-hot-toast';
-import { motion, AnimatePresence } from 'motion/react';
+import { motion, AnimatePresence, MotionConfig } from 'motion/react';
 import { ProtectedRoute } from './components/ProtectedRoute';
 import { AdminRoute } from './components/AdminRoute';
 import { WhatsAppSupport } from './components/WhatsAppSupport';
@@ -115,11 +115,13 @@ const App: React.FC = () => {
   return (
     <ErrorBoundary>
       <Toaster position="top-center" />
+      <MotionConfig reducedMotion="user">
       <Router>
         <AnalyticsTracker />
         <AnimatedRoutes />
         <WhatsAppSupport />
       </Router>
+      </MotionConfig>
     </ErrorBoundary>
   );
 };

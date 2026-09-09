@@ -28,13 +28,33 @@ export function usePlanVerification(eventId: string | undefined) {
     setLoading(true);
     setError(null);
     try {
-      // Find proper API host origin
+      // Find proper API host origin — §5 authoritative via entitlements (§6 server)
       const origin = window.location.origin;
-      const response = await fetch(`${origin}/api/events/${eventId}/verify-plan`);
+      // Tenta novo endpoint entitlements, fallback para verify-plan legado
+      let response = await fetch(`${origin}/api/events/${eventId}/entitlements`);
+      if (!response.ok) {
+        response = await fetch(`${origin}/api/events/${eventId}/verify-plan`);
+      }
       if (!response.ok) {
         throw new Error(`Erro ao validar plano: status ${response.status}`);
       }
-      const json: PlanVerificationResult = await response.json();
+      const raw: any = await response.json();
+      // Normaliza entitlements → PlanVerificationResult
+      const json: PlanVerificationResult = raw.features ? raw : {
+        eventId,
+        plan: raw.plan || raw.planName || 'essential',
+        isBlocked: !!raw.isBlocked || !!raw.isExpired,
+        features: {
+          rsvpLimit: raw.guestLimit ?? raw.rsvpLimit ?? 100,
+          backgroundMusic: raw.features?.includes('music') ?? !!raw.features?.music ?? false,
+          customDomain: raw.features?.includes('custom_domain') ?? false,
+          tableMaps: raw.features?.includes('tables') ?? raw.features?.tableMaps ?? false,
+          guestBook: raw.features?.includes('guestbook') ?? false,
+          whiteLabel: raw.features?.includes('remove_branding') ?? false,
+          staffAccess: raw.features?.includes('team_management') ?? false,
+        },
+        verifiedAt: raw.verifiedAt || new Date().toISOString(),
+      };
       setData(json);
     } catch (err: any) {
       console.error("[usePlanVerification ERROR]", err);
@@ -53,7 +73,7 @@ export function usePlanVerification(eventId: string | undefined) {
     error,
     data,
     verifyPlan,
-    isPremium: data ? ['Premium', 'Business', 'Corporate'].includes(data.plan) : false,
-    isBusiness: data ? ['Business', 'Corporate'].includes(data.plan) : false,
+    isPremium: data ? ['premium','vip','business','Premium','VIP','Business','Corporate'].includes(data.plan) : false,
+    isBusiness: data ? ['business','Business','Corporate'].includes(data.plan.toLowerCase()) : false,
   };
 }

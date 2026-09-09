@@ -10,6 +10,7 @@ import {
   Copy,
   MessageSquare,
   CheckCircle2,
+  Crown,
 } from "lucide-react";
 import { Link, useNavigate } from "react-router-dom";
 import { doc, updateDoc, getDoc, setDoc } from "firebase/firestore";
@@ -23,68 +24,98 @@ import { Navbar } from "../../components/Navbar";
 import { SEO } from "../../components/SEO";
 import { Button } from "../../components/ui/Button";
 import toast from "react-hot-toast";
+import { PLANS, ADDONS } from "../../config/plans";
 
 const plans = [
   {
+    id: "essential",
     name: "Essencial",
     subtitle: "Pagamento Único por Evento",
     prices: {
-      monthly: "7.500 Kz",
+      monthly: `${PLANS.essential.price.toLocaleString('pt-AO')} Kz`,
       annual: "Válido por evento",
     },
-    savings: "Ativo até 30 dias após o evento",
-    description:
-      "Crie eventos inesquecíveis com todas as ferramentas básicas que precisa.",
+    savings: `Activo durante ${PLANS.essential.validityDays} dias • Até ${PLANS.essential.guestLimit} convidados`,
+    description: PLANS.essential.description,
     icon: <Sparkles className="w-8 h-8 text-blue-400" />,
     features: [
       "Acesso por Evento Específico",
       "Casamentos, Chás e Aniversários",
-      "RSVP Até 100 convidados",
+      `RSVP Até ${PLANS.essential.guestLimit} convidados`,
       "Galeria de Fotos Básica",
       "Código QR Exclusivo",
+      "Localização & Mapa",
+      "Countdown",
     ],
   },
   {
+    id: "premium",
     name: "Premium",
     subtitle: "Pagamento Único por Evento",
     prices: {
-      monthly: "20.000 Kz",
+      monthly: `${PLANS.premium.price.toLocaleString('pt-AO')} Kz`,
       annual: "Válido por evento",
     },
-    savings: "Ativo até 30 dias após o evento",
+    savings: `Activo durante ${PLANS.premium.validityDays} dias • Até ${PLANS.premium.guestLimit} convidados`,
     popular: true,
-    description:
-      "A experiência completa. Ideal para quem exige sofisticação e não quer limites de convidados.",
+    description: PLANS.premium.description,
     icon: <Gem className="w-8 h-8 text-purple-400" />,
     features: [
       "Acesso por Evento Específico",
       "Todos os Temas Premium Liberados",
-      "RSVP Ilimitado",
-      "Sem marca d'água (White-label)",
+      `RSVP Até ${PLANS.premium.guestLimit} convidados`,
+      "Convidados Individualizados",
+      "Galeria Premium",
       "Música de Fundo (TocaPlayer)",
-      "Domínio Personalizado (.com)",
-      "Mapa das Mesas",
       "Livro de Assinaturas Digital",
+      "Mapa das Mesas",
+      "Sem marca d'água (White-label)",
+      "Analytics Básicos",
     ],
   },
   {
+    id: "vip",
+    name: "VIP",
+    subtitle: "Pagamento Único por Evento",
+    prices: {
+      monthly: `${PLANS.vip.price.toLocaleString('pt-AO')} Kz`,
+      annual: "Válido por evento",
+    },
+    savings: `Activo durante ${PLANS.vip.validityDays} dias • Até ${PLANS.vip.guestLimit} convidados`,
+    description: PLANS.vip.description,
+    icon: <Crown className="w-8 h-8 text-amber-500" />,
+    features: [
+      "Tudo do Premium",
+      `RSVP Até ${PLANS.vip.guestLimit} convidados`,
+      "QR Individual por Convidado",
+      "Check-in Inteligente",
+      "Gestão +1",
+      "Mesas Avançadas",
+      "Lembretes Automáticos",
+      "Analytics Avançados",
+      "Domínio Personalizado",
+      "Suporte Prioritário",
+    ],
+  },
+  {
+    id: "business",
     name: "Business",
     displayName: "Business (B2B)",
-    subtitle: "Assinatura Mensal/Anual",
+    subtitle: "Assinatura Mensal",
     prices: {
-      monthly: "45.000 Kz",
-      annual: "450.000 Kz",
+      monthly: `${PLANS.business.price.toLocaleString('pt-AO')} Kz`,
+      annual: "Por mês",
     },
-    savings: "Faturado como assinatura de SaaS",
-    description:
-      "A solução definitiva para empresas, agências e cerimonialistas que organizam múltiplos eventos.",
+    savings: "Eventos ilimitados • Faturado como SaaS",
+    description: PLANS.business.description,
     icon: <Building2 className="w-8 h-8 text-amber-400" />,
     features: [
       "Eventos Ativos Ilimitados (∞)",
       "Design White-Label p/ seus clientes",
       "Painel de Gestão de Clientes",
       "Check-in Inteligente",
-      "Gestor de Conta Dedicado",
+      "Equipa & Gestão Profissional",
+      `Concierge +${ADDONS.concierge.price.toLocaleString('pt-AO')} Kz (opcional)`,
     ],
   },
 ];
@@ -169,20 +200,11 @@ export const PlansPage: React.FC = () => {
       return;
     }
 
-    if (plan.name === "Business") {
-      setWhatsappModal({
-        name: plan.name,
-        price: "Sob Consulta",
-        billingCycle: "monthly",
-      });
-      return;
-    }
-
     const priceVal = plan.prices.monthly;
     setWhatsappModal({
       name: plan.name,
       price: priceVal,
-      billingCycle: plan.name === "Business" ? "monthly" : undefined,
+      billingCycle: plan.id === "business" ? "monthly" : undefined,
     });
   };
 
@@ -272,10 +294,10 @@ export const PlansPage: React.FC = () => {
           variants={containerVariants}
           initial="hidden"
           animate="visible"
-          className="grid grid-cols-1 lg:grid-cols-3 gap-8 md:gap-6 lg:gap-8 max-w-6xl mx-auto"
+          className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-4 gap-8 md:gap-6 lg:gap-6 max-w-[1400px] mx-auto"
         >
           {plans.map((plan) => {
-            const isCurrentPlan = currentPlan === plan.name;
+            const isCurrentPlan = currentPlan && (currentPlan.toLowerCase() === plan.name.toLowerCase() || (plan as any).id && currentPlan.toLowerCase() === (plan as any).id);
 
             return (
               <motion.div

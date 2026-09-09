@@ -68,7 +68,7 @@ export const EVENTS: EventDetails[] = [
     receptionName: "Copo d'água",
     receptionAddress: "Lookal Ocean Club, Ilha de Luanda",
     mapLink: "https://maps.google.com/?q=Lookal+Ocean+Club+Luanda",
-    heroImage: "/casalModel.webp",
+    heroImage: "/chany-pedro-preview.webp",
     description:
       "Temos a honra de convidá-lo(a) a comemorar esta data especial connosco. Venha juntar-se a nós e ajudar-nos a celebrar o nosso enlace matrimonial de acordo com a agenda abaixo:",
     musicTrack: "TEEKS - First Time",
@@ -136,7 +136,7 @@ Anacanizia Lopes Lima`,
     receptionName: "Copo d'água",
     receptionAddress: "Salão Noblesse, Talatona, Luanda",
     mapLink: "https://maps.google.com/?q=Talatona+Luanda",
-    heroImage: "/bridal-templates/templateCha1.png",
+    heroImage: "https://images.unsplash.com/photo-1583939003579-730e3918a45a?q=80&w=1200&auto=format&fit=crop",
     description: `I Coríntios 13: 4-7
 Aqui começa o nosso lar, erguido sobre a fé e o amor de Deus.
 Cada passo que damos é promessa de que ele será sempre o alicerce da nossa Família.`,
@@ -202,7 +202,7 @@ Cada passo que damos é promessa de que ele será sempre o alicerce da nossa Fam
     time: "18:00",
     locationName: "Espaço Elegance",
     address: "Talatona, Luanda",
-    heroImage: "/bridal-templates/templateCha2.png",
+    heroImage: "https://images.unsplash.com/photo-1519225421980-715cb02151ff?q=80&w=2670&auto=format&fit=crop",
     description:
       "Um dia inesquecível de celebração do nosso amor. Junte-se a nós para brindarmos à vida e à felicidade (Modelo Essencial).",
     musicTrack: "A Thousand Years - Christina Perri",
@@ -230,7 +230,7 @@ Cada passo que damos é promessa de que ele será sempre o alicerce da nossa Fam
     time: "16:00",
     locationName: "Solar dos Hibiscos",
     address: "Mussulo, Luanda, Angola",
-    heroImage: "/bridal-templates/templateCha2.png",
+    heroImage: "https://images.unsplash.com/photo-1515934751635-c81c6bc9a2d8?q=80&w=2574&auto=format&fit=crop",
     description:
       '"O amor é paciente, o amor é bondoso. Não inveja, não se vangloria, não se orgulha." (1 Coríntios 13:4). Sua presença é essencial neste novo capítulo de nossas vidas.',
     musicTrack: "Turning Page - Sleeping At Last",
@@ -513,8 +513,7 @@ Fernando Rafael Menezes`,
     receptionName: "",
     receptionAddress: "",
     mapLink: "https://goo.gl/maps/example",
-    heroImage:
-      "https://images.unsplash.com/photo-1596462502278-27bfdc403348?q=80&w=2000&auto=format&fit=crop",
+    heroImage: "/bridal-templates/templateCha1.png",
     description:
       "Você é uma pessoa muito especial na minha vida e por isso, quero que esteja presente no meu chá de panela! Vamos reunir a mulherada e comemorar!",
     musicTrack: "Bossa Nova Cover",
@@ -533,8 +532,7 @@ Fernando Rafael Menezes`,
     time: "14h às 19h",
     locationName: "Casa da Noiva",
     address: "Talatona, Luanda",
-    heroImage:
-      "https://images.unsplash.com/photo-1563241527-3004b7be0ffd?q=80&w=2000&auto=format&fit=crop",
+    heroImage: "/bridal-templates/templateCha2.png",
     description: `Você é uma pessoa muito especial na minha vida e por isso, quero que esteja presente no meu chá de panela!
 Vamos reunir a mulherada e comemorar!`,
     musicTrack: "Acoustic Guitar",
@@ -552,8 +550,7 @@ Vamos reunir a mulherada e comemorar!`,
     time: "15:00",
     locationName: "Rooftop Bar",
     address: "Luanda, Angola",
-    heroImage:
-      "https://images.unsplash.com/photo-1551024601-bec78aea704b?q=80&w=2000&auto=format&fit=crop",
+    heroImage: "/bridal-templates/templateCha3.png",
     description:
       "Um encontro intimista, minimalista e cheio de charme. Venha brindar comigo este novo capítulo em um chá de panela especial.",
     musicTrack: "Bossa Nova Cover",
@@ -571,8 +568,7 @@ Vamos reunir a mulherada e comemorar!`,
     time: "16:00",
     locationName: "Jardim de Inverno",
     address: "Talatona, Luanda",
-    heroImage:
-      "https://images.unsplash.com/photo-1582662057262-6718cf2ce64b?q=80&w=2000&auto=format&fit=crop",
+    heroImage: "/bridal-templates/templateCha4.png",
     description:
       "Vista-se com amor e venha tomar uma xícara de chá comigo. Uma tarde vintage para celebrarmos juntas o meu chá de panela!",
     musicTrack: "Acoustic Guitar",

@@ -1,0 +1,1144 @@
+{
+  "communities": {
+    "0": [
+      "components_firebaseprovider",
+      "components_firebaseprovider_app",
+      "components_firebaseprovider_auth",
+      "components_firebaseprovider_db",
+      "components_firebaseprovider_firebasecontext",
+      "components_firebaseprovider_firebasecontexttype",
+      "components_firebaseprovider_firebaseprovider",
+      "components_firebaseprovider_firestoreerrorinfo",
+      "components_firebaseprovider_getcachedprofile",
+      "components_firebaseprovider_getcacheduser",
+      "components_firebaseprovider_handlefirestoreerror",
+      "components_firebaseprovider_operationtype",
+      "components_firebaseprovider_usefirebase",
+      "components_navbar",
+      "components_navbar_navbar",
+      "components_protectedroute",
+      "components_protectedroute_protectedroute",
+      "components_seo",
+      "components_seo_seo",
+      "components_seo_seoprops",
+      "components_supportmodal",
+      "components_supportmodal_supportmodal",
+      "components_supportmodal_supportmodalprops",
+      "components_ui_button",
+      "components_ui_button_button",
+      "components_ui_button_buttonprops",
+      "components_ui_skeleton",
+      "components_ui_skeleton_skeleton",
+      "features_admin_admindashboard",
+      "features_admin_admindashboard_admindashboard",
+      "features_admin_admindashboard_analyticsview",
+      "features_admin_admindashboard_analyticsviewprops",
+      "features_auth_authpage",
+      "features_auth_authpage_authpage",
+      "features_business_businessdashboard",
+      "features_business_businessdashboard_businessdashboard",
+      "features_business_createbusiness",
+      "features_business_createbusiness_createbusiness",
+      "features_checkin_checkinscanner",
+      "features_checkin_checkinscanner_checkinscanner",
+      "features_dashboard_dashboard",
+      "features_dashboard_dashboard_dashboard",
+      "features_dashboard_dashboard_filterbutton",
+      "features_dashboard_dashboard_statcard",
+      "features_dashboard_dashboard_statusbadge",
+      "features_dashboard_guestbookmanager",
+      "features_dashboard_guestbookmanager_guestbookmanager",
+      "features_dashboard_onboardingwizard",
+      "features_dashboard_onboardingwizard_onboardingwizard",
+      "features_dashboard_onboardingwizard_onboardingwizardprops",
+      "features_dashboard_smartassistant",
+      "features_dashboard_smartassistant_boosterguest",
+      "features_dashboard_smartassistant_boosterreport",
+      "features_dashboard_smartassistant_smartassistant",
+      "features_dashboard_smartassistant_smartassistantprops",
+      "features_dashboard_teammanager",
+      "features_dashboard_teammanager_teammanager",
+      "features_dashboard_teammanager_teammanagerprops",
+      "features_dashboard_teammanager_teammember",
+      "features_dashboard_userdashboard",
+      "features_dashboard_userdashboard_userdashboard",
+      "features_dashboard_virtualgiftsmanager",
+      "features_dashboard_virtualgiftsmanager_giftitem",
+      "features_dashboard_virtualgiftsmanager_virtualgiftsmanager",
+      "features_landing_aboutpage",
+      "features_landing_aboutpage_aboutpage",
+      "features_landing_landingpage",
+      "features_landing_landingpage_featurecard",
+      "features_landing_landingpage_landingpage",
+      "features_landing_landingpage_motionlink",
+      "features_landing_landingpage_testimonials",
+      "features_landing_privacypage",
+      "features_landing_privacypage_privacypage",
+      "features_landing_termspage",
+      "features_landing_termspage_termspage",
+      "features_plans_planspage",
+      "features_plans_planspage_containervariants",
+      "features_plans_planspage_itemvariants",
+      "features_plans_planspage_plans",
+      "features_plans_planspage_planspage",
+      "lib_clipboard",
+      "lib_sound",
+      "lib_sound_playscansound"
+    ],
+    "1": [
+      "components_music_tocaplayer",
+      "components_music_tocaplayer_tocaplayer",
+      "components_music_tocaplayer_tocaplayerprops",
+      "components_ui_bottomsheet",
+      "components_ui_bottomsheet_bottomsheet",
+      "components_ui_bottomsheet_bottomsheetprops",
+      "features_invitation_guestbook",
+      "features_invitation_guestbook_guestbook",
+      "features_invitation_invitationview",
+      "features_invitation_invitationview_babyshowerlayout",
+      "features_invitation_invitationview_bridalshowerlayout",
+      "features_invitation_invitationview_classiclayout",
+      "features_invitation_invitationview_compressimage",
+      "features_invitation_invitationview_countdowntimer",
+      "features_invitation_invitationview_editablefield",
+      "features_invitation_invitationview_editableimagewrapper",
+      "features_invitation_invitationview_editablesectionwrapper",
+      "features_invitation_invitationview_fadeinsection",
+      "features_invitation_invitationview_floatingdesigndock",
+      "features_invitation_invitationview_gardenlayout",
+      "features_invitation_invitationview_getimageurl",
+      "features_invitation_invitationview_getrsvptext",
+      "features_invitation_invitationview_golddivider",
+      "features_invitation_invitationview_image_presets",
+      "features_invitation_invitationview_imageuploadfield",
+      "features_invitation_invitationview_industriallayout",
+      "features_invitation_invitationview_invitationview",
+      "features_invitation_invitationview_layout_presets",
+      "features_invitation_invitationview_limintsogoldlayout",
+      "features_invitation_invitationview_limintsomelayout",
+      "features_invitation_invitationview_luxurylayout",
+      "features_invitation_invitationview_modernlayout",
+      "features_invitation_invitationview_persuasive_loader_messages",
+      "features_invitation_invitationview_rsvpform",
+      "features_invitation_invitationview_rusticlayout",
+      "features_invitation_invitationview_sectiontitle",
+      "features_invitation_invitationview_track_presets",
+      "features_invitation_virtualgiftsguest",
+      "features_invitation_virtualgiftsguest_giftitem",
+      "features_invitation_virtualgiftsguest_virtualgiftsguest",
+      "features_landing_templategallerypage",
+      "features_landing_templategallerypage_categories",
+      "features_landing_templategallerypage_motionlink",
+      "features_landing_templategallerypage_templategallerypage",
+      "lib_clipboard_copytoclipboard",
+      "lib_imageoptimizer",
+      "lib_imageoptimizer_getoptimizedimageurl",
+      "lib_imageoptimizer_optimizeimageoptions",
+      "mockdata",
+      "mockdata_eventdetails",
+      "mockdata_events",
+      "mockdata_geteventbyid",
+      "mockdata_geteventbylayoutmode",
+      "mockdata_themetype",
+      "types_themetype"
+    ],
+    "2": [
+      "app",
+      "app_aboutpage",
+      "app_admindashboard",
+      "app_animatedroutes",
+      "app_app",
+      "app_authpage",
+      "app_businessdashboard",
+      "app_checkinscanner",
+      "app_clientdashboard",
+      "app_createbusiness",
+      "app_dashboard",
+      "app_eventcreator",
+      "app_invitationview",
+      "app_landingpage",
+      "app_notfound",
+      "app_pageloader",
+      "app_pagewrapper",
+      "app_planspage",
+      "app_privacypage",
+      "app_templategallerypage",
+      "app_termspage",
+      "app_userdashboard",
+      "components_adminroute",
+      "components_adminroute_adminroute",
+      "components_analyticstracker",
+      "components_analyticstracker_analyticstracker",
+      "components_analyticstracker_getbrowsertype",
+      "components_analyticstracker_getdevicetype",
+      "components_analyticstracker_window",
+      "components_notfound",
+      "components_notfound_notfound",
+      "components_whatsappsupport",
+      "components_whatsappsupport_whatsappsupport",
+      "index",
+      "index_root",
+      "index_rootelement"
+    ],
+    "3": [
+      "api_index",
+      "components_errorboundary",
+      "components_errorboundary_errorboundary",
+      "components_errorboundary_errorboundary_componentdidcatch",
+      "components_errorboundary_errorboundary_fallbackcustom",
+      "components_errorboundary_errorboundary_getderivedstatefromerror",
+      "components_errorboundary_errorboundary_handlecopy",
+      "components_errorboundary_errorboundary_handlereload",
+      "components_errorboundary_errorboundary_render",
+      "components_errorboundary_props",
+      "components_errorboundary_state",
+      "lib_logger",
+      "lib_logger_category_colors",
+      "lib_logger_colors",
+      "lib_logger_formattime",
+      "lib_logger_logcategory",
+      "lib_logger_logger",
+      "lib_logger_loglevel",
+      "lib_logger_logoptions",
+      "server",
+      "server_activetransactionlocks",
+      "server_airatelimiter",
+      "server_apiratelimiter",
+      "server_app",
+      "server_corsoptions",
+      "server_firebaseconfig",
+      "server_geteventdetails",
+      "server_keygenerator",
+      "server_paymentwebhooks",
+      "server_rsvpratelimiter",
+      "server_startserver"
+    ],
+    "4": [
+      "esbuild",
+      "eslint",
+      "eslint_js",
+      "eslint_plugin_react_hooks",
+      "firebase_tools",
+      "package_devdependencies",
+      "package_devdependencies_esbuild",
+      "package_devdependencies_eslint",
+      "package_devdependencies_eslint_js",
+      "package_devdependencies_eslint_plugin_react_hooks",
+      "package_devdependencies_firebase_tools",
+      "package_devdependencies_tsx",
+      "package_devdependencies_types_cors",
+      "package_devdependencies_types_express",
+      "package_devdependencies_types_leaflet",
+      "package_devdependencies_types_node",
+      "package_devdependencies_typescript",
+      "package_devdependencies_typescript_eslint_eslint_plugin",
+      "package_devdependencies_typescript_eslint_parser",
+      "package_devdependencies_vite",
+      "package_devdependencies_vitejs_plugin_react",
+      "tsx",
+      "types_cors",
+      "types_express",
+      "types_leaflet",
+      "types_node",
+      "typescript",
+      "typescript_eslint_eslint_plugin",
+      "typescript_eslint_parser",
+      "vite",
+      "vitejs_plugin_react"
+    ],
+    "5": [
+      "public_manifest",
+      "public_manifest_background_color",
+      "public_manifest_categories",
+      "public_manifest_description",
+      "public_manifest_dir",
+      "public_manifest_display",
+      "public_manifest_display_override",
+      "public_manifest_icons",
+      "public_manifest_id",
+      "public_manifest_lang",
+      "public_manifest_name",
+      "public_manifest_orientation",
+      "public_manifest_short_name",
+      "public_manifest_shortcuts",
+      "public_manifest_start_url",
+      "public_manifest_theme_color",
+      "ref_events",
+      "ref_lifestyle",
+      "ref_minimal_ui",
+      "ref_productivity",
+      "ref_standalone",
+      "ref_window_controls_overlay"
+    ],
+    "6": [
+      "ref_dom",
+      "ref_dom_iterable",
+      "ref_es2022",
+      "ref_node",
+      "tsconfig",
+      "tsconfig_compileroptions",
+      "tsconfig_compileroptions_allowimportingtsextensions",
+      "tsconfig_compileroptions_allowjs",
+      "tsconfig_compileroptions_experimentaldecorators",
+      "tsconfig_compileroptions_isolatedmodules",
+      "tsconfig_compileroptions_jsx",
+      "tsconfig_compileroptions_lib",
+      "tsconfig_compileroptions_module",
+      "tsconfig_compileroptions_moduledetection",
+      "tsconfig_compileroptions_moduleresolution",
+      "tsconfig_compileroptions_noemit",
+      "tsconfig_compileroptions_paths",
+      "tsconfig_compileroptions_skiplibcheck",
+      "tsconfig_compileroptions_target",
+      "tsconfig_compileroptions_types",
+      "tsconfig_compileroptions_usedefineforclassfields"
+    ],
+    "7": [
+      "components_datetimepickermodal",
+      "components_datetimepickermodal_datetimepickermodal",
+      "components_datetimepickermodal_datetimepickermodalprops",
+      "components_datetimepickermodal_monthsptfull",
+      "components_datetimepickermodal_parsetodateinputval",
+      "components_datetimepickermodal_parsetotimeinputval",
+      "components_datetimepickermodal_weekdayspt",
+      "components_inlineedit",
+      "components_inlineedit_formatdisplaydatefortemplate",
+      "components_inlineedit_formatdisplaytime",
+      "components_inlineedit_inlineimage",
+      "components_inlineedit_inlineimageprops",
+      "components_inlineedit_inlinetext",
+      "components_inlineedit_inlinetextprops",
+      "components_inlineedit_parsetodateinputval",
+      "components_inlineedit_parsetotimeinputval",
+      "features_invitation_travelmap",
+      "features_invitation_travelmap_getvalidmapurl",
+      "features_invitation_travelmap_travelmap"
+    ],
+    "8": [
+      "features_dashboard_tablemanager",
+      "features_dashboard_tablemanager_table",
+      "features_dashboard_tablemanager_tablemanager",
+      "features_invitation_checkstatusmodal",
+      "features_invitation_checkstatusmodal_checkstatusmodal",
+      "features_invitation_checkstatusmodal_checkstatusmodalprops",
+      "features_invitation_eventcreator",
+      "features_invitation_eventcreator_eventcreator",
+      "features_invitation_eventcreator_giftitem",
+      "features_invitation_eventcreator_timelineitem",
+      "types",
+      "types_dresscode",
+      "types_eventdetails",
+      "types_giftitem",
+      "types_layoutmode",
+      "types_themeconfig",
+      "types_timelineitem",
+      "types_tipitem"
+    ],
+    "9": [
+      "features_dashboard_clientdashboard",
+      "features_dashboard_clientdashboard_clientdashboard",
+      "features_dashboard_clientdashboard_filterbutton",
+      "features_dashboard_clientdashboard_statcard",
+      "features_dashboard_clientdashboard_statusbadge",
+      "features_dashboard_executivereportmodal",
+      "features_dashboard_executivereportmodal_executivereportmodal",
+      "features_dashboard_executivereportmodal_executivereportmodalprops",
+      "features_dashboard_guestdetailsmodal",
+      "features_dashboard_guestdetailsmodal_guestdetailsmodal",
+      "features_dashboard_guestdetailsmodal_statusbadge",
+      "features_dashboard_guestsprogressbar",
+      "features_dashboard_guestsprogressbar_guest",
+      "features_dashboard_guestsprogressbar_guestsprogressbar",
+      "features_dashboard_guestsprogressbar_guestsprogressbarprops"
+    ],
+    "10": [
+      "package",
+      "package_name",
+      "package_overrides",
+      "package_overrides_opentelemetry_core",
+      "package_overrides_uuid",
+      "package_private",
+      "package_scripts",
+      "package_scripts_build",
+      "package_scripts_dev",
+      "package_scripts_lint",
+      "package_scripts_preview",
+      "package_scripts_start",
+      "package_type",
+      "package_version"
+    ],
+    "11": [
+      "cors",
+      "framer_motion",
+      "html_to_image",
+      "lucide_react",
+      "package_dependencies",
+      "package_dependencies_cors",
+      "package_dependencies_framer_motion",
+      "package_dependencies_html_to_image",
+      "package_dependencies_lucide_react"
+    ],
+    "12": [
+      "components_qrscanner",
+      "components_qrscanner_qrscanner",
+      "components_qrscanner_qrscannerprops",
+      "html5_qrcode",
+      "package_dependencies_html5_qrcode"
+    ],
+    "13": [
+      "remove_whatsapp",
+      "remove_whatsapp_fs",
+      "remove_whatsapp_lp",
+      "remove_whatsapp_pp",
+      "remove_whatsapp_seo"
+    ],
+    "14": [
+      "components_gallerylightbox",
+      "components_gallerylightbox_gallerylightbox",
+      "components_gallerylightbox_gallerylightboxprops",
+      "components_gallerylightbox_photoinfo"
+    ],
+    "15": [
+      "features_landing_faqsection",
+      "features_landing_faqsection_faq_items",
+      "features_landing_faqsection_faqitem",
+      "features_landing_faqsection_faqsection"
+    ],
+    "16": [
+      "features_plans_useplanverification",
+      "features_plans_useplanverification_authoritativefeatures",
+      "features_plans_useplanverification_planverificationresult",
+      "features_plans_useplanverification_useplanverification"
+    ],
+    "17": [
+      "test_db",
+      "test_db_db",
+      "test_db_firebaseconfig",
+      "test_db_test"
+    ],
+    "18": [
+      "test_fetch",
+      "test_fetch_db",
+      "test_fetch_firebaseconfig",
+      "test_fetch_test"
+    ],
+    "19": [
+      "add_galleries",
+      "add_galleries_code",
+      "add_galleries_fs"
+    ],
+    "20": [
+      "add_table_tab",
+      "add_table_tab_dashboard",
+      "add_table_tab_fs"
+    ],
+    "21": [
+      "features_invitation_invitationview_premiumloader",
+      "package_dependencies_react",
+      "react"
+    ],
+    "22": [
+      "fix",
+      "fix_content",
+      "fix_fs"
+    ],
+    "23": [
+      "fix2",
+      "fix2_content",
+      "fix2_fs"
+    ],
+    "24": [
+      "fix_dashboard_whatsapp",
+      "fix_dashboard_whatsapp_dashboard",
+      "fix_dashboard_whatsapp_fs"
+    ],
+    "25": [
+      "fix_invitation",
+      "fix_invitation_content",
+      "fix_invitation_fs"
+    ],
+    "26": [
+      "fix_landing_images",
+      "fix_landing_images_code",
+      "fix_landing_images_fs"
+    ],
+    "27": [
+      "fix_props",
+      "fix_props_content",
+      "fix_props_fs"
+    ],
+    "28": [
+      "fix_table_manager",
+      "fix_table_manager_content",
+      "fix_table_manager_fs"
+    ],
+    "29": [
+      "fix_tabs_visibility",
+      "fix_tabs_visibility_dashboard",
+      "fix_tabs_visibility_fs"
+    ],
+    "30": [
+      "fix_tabs_visibility_2",
+      "fix_tabs_visibility_2_dashboard",
+      "fix_tabs_visibility_2_fs"
+    ],
+    "31": [
+      "fix_tabs_visibility_3",
+      "fix_tabs_visibility_3_content",
+      "fix_tabs_visibility_3_fs"
+    ],
+    "32": [
+      "fix_tabs_visibility_4",
+      "fix_tabs_visibility_4_content",
+      "fix_tabs_visibility_4_fs"
+    ],
+    "33": [
+      "fix_team_manager",
+      "fix_team_manager_file",
+      "fix_team_manager_fs"
+    ],
+    "34": [
+      "fix_team_manager_2",
+      "fix_team_manager_2_file",
+      "fix_team_manager_2_fs"
+    ],
+    "35": [
+      "patch",
+      "patch_code",
+      "patch_fs"
+    ],
+    "36": [
+      "patch2",
+      "patch2_code",
+      "patch2_fs"
+    ],
+    "37": [
+      "patch_check_status",
+      "patch_check_status_content",
+      "patch_check_status_fs"
+    ],
+    "38": [
+      "patch_checkin_token",
+      "patch_checkin_token_file",
+      "patch_checkin_token_fs"
+    ],
+    "39": [
+      "patch_cleanup",
+      "patch_cleanup_code",
+      "patch_cleanup_fs"
+    ],
+    "40": [
+      "patch_client_dashboard_cjs_patch_client_dashboard",
+      "patch_client_dashboard_content",
+      "patch_client_dashboard_fs"
+    ],
+    "41": [
+      "patch_cors",
+      "patch_cors_content",
+      "patch_cors_fs"
+    ],
+    "42": [
+      "patch_fallback",
+      "patch_fallback_code",
+      "patch_fallback_fs"
+    ],
+    "43": [
+      "patch_features",
+      "patch_features_fs",
+      "patch_features_lp"
+    ],
+    "44": [
+      "patch_get_event",
+      "patch_get_event_code",
+      "patch_get_event_fs"
+    ],
+    "45": [
+      "patch_invitation",
+      "patch_invitation_content",
+      "patch_invitation_fs"
+    ],
+    "46": [
+      "patch_logging",
+      "patch_logging_code",
+      "patch_logging_fs"
+    ],
+    "47": [
+      "patch_logging2",
+      "patch_logging2_code",
+      "patch_logging2_fs"
+    ],
+    "48": [
+      "patch_logging3",
+      "patch_logging3_code",
+      "patch_logging3_fs"
+    ],
+    "49": [
+      "patch_rules",
+      "patch_rules_content",
+      "patch_rules_fs"
+    ],
+    "50": [
+      "patch_rules_guest",
+      "patch_rules_guest_fs",
+      "patch_rules_guest_rules"
+    ],
+    "51": [
+      "patch_team_rules",
+      "patch_team_rules_fs",
+      "patch_team_rules_rules"
+    ],
+    "52": [
+      "test_fetch2",
+      "test_fetch2_firebaseconfig",
+      "test_fetch2_geteventdetails"
+    ],
+    "53": [
+      "test_og",
+      "test_og_fs",
+      "test_og_html"
+    ],
+    "54": [
+      "test_rest",
+      "test_rest_firebaseconfig",
+      "test_rest_test"
+    ],
+    "55": [
+      "test_rest2",
+      "test_rest2_firebaseconfig",
+      "test_rest2_test"
+    ],
+    "56": [
+      "update_checkin",
+      "update_checkin_file",
+      "update_checkin_fs"
+    ],
+    "57": [
+      "components_audiouploader",
+      "components_audiouploader_audiouploader"
+    ],
+    "58": [
+      "components_imageuploader",
+      "components_imageuploader_imageuploader"
+    ],
+    "59": [
+      "crypto",
+      "package_dependencies_crypto"
+    ],
+    "60": [
+      "dotenv",
+      "package_dependencies_dotenv"
+    ],
+    "61": [
+      "express",
+      "package_dependencies_express"
+    ],
+    "62": [
+      "express_rate_limit",
+      "package_dependencies_express_rate_limit"
+    ],
+    "63": [
+      "firebase",
+      "package_dependencies_firebase"
+    ],
+    "64": [
+      "firebase_admin",
+      "package_dependencies_firebase_admin"
+    ],
+    "65": [
+      "fix_all",
+      "fix_all_clean_joyride"
+    ],
+    "66": [
+      "google_genai",
+      "package_dependencies_google_genai"
+    ],
+    "67": [
+      "helmet",
+      "package_dependencies_helmet"
+    ],
+    "68": [
+      "html2canvas",
+      "package_dependencies_html2canvas"
+    ],
+    "69": [
+      "leaflet",
+      "package_dependencies_leaflet"
+    ],
+    "70": [
+      "motion",
+      "package_dependencies_motion"
+    ],
+    "71": [
+      "package_dependencies_qrcode_react",
+      "qrcode_react"
+    ],
+    "72": [
+      "package_dependencies_react_dom",
+      "react_dom"
+    ],
+    "73": [
+      "package_dependencies_react_helmet_async",
+      "react_helmet_async"
+    ],
+    "74": [
+      "package_dependencies_react_hot_toast",
+      "react_hot_toast"
+    ],
+    "75": [
+      "package_dependencies_react_is",
+      "react_is"
+    ],
+    "76": [
+      "package_dependencies_react_joyride",
+      "react_joyride"
+    ],
+    "77": [
+      "package_dependencies_react_leaflet",
+      "react_leaflet"
+    ],
+    "78": [
+      "package_dependencies_react_router_dom",
+      "react_router_dom"
+    ],
+    "79": [
+      "package_dependencies_recharts",
+      "recharts"
+    ],
+    "80": [
+      "package_dependencies_vis_gl_react_google_maps",
+      "vis_gl_react_google_maps"
+    ],
+    "81": [
+      "package_dependencies_yudiel_react_qr_scanner",
+      "yudiel_react_qr_scanner"
+    ],
+    "82": [
+      "public_sw",
+      "public_sw_assets_to_cache"
+    ],
+    "83": [
+      "test_env",
+      "test_env_child"
+    ],
+    "84": [
+      "test_prod_server",
+      "test_prod_server_child"
+    ],
+    "85": [
+      "test_regex",
+      "test_regex_result"
+    ],
+    "86": [
+      "update_checkin_full",
+      "update_checkin_full_fs"
+    ],
+    "87": [
+      "vercel",
+      "vercel_rewrites"
+    ],
+    "88": [
+      "add_guestbook_layouts"
+    ],
+    "89": [
+      "eslint_config"
+    ],
+    "90": [
+      "fix_final_ts"
+    ],
+    "91": [
+      "fix_final_ts_2"
+    ],
+    "92": [
+      "fix_final_ts_3"
+    ],
+    "93": [
+      "fix_final_ts_4"
+    ],
+    "94": [
+      "fix_final_ts_5"
+    ],
+    "95": [
+      "fix_final_ts_6"
+    ],
+    "96": [
+      "fix_final_ts_7"
+    ],
+    "97": [
+      "fix_inputs"
+    ],
+    "98": [
+      "fix_inputs2"
+    ],
+    "99": [
+      "fix_inputs3"
+    ],
+    "100": [
+      "fix_is_premium"
+    ],
+    "101": [
+      "fix_is_premium2"
+    ],
+    "102": [
+      "fix_is_premium3"
+    ],
+    "103": [
+      "fix_remaining"
+    ],
+    "104": [
+      "fix_remaining_ts"
+    ],
+    "105": [
+      "fix_tour"
+    ],
+    "106": [
+      "fix_ts"
+    ],
+    "107": [
+      "fix_types"
+    ],
+    "108": [
+      "fix_watermark"
+    ],
+    "109": [
+      "move_templates"
+    ],
+    "110": [
+      "patch_client_dashboard2"
+    ],
+    "111": [
+      "patch_client_dashboard_py_patch_client_dashboard"
+    ],
+    "112": [
+      "patch_dashboard"
+    ],
+    "113": [
+      "patch_dashboard2"
+    ],
+    "114": [
+      "patch_dashboard3"
+    ],
+    "115": [
+      "patch_dashboard_blocked"
+    ],
+    "116": [
+      "patch_invitation3"
+    ],
+    "117": [
+      "patch_invitation_blocked"
+    ],
+    "118": [
+      "patch_invitation_tour"
+    ],
+    "119": [
+      "patch_invitation_view"
+    ],
+    "120": [
+      "test_premium"
+    ],
+    "121": [
+      "test_server"
+    ],
+    "122": [
+      "update_check_status"
+    ],
+    "123": [
+      "update_check_status_props"
+    ],
+    "124": [
+      "update_check_status_props2"
+    ],
+    "125": [
+      "update_dashboards"
+    ],
+    "126": [
+      "update_invitation"
+    ],
+    "127": [
+      "update_support"
+    ],
+    "128": [
+      "verify_essential"
+    ],
+    "129": [
+      "vite_config"
+    ]
+  },
+  "cohesion": {
+    "0": 0.06406112253893623,
+    "1": 0.07542087542087542,
+    "2": 0.06507936507936508,
+    "3": 0.07311827956989247,
+    "4": 0.06451612903225806,
+    "5": 0.09090909090909091,
+    "6": 0.09523809523809523,
+    "7": 0.14619883040935672,
+    "8": 0.13725490196078433,
+    "9": 0.1619047619047619,
+    "10": 0.14285714285714285,
+    "11": 0.2222222222222222,
+    "12": 0.4,
+    "13": 0.4,
+    "14": 0.5,
+    "15": 0.6666666666666666,
+    "16": 0.5,
+    "17": 0.5,
+    "18": 0.5,
+    "19": 0.6666666666666666,
+    "20": 0.6666666666666666,
+    "21": 0.6666666666666666,
+    "22": 0.6666666666666666,
+    "23": 0.6666666666666666,
+    "24": 0.6666666666666666,
+    "25": 0.6666666666666666,
+    "26": 0.6666666666666666,
+    "27": 0.6666666666666666,
+    "28": 0.6666666666666666,
+    "29": 0.6666666666666666,
+    "30": 0.6666666666666666,
+    "31": 0.6666666666666666,
+    "32": 0.6666666666666666,
+    "33": 0.6666666666666666,
+    "34": 0.6666666666666666,
+    "35": 0.6666666666666666,
+    "36": 0.6666666666666666,
+    "37": 0.6666666666666666,
+    "38": 0.6666666666666666,
+    "39": 0.6666666666666666,
+    "40": 0.6666666666666666,
+    "41": 0.6666666666666666,
+    "42": 0.6666666666666666,
+    "43": 0.6666666666666666,
+    "44": 0.6666666666666666,
+    "45": 0.6666666666666666,
+    "46": 0.6666666666666666,
+    "47": 0.6666666666666666,
+    "48": 0.6666666666666666,
+    "49": 0.6666666666666666,
+    "50": 0.6666666666666666,
+    "51": 0.6666666666666666,
+    "52": 0.6666666666666666,
+    "53": 0.6666666666666666,
+    "54": 0.6666666666666666,
+    "55": 0.6666666666666666,
+    "56": 0.6666666666666666,
+    "57": 1.0,
+    "58": 1.0,
+    "59": 1.0,
+    "60": 1.0,
+    "61": 1.0,
+    "62": 1.0,
+    "63": 1.0,
+    "64": 1.0,
+    "65": 1.0,
+    "66": 1.0,
+    "67": 1.0,
+    "68": 1.0,
+    "69": 1.0,
+    "70": 1.0,
+    "71": 1.0,
+    "72": 1.0,
+    "73": 1.0,
+    "74": 1.0,
+    "75": 1.0,
+    "76": 1.0,
+    "77": 1.0,
+    "78": 1.0,
+    "79": 1.0,
+    "80": 1.0,
+    "81": 1.0,
+    "82": 1.0,
+    "83": 1.0,
+    "84": 1.0,
+    "85": 1.0,
+    "86": 1.0,
+    "87": 1.0,
+    "88": 1.0,
+    "89": 1.0,
+    "90": 1.0,
+    "91": 1.0,
+    "92": 1.0,
+    "93": 1.0,
+    "94": 1.0,
+    "95": 1.0,
+    "96": 1.0,
+    "97": 1.0,
+    "98": 1.0,
+    "99": 1.0,
+    "100": 1.0,
+    "101": 1.0,
+    "102": 1.0,
+    "103": 1.0,
+    "104": 1.0,
+    "105": 1.0,
+    "106": 1.0,
+    "107": 1.0,
+    "108": 1.0,
+    "109": 1.0,
+    "110": 1.0,
+    "111": 1.0,
+    "112": 1.0,
+    "113": 1.0,
+    "114": 1.0,
+    "115": 1.0,
+    "116": 1.0,
+    "117": 1.0,
+    "118": 1.0,
+    "119": 1.0,
+    "120": 1.0,
+    "121": 1.0,
+    "122": 1.0,
+    "123": 1.0,
+    "124": 1.0,
+    "125": 1.0,
+    "126": 1.0,
+    "127": 1.0,
+    "128": 1.0,
+    "129": 1.0
+  },
+  "gods": [
+    {
+      "id": "components_firebaseprovider_usefirebase",
+      "label": "useFirebase()",
+      "degree": 31
+    },
+    {
+      "id": "components_firebaseprovider_db",
+      "label": "db",
+      "degree": 24
+    },
+    {
+      "id": "lib_clipboard_copytoclipboard",
+      "label": "copyToClipboard()",
+      "degree": 23
+    },
+    {
+      "id": "components_firebaseprovider_handlefirestoreerror",
+      "label": "handleFirestoreError()",
+      "degree": 19
+    },
+    {
+      "id": "mockdata_events",
+      "label": "EVENTS",
+      "degree": 17
+    },
+    {
+      "id": "tsconfig_compileroptions",
+      "label": "compilerOptions",
+      "degree": 16
+    },
+    {
+      "id": "components_navbar_navbar",
+      "label": "Navbar()",
+      "degree": 13
+    },
+    {
+      "id": "features_invitation_invitationview_getimageurl",
+      "label": "getImageUrl()",
+      "degree": 13
+    },
+    {
+      "id": "components_firebaseprovider_operationtype",
+      "label": "OperationType",
+      "degree": 11
+    },
+    {
+      "id": "features_invitation_invitationview_getrsvptext",
+      "label": "getRSVPText()",
+      "degree": 11
+    }
+  ],
+  "surprises": [
+    {
+      "source": "EventCreator()",
+      "target": "useFirebase()",
+      "source_files": [
+        "features/invitation/EventCreator.tsx",
+        "components/FirebaseProvider.tsx"
+      ],
+      "confidence": "EXTRACTED",
+      "relation": "calls",
+      "why": "connects across different repos/directories; bridges separate communities; peripheral node `EventCreator()` unexpectedly reaches hub `useFirebase()`"
+    },
+    {
+      "source": "CreateBusiness()",
+      "target": "useFirebase()",
+      "source_files": [
+        "features/business/CreateBusiness.tsx",
+        "components/FirebaseProvider.tsx"
+      ],
+      "confidence": "EXTRACTED",
+      "relation": "calls",
+      "why": "connects across different repos/directories; peripheral node `CreateBusiness()` unexpectedly reaches hub `useFirebase()`"
+    },
+    {
+      "source": "InvitationView()",
+      "target": "useFirebase()",
+      "source_files": [
+        "features/invitation/InvitationView.tsx",
+        "components/FirebaseProvider.tsx"
+      ],
+      "confidence": "EXTRACTED",
+      "relation": "calls",
+      "why": "connects across different repos/directories; bridges separate communities"
+    },
+    {
+      "source": "AboutPage()",
+      "target": "useFirebase()",
+      "source_files": [
+        "features/landing/AboutPage.tsx",
+        "components/FirebaseProvider.tsx"
+      ],
+      "confidence": "EXTRACTED",
+      "relation": "calls",
+      "why": "connects across different repos/directories; peripheral node `AboutPage()` unexpectedly reaches hub `useFirebase()`"
+    },
+    {
+      "source": "Navbar()",
+      "target": "react",
+      "source_files": [
+        "components/Navbar.tsx",
+        "package.json"
+      ],
+      "confidence": "EXTRACTED",
+      "relation": "references",
+      "why": "connects across different repos/directories; bridges separate communities"
+    }
+  ],
+  "questions": [
+    {
+      "type": "bridge_node",
+      "question": "Why does `dependencies` connect `dependencies` to `package.json`, `QRScanner.tsx`, `react`, `crypto`, `dotenv`, `express`, `express-rate-limit`, `firebase`, `firebase-admin`, `@google/genai`, `helmet`, `html2canvas`, `leaflet`, `motion`, `qrcode.react`, `react-dom`, `react-helmet-async`, `react-hot-toast`, `react-is`, `react-joyride`, `react-leaflet`, `react-router-dom`, `recharts`, `@vis.gl/react-google-maps`, `@yudiel/react-qr-scanner`?",
+      "why": "High betweenness centrality (0.167) - this node is a cross-community bridge."
+    },
+    {
+      "type": "bridge_node",
+      "question": "Why does `react` connect `react` to `FirebaseProvider.tsx`, `dependencies`?",
+      "why": "High betweenness centrality (0.121) - this node is a cross-community bridge."
+    },
+    {
+      "type": "bridge_node",
+      "question": "Why does `Navbar()` connect `FirebaseProvider.tsx` to `InvitationView.tsx`, `react`?",
+      "why": "High betweenness centrality (0.089) - this node is a cross-community bridge."
+    },
+    {
+      "type": "isolated_nodes",
+      "question": "What connects `LandingPage`, `TemplateGalleryPage`, `TermsPage` to the rest of the system?",
+      "why": "260 weakly-connected nodes found - possible documentation gaps or missing edges."
+    },
+    {
+      "type": "low_cohesion",
+      "question": "Should `FirebaseProvider.tsx` be split into smaller, more focused modules?",
+      "why": "Cohesion score 0.06406112253893623 - nodes in this community are weakly interconnected."
+    },
+    {
+      "type": "low_cohesion",
+      "question": "Should `InvitationView.tsx` be split into smaller, more focused modules?",
+      "why": "Cohesion score 0.07542087542087542 - nodes in this community are weakly interconnected."
+    },
+    {
+      "type": "low_cohesion",
+      "question": "Should `App.tsx` be split into smaller, more focused modules?",
+      "why": "Cohesion score 0.06507936507936508 - nodes in this community are weakly interconnected."
+    }
+  ]
+}

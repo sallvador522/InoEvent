@@ -1,4 +1,4 @@
-import React from 'react';
+import React, { useEffect, useRef } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
 import { X, MessageSquare, Shield, Clock } from 'lucide-react';
 
@@ -10,6 +10,24 @@ interface SupportModalProps {
 
 export const SupportModal: React.FC<SupportModalProps> = ({ isOpen, onClose, userPlan }) => {
   const isBusiness = userPlan === "Business" || userPlan === "Corporate";
+  const panelRef = useRef<HTMLDivElement>(null);
+  const lastFocusedRef = useRef<HTMLElement | null>(null);
+
+  useEffect(() => {
+    if (!isOpen) return;
+    lastFocusedRef.current = document.activeElement as HTMLElement | null;
+    document.body.style.overflow = 'hidden';
+    panelRef.current?.focus();
+    const onKey = (e: KeyboardEvent) => {
+      if (e.key === 'Escape') onClose();
+    };
+    document.addEventListener('keydown', onKey);
+    return () => {
+      document.removeEventListener('keydown', onKey);
+      document.body.style.overflow = '';
+      lastFocusedRef.current?.focus();
+    };
+  }, [isOpen, onClose]);
 
   const handleOpenWhatsApp = (number: string) => {
     const text = encodeURIComponent("Olá! Preciso de suporte com a plataforma InoEvents.");
@@ -31,11 +49,16 @@ export const SupportModal: React.FC<SupportModalProps> = ({ isOpen, onClose, use
 
           {/* Modal Content */}
           <motion.div
+            ref={panelRef}
+            role="dialog"
+            aria-modal="true"
+            aria-label="Falar com o suporte"
+            tabIndex={-1}
             initial={{ opacity: 0, scale: 0.95, y: 20 }}
             animate={{ opacity: 1, scale: 1, y: 0 }}
             exit={{ opacity: 0, scale: 0.95, y: 20 }}
             transition={{ type: "spring", duration: 0.5 }}
-            className="relative w-full max-w-md bg-white/95 backdrop-blur-xl border border-slate-100 rounded-3xl p-6 shadow-2xl z-10 overflow-hidden"
+            className="relative w-full max-w-md bg-white/95 backdrop-blur-xl border border-slate-100 rounded-3xl p-6 shadow-2xl z-10 overflow-hidden outline-none"
           >
             {/* Ambient Top Glow */}
             <div className="absolute top-0 left-0 right-0 h-1 bg-gradient-to-r from-emerald-500 to-teal-400" />

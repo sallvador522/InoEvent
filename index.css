@@ -1,7 +1,32 @@
 @import "tailwindcss";
 
+/* Hallmark · macrostructure: Photographic · tone: editorial-luxo · theme: Atelier-creme-continuo
+ * pre-emit critique: P5 H4 E4 S5 R5 V4
+ * genre: editorial · nav: N1-preservada (componente global) · footer: Ft6-letter-close
+ * honest-tech: whatsapp=partilha-link-confirma-na-pagina · presentes=iban-manual+registo · ia=assistente-criacao
+ */
+
 html, body {
-  background-color: #0f172a;
+  background-color: #FDFBF7;
+  overflow-x: clip;
+}
+
+img {
+  max-width: 100%;
+}
+
+:focus-visible {
+  outline: 2px solid #C5A028;
+  outline-offset: 2px;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  *, *::before, *::after {
+    animation-duration: 0.01ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: 0.01ms !important;
+    scroll-behavior: auto !important;
+  }
 }
 
 @theme {
@@ -28,6 +53,21 @@ html, body {
 
   --animate-pulse-slow: pulse 3s cubic-bezier(0.4, 0, 0.6, 1) infinite;
   --animate-fade-in-down: fadeInDown 0.8s ease-out forwards;
+
+  /* Papel contínuo luxo creme — navy só em texto, gold só em filetes */
+  --color-paper: #FDFBF7;
+  --color-panel: #FFFDF8;
+  --color-ink: #1B365D;
+  --color-gold: #C5A028;
+  --color-gold-deep: #8a6d1c;
+  --color-gold-soft: #E7CB7A;
+
+  /* Motion tokens — só transform/opacity, easings nomeados */
+  --dur-fast: 160ms;
+  --dur-med: 300ms;
+  --dur-slow: 600ms;
+  --ease-out: cubic-bezier(0.22, 1, 0.36, 1);
+  --ease-in-out: cubic-bezier(0.4, 0, 0.2, 1);
 
   @keyframes fadeInDown {
     0% { opacity: 0; transform: translateY(-20px); }

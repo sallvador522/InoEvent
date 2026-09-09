@@ -24,6 +24,10 @@ service cloud.firestore {
              (data.get('locationUrl', null) is string || data.get('locationUrl', null) == null);
     }
 
+    function isValidOrder(data) {
+      return data.userId is string && data.eventId is string && data.plan is string && data.amount is number && data.billingStatus in ['pending','paid','failed','cancelled','refunded','expired'];
+    }
+
     function isValidTransaction(data) {
       return data.keys().hasAll(['ownerId', 'amount', 'type', 'description', 'date']) &&
              data.ownerId is string &&
@@ -68,12 +72,8 @@ service cloud.firestore {
       allow get: if true;
       
       // --- Create ---
-      allow create: if isSignedIn() && isValidId(eventId) && isValidEvent(incoming()) && incoming().ownerId == request.auth.uid && (
-        incoming().get('plan', 'Essencial') == 'Essencial' || (
-          exists(/databases/$(database)/documents/users/$(request.auth.uid)) &&
-          incoming().get('plan', 'Essencial') == get(/databases/$(database)/documents/users/$(request.auth.uid)).data.get('plan', 'Essencial')
-        )
-      );
+      // §7 limites são validados no backend (server/lib/entitlements), não só nas rules
+      allow create: if isSignedIn() && isValidId(eventId) && isValidEvent(incoming()) && incoming().ownerId == request.auth.uid;
       
       // --- Update ---
       allow update: if isValidId(eventId) && resource != null && (
@@ -145,6 +145,20 @@ service cloud.firestore {
         );
         allow delete: if (isSignedIn() && get(/databases/$(database)/documents/events/$(eventId)).data.ownerId == request.auth.uid) || isAdmin();
       }
+    }
+
+    match /orders/{orderId} {
+      allow get: if isSignedIn() && (resource.data.userId == request.auth.uid || isAdmin());
+      allow list: if isSignedIn() && (resource.data.userId == request.auth.uid || isAdmin());
+      allow create: if isSignedIn() && isValidId(orderId) && incoming().userId == request.auth.uid && isValidOrder(incoming());
+      allow update: if isAdmin() || (isSignedIn() && resource.data.userId == request.auth.uid && incoming().diff(existing()).affectedKeys().hasOnly(['billingStatus','paidAt','providerTransactionId','metadata']));
+    }
+
+    match /subscriptions/{subId} {
+      allow get: if isSignedIn() && (resource.data.userId == request.auth.uid || isAdmin());
+      allow list: if isSignedIn() && (resource.data.userId == request.auth.uid || isAdmin());
+      allow create: if isSignedIn() && isValidId(subId) && incoming().userId == request.auth.uid;
+      allow update: if isAdmin() || (isSignedIn() && resource.data.userId == request.auth.uid);
     }
 
     match /visits/{visitId} {

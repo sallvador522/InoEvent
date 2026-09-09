@@ -3,6 +3,7 @@ import { motion, AnimatePresence } from 'framer-motion';
 import { Sparkles, Heart, Calendar, Palette, Check, ArrowRight, ArrowLeft, Loader2, PartyPopper, Smile, MapPin, Eye } from 'lucide-react';
 import { useNavigate } from 'react-router-dom';
 import { useFirebase, db, handleFirestoreError, OperationType } from '../../components/FirebaseProvider';
+import { getGuestLimit, normalizePlanId, getPlanConfig, canUseFeature, getEventCreationLimit, isBusinessPlan } from '../../lib/entitlements';
 import { doc, setDoc, collection, updateDoc } from 'firebase/firestore';
 import toast from 'react-hot-toast';
 
@@ -84,10 +85,8 @@ export const OnboardingWizard: React.FC<OnboardingWizardProps> = ({ onCancel, on
             // Check plan limits safely (bypass if creating a baby shower or bridal shower)
             const isBypassLimit = eventType === 'BRIDAL_SHOWER' || (eventType as any) === 'BABY_SHOWER';
 
-            if (!isBypassLimit && userProfile?.plan !== 'Business' && userProfile?.plan !== 'Corporate') {
-                const plan = userProfile?.plan || 'Essencial';
-                let limit = 2;
-                if (plan === 'Premium') limit = 5;
+            if (!isBypassLimit && !isBusinessPlan(userProfile?.plan)) {
+                const plan = normalizePlanId(userProfile?.plan); const limit = getEventCreationLimit(plan);
 
                 const { getDocs, query, where } = await import('firebase/firestore');
                 const eventsRef = collection(db, 'events');

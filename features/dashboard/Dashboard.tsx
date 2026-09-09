@@ -21,6 +21,7 @@ import { ExecutiveReportModal } from './ExecutiveReportModal';
 import { GuestDetailsModal } from './GuestDetailsModal';
 
 import { copyToClipboard } from '../../lib/clipboard';
+import { getGuestLimit, normalizePlanId, canUseFeature, getPlanConfig } from '../../lib/entitlements';
 
 export const Dashboard = () => {
     const { id } = useParams<{ id: string }>();
@@ -340,10 +341,7 @@ export const Dashboard = () => {
     const handleManualAddGuest = async () => {
         if (!newGuestName.trim() || !id) return;
         
-        let maxGuests = 100;
-        if (event?.plan === 'Premium') maxGuests = 500;
-        if (event?.plan === 'Business') maxGuests = 5000;
-        if (event?.plan === 'Corporate') maxGuests = Infinity;
+        const maxGuests = getGuestLimit(event?.planId || event?.plan);
         
         const confirmedCount = guests.filter(g => g.status === 'CONFIRMED').length;
         if (confirmedCount >= maxGuests) {
@@ -1059,10 +1057,7 @@ export const Dashboard = () => {
                                                 const text = event.target.result;
                                                 const rows = text.split("\n");
                                                 const guestsCollection = collection(db, "events", id!, "guests");
-                                                let maxGuests = 100;
-                                                if (event?.plan === "Premium") maxGuests = 500;
-                                                if (event?.plan === "Business") maxGuests = 5000;
-                                                if (event?.plan === "Corporate") maxGuests = Infinity;
+                                                const maxGuests = getGuestLimit(event?.planId || event?.plan);
                                                 let added = 0;
                                                 const currentCount = guests.filter(g => g.status === "CONFIRMED").length;
                                                 const maxToAdd = maxGuests - currentCount;

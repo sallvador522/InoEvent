@@ -37,24 +37,25 @@ router.get('/plans', async (req, res, next) => {
     }
     
     const plansTitle = "Planos e Preços de Convites Digitais Premium | InoEvents";
-    const plansDesc = "Conheça os preços do InoEvents. Plano Essencial (7.500 Kz), Plano Premium (20.000 Kz) e Plano Business para agências (45.000 Kz/mês). Crie convites com RSVP e QR Code em Angola.";
+    const plansDesc = "Conheça os preços do InoEvents. Essencial 7.500 Kz, Premium 15.000 Kz, VIP 25.000 Kz e Business 39.900 Kz/mês. Concierge +10.000 Kz. RSVP, QR, check-in e gestão de convidados em Angola.";
     
     html = html.replace(/<title>[^<]*<\/title>/g, `<title>${plansTitle}</title>`);
     html = html.replace(/<meta name="description" content="[^"]*"\s*\/?>/g, `<meta name="description" content="${plansDesc}" />`);
     
-    // Inject hidden text block for AI crawlers (like GPTBot, Perplexity)
+    // Inject hidden text block for AI crawlers (like GPTBot, Perplexity) — §14 fonte central config/plans.ts
     const hiddenAIText = `
       <div style="display:none;" id="ai-pricing-context">
         <h1>Preços e Planos do InoEvents Angola</h1>
         <h2>Plano Essencial</h2>
-        <p>Preço: 7.500 Kz (Pagamento único por evento).</p>
-        <p>Inclui: RSVP para até 100 convidados, Código QR Exclusivo, Galeria de Fotos Básica.</p>
+        <p>Preço: 7.500 Kz (Pagamento único por evento). Validade 90 dias. Até 100 convidados. Inclui: RSVP, Código QR Exclusivo, Galeria Básica, Localização, Countdown.</p>
         <h2>Plano Premium</h2>
-        <p>Preço: 20.000 Kz (Pagamento único por evento).</p>
-        <p>Inclui: RSVP Ilimitado, Sem marca d'água (White-label), Música de Fundo (TocaPlayer), Domínio Personalizado (.com), Mapa das Mesas, Livro de Assinaturas Digital e temas premium.</p>
+        <p>Preço: 15.000 Kz (Pagamento único por evento). Validade 180 dias. Até 300 convidados. Inclui: tudo do Essencial + convidados individualizados, galeria premium, música, livro de assinaturas, mapa das mesas, temas premium, remoção da marca, analytics básicos.</p>
+        <h2>Plano VIP</h2>
+        <p>Preço: 25.000 Kz (Pagamento único por evento). Validade 365 dias. Até 700 convidados. Inclui: tudo do Premium + QR individual, check-in, gestão +1, mesas avançadas, lembretes, analytics avançados, personalização avançada, suporte prioritário, domínio personalizado.</p>
+        <h2>Concierge (Add-on)</h2>
+        <p>Preço: +10.000 Kz por evento. A equipa InoEvent configura o evento por si.</p>
         <h2>Plano Business (B2B)</h2>
-        <p>Preço: 45.000 Kz mensais ou 450.000 Kz anuais.</p>
-        <p>Inclui: Eventos Ilimitados para agências e cerimonialistas, Design White-Label para clientes, Painel de Gestão e Check-in Inteligente.</p>
+        <p>Preço: 39.900 Kz por mês (subscrição). Eventos ilimitados para agências e cerimonialistas, white-label, painel de gestão, check-in, equipa.</p>
       </div>
     `;
     

@@ -19,6 +19,7 @@ import { TocaPlayer } from "../../components/music/TocaPlayer";
 import { BottomSheet } from "../../components/ui/BottomSheet";
 import { Button } from "../../components/ui/Button";
 import { db, useFirebase } from "../../components/FirebaseProvider";
+import { getGuestLimit, normalizePlanId, getPlanConfig, canUseFeature, getEventCreationLimit, isBusinessPlan, isEventExpired } from "../../lib/entitlements";
 import {
   doc,
   getDoc,
@@ -467,15 +468,14 @@ const InvitationView: React.FC = () => {
   // Active working details is localEvent if editing, else loaded static/saving event
   const activeEvent = isEditing ? localEvent || event : event;
 
-  // Premium Checks
-  const isPremium = isTemplate || isEditing || (activeEvent && (activeEvent as any).plan && ((activeEvent as any).plan === 'Premium' || (activeEvent as any).plan === 'Business' || (activeEvent as any).plan === 'Corporate'));
+  // Premium Checks — §5 usar feature gating centralizado
+  const planIdForCheck = normalizePlanId((activeEvent as any)?.planId || (activeEvent as any)?.plan);
+  const isPremium = isTemplate || isEditing || canUseFeature(planIdForCheck, 'premium_themes');
 
-  // Check if event is blocked
-  const isPast30Days = activeEvent?.isoDate ? (new Date().getTime() - new Date(activeEvent.isoDate).getTime()) > 30 * 24 * 60 * 60 * 1000 : false;
+  // Check if event is blocked — §8 expiração centralizada via expiresAt (§8) + isEventExpired
   const isTemporarilyBlocked = !isEditing && !isTemplate && activeEvent && (
     activeEvent.isBlocked || activeEvent.isPublished === false || 
-    (activeEvent.scheduledBlockDate && new Date(activeEvent.scheduledBlockDate) <= new Date()) ||
-    (((activeEvent as any).plan === 'Essencial' || !(activeEvent as any).plan) && isPast30Days)
+    isEventExpired(activeEvent as any)
   );
 
   if (isTemporarilyBlocked) {
@@ -659,9 +659,14 @@ const InvitationView: React.FC = () => {
       const isNewSave = !snap.exists();
 
       if (isNewSave) {
-        // Just create the document directly, it's unpublished until they click 'Publicar'
+        // Just create the document directly, it's unpublished until they click 'Publicar' — §9 rascunho
+        const normPlanDraft = normalizePlanId((localEvent as any).plan || (localEvent as any).planId || userProfile?.plan || 'essential');
         const savedPayload = {
           ...localEvent,
+          plan: normPlanDraft,
+          planId: normPlanDraft,
+          status: 'active',
+          billingStatus: 'pending',
           ownerId: user.uid,
           updatedAt: new Date().toISOString(),
           draftData: localEvent,
@@ -713,12 +718,10 @@ const InvitationView: React.FC = () => {
 
         if (
           !isBypassLimit &&
-          userProfile?.plan !== "Business" &&
-          userProfile?.plan !== "Corporate"
+          !isBusinessPlan(userProfile?.plan)
         ) {
-          const plan = userProfile?.plan || 'Essencial';
-          let limit = 2;
-          if (plan === 'Premium') limit = 5;
+          const plan = normalizePlanId(userProfile?.plan);
+          const limit = getEventCreationLimit(plan);
 
           const eventsRef = collection(db, 'events');
           const q = query(eventsRef, where("ownerId", "==", user.uid));
@@ -741,9 +744,23 @@ const InvitationView: React.FC = () => {
         }
       }
 
-      // Save document values
+      // Save document values — §8/§9 validade e status centralizados
+      const normalizedPlanInv = normalizePlanId((localEvent as any).plan || (localEvent as any).planId || userProfile?.plan || 'essential');
+      const expiresAtInv = (() => {
+        if ((localEvent as any).expiresAt) return (localEvent as any).expiresAt;
+        const daysMap: Record<string, number> = { essential: 90, premium: 180, vip: 365, business: 365 };
+        const d = daysMap[normalizedPlanInv] ?? 90;
+        if (!isFinite(d)) return null;
+        const dt = new Date(); dt.setDate(dt.getDate() + d); return dt.toISOString();
+      })();
       const savedPayload = {
         ...localEvent,
+        plan: normalizedPlanInv,
+        planId: normalizedPlanInv,
+        status: (localEvent as any).status || 'active',
+        billingStatus: (localEvent as any).billingStatus || 'pending',
+        expiresAt: expiresAtInv,
+        publishedAt: (localEvent as any).publishedAt || new Date().toISOString(),
         ownerId: user.uid,
         updatedAt: new Date().toISOString(),
       };

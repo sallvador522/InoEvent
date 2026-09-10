@@ -6,6 +6,7 @@ import { useFirebase, db } from '../../components/FirebaseProvider';
 import { Navbar } from '../../components/Navbar';
 import { SEO } from '../../components/SEO';
 import { normalizePlanId, getEventCreationLimit, getValidityDays, isBusinessPlan } from '../../config/plans';
+import { uploadEventAudio, deleteEventAudio, isOwnStorageAudio, formatAudioSize, MAX_AUDIO_BYTES } from '../../lib/audioUpload';
 import { ArrowLeft, ArrowRight, Check, Plus, Trash2, Gift, Lock } from 'lucide-react';
 import toast from 'react-hot-toast';
 
@@ -79,9 +80,12 @@ export const WeddingQuestionnaire: React.FC = () => {
   const [eventId, setEventId] = useState<string | null>(null);
   const [saving, setSaving] = useState(false);
   const fileRef = useRef<HTMLInputElement>(null);
+  const galleryRef = useRef<HTMLInputElement>(null);
 
   const [brideName, setBrideName] = useState('');
   const [groomName, setGroomName] = useState('');
+  const [brideParents, setBrideParents] = useState('');
+  const [groomParents, setGroomParents] = useState('');
   const [title, setTitle] = useState('');
   const [titleTouched, setTitleTouched] = useState(false);
   const [date, setDate] = useState('');
@@ -93,7 +97,10 @@ export const WeddingQuestionnaire: React.FC = () => {
   const [receptionAddress, setReceptionAddress] = useState('');
   const [description, setDescription] = useState('');
   const [heroImage, setHeroImage] = useState('');
+  const [gallery, setGallery] = useState<string[]>([]);
   const [musicTrack, setMusicTrack] = useState('romantic');
+  const [uploadingMusic, setUploadingMusic] = useState(false);
+  const musicRef = useRef<HTMLInputElement>(null);
   const [dressCode, setDressCode] = useState('');
   const [gifts, setGifts] = useState<GiftItem[]>([]);
   const [newGift, setNewGift] = useState({ title: '', price: '', emoji: '🎁' });
@@ -119,14 +126,19 @@ export const WeddingQuestionnaire: React.FC = () => {
     setSaving(true);
     try {
       const id = eventId || 'evt_' + Math.random().toString(36).substring(2, 11);
+      const plan = normalizePlanId(userProfile?.plan || 'essential');
       const payload: Record<string, any> = {
         id,
         ownerId: user.uid,
         type: 'WEDDING',
         status: 'draft',
+        plan,
+        planId: plan,
         title,
         brideName,
         groomName,
+        brideParents,
+        groomParents,
         date,
         time,
         locationName,
@@ -136,6 +148,7 @@ export const WeddingQuestionnaire: React.FC = () => {
         receptionAddress,
         description,
         heroImage,
+        gallery,
         musicTrack,
         dressCode: { title: 'Dress Code', description: dressCode },
         bankName,
@@ -192,12 +205,20 @@ export const WeddingQuestionnaire: React.FC = () => {
     try {
       const plan = normalizePlanId(userProfile?.plan || 'essential');
       if (!eventId && !isBusinessPlan(plan)) {
-        const snap = await getDocs(
-          query(collection(db, 'events'), where('ownerId', '==', user.uid))
-        );
-        const paidCount = snap.docs.filter(
-          (d) => d.data().type !== 'BABY_SHOWER' && d.data().type !== 'BRIDAL_SHOWER'
-        ).length;
+        let paidCount = 0;
+        try {
+          const snap = await getDocs(
+            query(collection(db, 'events'), where('ownerId', '==', user.uid))
+          );
+          paidCount = snap.docs.filter(
+            (d) => d.data().type !== 'BABY_SHOWER' && d.data().type !== 'BRIDAL_SHOWER'
+          ).length;
+        } catch (e) {
+          console.error(e);
+          toast.error('Sem ligação para verificar o seu plano. Verifique a internet e tente de novo.');
+          setSaving(false);
+          return;
+        }
         if (paidCount >= getEventCreationLimit(plan)) {
           toast.error(`Você atingiu o limite de convites do seu plano. Faça upgrade para criar mais!`);
           setSaving(false);
@@ -209,6 +230,7 @@ export const WeddingQuestionnaire: React.FC = () => {
         days === null ? null : new Date(Date.now() + days * 86400000).toISOString();
       const id = await saveDraft({
         status: 'active',
+        isPublished: false,
         billingStatus: 'pending',
         plan,
         planId: plan,
@@ -294,6 +316,16 @@ export const WeddingQuestionnaire: React.FC = () => {
                 <div>
                   <label className={labelCls} htmlFor="wq-title">Título do convite</label>
                   <input id="wq-title" className={inputCls} value={title} onChange={(e) => { setTitle(e.target.value); setTitleTouched(true); }} placeholder="Ana Clara & João Pedro" autoComplete="off" />
+                </div>
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 mt-4">
+                  <div>
+                    <label className={labelCls} htmlFor="wq-bridepar">Pais da noiva</label>
+                    <input id="wq-bridepar" className={inputCls} value={brideParents} onChange={(e) => setBrideParents(e.target.value)} placeholder="Ex: Maria e José" autoComplete="off" />
+                  </div>
+                  <div>
+                    <label className={labelCls} htmlFor="wq-groompar">Pais do noivo</label>
+                    <input id="wq-groompar" className={inputCls} value={groomParents} onChange={(e) => setGroomParents(e.target.value)} placeholder="Ex: Ana e Carlos" autoComplete="off" />
+                  </div>
                 </div>
               </div>
             )}
@@ -389,19 +421,127 @@ export const WeddingQuestionnaire: React.FC = () => {
                     />
                   </div>
                 </div>
+                <div className="mb-4">
+                  <span className={labelCls}>Galeria (até 6 fotos)</span>
+                  <div className="grid grid-cols-3 gap-2">
+                    {gallery.map((src, i) => (
+                      <div key={i} className="relative aspect-square rounded-xl overflow-hidden border border-slate-200">
+                        <img src={src} alt={`Foto ${i + 1} do casal`} className="w-full h-full object-cover" />
+                        <button
+                          type="button"
+                          onClick={() => setGallery((g) => g.filter((_, gi) => gi !== i))}
+                          aria-label={`Remover foto ${i + 1}`}
+                          className="absolute top-1 right-1 w-8 h-8 rounded-full bg-slate-900/70 text-white flex items-center justify-center hover:bg-red-500 cursor-pointer"
+                          style={{ transition: 'background-color 200ms ease' }}
+                        >
+                          <Trash2 size={14} />
+                        </button>
+                      </div>
+                    ))}
+                    {gallery.length < 6 && (
+                      <button
+                        type="button"
+                        onClick={() => galleryRef.current?.click()}
+                        className="aspect-square rounded-xl border border-dashed border-slate-300 flex flex-col items-center justify-center gap-1 text-slate-400 hover:text-[#1B365D] hover:border-[#C5A028] cursor-pointer"
+                        style={{ transition: 'color 200ms ease, border-color 200ms ease' }}
+                      >
+                        <Plus size={20} />
+                        <span className="text-[10px] font-bold uppercase tracking-wider">Foto</span>
+                      </button>
+                    )}
+                  </div>
+                  <input
+                    type="file"
+                    ref={galleryRef}
+                    onChange={async (e) => {
+                      const files = Array.from(e.target.files || []).slice(0, 6 - gallery.length);
+                      if (files.length === 0) return;
+                      try {
+                        const imgs = await Promise.all(files.map((f) => compressImage(f)));
+                        setGallery((g) => [...g, ...imgs].slice(0, 6));
+                        toast.success('Fotos prontas!');
+                      } catch {
+                        toast.error('Não foi possível ler as fotos.');
+                      }
+                      e.target.value = '';
+                    }}
+                    accept="image/*"
+                    multiple
+                    className="hidden"
+                  />
+                </div>
                 <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
                   <div>
                     <label className={labelCls} htmlFor="wq-music">Música de fundo</label>
-                    <select id="wq-music" className={inputCls} value={musicTrack} onChange={(e) => setMusicTrack(e.target.value)}>
+                    <select id="wq-music" className={inputCls} value={isOwnStorageAudio(musicTrack) ? 'custom' : musicTrack} onChange={(e) => { if (e.target.value !== 'custom') setMusicTrack(e.target.value); }}>
                       {MUSIC_OPTIONS.map((m) => (
                         <option key={m.id} value={m.id}>{m.label}</option>
                       ))}
+                      {isOwnStorageAudio(musicTrack) && (
+                        <option value="custom">O meu mp3 (enviado)</option>
+                      )}
                     </select>
                   </div>
                   <div>
                     <label className={labelCls} htmlFor="wq-dress">Dress code</label>
                     <input id="wq-dress" className={inputCls} value={dressCode} onChange={(e) => setDressCode(e.target.value)} placeholder="Ex: Traje formal, tons claros" autoComplete="off" />
                   </div>
+                </div>
+                <div className="mt-4 bg-white border border-slate-200 rounded-xl p-4">
+                  <span className={labelCls}>Ou enviem a vossa música (mp3, até {formatAudioSize(MAX_AUDIO_BYTES)})</span>
+                  {isOwnStorageAudio(musicTrack) ? (
+                    <div className="flex items-center gap-3">
+                      <audio src={musicTrack} controls preload="metadata" className="flex-1 h-10 min-w-0" />
+                      <button
+                        type="button"
+                        onClick={async () => {
+                          const old = musicTrack;
+                          setMusicTrack('romantic');
+                          await saveDraft({ musicTrack: 'romantic' });
+                          await deleteEventAudio(old);
+                        }}
+                        className="shrink-0 text-xs font-bold text-slate-400 hover:text-red-500 uppercase tracking-wider cursor-pointer px-2 min-h-[44px]"
+                        style={{ transition: 'color 200ms ease' }}
+                      >
+                        Tirar
+                      </button>
+                    </div>
+                  ) : (
+                    <button
+                      type="button"
+                      disabled={uploadingMusic}
+                      onClick={() => musicRef.current?.click()}
+                      className="w-full min-h-[48px] rounded-xl border border-dashed border-slate-300 font-bold text-xs uppercase tracking-wider text-slate-500 hover:text-[#1B365D] hover:border-[#C5A028] disabled:opacity-60 cursor-pointer"
+                      style={{ transition: 'color 200ms ease, border-color 200ms ease' }}
+                    >
+                      {uploadingMusic ? 'A enviar música…' : 'Escolher mp3 do dispositivo'}
+                    </button>
+                  )}
+                  <input
+                    type="file"
+                    ref={musicRef}
+                    onChange={async (e) => {
+                      const file = e.target.files?.[0];
+                      e.target.value = '';
+                      if (!file || !user) return;
+                      setUploadingMusic(true);
+                      try {
+                        const old = musicTrack;
+                        const url = await uploadEventAudio(file, user.uid);
+                        setMusicTrack(url);
+                        await saveDraft({ musicTrack: url });
+                        await deleteEventAudio(isOwnStorageAudio(old) ? old : null);
+                        toast.success('Música pronta — toca ao abrir o convite!');
+                      } catch (err: any) {
+                        toast.error(err?.message || 'Não foi possível enviar a música.');
+                      } finally {
+                        setUploadingMusic(false);
+                      }
+                    }}
+                    accept="audio/mpeg,audio/mp3,audio/*"
+                    className="hidden"
+                  />
+                  <p className="text-[11px] text-slate-400 font-light mt-2">Toca automaticamente ao abrir o convite.</p>
                 </div>
               </div>
             )}

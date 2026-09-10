@@ -1,6 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { Navbar } from '../../components/Navbar';
-import { db } from '../../components/FirebaseProvider';
+import { db, auth } from '../../components/FirebaseProvider';
 import { collection, getDocs, query, orderBy, doc, updateDoc, addDoc, limit, startAfter } from 'firebase/firestore';
 import { toast } from 'react-hot-toast';
 import { motion, AnimatePresence } from 'framer-motion';
@@ -11,10 +11,12 @@ export const AdminDashboard: React.FC = () => {
   const [users, setUsers] = useState<any[]>([]);
   const [events, setEvents] = useState<any[]>([]);
   const [transactions, setTransactions] = useState<any[]>([]);
+  const [orders, setOrders] = useState<any[]>([]);
   const [visits, setVisits] = useState<any[]>([]);
   const [loading, setLoading] = useState(true);
+  const [confirmingOrderId, setConfirmingOrderId] = useState<string | null>(null);
   
-  const [activeTab, setActiveTab] = useState<'overview' | 'users' | 'events' | 'transactions' | 'analytics'>('overview');
+  const [activeTab, setActiveTab] = useState<'overview' | 'users' | 'events' | 'transactions' | 'orders' | 'analytics'>('overview');
   const [selectedUser, setSelectedUser] = useState<any | null>(null);
   
   const [searchQuery, setSearchQuery] = useState('');
@@ -38,6 +40,19 @@ export const AdminDashboard: React.FC = () => {
         const usersSnapshot = await getDocs(query(collection(db, 'users'), limit(500)));
         const eventsSnapshot = await getDocs(query(collection(db, 'events'), limit(500)));
         const transactionsSnapshot = await getDocs(query(collection(db, 'transactions'), orderBy('date', 'desc'), limit(100)));
+        let ordersData: any[] = [];
+        try {
+          const ordersSnapshot = await getDocs(query(collection(db, 'orders'), limit(100)));
+          ordersData = ordersSnapshot.docs
+            .map(d => ({ id: d.id, ...d.data() }))
+            .sort((a: any, b: any) => {
+              const rank = (o: any) => (o.billingStatus === 'pending' ? 0 : 1);
+              if (rank(a) !== rank(b)) return rank(a) - rank(b);
+              return String(b.createdAt || '').localeCompare(String(a.createdAt || ''));
+            });
+        } catch (ordErr) {
+          console.warn('Falha ao buscar pedidos:', ordErr);
+        }
         
         let visitsData: any[] = [];
         try {
@@ -50,6 +65,7 @@ export const AdminDashboard: React.FC = () => {
         setUsers(usersSnapshot.docs.map(doc => ({ id: doc.id, ...doc.data() })));
         setEvents(eventsSnapshot.docs.map(doc => ({ id: doc.id, ...doc.data() })));
         setTransactions(transactionsSnapshot.docs.map(doc => ({ id: doc.id, ...doc.data() })));
+        setOrders(ordersData);
         setVisits(visitsData);
       } catch (error) {
         console.error('Error fetching admin data:', error);
@@ -82,9 +98,9 @@ export const AdminDashboard: React.FC = () => {
         }
         await updateDoc(doc(db, 'users', pendingPlanChange.userId), { 
           plan: pendingPlanChange.nextPlan,
-          planExpiresAt: pendingPlanChange.nextPlan === 'Essencial' ? null : date.toISOString()
+          planExpiresAt: (pendingPlanChange.nextPlan === 'Essencial' || pendingPlanChange.nextPlan === 'Free') ? null : date.toISOString()
         });
-        setUsers(users.map(u => u.id === pendingPlanChange.userId ? { ...u, plan: pendingPlanChange.nextPlan, planExpiresAt: pendingPlanChange.nextPlan === 'Essencial' ? null : date.toISOString() } : u));
+        setUsers(users.map(u => u.id === pendingPlanChange.userId ? { ...u, plan: pendingPlanChange.nextPlan, planExpiresAt: (pendingPlanChange.nextPlan === 'Essencial' || pendingPlanChange.nextPlan === 'Free') ? null : date.toISOString() } : u));
         if (selectedUser?.id === pendingPlanChange.userId) {
           setSelectedUser({ ...selectedUser, plan: pendingPlanChange.nextPlan });
         }
@@ -109,6 +125,86 @@ export const AdminDashboard: React.FC = () => {
       console.error('Error upgrading plan/sending notification:', error);
       toast.error('Erro ao processar alteração ou enviar notificação.');
     }
+  };
+
+  const handleConfirmOrder = async (order: any) => {
+    if (!order || order.billingStatus !== 'pending') return;
+    setConfirmingOrderId(order.id);
+    try {
+      const token = await auth.currentUser?.getIdToken();
+      const res = await fetch(`/api/orders/${order.id}/confirm`, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          ...(token ? { Authorization: `Bearer ${token}` } : {}),
+        },
+        body: JSON.stringify({}),
+      });
+      if (!res.ok) throw new Error('confirm failed');
+      setOrders((list) =>
+        list.map((o) =>
+          o.id === order.id ? { ...o, billingStatus: 'paid', paidAt: new Date().toISOString() } : o
+        )
+      );
+      try {
+        await addDoc(collection(db, 'users', order.userId, 'notifications'), {
+          title: 'Pagamento confirmado 🎉',
+          message: `O plano ${order.plan} do teu evento foi ativado. Já podes partilhar o convite!`,
+          createdAt: new Date().toISOString(),
+          read: false,
+          type: 'plan_upgrade',
+        });
+      } catch {
+        /* notificação best-effort */
+      }
+      toast.success(`Pedido ${order.id} confirmado — evento ativado!`);
+    } catch (error) {
+      console.error('Error confirming order:', error);
+      toast.error('Não foi possível confirmar. Tente de novo.');
+    } finally {
+      setConfirmingOrderId(null);
+    }
+  };
+
+  const renderOrders = () => {
+    const fmtKz = (v: any) => `${Number(v || 0).toLocaleString('pt-AO')} Kz`;
+    return (
+      <div className="bg-white rounded-3xl border border-slate-100 shadow-sm overflow-hidden">
+        <div className="p-6 border-b border-slate-100">
+          <h3 className="font-bold text-slate-900">Pedidos de ativação</h3>
+          <p className="text-sm text-slate-500">Pendentes primeiro. Confirmar ativa o evento e notifica o dono.</p>
+        </div>
+        {orders.length === 0 ? (
+          <p className="p-6 text-sm text-slate-500">Nenhum pedido ainda.</p>
+        ) : (
+          <ul className="divide-y divide-slate-100">
+            {orders.map((o) => (
+              <li key={o.id} className="p-4 sm:p-5 flex flex-col sm:flex-row sm:items-center gap-3">
+                <div className="flex-1 min-w-0">
+                  <p className="font-bold text-sm text-slate-900 truncate">
+                    {o.plan} · {fmtKz(o.amount)}
+                    <span className={`ml-2 text-[10px] font-black uppercase tracking-wider px-2 py-0.5 rounded-full ${o.billingStatus === 'paid' ? 'bg-emerald-100 text-emerald-700' : o.billingStatus === 'failed' ? 'bg-red-100 text-red-600' : 'bg-amber-100 text-amber-700'}`}>
+                      {o.billingStatus}
+                    </span>
+                  </p>
+                  <p className="text-xs text-slate-500 truncate">Pedido {o.id} · Evento {o.eventId}</p>
+                </div>
+                {o.billingStatus === 'pending' && (
+                  <button
+                    onClick={() => handleConfirmOrder(o)}
+                    disabled={confirmingOrderId === o.id}
+                    className="shrink-0 px-5 h-11 rounded-full bg-emerald-600 text-white font-bold text-xs uppercase tracking-wider hover:bg-emerald-700 disabled:opacity-60 cursor-pointer whitespace-nowrap"
+                    style={{ transition: 'background-color 200ms ease' }}
+                  >
+                    {confirmingOrderId === o.id ? 'A confirmar…' : 'Confirmar pagamento'}
+                  </button>
+                )}
+              </li>
+            ))}
+          </ul>
+        )}
+      </div>
+    );
   };
 
   if (loading) {
@@ -236,8 +332,9 @@ export const AdminDashboard: React.FC = () => {
                     onChange={(e) => handlePlanChangeSelect(selectedUser.id, selectedUser.plan || 'Essencial', e.target.value)}
                     className="bg-white border text-right border-slate-200 text-slate-700 text-sm rounded-lg focus:ring-brand-blue focus:border-brand-blue block p-1 font-bold outline-none cursor-pointer"
                   >
-                    <option value="Essencial">Essencial</option>
-                    <option value="Premium">Premium</option>
+                        <option value="Essencial">Essencial</option>
+                        <option value="Free">Free</option>
+                        <option value="Premium">Premium</option>
                     <option value="Business">Business</option>
                     <option value="Corporate">Corporate</option>
                   </select>
@@ -374,8 +471,9 @@ export const AdminDashboard: React.FC = () => {
                  className="bg-white border border-slate-200 text-slate-700 text-sm rounded-lg focus:ring-brand-blue focus:border-brand-blue block p-2 outline-none cursor-pointer"
               >
                  <option value="all">Todos os Planos</option>
-                 <option value="Essencial">Essencial</option>
-                 <option value="Premium">Premium</option>
+                  <option value="Essencial">Essencial</option>                                               
+                  <option value="Free">Free</option>
+                  <option value="Premium">Premium</option>
                  <option value="Business">Business</option>
                  <option value="Corporate">Corporate</option>
               </select>
@@ -402,7 +500,8 @@ export const AdminDashboard: React.FC = () => {
                         onChange={(e) => handlePlanChangeSelect(user.id, user.plan || 'Essencial', e.target.value, e as any)}
                         className="bg-white border border-slate-200 text-slate-700 text-xs rounded-lg focus:ring-brand-blue focus:border-brand-blue block p-1.5 font-bold cursor-pointer outline-none"
                     >
-                        <option value="Essencial">Essencial</option>
+                        <option value="Essencial">Essencial</option>                                            
+                    <option value="Free">Free</option>
                         <option value="Premium">Premium</option>
                         <option value="Business">Business</option>
                         <option value="Corporate">Corporate</option>
@@ -549,6 +648,12 @@ export const AdminDashboard: React.FC = () => {
               Transações
             </button>
             <button 
+              onClick={() => { setActiveTab('orders'); setSelectedUser(null); }}
+              className={`px-4 py-2 text-sm font-bold rounded-lg transition-all whitespace-nowrap ${activeTab === 'orders' ? 'bg-slate-900 text-white shadow-md' : 'text-slate-500 hover:text-slate-900 hover:bg-slate-100'}`}
+            >
+              Pedidos
+            </button>
+            <button 
               onClick={() => { setActiveTab('analytics'); setSelectedUser(null); }}
               className={`px-4 py-2 text-sm font-bold rounded-lg transition-all whitespace-nowrap ${activeTab === 'analytics' ? 'bg-slate-900 text-white shadow-md' : 'text-slate-500 hover:text-slate-900 hover:bg-slate-100'}`}
             >
@@ -569,6 +674,7 @@ export const AdminDashboard: React.FC = () => {
             {activeTab === 'users' && renderUsers()}
             {activeTab === 'events' && renderEvents()}
             {activeTab === 'transactions' && renderTransactions()}
+            {activeTab === 'orders' && renderOrders()}
             {activeTab === 'analytics' && <AnalyticsView visits={visits} events={events} users={users} />}
           </motion.div>
         </AnimatePresence>
@@ -607,7 +713,7 @@ export const AdminDashboard: React.FC = () => {
                 </div>
 
                 
-                {pendingPlanChange && pendingPlanChange.nextPlan !== 'Essencial' && (
+                {pendingPlanChange && pendingPlanChange.nextPlan !== 'Essencial' && pendingPlanChange.nextPlan !== 'Free' && (
                   <div className="mb-4">
                     <label className="block text-xs font-bold text-slate-500 uppercase tracking-wider mb-2">Ciclo do Plano</label>
                     <select 

@@ -2,7 +2,7 @@ import React, { useState, useEffect, useRef } from "react";
 import { createPortal } from "react-dom";
 import toast from "react-hot-toast";
 
-const compressImage = (file: File): Promise<string> => {
+export const compressImage = (file: File, maxDim = 1200): Promise<string> => {
   return new Promise((resolve, reject) => {
     const reader = new FileReader();
     reader.readAsDataURL(file);
@@ -11,8 +11,8 @@ const compressImage = (file: File): Promise<string> => {
       img.src = e.target?.result as string;
       img.onload = () => {
         const canvas = document.createElement("canvas");
-        const MAX_WIDTH = 1200;
-        const MAX_HEIGHT = 1200;
+        const MAX_WIDTH = maxDim;
+        const MAX_HEIGHT = maxDim;
         let width = img.width;
         let height = img.height;
 

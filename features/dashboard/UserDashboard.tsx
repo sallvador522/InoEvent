@@ -403,7 +403,7 @@ export const UserDashboard: React.FC = () => {
                 </p>
               </div>
             </div>
-            {(!userProfile?.plan || userProfile?.plan === "Essencial") && (
+            {(!userProfile?.plan || userProfile?.plan === "Essencial" || userProfile?.plan === "Free") && (
               <Button
                 onClick={() => navigate("/plans")}
                 className="bg-brand-blue hover:bg-brand-blue/90 text-white text-xs font-bold px-6 py-3 rounded-2xl shadow-lg shadow-brand-blue/15 hover:scale-[1.02] active:scale-95 transition-all outline-none cursor-pointer select-none whitespace-nowrap self-start md:self-center"

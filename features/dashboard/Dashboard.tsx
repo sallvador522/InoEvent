@@ -221,11 +221,48 @@ export const Dashboard = () => {
     }, [id]);
 
     const handleCopyLink = () => {
+        if (!requirePaidForShare()) return;
         const link = `${getPublicOrigin()}/invite/${event?.id}`;
         copyToClipboard(link);
         setCopied(true);
         toast.success("Link do evento copiado!");
         setTimeout(() => setCopied(false), 2000);
+    };
+
+    // Porteira de partilha: eventos novos só partilham pagos; contas Free nunca.
+    // Eventos antigos (isPublished diferente de false) passam — regra de grandfather,
+    // exceto contas Free, que provam mas não partilham.
+    const isFreeAccount =
+        normalizePlanId(userProfile?.plan) === 'free' ||
+        normalizePlanId((event as any)?.plan || (event as any)?.planId) === 'free';
+
+    const isShareLocked =
+        !!event &&
+        (isFreeAccount ||
+            (event.isPublished === false &&
+                event.billingStatus !== 'paid' &&
+                normalizePlanId(userProfile?.plan) !== 'business'));
+
+    const requirePaidForShare = () => {
+        if (isShareLocked) {
+            toast.error(
+                isFreeAccount
+                    ? 'Na conta Free crias e provas à vontade. Para partilhar, ativa um plano.'
+                    : 'Este convite ativa com um plano. Escolhe abaixo para partilhar.'
+            );
+            navigate(`/plans?eventId=${id}&from=share`);
+            return false;
+        }
+        return true;
+    };
+
+    const requireGuestsAllowed = () => {
+        if (isFreeAccount) {
+            toast.error('A lista de convidados abre após ativares um plano.');
+            navigate(`/plans?eventId=${id}&from=share`);
+            return false;
+        }
+        return true;
     };
 
     const confirmDelete = () => setShowDeleteConfirm(true);
@@ -340,6 +377,7 @@ export const Dashboard = () => {
 
     const handleManualAddGuest = async () => {
         if (!newGuestName.trim() || !id) return;
+        if (!requireGuestsAllowed()) return;
         
         const maxGuests = getGuestLimit(event?.planId || event?.plan);
         
@@ -370,6 +408,7 @@ export const Dashboard = () => {
 
     const handleWhatsAppShare = (guest: any) => {
         if (!id || !event) return;
+        if (!requirePaidForShare()) return;
         const msg = `Olá ${guest.name}! Segue o link do convite para "${event.title}": ${getPublicOrigin()}/invite/${id}`;
         const phone = (guest.phone || "").replace(/\D/g, '');
         if (phone) {
@@ -812,9 +851,14 @@ export const Dashboard = () => {
                             )}
                         </AnimatePresence>
                     </div>
-                    <Link to={`/invite/${event.id}`} target="_blank" className="px-4 py-2 bg-brand-blue text-white rounded-full font-bold text-sm hover:bg-brand-blue/90 shadow-lg shadow-brand-blue/20 transition-all">
-                        Ver Convite
-                    </Link>
+                    <button
+                        onClick={() => {
+                            window.open(`/invite/${event.id}`, '_blank', 'noopener,noreferrer');
+                        }}
+                        className="px-4 py-2 bg-brand-blue text-white rounded-full font-bold text-sm hover:bg-brand-blue/90 shadow-lg shadow-brand-blue/20 transition-all cursor-pointer"
+                    >
+                        {isShareLocked ? 'Pré-visualizar' : 'Ver Convite'}
+                    </button>
                 </div>
             </nav>
 
@@ -881,6 +925,7 @@ export const Dashboard = () => {
                         </div>
                         <button 
                             onClick={async () => {
+                                if (!requirePaidForShare()) return;
                                 let token = event.clientToken;
                                 if (!token) {
                                     token = Math.random().toString(36).substring(2, 8).toUpperCase();
@@ -896,6 +941,28 @@ export const Dashboard = () => {
                         </button>
                     </div>
                 </div>
+
+                {isShareLocked && (
+                    <div className="mb-8 bg-amber-50 border border-amber-200 rounded-3xl p-5 flex flex-col sm:flex-row sm:items-center gap-4">
+                        <div className="flex-1">
+                            <p className="font-bold text-slate-800">
+                                {isFreeAccount ? 'Conta Free — prova à vontade' : 'Aguarda pagamento'}
+                            </p>
+                            <p className="text-sm text-slate-600">
+                                {isFreeAccount
+                                    ? 'Cria e prova o teu convite. Para partilhar e gerir convidados, ativa um plano.'
+                                    : 'O teu convite está pronto, mas o link público só vive após a ativação. Conclui no WhatsApp e avisamos aqui.'}
+                            </p>
+                        </div>
+                        <button
+                            onClick={() => navigate(`/plans?eventId=${id}&from=share`)}
+                            className="shrink-0 px-6 h-12 rounded-full bg-[#1B365D] text-white font-bold text-xs uppercase tracking-wider hover:bg-[#224373] cursor-pointer whitespace-nowrap"
+                            style={{ transition: 'background-color 200ms ease' }}
+                        >
+                            Escolher plano
+                        </button>
+                    </div>
+                )}
 
                 {/* Real-time Web Push notification indicator */}
                 <div className="bg-gradient-to-r from-slate-50 to-blue-50/10 border border-slate-200/50 p-5 rounded-3xl flex flex-col md:flex-row md:items-center justify-between gap-4 mb-8">
@@ -1042,10 +1109,11 @@ export const Dashboard = () => {
                             <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
                                 <h3 className="text-xl font-bold text-slate-800">Lista de Convidados</h3>
                                 <div className="grid grid-cols-2 sm:flex sm:flex-wrap items-center gap-2 w-full sm:w-auto">
-                                <button onClick={() => setShowAddGuestModal(true)} className="justify-center text-sm font-bold text-white bg-slate-800 px-4 py-2 rounded-xl hover:bg-black transition-colors flex items-center gap-2 shadow-sm text-center">
+                                <button onClick={() => { if (requireGuestsAllowed()) setShowAddGuestModal(true); }} className="justify-center text-sm font-bold text-white bg-slate-800 px-4 py-2 rounded-xl hover:bg-black transition-colors flex items-center gap-2 shadow-sm text-center">
                                     <Plus size={16} /> Adicionar
                                 </button>
                                 <button onClick={() => {
+                                    if (!requireGuestsAllowed()) return;
                                     const input = document.createElement("input");
                                     input.type = "file";
                                     input.accept = ".csv";
@@ -1587,6 +1655,7 @@ export const Dashboard = () => {
                             <div className="flex flex-col gap-4 text-sm">
                                 <button 
                                     onClick={() => {
+                                        if (!requirePaidForShare()) return;
                                         const link = `${getPublicOrigin()}/invite/${event.id}`;
                                         copyToClipboard(link);
                                         toast.success("Link do convite copiado!");

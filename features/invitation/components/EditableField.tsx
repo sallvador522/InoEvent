@@ -36,7 +36,7 @@ export const EditableField: React.FC<{
   };
 
   if (!isEditing) {
-    return <span className={className}>{value}</span>;
+    return <span className={`break-words max-w-full ${className}`}>{value}</span>;
   }
 
   return (
@@ -46,10 +46,10 @@ export const EditableField: React.FC<{
           e.stopPropagation();
           setIsFieldEditing(true);
         }}
-        className={`group relative cursor-pointer border-2 border-dashed border-[#BF9B30]/30 hover:border-[#BF9B30]/80 bg-[#BF9B30]/[0.02] hover:bg-[#BF9B30]/10 px-3 py-1 rounded-2xl transition-all duration-300 inline-flex items-center gap-1.5 max-w-full text-center ${className}`}
+        className={`group relative cursor-pointer border-2 border-dashed border-[#BF9B30]/30 hover:border-[#BF9B30]/80 bg-[#BF9B30]/[0.02] hover:bg-[#BF9B30]/10 px-3 py-1 rounded-2xl transition-all duration-300 inline-flex items-center gap-1.5 max-w-full min-w-0 overflow-hidden text-center ${className}`}
         title="Toque para editar"
       >
-        <span>{value || "(Toque para editar)"}</span>
+        <span className="min-w-0 break-words">{value || "(Toque para editar)"}</span>
         <span className="opacity-0 group-hover:opacity-100 transition-all duration-300 ml-1 bg-[#1A2026] border border-[#BF9B30]/40 text-[#BF9B30] rounded-full w-5 h-5 shadow-[0_4px_10px_rgba(0,0,0,0.3)] flex items-center justify-center shrink-0 scale-[0.85] hover:scale-105 active:scale-95">
           <span className="material-symbols-outlined text-[10px] font-bold">
             edit

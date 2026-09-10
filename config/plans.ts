@@ -13,7 +13,7 @@
 // ---------------------------------------------------------------------------
 // Tipos base
 // ---------------------------------------------------------------------------
-export type PlanId = 'essential' | 'premium' | 'vip' | 'business';
+export type PlanId = 'essential' | 'premium' | 'vip' | 'business' | 'free';
 export type BillingType = 'one_time' | 'subscription';
 export type AddonId = 'concierge';
 
@@ -81,6 +81,20 @@ export interface AddonConfig {
 // Definição central — valores do estudo brutal §25 + prompt §2/§14
 // ---------------------------------------------------------------------------
 export const PLANS: Record<PlanId, PlanConfig> = {
+  free: {
+    id: 'free',
+    name: 'Free',
+    price: 0,
+    currency: 'AOA',
+    billingType: 'one_time',
+    validityDays: 30,
+    guestLimit: 0,
+    subtitle: 'Degustação sem custo',
+    description: 'Para ver modelos, criar e provar o convite. Partilha e convidados só após um plano.',
+    features: [
+      'rsvp',
+    ],
+  },
   essential: {
     id: 'essential',
     name: 'Essencial',
@@ -237,6 +251,7 @@ export function normalizePlanId(raw: unknown): PlanId {
   if (!raw || typeof raw !== 'string') return 'essential';
   const v = raw.trim().toLowerCase();
   if (v === 'essential' || v === 'essencial') return 'essential';
+  if (v === 'free' || v === 'gratis' || v === 'grátis' || v === 'gratuito') return 'free';
   if (v === 'premium') return 'premium';
   if (v === 'vip') return 'vip';
   if (v === 'business' || v === 'corporate' || v === 'b2b') return 'business';
@@ -288,6 +303,7 @@ export function getAddonPrice(addonId: AddonId): number {
 
 /** Limite de criação de eventos B2C por plano — §7 */
 export const EVENT_CREATION_LIMITS: Record<PlanId, number> = {
+  free: 1,
   essential: 2,
   premium: 5,
   vip: 5,

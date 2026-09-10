@@ -1,4 +1,4 @@
-import React, { useState } from "react";
+import React, { useState, useEffect } from "react";
 import { motion, AnimatePresence } from "framer-motion";
 import {
   Check,
@@ -12,10 +12,11 @@ import {
   CheckCircle2,
   Crown,
 } from "lucide-react";
-import { Link, useNavigate } from "react-router-dom";
+import { Link, useNavigate, useSearchParams } from "react-router-dom";
 import { doc, updateDoc, getDoc, setDoc } from "firebase/firestore";
 import {
   useFirebase,
+  auth,
   db,
   handleFirestoreError,
   OperationType,
@@ -148,12 +149,32 @@ import { copyToClipboard } from "../../lib/clipboard";
 export const PlansPage: React.FC = () => {
   const navigate = useNavigate();
   const { user, userProfile } = useFirebase();
+  const [searchParams] = useSearchParams();
+  const activatingEventId = searchParams.get("eventId");
+  const [activatingEventTitle, setActivatingEventTitle] = useState<string | null>(null);
   const [isProcessing, setIsProcessing] = useState(false);
   const [whatsappModal, setWhatsappModal] = useState<{
     name: string;
     price: string;
+    planId: string;
     billingCycle?: "monthly" | "annual";
   } | null>(null);
+
+  useEffect(() => {
+    if (!activatingEventId) {
+      setActivatingEventTitle(null);
+      return;
+    }
+    getDoc(doc(db, "events", activatingEventId))
+      .then((snap) => {
+        if (snap.exists() && snap.data().ownerId === user?.uid) {
+          setActivatingEventTitle(snap.data().title || "o seu evento");
+        } else {
+          setActivatingEventTitle(null);
+        }
+      })
+      .catch(() => setActivatingEventTitle(null));
+  }, [activatingEventId, user]);
 
   const handleCopy = (text: string) => {
     copyToClipboard(text);
@@ -204,21 +225,57 @@ export const PlansPage: React.FC = () => {
     setWhatsappModal({
       name: plan.name,
       price: priceVal,
+      planId: plan.id,
       billingCycle: plan.id === "business" ? "monthly" : undefined,
     });
   };
 
-  const handleOpenWhatsApp = (whatsappNumber: string) => {
+  const createOrderForEvent = async (planId: string): Promise<string | null> => {
+    if (!activatingEventId || !user) return null;
+    try {
+      const token = await auth.currentUser?.getIdToken();
+      const res = await fetch("/api/orders", {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+          ...(token ? { Authorization: `Bearer ${token}` } : {}),
+        },
+        body: JSON.stringify({
+          userId: user.uid,
+          eventId: activatingEventId,
+          plan: planId,
+        }),
+      });
+      if (!res.ok) return null;
+      const data = await res.json();
+      return data.order?.id || null;
+    } catch {
+      return null;
+    }
+  };
+
+  const handleOpenWhatsApp = async (whatsappNumber: string) => {
     if (!whatsappModal || !user) return;
 
+    const orderId = await createOrderForEvent(whatsappModal.planId);
+    const orderRef = orderId ? `\nPedido: ${orderId}` : "";
+
     const messageText = whatsappModal.name === "Business"
-      ? `Olá! Gostaria de subscrever ao Plano ${whatsappModal.name.toUpperCase()} para a minha agência.\n\nID da Plataforma: ${user.uid}\nE-mail: ${user.email || "Não informado"}\n\nEstou em contacto para concluir o pagamento do meu plano. Obrigado!`
-      : `Olá! Gostaria de comprar o Plano ${whatsappModal.name.toUpperCase()} por ${whatsappModal.price}.\n\nID da Plataforma: ${user.uid}\nE-mail: ${user.email || "Não informado"}\n\nEstou em contacto para concluir o pagamento do meu plano. Obrigado!`;
+      ? `Olá! Gostaria de subscrever ao Plano ${whatsappModal.name.toUpperCase()} para a minha agência.\n\nID da Plataforma: ${user.uid}\nE-mail: ${user.email || "Não informado"}${orderRef ? `\nEvento: ${activatingEventId || "—"}${orderRef}` : ""}\n\nEstou em contacto para concluir o pagamento do meu plano. Obrigado!`
+      : `Olá! Gostaria de comprar o Plano ${whatsappModal.name.toUpperCase()} por ${whatsappModal.price}.\n\nID da Plataforma: ${user.uid}\nE-mail: ${user.email || "Não informado"}${orderRef ? `\nEvento: ${activatingEventId || "—"}${orderRef}` : ""}\n\nEstou em contacto para concluir o pagamento do meu plano. Obrigado!`;
 
     const cleanNumber = whatsappNumber.replace(/\D/g, "");
     const url = `https://wa.me/${cleanNumber}?text=${encodeURIComponent(messageText)}`;
     window.open(url, "_blank", "noopener,noreferrer");
     setWhatsappModal(null);
+    if (activatingEventId) {
+      toast.success(
+        orderId
+          ? `Pedido ${orderId} registado! Conclua no WhatsApp e avisamos aqui.`
+          : "A abrir o WhatsApp para concluir o pagamento."
+      );
+      navigate(`/dashboard/${activatingEventId}?orderPending=1`);
+    }
   };
 
   const currentPlan = userProfile?.plan || "Essencial";
@@ -272,6 +329,12 @@ export const PlansPage: React.FC = () => {
             Design impecável e tecnologia premium, estruturados para tornar o
             seu evento inesquecível.
           </p>
+          {activatingEventTitle && (
+            <div className="mt-6 inline-flex items-center gap-2 bg-[#1B365D] text-white text-sm font-bold px-5 py-3 rounded-full shadow-lg">
+              <span className="w-2 h-2 rounded-full bg-[#C5A028] animate-pulse" />
+              A ativar: “{activatingEventTitle}” — escolhe o plano abaixo
+            </div>
+          )}
         </motion.div>
 
         <motion.div

@@ -82,7 +82,7 @@ service cloud.firestore {
             (resource.data.ownerId == request.auth.uid || exists(/databases/$(database)/documents/events/$(eventId)/team/$(request.auth.uid))) && 
             isValidEvent(incoming()) && 
             incoming().ownerId == resource.data.ownerId &&
-            incoming().get('plan', 'Essencial') == resource.data.get('plan', 'Essencial')
+            incoming().get('plan', 'essential').lower() == resource.data.get('plan', 'essential').lower()
           ) ||
           (
             isSignedIn() && 

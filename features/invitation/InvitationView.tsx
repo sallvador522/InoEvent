@@ -40,6 +40,7 @@ import {
 import { auth } from "../../components/FirebaseProvider";
 import toast from "react-hot-toast";
 import { copyToClipboard } from "../../lib/clipboard";
+import { uploadEventAudio, deleteEventAudio, isOwnStorageAudio } from "../../lib/audioUpload";
 import { QRCodeSVG } from "qrcode.react";
 import { SEO } from "../../components/SEO";
 import { getOptimizedImageUrl, OptimizeImageOptions } from "../../lib/imageOptimizer";
@@ -50,8 +51,20 @@ import { ImageUploadField } from "./components/ImageUploadField";
 import { PremiumLoader } from "./components/PremiumLoader";
 import { CountdownTimer } from "./components/CountdownTimer";
 import { EditableImageWrapper } from "./components/EditableImageWrapper";
+import { compressImage } from "./components/EditableImageWrapper";
 import { getRSVPText } from "./lib/rsvpText";
 import { CheckStatusModal } from "./CheckStatusModal";
+
+  // Formata ISO (YYYY-MM-DD) para "17 de Setembro de 2026" — só display, edição usa o ISO
+const formatDateLong = (iso: any): string => {
+  if (!iso || typeof iso !== 'string') return '';
+  const m = iso.match(/^(\d{4})-(\d{2})-(\d{2})/);
+  if (!m) return iso;
+  const months = ['Janeiro', 'Fevereiro', 'Março', 'Abril', 'Maio', 'Junho', 'Julho', 'Agosto', 'Setembro', 'Outubro', 'Novembro', 'Dezembro'];
+  const month = months[Number(m[2]) - 1];
+  if (!month) return iso;
+  return `${Number(m[3])} de ${month} de ${m[1]}`;
+};
 
 // Helper to safely get image source URL from string or custom object and optimize it
 const getImageUrl = (img: any, options: OptimizeImageOptions = {}): string => {
@@ -62,7 +75,7 @@ const getImageUrl = (img: any, options: OptimizeImageOptions = {}): string => {
     url = img.url;
   }
   
-  if (!url) return "";
+  if (!url) return "/casalModel.webp";
   
   // Set default smart parameters for high-performance mobile loading in Angola
   const optOptions: OptimizeImageOptions = {
@@ -157,13 +170,15 @@ const InvitationView: React.FC = () => {
   const isNew = new URLSearchParams(window.location.search).get("new") === "true";
   const isTemplate = EVENTS.some((e) => e.id === id);
 
-  // Load event either from Firestore custom URL or template static mockup
+   // Load event either from Firestore custom URL or template static mockup
   const [event, setEvent] = useState<EventDetails | null>(() => {
     return (getEventById(id || "") as any) || null;
   });
   const [localEvent, setLocalEvent] = useState<EventDetails | null>(null);
-  const [firebaseLoading, setFirebaseLoading] = useState(true);
+  const [firebaseLoading, setFirebaseLoading] = useState(() => !getEventById(id || ""));
   const [networkError, setNetworkError] = useState<string | null>(null);
+  // Depois da primeira carga, o loader nunca volta: updates re-renderizam por cima dos dados
+  const hasLoadedOnce = useRef(false);
   const [isRSVPOpen, setRSVPOpen] = useState(false);
   const [hasOpened, setHasOpened] = useState(false);
   const [isCheckStatusOpen, setCheckStatusOpen] = useState(false);
@@ -216,6 +231,20 @@ const InvitationView: React.FC = () => {
   const [activeModal, setActiveModal] = useState<
     "style" | "locations" | "timeline" | "gifts" | "gallery" | "hero" | null
   >(null);
+  // Confirmação em 2 toques para esconder secções (reversível, mas desorienta)
+  const [confirmHide, setConfirmHide] = useState<string | null>(null);
+  const confirmHideTimer = useRef<number | null>(null);
+  const askHideConfirm = (section: string, run: () => void) => {
+    if (confirmHide === section) {
+      if (confirmHideTimer.current) window.clearTimeout(confirmHideTimer.current);
+      setConfirmHide(null);
+      run();
+    } else {
+      setConfirmHide(section);
+      if (confirmHideTimer.current) window.clearTimeout(confirmHideTimer.current);
+      confirmHideTimer.current = window.setTimeout(() => setConfirmHide(null), 3000);
+    }
+  };
   const [showLayersPanel, setShowLayersPanel] = useState(true);
   const [isSaving, setIsSaving] = useState(false);
   const [mobileView, setMobileView] = useState<"editor" | "preview">("preview");
@@ -329,8 +358,11 @@ const InvitationView: React.FC = () => {
       }
 
       // Firestore dynamic load with cache-then-network dual strategy for absolute resilience
-      setFirebaseLoading(true);
-      setNetworkError(null);
+      // Só acende o loader na primeira carga — re-renders (user/isEditing) atualizam por cima
+      if (!hasLoadedOnce.current && !isTemplate && !getEventById(id || "")) {
+        setFirebaseLoading(true);
+        setNetworkError(null);
+      }
 
       try {
         const eventRef = doc(db, "events", id);
@@ -392,7 +424,6 @@ const InvitationView: React.FC = () => {
         // 2. Continuous real-time listener for seamless synchronization (without resetting state on network errors)
         unsubscribe = onSnapshot(
           eventRef,
-          { includeMetadataChanges: true },
           (docSnap) => {
             if (docSnap.exists()) {
               const customEvt = {
@@ -445,6 +476,11 @@ const InvitationView: React.FC = () => {
     };
   }, [id, isEditing, user]);
 
+  // Marca a primeira carga resolvida: a partir daqui, sem loader de novo
+  useEffect(() => {
+    if (!firebaseLoading) hasLoadedOnce.current = true;
+  }, [firebaseLoading]);
+
   // Track Page Views
   useEffect(() => {
     if (!isEditing && event && event.id && !(event as any).isTemplate) {
@@ -473,23 +509,37 @@ const InvitationView: React.FC = () => {
   const isPremium = isTemplate || isEditing || canUseFeature(planIdForCheck, 'premium_themes');
 
   // Check if event is blocked — §8 expiração centralizada via expiresAt (§8) + isEventExpired
-  const isTemporarilyBlocked = !isEditing && !isTemplate && activeEvent && (
+  const isOwnerPreview = !!(
+    user &&
+    event &&
+    event.ownerId === user.uid &&
+    activeEvent &&
+    (activeEvent as any).billingStatus !== 'paid' &&
+    activeEvent.isPublished === false
+  );
+
+  const isTemporarilyBlocked = !isEditing && !isTemplate && activeEvent && !isOwnerPreview && (
     activeEvent.isBlocked || activeEvent.isPublished === false || 
     isEventExpired(activeEvent as any)
   );
+  const isPendingActivation = !isEditing && !isTemplate && activeEvent &&
+    !activeEvent.isBlocked &&
+    activeEvent.isPublished === false &&
+    (activeEvent as any).billingStatus !== 'paid' &&
+    !isEventExpired(activeEvent as any);
 
   if (isTemporarilyBlocked) {
     return (
       <div className="min-h-screen bg-slate-50 flex flex-col items-center justify-center p-6 text-slate-800 font-sans text-center">
         <div className="bg-white border border-slate-200 p-8 rounded-3xl max-w-md shadow-2xl">
-          <div className="w-16 h-16 bg-red-50 text-red-500 rounded-full flex items-center justify-center mx-auto mb-6">
+          <div className={`w-16 h-16 rounded-full flex items-center justify-center mx-auto mb-6 ${isPendingActivation ? 'bg-amber-50 text-amber-500' : 'bg-red-50 text-red-500'}`}>
             <svg xmlns="http://www.w3.org/2000/svg" className="h-8 w-8" fill="none" viewBox="0 0 24 24" stroke="currentColor">
               <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 15v2m-6 4h12a2 2 0 002-2v-6a2 2 0 00-2-2H6a2 2 0 00-2 2v6a2 2 0 002 2zm10-10V7a4 4 0 00-8 0v4h8z" />
             </svg>
           </div>
-          <h2 className="text-2xl font-bold mb-4">{activeEvent.blockedTitle || "Convite Indisponível"}</h2>
+          <h2 className="text-2xl font-bold mb-4">{activeEvent.blockedTitle || (isPendingActivation ? "Convite ainda não ativado" : "Convite Indisponível")}</h2>
           <p className="text-slate-500 mb-8 leading-relaxed">
-            {activeEvent.blockedMessage || "Este convite encontra-se temporariamente bloqueado ou expirou. Por favor, contacte os anfitriões para mais informações."}
+            {activeEvent.blockedMessage || (isPendingActivation ? "Os anfitriões ainda estão a preparar tudo. Tenta de novo em breve." : "Este convite encontra-se temporariamente bloqueado ou expirou. Por favor, contacte os anfitriões para mais informações.")}
           </p>
         </div>
       </div>
@@ -524,7 +574,8 @@ const InvitationView: React.FC = () => {
             </p>
             <button
               onClick={() => window.location.reload()}
-              className="w-full bg-violet-600 hover:bg-violet-500 text-white font-semibold py-3 px-6 rounded-2xl transition duration-200 shadow-lg shadow-violet-600/30"
+              className="w-full bg-[#1B365D] hover:bg-[#224373] text-white font-semibold py-3 px-6 rounded-2xl transition duration-200 shadow-lg min-h-[48px] cursor-pointer"
+              style={{ transition: 'background-color 200ms ease' }}
             >
               Tentar Novamente
             </button>
@@ -862,18 +913,37 @@ const InvitationView: React.FC = () => {
     });
   };
 
-  const addGalleryImage = () => {
+  const addGalleryImage = async (file?: File) => {
     const plan = userProfile?.plan || 'Essencial';
     if (plan === 'Essencial' && (localEvent?.gallery?.length || 0) >= 10) {
       toast.error("A Galeria Básica permite até 10 fotos. Faça upgrade para adicionar mais!");
       return;
     }
+    if (!file) {
+      toast.error('Escolha uma foto do dispositivo.');
+      return;
+    }
+    try {
+      const dataUrl = await compressImage(file, 1200);
+      setLocalEvent((prev) => {
+        if (!prev) return null;
+        const list = prev.gallery || [];
+        return { ...prev, gallery: [...list, dataUrl] };
+      });
+      toast.success('Foto adicionada!');
+    } catch {
+      toast.error('Não foi possível ler a foto.');
+    }
+  };
+
+  const moveGalleryImage = (index: number, dir: -1 | 1) => {
     setLocalEvent((prev) => {
       if (!prev) return null;
-      const list = prev.gallery || [];
-      const newImg =
-        "https://images.unsplash.com/photo-1519741497674-611481863552?q=80&w=2574&auto=format&fit=crop";
-      return { ...prev, gallery: [...list, newImg] };
+      const list = [...(prev.gallery || [])];
+      const j = index + dir;
+      if (j < 0 || j >= list.length) return prev;
+      [list[index], list[j]] = [list[j], list[index]];
+      return { ...prev, gallery: list };
     });
   };
 
@@ -1067,7 +1137,7 @@ const InvitationView: React.FC = () => {
 
         {/* FULL SCREEN WYSIWYG CANVAS */}
         <div className="tour-wysiwyg flex-1 overflow-y-auto bg-slate-100/90 relative pb-36 px-2 md:px-6 bg-[radial-gradient(#cbd5e1_1px,transparent_1px)] [background-size:20px_20px]">
-          {<TocaPlayer
+       {<TocaPlayer
             trackName={localEvent?.musicTrack || activeEvent.musicTrack}
             isDark={
               localEvent?.layoutMode === "LUXURY" ||
@@ -1206,6 +1276,8 @@ const InvitationView: React.FC = () => {
                           </label>
                           <input
                             type="text"
+                            required
+                            maxLength={80}
                             value={localEvent?.title || ""}
                             onChange={(e) =>
                               updateField("title", e.target.value)
@@ -1213,6 +1285,39 @@ const InvitationView: React.FC = () => {
                             className="w-full bg-[#1A2026] border border-[#BF9B30]/30 rounded-xl px-4 py-3 text-sm text-white focus:outline-none focus:border-[#BF9B30] transition-colors"
                             placeholder="Ex: João & Maria"
                           />
+                        </div>
+
+                        <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                          <div>
+                            <label className="block text-xs font-semibold text-[#BF9B30] mb-2 uppercase tracking-widest">
+                              Pais da noiva
+                            </label>
+                            <input
+                              type="text"
+                              maxLength={80}
+                              value={(localEvent as any)?.brideParents || ""}
+                              onChange={(e) =>
+                                updateField("brideParents", e.target.value)
+                              }
+                              className="w-full bg-[#1A2026] border border-[#BF9B30]/30 rounded-xl px-4 py-3 text-sm text-white focus:outline-none focus:border-[#BF9B30] transition-colors"
+                              placeholder="Ex: Maria e José"
+                            />
+                          </div>
+                          <div>
+                            <label className="block text-xs font-semibold text-[#BF9B30] mb-2 uppercase tracking-widest">
+                              Pais do noivo
+                            </label>
+                            <input
+                              type="text"
+                              maxLength={80}
+                              value={(localEvent as any)?.groomParents || ""}
+                              onChange={(e) =>
+                                updateField("groomParents", e.target.value)
+                              }
+                              className="w-full bg-[#1A2026] border border-[#BF9B30]/30 rounded-xl px-4 py-3 text-sm text-white focus:outline-none focus:border-[#BF9B30] transition-colors"
+                              placeholder="Ex: Ana e Carlos"
+                            />
+                          </div>
                         </div>
 
                         <div>
@@ -1232,17 +1337,19 @@ const InvitationView: React.FC = () => {
 
                         <div>
                           <label className="block text-xs font-semibold text-[#BF9B30] mb-2 uppercase tracking-widest">
-                            Data do Countdown (ISO AAAA-MM-DD)
+                            Data do Countdown
                           </label>
                           <input
-                            type="text"
+                            type="date"
                             value={localEvent?.isoDate || ""}
                             onChange={(e) =>
                               updateField("isoDate", e.target.value)
                             }
                             className="w-full bg-[#1A2026] border border-[#BF9B30]/30 rounded-xl px-4 py-3 text-sm text-white focus:outline-none focus:border-[#BF9B30] transition-colors"
-                            placeholder="Ex: 2026-10-12"
                           />
+                          <p className="text-[11px] text-slate-400 font-light mt-1.5">
+                            Só aparece nos temas com contagem regressiva.
+                          </p>
                         </div>
                       </div>
 
@@ -1261,45 +1368,39 @@ const InvitationView: React.FC = () => {
                         />
                       </div>
 
-                      <div>
-                        <label className="block text-xs font-semibold text-[#BF9B30] mb-2 uppercase tracking-widest">
-                          Imagem de Capa (Hero Image URL)
-                        </label>
-                        <input
-                          type="text"
-                          value={localEvent?.heroImage || ""}
-                          onChange={(e) =>
-                            updateField("heroImage", e.target.value)
-                          }
-                          className="w-full bg-[#1A2026] border border-[#BF9B30]/30 rounded-xl px-4 py-3 text-sm text-white focus:outline-none focus:border-[#BF9B30] transition-colors text-xs"
-                        />
-                        <div className="flex gap-2 mt-2">
-                          <button
-                            type="button"
-                            onClick={() =>
-                              updateField(
-                                "heroImage",
-                                "https://images.unsplash.com/photo-1519741497674-611481863552?q=80&w=2574",
-                              )
-                            }
-                            className="px-3 py-1.5 bg-white/5 text-[10px] text-gray-300 rounded hover:bg-[#BF9B30]/20 hover:text-[#BF9B30] transition-colors"
-                          >
-                            Preset Romântico
-                          </button>
-                          <button
-                            type="button"
-                            onClick={() =>
-                              updateField(
-                                "heroImage",
-                                "https://images.unsplash.com/photo-1515934751635-c81c6bc9a2d8?q=80&w=2670",
-                              )
-                            }
-                            className="px-3 py-1.5 bg-white/5 text-[10px] text-gray-300 rounded hover:bg-[#BF9B30]/20 hover:text-[#BF9B30] transition-colors"
-                          >
-                            Preset Alianças
-                          </button>
+                        <div>
+                          <label className="block text-xs font-semibold text-[#BF9B30] mb-2 uppercase tracking-widest">
+                            Imagem de Capa (URL)
+                          </label>
+                          <div className="flex gap-3 items-center">
+                            {localEvent?.heroImage ? (
+                              <img
+                                src={getImageUrl(localEvent.heroImage, { width: 200 })}
+                                alt="Pré-visualização da capa"
+                                className="w-14 h-14 object-cover rounded-xl border border-[#BF9B30]/30 shrink-0"
+                                onError={(e) => { (e.target as HTMLImageElement).style.display = 'none'; }}
+                              />
+                            ) : null}
+                            <input
+                              type="url"
+                              value={localEvent?.heroImage || ""}
+                              onChange={(e) =>
+                                updateField("heroImage", e.target.value)
+                              }
+                              className="flex-1 min-w-0 bg-[#1A2026] border border-[#BF9B30]/30 rounded-xl px-4 py-3 text-sm text-white focus:outline-none focus:border-[#BF9B30] transition-colors text-xs"
+                              placeholder="https://…"
+                            />
+                          </div>
+                          <div className="flex gap-2 mt-2">
+                            <button
+                              type="button"
+                              onClick={() => updateField("heroImage", "/casalModel.webp")}
+                              className="px-3 py-1.5 bg-white/5 text-[10px] text-gray-300 rounded hover:bg-[#BF9B30]/20 hover:text-[#BF9B30] transition-colors min-h-[32px] cursor-pointer"
+                            >
+                              Foto padrão
+                            </button>
+                          </div>
                         </div>
-                      </div>
                     </div>
                   )}
 
@@ -1318,17 +1419,22 @@ const InvitationView: React.FC = () => {
                             if (hs.includes("gallery")) {
                               updateField("hiddenSections", hs.filter(s => s !== "gallery"));
                             } else {
-                              updateField("hiddenSections", [...hs, "gallery"]);
-                              setActiveModal(null);
+                              askHideConfirm("gallery", () => {
+                                updateField("hiddenSections", [...hs, "gallery"]);
+                                setActiveModal(null);
+                              });
                             }
                           }}
-                          className={`px-4 py-2 text-[10px] font-bold rounded-lg transition-all ${
+                          className={`px-4 py-2.5 min-h-[44px] text-[10px] font-bold rounded-lg transition-colors cursor-pointer ${
                             (localEvent?.hiddenSections || []).includes("gallery")
                               ? "bg-[#BF9B30]/10 text-[#BF9B30] border border-[#BF9B30]/30 hover:bg-[#BF9B30]/20"
                               : "bg-red-500/10 text-red-400 border border-red-500/30 hover:bg-red-500/20"
                           }`}
+                          style={{ transition: 'background-color 200ms ease' }}
                         >
-                          {(localEvent?.hiddenSections || []).includes("gallery") ? "Mostrar Seção" : "Excluir Seção"}
+                          {(localEvent?.hiddenSections || []).includes("gallery")
+                            ? "Mostrar Seção"
+                            : confirmHide === "gallery" ? "Tocar de novo para esconder" : "Excluir Seção"}
                         </button>
                       </div>
                       
@@ -1337,13 +1443,18 @@ const InvitationView: React.FC = () => {
                           <label className="block text-xs font-semibold text-[#BF9B30] uppercase tracking-widest">
                             Galeria de Fotos do Casal
                           </label>
-                          <button
-                            type="button"
-                            onClick={addGalleryImage}
-                            className="px-3 py-1.5 bg-[#BF9B30]/10 hover:bg-[#BF9B30]/20 border border-[#BF9B30]/30 text-[#BF9B30] text-[10px] font-bold rounded-lg transition-all"
-                          >
+                          <label className="px-3 py-2.5 min-h-[44px] inline-flex items-center bg-[#BF9B30]/10 hover:bg-[#BF9B30]/20 border border-[#BF9B30]/30 text-[#BF9B30] text-[10px] font-bold rounded-lg cursor-pointer" style={{ transition: 'background-color 200ms ease' }}>
                             Adicionar Foto
-                          </button>
+                            <input
+                              type="file"
+                              accept="image/*"
+                              className="hidden"
+                              onChange={(e) => {
+                                addGalleryImage(e.target.files?.[0]);
+                                e.target.value = '';
+                              }}
+                            />
+                          </label>
                         </div>
 
                         <div className="grid grid-cols-3 gap-2">
@@ -1354,17 +1465,41 @@ const InvitationView: React.FC = () => {
                             >
                               <img
                                 src={typeof img === 'string' ? img : (img as any).url}
+                                alt={`Foto ${idx + 1} da galeria`}
                                 className="w-full h-full object-cover"
+                                onError={(e) => { (e.target as HTMLImageElement).style.display = 'none'; }}
                               />
-                              <div className="absolute inset-0 bg-black/60 opacity-0 group-hover:opacity-100 transition-opacity flex items-center justify-center gap-1.5 p-1">
+                              <div className="absolute inset-0 bg-black/60 opacity-100 md:opacity-0 md:group-hover:opacity-100 transition-opacity flex items-center justify-center gap-1.5 p-1">
+                                <button
+                                  type="button"
+                                  onClick={() => moveGalleryImage(idx, -1)}
+                                  disabled={idx === 0}
+                                  aria-label="Mover foto para a esquerda"
+                                  className="w-9 h-9 rounded-full bg-white/10 text-white flex items-center justify-center hover:bg-[#BF9B30]/40 transition-colors disabled:opacity-30 cursor-pointer"
+                                >
+                                  <span className="material-symbols-outlined text-[16px]">
+                                    arrow_back
+                                  </span>
+                                </button>
                                 <button
                                   type="button"
                                   onClick={() => deleteGalleryImage(idx)}
-                                  className="w-8 h-8 rounded-full bg-red-600/80 text-white flex items-center justify-center hover:bg-red-500 transition-colors"
-                                  title="Eliminar"
+                                  aria-label={`Eliminar foto ${idx + 1}`}
+                                  className="w-9 h-9 rounded-full bg-red-600/80 text-white flex items-center justify-center hover:bg-red-500 transition-colors cursor-pointer"
                                 >
                                   <span className="material-symbols-outlined text-[16px]">
                                     delete
+                                  </span>
+                                </button>
+                                <button
+                                  type="button"
+                                  onClick={() => moveGalleryImage(idx, 1)}
+                                  disabled={idx === (localEvent?.gallery || []).length - 1}
+                                  aria-label="Mover foto para a direita"
+                                  className="w-9 h-9 rounded-full bg-white/10 text-white flex items-center justify-center hover:bg-[#BF9B30]/40 transition-colors disabled:opacity-30 cursor-pointer"
+                                >
+                                  <span className="material-symbols-outlined text-[16px]">
+                                    arrow_forward
                                   </span>
                                 </button>
                               </div>
@@ -1390,17 +1525,22 @@ const InvitationView: React.FC = () => {
                             if (hs.includes("locations")) {
                               updateField("hiddenSections", hs.filter(s => s !== "locations"));
                             } else {
-                              updateField("hiddenSections", [...hs, "locations"]);
-                              setActiveModal(null);
+                              askHideConfirm("locations", () => {
+                                updateField("hiddenSections", [...hs, "locations"]);
+                                setActiveModal(null);
+                              });
                             }
                           }}
-                          className={`px-4 py-2 text-[10px] font-bold rounded-lg transition-all ${
+                          className={`px-4 py-2.5 min-h-[44px] text-[10px] font-bold rounded-lg cursor-pointer ${
                             (localEvent?.hiddenSections || []).includes("locations")
                               ? "bg-[#BF9B30]/10 text-[#BF9B30] border border-[#BF9B30]/30 hover:bg-[#BF9B30]/20"
                               : "bg-red-500/10 text-red-400 border border-red-500/30 hover:bg-red-500/20"
                           }`}
+                          style={{ transition: 'background-color 200ms ease' }}
                         >
-                          {(localEvent?.hiddenSections || []).includes("locations") ? "Mostrar Seção" : "Excluir Seção"}
+                          {(localEvent?.hiddenSections || []).includes("locations")
+                            ? "Mostrar Seção"
+                            : confirmHide === "locations" ? "Tocar de novo para esconder" : "Excluir Seção"}
                         </button>
                       </div>
 
@@ -1422,10 +1562,11 @@ const InvitationView: React.FC = () => {
                             className="w-full bg-[#0F1419] border border-[#BF9B30]/20 rounded-xl px-4 py-2.5 text-sm text-white focus:outline-none focus:border-[#BF9B30] transition-colors"
                           />
                         </div>
-                        <div>
-                          <label className="block text-[10px] text-gray-400 mb-1.5 uppercase tracking-wider">
-                            Horário
-                          </label>
+                              <div>
+                                <label className="block text-xs font-semibold text-[#BF9B30] mb-2 uppercase tracking-widest">
+                                  Horário
+                                </label>
+                                <p className="text-[10px] text-slate-500 font-light mb-1.5">Visível nos temas Moderno e Jardim.</p>
                           <input
                             type="text"
                             value={localEvent?.time || ""}
@@ -1467,9 +1608,12 @@ const InvitationView: React.FC = () => {
                       {localEvent?.type !== "BRIDAL_SHOWER" ? (
                         <div className="bg-[#1A2026] p-5 rounded-2xl border border-[#BF9B30]/20 space-y-4">
                           <div className="flex justify-between items-center">
-                            <span className="text-xs font-bold text-[#BF9B30] uppercase tracking-widest block">
-                              2. Recepção / Copo d'Água
-                            </span>
+                            <div className="min-w-0">
+                              <span className="text-xs font-bold text-[#BF9B30] uppercase tracking-widest block">
+                                2. Recepção / Copo d'Água
+                              </span>
+                              <p className="text-[10px] text-slate-500 font-light mt-1">Visível nos temas Moderno, Jardim e Industrial.</p>
+                            </div>
                             <button
                               type="button"
                               onClick={() => {
@@ -1546,17 +1690,22 @@ const InvitationView: React.FC = () => {
                             if (hs.includes("timeline")) {
                               updateField("hiddenSections", hs.filter(s => s !== "timeline"));
                             } else {
-                              updateField("hiddenSections", [...hs, "timeline"]);
-                              setActiveModal(null);
+                              askHideConfirm("timeline", () => {
+                                updateField("hiddenSections", [...hs, "timeline"]);
+                                setActiveModal(null);
+                              });
                             }
                           }}
-                          className={`px-4 py-2 text-[10px] font-bold rounded-lg transition-all ${
+                          className={`px-4 py-2.5 min-h-[44px] text-[10px] font-bold rounded-lg cursor-pointer ${
                             (localEvent?.hiddenSections || []).includes("timeline")
                               ? "bg-[#BF9B30]/10 text-[#BF9B30] border border-[#BF9B30]/30 hover:bg-[#BF9B30]/20"
                               : "bg-red-500/10 text-red-400 border border-red-500/30 hover:bg-red-500/20"
                           }`}
+                          style={{ transition: 'background-color 200ms ease' }}
                         >
-                          {(localEvent?.hiddenSections || []).includes("timeline") ? "Mostrar Seção" : "Excluir Seção"}
+                          {(localEvent?.hiddenSections || []).includes("timeline")
+                            ? "Mostrar Seção"
+                            : confirmHide === "timeline" ? "Tocar de novo para esconder" : "Excluir Seção"}
                         </button>
                       </div>
 
@@ -1697,17 +1846,22 @@ const InvitationView: React.FC = () => {
                             if (hs.includes("gifts")) {
                               updateField("hiddenSections", hs.filter(s => s !== "gifts"));
                             } else {
-                              updateField("hiddenSections", [...hs, "gifts"]);
-                              setActiveModal(null);
+                              askHideConfirm("gifts", () => {
+                                updateField("hiddenSections", [...hs, "gifts"]);
+                                setActiveModal(null);
+                              });
                             }
                           }}
-                          className={`px-4 py-2 text-[10px] font-bold rounded-lg transition-all ${
+                          className={`px-4 py-2.5 min-h-[44px] text-[10px] font-bold rounded-lg cursor-pointer ${
                             (localEvent?.hiddenSections || []).includes("gifts")
                               ? "bg-[#BF9B30]/10 text-[#BF9B30] border border-[#BF9B30]/30 hover:bg-[#BF9B30]/20"
                               : "bg-red-500/10 text-red-400 border border-red-500/30 hover:bg-red-500/20"
                           }`}
+                          style={{ transition: 'background-color 200ms ease' }}
                         >
-                          {(localEvent?.hiddenSections || []).includes("gifts") ? "Mostrar Seção" : "Excluir Seção"}
+                          {(localEvent?.hiddenSections || []).includes("gifts")
+                            ? "Mostrar Seção"
+                            : confirmHide === "gifts" ? "Tocar de novo para esconder" : "Excluir Seção"}
                         </button>
                       </div>
 
@@ -1717,6 +1871,7 @@ const InvitationView: React.FC = () => {
                           <span className="text-xs font-bold text-[#BF9B30] uppercase tracking-widest block">
                             1. Dress Code / Sugestão de Traje
                           </span>
+                          <p className="text-[10px] text-slate-500 font-light mt-1">Visível nos temas Moderno, Rústico e Industrial.</p>
                           <div>
                             <label className="block text-[10px] text-gray-400 mb-1.5 uppercase tracking-wider">
                               Descrição do Código de Vestimenta
@@ -1762,18 +1917,20 @@ const InvitationView: React.FC = () => {
 
                       {/* Gifts accounts details */}
                       <div className="bg-[#1A2026] p-5 rounded-2xl border border-[#BF9B30]/20 space-y-4">
-                        <div className="flex justify-between items-center">
+                        <div className="flex justify-between items-center gap-2">
                           <span className="text-xs font-bold text-[#BF9B30] uppercase tracking-widest block">
                             2. Lista de Casamento / IBAN / Pix
                           </span>
                           <button
                             type="button"
                             onClick={addGiftItem}
-                            className="text-[10px] text-[#BF9B30] hover:text-white font-bold uppercase tracking-wider transition-colors"
+                            className="text-[10px] text-[#BF9B30] hover:text-white font-bold uppercase tracking-wider cursor-pointer min-h-[44px] px-2 shrink-0"
+                            style={{ transition: 'color 200ms ease' }}
                           >
                             + Adicionar Conta
                           </button>
                         </div>
+                        <p className="text-[10px] text-slate-500 font-light -mt-2">O tema Clássico mostra a primeira conta da lista.</p>
 
                         {(localEvent?.gifts || []).map((item, idx) => (
                           <div
@@ -1799,6 +1956,7 @@ const InvitationView: React.FC = () => {
                                 <input
                                   type="text"
                                   value={item.title}
+                                  maxLength={60}
                                   onChange={(e) =>
                                     updateGiftItem(idx, "title", e.target.value)
                                   }
@@ -1831,11 +1989,17 @@ const InvitationView: React.FC = () => {
                               <input
                                 type="text"
                                 value={item.value}
+                                required
+                                maxLength={34}
                                 onChange={(e) =>
                                   updateGiftItem(idx, "value", e.target.value)
                                 }
+                                placeholder="AO06…"
                                 className="w-full bg-[#1A2026] border border-[#BF9B30]/20 rounded-lg px-3 py-1.5 text-xs text-white font-mono focus:outline-none focus:border-[#BF9B30] transition-colors"
                               />
+                              <p className="text-[10px] text-slate-500 font-light mt-1">
+                                IBAN, Pix ou link — é o que o botão Copiar usa. Vazio esconde a conta no convite.
+                              </p>
                             </div>
 
                             <div className="grid grid-cols-2 gap-3 pr-6 mt-3">
@@ -1922,7 +2086,7 @@ const InvitationView: React.FC = () => {
                   required
                   value={authName}
                   onChange={(e) => setAuthName(e.target.value)}
-                  className="w-full border rounded-lg px-3 py-2 text-sm focus:outline-none focus:border-violet-500"
+                  className="w-full border rounded-lg px-3 py-2 text-sm focus:outline-none focus:border-[#C5A028]"
                   placeholder="Ex: João e Maria"
                 />
               </div>
@@ -1936,7 +2100,7 @@ const InvitationView: React.FC = () => {
                 required
                 value={authEmail}
                 onChange={(e) => setAuthEmail(e.target.value)}
-                className="w-full border rounded-lg px-3 py-2 text-sm focus:outline-none focus:border-violet-500"
+                className="w-full border rounded-lg px-3 py-2 text-sm focus:outline-none focus:border-[#C5A028]"
                 placeholder="Ex: noivos@gmail.com"
               />
             </div>
@@ -1949,14 +2113,15 @@ const InvitationView: React.FC = () => {
                 required
                 value={authPassword}
                 onChange={(e) => setAuthPassword(e.target.value)}
-                className="w-full border rounded-lg px-3 py-2 text-sm focus:outline-none focus:border-violet-500"
+                className="w-full border rounded-lg px-3 py-2 text-sm focus:outline-none focus:border-[#C5A028]"
                 placeholder="••••••"
               />
             </div>
             <button
               type="submit"
               disabled={authLoading}
-              className="w-full py-3 bg-violet-600 hover:bg-violet-700 text-white rounded-xl font-bold text-sm shadow transition-all disabled:opacity-50"
+              className="w-full py-3 bg-[#1B365D] hover:bg-[#224373] text-white rounded-xl font-bold text-sm shadow transition-all disabled:opacity-50 min-h-[48px] cursor-pointer"
+              style={{ transition: 'background-color 200ms ease' }}
             >
               {authLoading
                 ? "Processando..."
@@ -1968,7 +2133,7 @@ const InvitationView: React.FC = () => {
               <button
                 type="button"
                 onClick={() => setIsSignUp(!isSignUp)}
-                className="text-violet-600 font-semibold hover:underline"
+                className="text-[#1B365D] font-semibold hover:underline"
               >
                 {isSignUp
                   ? "Já tem conta? Faça login"
@@ -2046,13 +2211,26 @@ const InvitationView: React.FC = () => {
         description={activeEvent.description || "Você foi convidado para o nosso evento especial! Veja os detalhes, localizações e confirme sua presença (RSVP)."}
         image={getImageUrl(activeEvent.heroImage)}
       />
-      {<TocaPlayer
+      <TocaPlayer
         trackName={activeEvent.musicTrack}
         isDark={
           activeEvent.layoutMode === "LUXURY" ||
           activeEvent.layoutMode === "INDUSTRIAL"
         }
-      />}
+      />
+
+      {isOwnerPreview && !isEditing && (
+        <div className="sticky top-0 z-40 bg-[#1B365D] text-white text-xs font-bold tracking-wider flex items-center justify-center gap-2 px-3 py-2.5">
+          <span className="truncate">Pré-visualização</span>
+          <button
+            onClick={() => navigate(`/invite/${activeEvent.id}?edit=true`)}
+            className="shrink-0 bg-[#C5A028] text-[#1B365D] px-4 py-2 min-h-[36px] rounded-full font-bold text-[11px] uppercase cursor-pointer hover:bg-[#d4af37]"
+            style={{ transition: 'background-color 200ms ease' }}
+          >
+            Editar
+          </button>
+        </div>
+      )}
 
       {/* Dynamic Layout Rendering */}
       {activeEvent.layoutMode === "CLASSIC" && (
@@ -2181,15 +2359,15 @@ const FadeInSection: React.FC<{
   delay?: number;
 }> = ({ children, className = "", delay = 0 }) => (
   <motion.div
-    initial={{ opacity: 0, y: 50, filter: "blur(6px)" }}
-    whileInView={{ opacity: 1, y: 0, filter: "blur(0px)" }}
-    viewport={{ once: true, margin: "-100px" }} // Trigger slightly before element is full view
+    initial={{ opacity: 0, y: 12 }}
+    whileInView={{ opacity: 1, y: 0 }}
+    viewport={{ once: true, margin: "-40px" }} // Trigger leve, sem blur (blur congela em Android fraco)
     transition={{
-      duration: 2.2, // Much slower and more graceful transition
-      ease: [0.16, 1, 0.3, 1], // Slow Out-Expo for premium luxury feel
+      duration: 0.5,
+      ease: "easeOut",
       delay,
     }}
-    className={`will-change-[transform,opacity] ${className}`}
+    className={`${className}`}
   >
     {children}
   </motion.div>
@@ -2219,16 +2397,38 @@ const FloatingDesignDock: React.FC<{
 }) => {
   const [isExpanded, setIsExpanded] = useState(false);
   const [activeTab, setActiveTab] = useState<"style" | "lists">("style");
+  const [uploadingMusic, setUploadingMusic] = useState(false);
+  const { user: dockUser } = useFirebase();
+
+  const handleMusicUpload = async (file: File | undefined) => {
+    if (!file) return;
+    if (!dockUser) {
+      toast.error('Entre na sua conta para enviar música.');
+      return;
+    }
+    setUploadingMusic(true);
+    try {
+      const prev = localEvent?.musicTrack;
+      const url = await uploadEventAudio(file, dockUser.uid);
+      updateField('musicTrack', url);
+      await deleteEventAudio(isOwnStorageAudio(prev) ? prev : null);
+      toast.success('Música pronta — toca ao abrir o convite!');
+    } catch (err: any) {
+      toast.error(err?.message || 'Não foi possível enviar a música.');
+    } finally {
+      setUploadingMusic(false);
+    }
+  };
 
   if (!isExpanded) {
     return (
-      <div className="fixed bottom-28 right-6 z-50 animate-in fade-in slide-in-from-right-8 duration-500">
+      <div className="fixed bottom-28 right-6 z-50 animate-in fade-in slide-in-from-right-8 duration-500" style={{ bottom: 'max(7rem, calc(env(safe-area-inset-bottom) + 5.5rem))' }}>
         <button
           onClick={() => setIsExpanded(true)}
-          className="bg-violet-600 hover:bg-violet-500 text-white rounded-full py-3.5 px-6 shadow-xl shadow-violet-900/20 flex items-center gap-2 border border-violet-400/30 text-[10px] font-black uppercase tracking-widest transition-all hover:scale-105 active:scale-95 cursor-pointer"
+          className="bg-[#C5A028] hover:bg-[#d4af37] text-[#1B365D] rounded-full py-3.5 px-6 shadow-xl flex items-center gap-2 text-[10px] font-black uppercase tracking-widest transition-all hover:scale-105 active:scale-95 cursor-pointer min-h-[44px]"
         >
           <span className="material-symbols-outlined text-sm">add_circle</span>
-          <span>Adicionar Seções</span>
+          <span>Editar secções</span>
         </button>
       </div>
     );
@@ -2242,7 +2442,7 @@ const FloatingDesignDock: React.FC<{
             onClick={() => setActiveTab("style")}
             className={`text-xs font-bold uppercase tracking-wider pb-1.5 border-b-2 transition-all cursor-pointer ${
               activeTab === "style"
-                ? "text-violet-400 border-violet-500"
+                ? "text-[#C5A028] border-[#C5A028]"
                 : "text-slate-400 border-transparent hover:text-slate-200"
             }`}
           >
@@ -2252,7 +2452,7 @@ const FloatingDesignDock: React.FC<{
             onClick={() => setActiveTab("lists")}
             className={`text-xs font-bold uppercase tracking-wider pb-1.5 border-b-2 transition-all cursor-pointer ${
               activeTab === "lists"
-                ? "text-violet-400 border-violet-500"
+                ? "text-[#C5A028] border-[#C5A028]"
                 : "text-slate-400 border-transparent hover:text-slate-200"
             }`}
           >
@@ -2285,7 +2485,7 @@ const FloatingDesignDock: React.FC<{
                     updateField("musicTrack", e.target.value);
                   }
                 }}
-                className="w-full bg-slate-950 border border-slate-800 rounded-xl px-3 py-2 text-xs text-slate-200 focus:outline-none focus:border-violet-500 cursor-pointer"
+                className="w-full bg-slate-950 border border-slate-800 rounded-xl px-3 py-2 text-xs text-slate-200 focus:outline-none focus:border-[#C5A028] cursor-pointer"
               >
                 <option value="/audio/oracao_do_amor.m4a">Oração do Amor (Padrão)</option>
                 <option value="romantic_piano.mp3">Piano Romântico</option>
@@ -2300,29 +2500,19 @@ const FloatingDesignDock: React.FC<{
                 )}
               </select>
 
-              <label className="flex items-center justify-center gap-2 w-full bg-violet-600/10 hover:bg-violet-600/20 text-violet-400 border border-violet-500/30 rounded-xl px-3 py-2 text-xs font-bold transition-all cursor-pointer">
-                <span className="material-symbols-outlined text-sm">
+              <label className={`flex items-center justify-center gap-2 w-full rounded-xl px-3 py-3 min-h-[48px] text-xs font-bold transition-colors cursor-pointer border ${uploadingMusic ? 'bg-[#1B365D]/5 text-slate-400 border-slate-200' : 'bg-[#1B365D]/5 hover:bg-[#1B365D]/10 text-[#1B365D] border-[#1B365D]/20'}`} style={{ transition: 'background-color 200ms ease' }}>
+                <span className="material-symbols-outlined text-sm text-[#8a6d1c]">
                   upload_file
                 </span>
-                Fazer Upload de Música (.mp3)
+                {uploadingMusic ? 'A enviar música…' : 'Fazer Upload de Música (.mp3, até 6MB)'}
                 <input
                   type="file"
-                  accept="audio/*"
+                  accept="audio/mpeg,audio/mp3,audio/*"
                   className="hidden"
+                  disabled={uploadingMusic}
                   onChange={(e) => {
-                    const file = e.target.files?.[0];
-                    if (file) {
-                      const reader = new FileReader();
-                      reader.onload = (event) => {
-                        if (event.target?.result) {
-                          updateField(
-                            "musicTrack",
-                            event.target.result as string,
-                          );
-                        }
-                      };
-                      reader.readAsDataURL(file);
-                    }
+                    handleMusicUpload(e.target.files?.[0]);
+                    e.target.value = '';
                   }}
                 />
               </label>
@@ -2334,18 +2524,18 @@ const FloatingDesignDock: React.FC<{
           <div className="grid grid-cols-2 gap-2">
             <button
               onClick={() => openModal("hero")}
-              className="p-3 bg-slate-950 border border-slate-800 hover:border-violet-500/50 hover:bg-slate-800 rounded-xl flex items-center gap-2 justify-center font-bold text-slate-200 transition-all cursor-pointer"
+              className="p-3 bg-slate-950 border border-slate-800 hover:border-[#C5A028]/50 hover:bg-slate-800 rounded-xl flex items-center gap-2 justify-center font-bold text-slate-200 transition-all cursor-pointer"
             >
-              <span className="material-symbols-outlined text-sm text-violet-400">
+              <span className="material-symbols-outlined text-sm text-[#C5A028]">
                 auto_stories
               </span>
               <span>Capa & Textos</span>
             </button>
             <button
               onClick={() => openModal("locations")}
-              className="p-3 bg-slate-950 border border-slate-800 hover:border-violet-500/50 hover:bg-slate-800 rounded-xl flex items-center gap-2 justify-center font-bold text-slate-200 transition-all cursor-pointer"
+              className="p-3 bg-slate-950 border border-slate-800 hover:border-[#C5A028]/50 hover:bg-slate-800 rounded-xl flex items-center gap-2 justify-center font-bold text-slate-200 transition-all cursor-pointer"
             >
-              <span className="material-symbols-outlined text-sm text-violet-400">
+              <span className="material-symbols-outlined text-sm text-[#C5A028]">
                 pin_drop
               </span>
               <span>
@@ -2357,9 +2547,9 @@ const FloatingDesignDock: React.FC<{
             {localEvent?.type !== "BRIDAL_SHOWER" && (
               <button
                 onClick={() => openModal("timeline")}
-                className="p-3 bg-slate-950 border border-slate-800 hover:border-violet-500/50 hover:bg-slate-800 rounded-xl flex items-center gap-2 justify-center font-bold text-slate-200 transition-all cursor-pointer"
+                className="p-3 bg-slate-950 border border-slate-800 hover:border-[#C5A028]/50 hover:bg-slate-800 rounded-xl flex items-center gap-2 justify-center font-bold text-slate-200 transition-all cursor-pointer"
               >
-                <span className="material-symbols-outlined text-sm text-violet-400">
+                <span className="material-symbols-outlined text-sm text-[#C5A028]">
                   schedule
                 </span>
                 <span>Cronograma</span>
@@ -2367,31 +2557,30 @@ const FloatingDesignDock: React.FC<{
             )}
             <button
               onClick={() => openModal("gifts")}
-              className={`p-3 bg-slate-950 border border-slate-800 hover:border-violet-500/50 hover:bg-slate-800 rounded-xl flex items-center gap-2 justify-center font-bold text-slate-200 transition-all cursor-pointer`}
+              className={`p-3 bg-slate-950 border border-slate-800 hover:border-[#C5A028]/50 hover:bg-slate-800 rounded-xl flex items-center gap-2 justify-center font-bold text-slate-200 transition-all cursor-pointer`}
             >
-              <span className="material-symbols-outlined text-sm text-violet-400">
+              <span className="material-symbols-outlined text-sm text-[#C5A028]">
                 account_balance_wallet
               </span>
               <span>Presentes</span>
             </button>
             <button
               onClick={() => openModal("gallery")}
-              className={`p-3 bg-slate-950 border border-slate-800 hover:border-violet-500/50 hover:bg-slate-800 rounded-xl flex items-center gap-2 justify-center font-bold text-slate-200 transition-all cursor-pointer col-span-2`}
+              className={`p-3 bg-slate-950 border border-slate-800 hover:border-[#C5A028]/50 hover:bg-slate-800 rounded-xl flex items-center gap-2 justify-center font-bold text-slate-200 transition-all cursor-pointer col-span-2`}
             >
-              <span className="material-symbols-outlined text-sm text-violet-400">
+              <span className="material-symbols-outlined text-sm text-[#C5A028]">
                 image
               </span>
               <span>Galeria de Fotos</span>
             </button>
           </div>
-          <p className="text-[9px] text-slate-500 text-center">
-            Você pode abrir os painéis acima para adicionar itens em massa ou
-            recuperar secções.
+          <p className="text-xs text-slate-500 text-center">
+            Secções escondidas voltam aqui para editar.
           </p>
         </div>
       )}
 
-      <div className="text-[9px] text-slate-500 text-center leading-normal pt-1.5 border-t border-slate-800/50">
+      <div className="text-xs text-slate-500 text-center leading-normal pt-1.5 border-t border-slate-800/50">
         💡{" "}
         <span className="font-semibold text-slate-400">
           Visualização de Elite:
@@ -2434,10 +2623,10 @@ const EditableSectionWrapper: React.FC<{
         // Only trigger edit modal if user didn't click inside another stopPropagation element
         onEditSection?.(section);
       }}
-      className={`relative group/section-layer cursor-pointer border-2 border-dashed border-violet-500/20 hover:border-violet-500/70 bg-white/[0.01] hover:bg-violet-500/[0.03] transition-all duration-300 rounded-[2rem] p-4 md:p-6 my-6 shadow-[0_4px_24px_rgba(139,92,246,0.02)] hover:shadow-[0_12px_36px_rgba(139,92,246,0.1)] active:scale-[0.995] ${className}`}
+      className={`relative group/section-layer cursor-pointer border-2 border-dashed border-[#C5A028]/25 hover:border-[#C5A028]/70 bg-white/[0.01] hover:bg-[#C5A028]/[0.03] transition-colors duration-200 rounded-[2rem] p-4 md:p-6 my-6 ${className}`}
     >
       {/* Floating Spatial Section Badge */}
-      <div className="absolute top-4 right-4 bg-violet-600/90 backdrop-blur-md text-white text-[9px] font-black uppercase tracking-widest px-3 py-1 rounded-full shadow-lg opacity-40 group-hover/section-layer:opacity-100 transition-all duration-300 flex items-center gap-1.5 border border-white/15 z-30 select-none pointer-events-none">
+      <div className="absolute top-4 right-4 bg-[#1B365D]/90 backdrop-blur-md text-white text-[11px] font-black uppercase tracking-widest px-3 py-1.5 rounded-full shadow-lg opacity-40 group-hover/section-layer:opacity-100 flex items-center gap-1.5 border border-white/15 z-30 select-none pointer-events-none min-h-[32px]" style={{ transition: 'opacity 200ms ease' }}>
         <span className="material-symbols-outlined text-[12px] font-bold">
           edit_note
         </span>
@@ -2445,7 +2634,7 @@ const EditableSectionWrapper: React.FC<{
       </div>
 
       {/* Glassmorphic visual outline/glow on hover */}
-      <div className="absolute inset-0 bg-gradient-to-tr from-violet-500/[0.01] to-indigo-500/[0.01] group-hover/section-layer:from-violet-500/[0.02] group-hover/section-layer:to-indigo-500/[0.02] transition-all rounded-[2rem] pointer-events-none z-10" />
+      <div className="absolute inset-0 bg-[#C5A028]/[0.01] group-hover/section-layer:bg-[#C5A028]/[0.02] rounded-[2rem] pointer-events-none z-10" style={{ transition: 'background-color 200ms ease' }} />
 
       {/* Content wrapper */}
       <div className="relative z-20">{children}</div>
@@ -2479,7 +2668,7 @@ guestName: string;
   deleteTimelineItem,
   updateTimelineItem,
 }) => {
-  const isPremium = isEditing || (event && EVENTS.some((e) => e.id === event.id)) || (event && (event as any).plan && ((event as any).plan === "Premium" || (event as any).plan === "Business" || (event as any).plan === "Corporate"));
+  const isPremium = isEditing || (event && EVENTS.some((e) => e.id === event.id)) || canUseFeature(normalizePlanId((event as any)?.plan), 'premium_themes');
   return (
     <div className="min-h-screen bg-slate-50 font-serif pb-28">
       {/* Formal Header */}
@@ -2507,35 +2696,42 @@ guestName: string;
           <motion.div
             initial={{ opacity: 0 }}
             animate={{ opacity: 1 }}
-            transition={{ duration: 2.5, ease: "easeInOut" }}
+            transition={{ duration: 0.9, ease: "easeOut" }}
             className="absolute inset-0 flex flex-col justify-end items-center pb-24 text-white text-center p-6 pointer-events-none"
           >
             <div className="pointer-events-auto flex flex-col items-center">
               <motion.h1
-                initial={{ y: 20, opacity: 0 }}
+                initial={{ y: 12, opacity: 0 }}
                 animate={{ y: 0, opacity: 1 }}
-                transition={{ delay: 0.5, duration: 2.0, ease: [0.16, 1, 0.3, 1] }}
-                className="text-5xl font-script mb-2"
+                transition={{ delay: 0.2, duration: 0.9, ease: "easeOut" }}
+                className="text-4xl md:text-5xl font-script mb-2 px-4 leading-tight"
               >
                 <EditableField
                   value={event.title}
                   onChange={(newVal) => updateField?.("title", newVal)}
                   isEditing={isEditing}
-                  className="text-white text-5xl font-script text-center"
+                  className="text-white text-4xl md:text-5xl font-script text-center break-words leading-tight"
                 />
               </motion.h1>
+              {(event as any).brideParents || (event as any).groomParents ? (
+                <p className="text-white/85 text-[11px] md:text-xs uppercase tracking-[0.25em] px-6 mb-1">
+                  {(event as any).brideParents && <>Filha de {(event as any).brideParents}</>}
+                  {(event as any).brideParents && (event as any).groomParents && <> · </>}
+                  {(event as any).groomParents && <>Filho de {(event as any).groomParents}</>}
+                </p>
+              ) : null}
               <div className="w-12 h-px bg-white/60 my-4"></div>
               <motion.p
-                initial={{ y: 20, opacity: 0 }}
-                animate={{ y: 0, opacity: 1 }}
-                transition={{ delay: 1.0, duration: 2.0, ease: [0.16, 1, 0.3, 1] }}
-                className="text-xl tracking-widest uppercase"
+                initial={{ y: 12, opacity: 0 }}
+                animate={{ opacity: 1, y: 0 }}
+                transition={{ delay: 0.35, duration: 0.9, ease: "easeOut" }}
+                className="text-lg md:text-xl tracking-widest uppercase px-4"
               >
                 <EditableField
-                  value={event.date}
+                  value={isEditing ? event.date : formatDateLong(event.date)}
                   onChange={(newVal) => updateField?.("date", newVal)}
                   isEditing={isEditing}
-                  className="text-white text-xl tracking-widest uppercase text-center"
+                  className="text-white text-lg md:text-xl tracking-widest uppercase text-center"
                 />
               </motion.p>
             </div>
@@ -2565,6 +2761,8 @@ guestName: string;
           onEditSection={onEditSection}
         >
           <FadeInSection>
+            {((event.timeline || []).length > 0 || isEditing) && (
+              <>
             <h3 className="text-xs font-bold uppercase tracking-[0.2em] text-slate-400 mb-6">
               Programação
             </h3>
@@ -2581,7 +2779,8 @@ guestName: string;
                         e.stopPropagation();
                         deleteTimelineItem?.(idx);
                       }}
-                      className="absolute -top-2 -right-2 bg-rose-500 hover:bg-rose-600 text-white rounded-full w-6 h-6 flex items-center justify-center shadow-lg hover:scale-105 active:scale-95 transition-all cursor-pointer z-30 opacity-0 group-hover/timeline-item:opacity-100 animate-in fade-in animate-out fade-out"
+                      className="absolute -top-2 -right-2 bg-rose-500 hover:bg-rose-600 text-white rounded-full w-9 h-9 flex items-center justify-center shadow-lg hover:scale-105 active:scale-95 cursor-pointer z-30 opacity-100 md:opacity-0 md:group-hover/timeline-item:opacity-100"
+                      style={{ transition: 'background-color 200ms ease, opacity 200ms ease' }}
                       title="Excluir Etapa"
                     >
                       <span className="material-symbols-outlined text-[14px]">
@@ -2622,7 +2821,9 @@ guestName: string;
                   </span>
                 </div>
               ))}
-            </div>
+                </div>
+              </>
+            )}
           </FadeInSection>
         </EditableSectionWrapper>
 
@@ -2652,14 +2853,16 @@ guestName: string;
                   multiline
                 />
               </p>
-              <Button
-                onClick={() => window.open(event.mapLink || "#", "_blank")}
-                variant="navy"
-                fullWidth
-                className="text-xs uppercase tracking-widest h-10"
-              >
-                Ver Mapa
-              </Button>
+              {event.mapLink ? (
+                <Button
+                  onClick={() => window.open(event.mapLink, "_blank")}
+                  variant="navy"
+                  fullWidth
+                  className="text-xs uppercase tracking-widest min-h-[48px]"
+                >
+                  Ver Mapa
+                </Button>
+              ) : null}
             </div>
           </FadeInSection>
         </EditableSectionWrapper>
@@ -2732,11 +2935,11 @@ guestName: string;
                     <Button
                       onClick={() => {
                         copyToClipboard(event.gifts?.[0]?.value || "");
-                        alert("IBAN Copiado!");
+                        toast.success("IBAN copiado!");
                       }}
                       variant="navy"
                       fullWidth
-                      className="text-xs uppercase tracking-widest h-10"
+                      className="text-xs uppercase tracking-widest min-h-[48px]"
                     >
                       Copiar IBAN
                     </Button>
@@ -2792,15 +2995,22 @@ guestName: string;
         )}
       </div>
 
-      <div className="fixed bottom-6 left-1/2 -translate-x-1/2 z-50">
+      <div className="fixed bottom-0 inset-x-0 z-50 flex flex-col items-center gap-2 px-6 pt-2" style={{ paddingBottom: 'max(1.25rem, env(safe-area-inset-bottom))' }}>
         <button
           onClick={onRSVP}
-          className="bg-brand-blue text-white px-10 py-4 rounded-full font-sans font-bold shadow-2xl shadow-brand-blue/40 uppercase tracking-widest text-xs hover:scale-105 transition-transform"
+          className="bg-brand-blue text-white px-8 py-4 rounded-full font-sans font-bold shadow-2xl shadow-brand-blue/40 uppercase tracking-widest text-xs whitespace-nowrap min-h-[52px] hover:scale-105 active:scale-95 cursor-pointer"
+          style={{ transition: 'transform 160ms ease-out' }}
         >
           {getRSVPText(event.type)}
         </button>
-          {onCheckStatus && <button onClick={onCheckStatus} className="mt-4 sm:mt-0 sm:ml-4 bg-white text-slate-900 border border-slate-200 shadow-lg hover:bg-slate-50 py-4 px-12 rounded-full font-bold uppercase tracking-widest text-sm transition-all w-full sm:w-auto">Meu Convite</button>}
+          {onCheckStatus && <button onClick={onCheckStatus} className="text-[11px] font-bold uppercase tracking-widest text-slate-500 bg-white/85 backdrop-blur rounded-full px-4 py-2.5 min-h-[44px] hover:text-slate-800 cursor-pointer" style={{ transition: 'color 200ms ease' }}>Meu convite</button>}
       </div>
+
+      {!isPremium && (
+        <footer className="text-center pb-10 px-6">
+          <p className="text-[11px] uppercase tracking-[0.2em] text-slate-400">Feito com InoEvents</p>
+        </footer>
+      )}
     </div>
   );
 };
@@ -2951,7 +3161,8 @@ const ModernLayout: React.FC<{
           <FadeInSection className="flex flex-col md:flex-row items-center gap-12">
             <div className="w-full md:w-1/2 aspect-[4/5] bg-gray-100 relative overflow-hidden group">
               <img
-                src={getImageUrl("https://images.unsplash.com/photo-1544070274-1b48b1111003?q=80&w=2670&auto=format&fit=crop", { width: 800 })}
+                src={getImageUrl(event.heroImage, { width: 800 })}
+                alt={event.title || "Foto do casal"}
                 className="w-full h-full object-cover grayscale group-hover:grayscale-0 transition-all duration-700"
                 loading="lazy"
                 referrerPolicy="no-referrer"
@@ -3472,7 +3683,8 @@ const GardenLayout: React.FC<{
             <div className="flex-1 order-1 md:order-2">
               <div className="aspect-[3/4] rounded-t-[100px] overflow-hidden shadow-lg">
                 <img
-                  src="https://images.unsplash.com/photo-1544070274-1b48b1111003?q=80&w=2670&auto=format&fit=crop"
+                  src={getImageUrl(event.heroImage, { width: 800 })}
+                  alt={event.title || "Foto do casal"}
                   className="w-full h-full object-cover"
                 />
               </div>
@@ -4260,7 +4472,8 @@ const IndustrialLayout: React.FC<{
       >
         <div className="relative border-r border-white/20 group overflow-hidden">
           <img
-            src="https://images.unsplash.com/photo-1544070274-1b48b1111003?q=80&w=2670&auto=format&fit=crop"
+            src={getImageUrl(event.heroImage, { width: 800 })}
+            alt={event.title || "Foto do casal"}
             className="w-full h-full object-cover grayscale group-hover:scale-105 transition-transform duration-700"
           />
           <div className="absolute bottom-0 left-0 p-8 bg-black/80 w-full backdrop-blur-sm">
@@ -4645,7 +4858,7 @@ const LuxuryLayout: React.FC<{
                   <div
                     className="absolute inset-0 bg-cover bg-center opacity-60"
                     style={{
-                      backgroundImage: `url('https://images.unsplash.com/photo-1544070274-1b48b1111003?q=80&w=2670&auto=format&fit=crop')`,
+                      backgroundImage: `url('${getImageUrl(event.heroImage, { width: 800 })}')`,
                     }}
                   ></div>
                   <div className="absolute inset-0 bg-gradient-to-t from-[#0F1419] to-transparent"></div>

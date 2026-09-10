@@ -342,6 +342,7 @@ export const EventCreator: React.FC = () => {
         planId: normalizedPlan,
         status: 'active',
         billingStatus: 'pending',
+        ...(isEditingExisting ? {} : { isPublished: false }),
         expiresAt: expiresAtDate,
         publishedAt: new Date().toISOString(),
         addons: {},

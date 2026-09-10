@@ -1,4 +1,9 @@
 User-agent: *
 Allow: /
+Disallow: /admin
+Disallow: /dashboard
+Disallow: /b2b
+Disallow: /checkin
+Disallow: /client-dashboard
 
-Sitemap: https://inoevent.online/sitemap.xml
+Sitemap: https://www.inoevent.online/sitemap.xml

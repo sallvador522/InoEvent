@@ -51,7 +51,7 @@ router.get('/plans', async (req, res, next) => {
         <h2>Plano Premium</h2>
         <p>Preço: 15.000 Kz (Pagamento único por evento). Validade 180 dias. Até 300 convidados. Inclui: tudo do Essencial + convidados individualizados, galeria premium, música, livro de assinaturas, mapa das mesas, temas premium, remoção da marca, analytics básicos.</p>
         <h2>Plano VIP</h2>
-        <p>Preço: 25.000 Kz (Pagamento único por evento). Validade 365 dias. Até 700 convidados. Inclui: tudo do Premium + QR individual, check-in, gestão +1, mesas avançadas, lembretes, analytics avançados, personalização avançada, suporte prioritário, domínio personalizado.</p>
+        <p>Preço: 25.000 Kz (Pagamento único por evento). Validade 365 dias. Até 700 convidados. Inclui: tudo do Premium + QR individual, check-in, gestão +1, mesas avançadas, analytics avançados, personalização avançada, suporte prioritário.</p>
         <h2>Concierge (Add-on)</h2>
         <p>Preço: +10.000 Kz por evento. A equipa InoEvent configura o evento por si.</p>
         <h2>Plano Business (B2B)</h2>

@@ -27,8 +27,8 @@ export const SEO: React.FC<SEOProps> = ({
     ? (image.startsWith('http') ? image : `${domain}${image.startsWith('/') ? '' : '/'}${image}`)
     : defaultImage;
   
-  // Highly optimized keywords for Google and AI (LLM) discovery in Angola emphasizing professional social event management (RSVP, QR Code, Check-In, Guest List, IBAN)
-  const defaultKeywords = "convites digitais em Angola, melhor site de convites de casamento Angola, chá de panela Angola, convites premium com RSVP Angola, convite digital Luanda, lista de presentes IBAN Angola, gerador de convites de casamento, convite interativo Angola, InoEvents, confirmação de presença Angola, festas e casamentos Luanda, RSVP online Angola, check-in por QR Code Angola, domínio personalizado casamentos, gestão de mesas casamentos, lista de convidados digital, gestão de casamentos e eventos sociais, convite.in alternativa Angola, fotify alternativa angola, fotify casamento angola, melhor alternativa ao fotify, casar.com angola, icasei angola, controle de presenças convidados, credenciamento QR Code, gerenciador de casamentos Luanda";
+  // Keywords próprias — sem marcas de terceiros
+  const defaultKeywords = "convites digitais em Angola, convites de casamento Angola, chá de panela Angola, convites premium com RSVP Angola, convite digital Luanda, lista de presentes IBAN Angola, convite interativo Angola, InoEvents, confirmação de presença Angola, festas e casamentos Luanda, RSVP online Angola, check-in por QR Code Angola, gestão de mesas casamentos, lista de convidados digital, gestão de casamentos e eventos sociais, controle de presenças convidados, credenciamento QR Code, gerenciador de casamentos Luanda";
 
   // Create highly structured JSON-LD schema combining Website, SoftwareApplication and Service 
   // for advanced AI (Gemini, ChatGPT, Perplexity) and Google indexation.
@@ -64,16 +64,12 @@ export const SEO: React.FC<SEOProps> = ({
       "applicationCategory": "BusinessApplication",
       "browserRequirements": "Requires HTML5",
       "url": domain,
-      "offers": {
-        "@type": "Offer",
-        "price": "0",
-        "priceCurrency": "AOA"
-      },
-      "aggregateRating": {
-        "@type": "AggregateRating",
-        "ratingValue": "4.9",
-        "ratingCount": "10324"
-      }
+      "offers": [
+        { "@type": "Offer", "name": "Convite Essencial", "price": "7500", "priceCurrency": "AOA" },
+        { "@type": "Offer", "name": "Convite Premium", "price": "15000", "priceCurrency": "AOA" },
+        { "@type": "Offer", "name": "Convite VIP", "price": "25000", "priceCurrency": "AOA" },
+        { "@type": "Offer", "name": "Business", "price": "39900", "priceCurrency": "AOA" }
+      ]
     },
     {
       "@context": "https://schema.org",

@@ -8,13 +8,95 @@ import { SEO } from '../../components/SEO';
 import { FAQSection } from './FAQSection';
 import { SupportModal } from '../../components/SupportModal';
 import { EVENTS } from '../../mockData';
-import { X, Copy, MessageSquare, ArrowRight, Award, Image as ImageIcon, CheckCircle2, Gem, PartyPopper, Utensils, Cake, Baby, Briefcase } from 'lucide-react';
+import { X, Copy, MessageSquare, ArrowRight, Award, CheckCircle2, Gem, Utensils, Briefcase, QrCode, Gift, Users, BookOpen, Globe, ChevronLeft, ChevronRight } from 'lucide-react';
 import toast from 'react-hot-toast';
 import { copyToClipboard } from '../../lib/clipboard';
 import { PLANS } from '../../config/plans';
 
-// Create a motion component from the React Router Link
-const MotionLink = motion.create(Link);
+// NOTA: depoimentos ilustrativos — trocar por clientes reais com nome, foto e autorização assim que existirem.
+const QUOTES = [
+  { text: "Os templates são maravilhosos. O meu casamento ganhou outro nível.", author: "Juliana M. — Noiva" },
+  { text: "A melhor plataforma de convites que já usei. Simplesmente elegante.", author: "Maria S. — Noiva" },
+  { text: "Enviei o link no WhatsApp e as confirmações entraram sozinhas.", author: "Carla D. — Aniversariante" },
+  { text: "O check-in com QR na entrada acabou com a confusão da receção.", author: "Sérgio A. — Organizador" },
+  { text: "Os presentes caíram direto na conta por IBAN, sem complicação.", author: "Ana P. — Noiva" },
+  { text: "Em duas noites tínhamos o convite pronto e partilhado.", author: "Domingos K. — Noivo" },
+];
+
+const QuoteRotator: React.FC = () => {
+  const [index, setIndex] = useState(0);
+  const [paused, setPaused] = useState(false);
+  const go = (dir: number) => setIndex((i) => (i + dir + QUOTES.length) % QUOTES.length);
+
+  useEffect(() => {
+    if (paused) return;
+    const timer = setInterval(() => {
+      setIndex((i) => (i + 1) % QUOTES.length);
+    }, 6000);
+    return () => clearInterval(timer);
+  }, [paused, index]);
+
+  const quote = QUOTES[index];
+
+  return (
+    <div
+      role="region"
+      aria-roledescription="carrossel"
+      aria-label="Depoimentos"
+      onMouseEnter={() => setPaused(true)}
+      onMouseLeave={() => setPaused(false)}
+      onFocus={() => setPaused(true)}
+      onBlur={() => setPaused(false)}
+      className="flex items-center gap-2 sm:gap-6"
+    >
+      <button
+        onClick={() => go(-1)}
+        aria-label="Depoimento anterior"
+        className="w-11 h-11 shrink-0 rounded-full border border-[#C5A028]/40 text-[#1B365D] hidden sm:flex items-center justify-center hover:bg-[#1B365D] hover:text-white hover:border-[#1B365D] cursor-pointer"
+        style={{ transition: 'background-color 200ms ease, color 200ms ease' }}
+      >
+        <ChevronLeft size={20} />
+      </button>
+      <figure className="flex-1 min-w-0 min-h-[190px] sm:min-h-[170px] flex flex-col justify-center">
+        <AnimatePresence mode="wait" initial={false}>
+          <motion.blockquote
+            key={index}
+            initial={{ opacity: 0, y: 12 }}
+            animate={{ opacity: 1, y: 0 }}
+            exit={{ opacity: 0, y: -12 }}
+            transition={{ duration: 0.5, ease: "easeOut" }}
+            className="font-serif text-2xl md:text-[1.75rem] leading-snug text-[#1B365D]"
+            aria-live="polite"
+          >
+            “{quote.text}”
+            <figcaption className="mt-4 text-sm font-sans font-light text-slate-500 not-italic">{quote.author}</figcaption>
+          </motion.blockquote>
+        </AnimatePresence>
+        <div className="flex items-center gap-2 mt-6" role="tablist" aria-label="Escolher depoimento">
+          {QUOTES.map((q, i) => (
+            <button
+              key={q.author}
+              role="tab"
+              aria-selected={i === index}
+              aria-label={`Depoimento ${i + 1} de ${q.author}`}
+              onClick={() => setIndex(i)}
+              className={`h-1.5 rounded-full cursor-pointer ${i === index ? "w-6 bg-[#C5A028]" : "w-1.5 bg-slate-300 hover:bg-slate-400"}`}
+              style={{ transition: 'background-color 200ms ease, width 200ms ease' }}
+            />
+          ))}
+        </div>
+      </figure>
+      <button
+        onClick={() => go(1)}
+        aria-label="Próximo depoimento"
+        className="w-11 h-11 shrink-0 rounded-full border border-[#C5A028]/40 text-[#1B365D] hidden sm:flex items-center justify-center hover:bg-[#1B365D] hover:text-white hover:border-[#1B365D] cursor-pointer"
+        style={{ transition: 'background-color 200ms ease, color 200ms ease' }}
+      >
+        <ChevronRight size={20} />
+      </button>
+    </div>
+  );
+};
 
 import { getOptimizedImageUrl } from '../../lib/imageOptimizer';
 
@@ -170,11 +252,16 @@ export const LandingPage: React.FC = () => {
     setShowTypeModal(true);
   }
 
+  const handleConcierge = () => {
+    const msg = "Olá InoEvents! Quero o serviço Concierge (+10.000 Kz) — que a vossa equipa crie o meu convite por mim.";
+    window.open(`https://wa.me/244952815430?text=${encodeURIComponent(msg)}`, "_blank", "noopener,noreferrer");
+  }
+
   return (
     <div className="flex-1 min-h-screen flex flex-col justify-between relative font-display overflow-x-hidden bg-[#FDFBF7] text-slate-900">
       <SEO 
         title="InoEvents Angola | Convites Digitais de Casamento, Chá de Panela e Gestão de Eventos" 
-        description="A plataforma mais elegante de Angola para criar convites digitais de casamento e chás de panela com RSVP online, QR Code de acesso, check-in presencial no evento, lista de convidados e presentes por IBAN."
+        description="A plataforma mais elegante de Angola para criar convites digitais de casamento e chás de panela a partir de 7.500 Kz, com RSVP online, QR Code de acesso, check-in presencial no evento, lista de convidados e presentes por IBAN."
       />
 
       <Navbar />
@@ -233,8 +320,8 @@ export const LandingPage: React.FC = () => {
                  transition={{ duration: 0.8, ease: "easeOut", delay: 0.5 }}
                  className="flex flex-col items-center gap-6 w-full max-w-2xl mx-auto px-4"
               >
-                {/* Primary CTA — 1 dominant action, hierarchy clara */}
-                <div className="flex flex-col items-center gap-3 w-full max-w-sm sm:max-w-lg">
+                {/* Primary CTA — hierarquia clara, lado a lado no desktop */}
+                <div className="flex flex-col sm:flex-row items-stretch sm:items-center justify-center gap-3 w-full sm:w-auto">
                    <button
                      onClick={handleCreateEvent}
                      className="w-full sm:w-auto h-12 px-8 bg-[#C5A028] text-[#1B365D] text-xs font-bold uppercase tracking-wider rounded-full flex items-center justify-center gap-2 group cursor-pointer hover:bg-[#d4af37] active:scale-[0.97]"
@@ -244,24 +331,15 @@ export const LandingPage: React.FC = () => {
                      <ArrowRight size={16} className="group-hover:translate-x-0.5 shrink-0" style={{ transition: 'transform 160ms ease-out' }} />
                   </button>
 
-                  {/* CTAs secundários — alvos 44px, peso visual leve */}
-                  <div className="flex items-center gap-2">
-                    <a
-                       href="#exemplo"
-                       className="min-h-[44px] inline-flex items-center gap-1 px-2 text-[11px] font-semibold text-white/80 hover:text-white"
-                       style={{ transition: 'color 200ms ease' }}
-                    >
-                       <ImageIcon size={13} className="text-white/60" />
-                       Ver um exemplo
-                    </a>
-                    <span className="w-px h-3 bg-white/30" />
+                  {/* Secundário — botão fantasma com peso de botão */}
+                  <div className="flex flex-col sm:flex-row items-stretch sm:items-center gap-3 w-full sm:w-auto">
                     <button
-                       onClick={() => setSupportOpen(true)}
-                       className="min-h-[44px] inline-flex items-center gap-1 px-2 text-[11px] font-semibold text-[var(--color-gold-soft)] hover:text-white cursor-pointer"
-                       style={{ transition: 'color 200ms ease' }}
+                       onClick={handleConcierge}
+                       className="w-full sm:w-auto min-h-[48px] inline-flex items-center justify-center gap-2 px-7 rounded-full border-2 border-white/70 text-white text-xs font-bold uppercase tracking-wider hover:bg-white hover:text-[#1B365D] hover:border-white active:scale-[0.97] cursor-pointer"
+                       style={{ transition: 'transform 160ms ease-out, background-color 200ms ease, color 200ms ease' }}
                     >
-                       <Award size={13} className="shrink-0" />
-                       Pedir ajuda
+                       <Award size={15} className="shrink-0" />
+                       Concierge: criamos por si
                     </button>
                   </div>
                 </div>
@@ -288,17 +366,17 @@ export const LandingPage: React.FC = () => {
                            className="flex flex-col gap-6 will-change-transform"
                         >
                            <img src="/casalModel.webp" className="rounded-2xl shadow-sm object-cover w-full aspect-[3/4]" alt="Convite de casamento" />
-                           <img src="/bridal-templates/templateCha3.png" className="rounded-2xl shadow-sm object-cover w-full aspect-[3/4]" alt="Convite de chá de panela" />
-                           <img src="/bridal-templates/templateCha1.png" className="rounded-2xl shadow-sm object-cover w-full aspect-[3/4]" alt="Convite de chá de panela" />
+                           <img src="/bridal-templates/templateCha3.webp" className="rounded-2xl shadow-sm object-cover w-full aspect-[3/4]" alt="Convite de chá de panela" />
+                           <img src="/bridal-templates/templateCha1.webp" className="rounded-2xl shadow-sm object-cover w-full aspect-[3/4]" alt="Convite de chá de panela" />
                         </motion.div>
                         <motion.div
                            animate={{ y: ["-50%", "0%"] }}
                            transition={{ repeat: Infinity, duration: 22, ease: "linear" }}
                            className="flex flex-col gap-6 mt-[-50%] will-change-transform"
                         >
-                           <img src="/bridal-templates/templateCha2.png" className="rounded-2xl shadow-sm object-cover w-full aspect-[3/4]" alt="Convite de chá de panela" />
-                           <img src="/bridal-templates/templateCha4.png" className="rounded-2xl shadow-sm object-cover w-full aspect-[3/4]" alt="Convite de chá de panela" />
-                           <img src="/bridal-templates/templateCha1.png" className="rounded-2xl shadow-sm object-cover w-full aspect-[3/4]" alt="Convite de chá de panela" />
+                           <img src="/bridal-templates/templateCha2.webp" className="rounded-2xl shadow-sm object-cover w-full aspect-[3/4]" alt="Convite de chá de panela" />
+                           <img src="/bridal-templates/templateCha4.webp" className="rounded-2xl shadow-sm object-cover w-full aspect-[3/4]" alt="Convite de chá de panela" />
+                           <img src="/bridal-templates/templateCha1.webp" className="rounded-2xl shadow-sm object-cover w-full aspect-[3/4]" alt="Convite de chá de panela" />
                         </motion.div>
                      </div>
                   </div>
@@ -345,6 +423,97 @@ export const LandingPage: React.FC = () => {
            </span>
            <span className="h-px w-8 bg-[#C5A028]/60" />
         </div>
+
+        {/* Como funciona — três gestos */}
+        <section id="features" className="px-6 pt-4 md:pt-8 pb-4 md:pb-8 w-full">
+          <div className="max-w-3xl mx-auto">
+            <h2 className="text-3xl md:text-[2.75rem] font-serif font-bold text-[#1B365D] tracking-tight leading-[1.1] mb-4">
+              Do link ao <span className="italic font-medium text-[#8a6d1c]">sim</span>, em três gestos.
+            </h2>
+            <p className="text-slate-600 font-light text-lg leading-relaxed mb-12">
+              Sem papel, sem listas em cadernos, sem telefonemas a confirmar um a um.
+            </p>
+            <ol className="flex flex-col">
+              <li className="grid grid-cols-[auto_minmax(0,1fr)] gap-6 py-8 border-t border-[#C5A028]/30">
+                <span className="font-serif italic text-2xl text-[#8a6d1c] leading-none pt-1">I.</span>
+                <div>
+                  <h3 className="font-serif font-bold text-xl text-slate-900 mb-2">Partilhe o link</h3>
+                  <p className="text-slate-600 font-light leading-relaxed">Do painel, envie o convite a cada convidado por WhatsApp com uma mensagem pronta a acompanhar.</p>
+                </div>
+              </li>
+              <li className="grid grid-cols-[auto_minmax(0,1fr)] gap-6 py-8 border-t border-[#C5A028]/30">
+                <span className="font-serif italic text-2xl text-[#8a6d1c] leading-none pt-1">II.</span>
+                <div>
+                  <h3 className="font-serif font-bold text-xl text-slate-900 mb-2">Confirmam na página</h3>
+                  <p className="text-slate-600 font-light leading-relaxed">Cada convidado abre o link e confirma presença; nos planos avançados recebe um código QR individual.</p>
+                </div>
+              </li>
+              <li className="grid grid-cols-[auto_minmax(0,1fr)] gap-6 py-8 border-t border-b border-[#C5A028]/30">
+                <span className="font-serif italic text-2xl text-[#8a6d1c] leading-none pt-1">III.</span>
+                <div>
+                  <h3 className="font-serif font-bold text-xl text-slate-900 mb-2">Receba no dia</h3>
+                  <p className="text-slate-600 font-light leading-relaxed">Check-in à entrada com a câmara, presentes por IBAN registados e mesas organizadas.</p>
+                </div>
+              </li>
+            </ol>
+          </div>
+        </section>
+
+        {/* Funcionalidades — só o que a plataforma faz */}
+        <section className="px-6 py-16 md:py-24 w-full" aria-label="Funcionalidades">
+          <div className="max-w-5xl mx-auto">
+            <h2 className="text-3xl md:text-[2.75rem] font-serif font-bold text-[#1B365D] tracking-tight leading-[1.1] mb-4">
+              Tudo o que o convite <span className="italic font-medium text-[#8a6d1c]">faz por si</span>
+            </h2>
+            <p className="text-slate-600 font-light text-lg leading-relaxed mb-12 max-w-2xl">
+              Nada aqui é promessa — cada linha corresponde a uma ferramenta real do painel.
+            </p>
+            <ul className="grid grid-cols-1 md:grid-cols-2 gap-x-12 border-b border-[#C5A028]/30">
+              <li className="flex gap-4 py-6 border-t border-[#C5A028]/30">
+                <MessageSquare size={20} className="text-[#8a6d1c] shrink-0 mt-1" />
+                <div>
+                  <h3 className="font-bold text-slate-900 mb-1">Confirmação sem telefonemas</h3>
+                  <p className="text-sm text-slate-600 font-light leading-relaxed">O convidado recebe o link no WhatsApp e confirma presença na página.</p>
+                </div>
+              </li>
+              <li className="flex gap-4 py-6 border-t border-[#C5A028]/30">
+                <QrCode size={20} className="text-[#8a6d1c] shrink-0 mt-1" />
+                <div>
+                  <h3 className="font-bold text-slate-900 mb-1">Entrada com check-in</h3>
+                  <p className="text-sm text-slate-600 font-light leading-relaxed">QR individual por convidado e leitura à entrada, nos planos VIP e Business.</p>
+                </div>
+              </li>
+              <li className="flex gap-4 py-6 border-t border-[#C5A028]/30">
+                <Gift size={20} className="text-[#8a6d1c] shrink-0 mt-1" />
+                <div>
+                  <h3 className="font-bold text-slate-900 mb-1">Presentes em Kwanza</h3>
+                  <p className="text-sm text-slate-600 font-light leading-relaxed">Cotas com valores, transferência por IBAN e registo de cada contribuição.</p>
+                </div>
+              </li>
+              <li className="flex gap-4 py-6 border-t border-[#C5A028]/30">
+                <Users size={20} className="text-[#8a6d1c] shrink-0 mt-1" />
+                <div>
+                  <h3 className="font-bold text-slate-900 mb-1">Mesas organizadas</h3>
+                  <p className="text-sm text-slate-600 font-light leading-relaxed">Distribua cada convidado pelo seu lugar, a partir do Premium.</p>
+                </div>
+              </li>
+              <li className="flex gap-4 py-6 border-t border-[#C5A028]/30">
+                <BookOpen size={20} className="text-[#8a6d1c] shrink-0 mt-1" />
+                <div>
+                  <h3 className="font-bold text-slate-900 mb-1">Livro, galeria e música</h3>
+                  <p className="text-sm text-slate-600 font-light leading-relaxed">Recados dos convidados, fotos com likes e fundo musical, conforme o plano.</p>
+                </div>
+              </li>
+              <li className="flex gap-4 py-6 border-t border-[#C5A028]/30">
+                <Globe size={20} className="text-[#8a6d1c] shrink-0 mt-1" />
+                <div>
+                  <h3 className="font-bold text-slate-900 mb-1">Contagem regressiva e localização</h3>
+                  <p className="text-sm text-slate-600 font-light leading-relaxed">Countdown no convite e botão de mapa para os convidados chegarem sem ligar.</p>
+                </div>
+              </li>
+            </ul>
+          </div>
+        </section>
 
         {/* Pricing Section (New) */}
         <section id="pricing" className="px-6 py-16 md:py-24 w-full relative z-20">
@@ -458,11 +627,11 @@ export const LandingPage: React.FC = () => {
                      </li>
                      <li className="flex items-center gap-3 text-[13px] text-slate-600">
                         <CheckCircle2 size={18} className="text-[#C5A028] shrink-0" />
-                        <span>Acompanhantes e lembretes</span>
+                        <span>Gestão de acompanhantes</span>
                      </li>
                      <li className="flex items-center gap-3 text-[13px] text-slate-600">
                         <CheckCircle2 size={18} className="text-[#C5A028] shrink-0" />
-                        <span>Domínio personalizado</span>
+                        <span>Estatísticas avançadas</span>
                      </li>
                      <li className="flex items-center gap-3 text-[13px] text-slate-600">
                         <CheckCircle2 size={18} className="text-[#C5A028] shrink-0" />
@@ -520,56 +689,11 @@ export const LandingPage: React.FC = () => {
           </div>
         </section>
 
-        {/* Como funciona — três gestos */}
-        <section id="features" className="px-6 py-16 md:py-24 w-full">
-          <div className="max-w-3xl mx-auto">
-            <h2 className="text-3xl md:text-[2.75rem] font-serif font-bold text-[#1B365D] tracking-tight leading-[1.1] mb-4">
-              Do link ao <span className="italic font-medium text-[#8a6d1c]">sim</span>, em três gestos.
-            </h2>
-            <p className="text-slate-600 font-light text-lg leading-relaxed mb-12">
-              Sem papel, sem listas em cadernos, sem telefonemas a confirmar um a um.
-            </p>
-            <ol className="flex flex-col">
-              <li className="grid grid-cols-[auto_minmax(0,1fr)] gap-6 py-8 border-t border-[#C5A028]/30">
-                <span className="font-serif italic text-2xl text-[#8a6d1c] leading-none pt-1">I.</span>
-                <div>
-                  <h3 className="font-serif font-bold text-xl text-slate-900 mb-2">Partilhe o link</h3>
-                  <p className="text-slate-600 font-light leading-relaxed">Do painel, envie o convite a cada convidado por WhatsApp com uma mensagem pronta a acompanhar.</p>
-                </div>
-              </li>
-              <li className="grid grid-cols-[auto_minmax(0,1fr)] gap-6 py-8 border-t border-[#C5A028]/30">
-                <span className="font-serif italic text-2xl text-[#8a6d1c] leading-none pt-1">II.</span>
-                <div>
-                  <h3 className="font-serif font-bold text-xl text-slate-900 mb-2">Confirmam na página</h3>
-                  <p className="text-slate-600 font-light leading-relaxed">Cada convidado abre o link e confirma presença; nos planos avançados recebe um código QR individual.</p>
-                </div>
-              </li>
-              <li className="grid grid-cols-[auto_minmax(0,1fr)] gap-6 py-8 border-t border-b border-[#C5A028]/30">
-                <span className="font-serif italic text-2xl text-[#8a6d1c] leading-none pt-1">III.</span>
-                <div>
-                  <h3 className="font-serif font-bold text-xl text-slate-900 mb-2">Receba no dia</h3>
-                  <p className="text-slate-600 font-light leading-relaxed">Check-in à entrada com a câmara, presentes por IBAN registados e mesas organizadas.</p>
-                </div>
-              </li>
-            </ol>
-            <p className="mt-10 text-sm text-slate-500 leading-relaxed font-light">
-              <span className="font-bold text-slate-700">Incluído conforme o plano:</span> galeria de fotos, música de fundo, livro de assinaturas, mapa das mesas, estatísticas do evento, domínio próprio e assistente de criação.
-            </p>
-          </div>
-        </section>
-
-        {/* Vozes — duas citações quietas */}
+        {/* Vozes — rotação fluida de seis */}
         <section className="px-6 py-16 md:py-24 w-full" aria-label="Depoimentos">
           <h2 className="sr-only">O que dizem os noivos</h2>
-          <div className="max-w-4xl mx-auto grid grid-cols-1 md:grid-cols-2 gap-10 md:gap-14">
-            <figure>
-              <blockquote className="font-serif text-2xl leading-snug text-[#1B365D]">“Os templates são maravilhosos. O meu casamento ganhou outro nível.”</blockquote>
-              <figcaption className="mt-4 text-sm text-slate-500 font-light">Juliana M. — Noiva</figcaption>
-            </figure>
-            <figure className="md:pt-12">
-              <blockquote className="font-serif text-2xl leading-snug text-[#1B365D]">“A melhor plataforma de convites que já usei. Simplesmente elegante.”</blockquote>
-              <figcaption className="mt-4 text-sm text-slate-500 font-light">Maria S. — Noiva</figcaption>
-            </figure>
+          <div className="max-w-3xl mx-auto">
+            <QuoteRotator />
           </div>
         </section>
 
@@ -623,41 +747,35 @@ export const LandingPage: React.FC = () => {
               animate={{ scale: 1, opacity: 1 }}
               exit={{ scale: 0.95, opacity: 0, transition: { duration: 0.15 } }}
               transition={{ type: "spring", duration: 0.4, bounce: 0.15 }}
-              className="bg-white rounded-[2.5rem] p-6 md:p-8 max-w-lg w-full max-h-[90vh] md:max-h-[85vh] flex flex-col shadow-2xl border border-slate-100 relative overflow-hidden text-left outline-none"
+              className="bg-[#FFFDF8] rounded-3xl p-6 md:p-8 max-w-md w-full flex flex-col shadow-2xl border border-[#C5A028]/30 relative overflow-hidden text-left outline-none"
             >
-              {/* Decorative design details */}
-              <div className="absolute top-0 left-0 w-full h-2 bg-gradient-to-r from-brand-blue to-[#BF9B30]" />
-              
               <button
                 onClick={() => setShowTypeModal(false)}
-                className="absolute top-6 right-6 text-slate-400 hover:text-slate-600 p-2 rounded-full hover:bg-slate-100 transition-all cursor-pointer border border-slate-100"
+                aria-label="Fechar"
+                className="absolute top-5 right-5 text-slate-400 hover:text-slate-700 w-11 h-11 rounded-full hover:bg-slate-100 flex items-center justify-center cursor-pointer border border-slate-100"
+                style={{ transition: 'background-color 200ms ease, color 200ms ease' }}
               >
                 <X size={20} className="block" />
               </button>
 
-              <div className="text-center mb-6 shrink-0">
-                <div className="mx-auto w-12 h-12 bg-blue-50 text-brand-blue rounded-xl flex items-center justify-center mb-3">
-                  <PartyPopper size={28} />
-                </div>
-                <h3 className="text-xl md:text-2xl font-serif font-black text-slate-900 mb-1">Que tipo de evento deseja criar?</h3>
-                <p className="text-slate-500 text-xs md:text-sm">Selecione uma das opções abaixo para ver os modelos ideais e personalizados para o seu momento único.</p>
+              <div className="text-center mb-6 shrink-0 px-2">
+                <h3 className="text-2xl font-serif font-bold text-[#1B365D] tracking-tight mb-2">Que momento vamos celebrar?</h3>
+                <p className="text-slate-500 text-sm font-light">Dois caminhos, um só cuidado.</p>
               </div>
 
-              <div className="grid grid-cols-1 gap-3 mb-6 flex-1 min-h-0 overflow-y-auto pr-1">
+              <div className="grid grid-cols-1 gap-3">
                 {[
-                  { id: 'wedding', label: 'Casamento', desc: 'União de almas, RSVP detalhado, lista de presentes e IBAN.', icon: <Gem size={24} />, color: 'from-amber-500/10 to-amber-600/10 text-amber-600' },
-                  { id: 'bridal', label: 'Chá de Panela', desc: 'Chá de cozinha, presentes práticos e brincadeiras animadas.', icon: <Utensils size={24} />, color: 'from-pink-500/10 to-rose-600/10 text-pink-600' },
-                  { id: 'birthday', label: 'Aniversário', desc: 'Comemoração, contagem regressiva e confirmação de presença rápida.', icon: <Cake size={24} />, color: 'from-purple-500/10 to-indigo-600/10 text-purple-600' },
-                  { id: 'baby', label: 'Chá de Bebê', desc: 'Boas-vindas calorosas ao novo membro especial da família.', icon: <Baby size={24} />, color: 'from-cyan-500/10 to-blue-600/10 text-cyan-600' },
-                  { id: 'corporate', label: 'Evento Corporativo', desc: 'Palestras, conferências, lançamentos e credenciamento ágil.', icon: <Briefcase size={24} />, color: 'from-slate-700/10 to-slate-950/10 text-slate-800' },
+                  { id: 'wedding', label: 'Casamento', desc: 'RSVP detalhado, lista de presentes e IBAN.', icon: <Gem size={24} />, color: 'from-amber-500/10 to-amber-600/10 text-amber-600' },
+                  { id: 'bridal', label: 'Chá de Panela', desc: 'Presentes práticos e confirmação rápida.', icon: <Utensils size={24} />, color: 'from-pink-500/10 to-rose-600/10 text-pink-600' },
                 ].map((item) => (
                   <button
                     key={item.id}
                     onClick={() => {
-                      navigate(`/templates?category=${item.id}`);
+                      navigate(item.id === 'wedding' ? '/create-wedding' : `/templates?category=${item.id}`);
                       setShowTypeModal(false);
                     }}
-                    className="flex items-center gap-4 p-4 rounded-2xl border border-slate-100 hover:border-slate-300 hover:bg-slate-50/50 text-left transition-all duration-300 group cursor-pointer w-full bg-white"
+                    className="flex items-center gap-4 p-4 rounded-2xl border border-slate-200 hover:border-[#C5A028]/60 hover:bg-white text-left cursor-pointer w-full bg-white"
+                    style={{ transition: 'border-color 200ms ease, background-color 200ms ease' }}
                   >
                     <div className={`w-12 h-12 rounded-xl bg-gradient-to-br ${item.color} flex items-center justify-center shrink-0`}>
                       {item.icon}
@@ -671,15 +789,6 @@ export const LandingPage: React.FC = () => {
                     </div>
                   </button>
                 ))}
-              </div>
-
-              <div className="flex justify-end gap-3 border-t border-slate-100 pt-5">
-                <button
-                  onClick={() => setShowTypeModal(false)}
-                  className="px-6 py-3 rounded-full font-bold bg-slate-100 hover:bg-slate-200 text-slate-600 transition-colors cursor-pointer text-xs md:text-sm"
-                >
-                  Cancelar
-                </button>
               </div>
             </motion.div>
           </motion.div>

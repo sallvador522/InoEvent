@@ -67,7 +67,7 @@ export const OnboardingWizard: React.FC<OnboardingWizardProps> = ({ onCancel, on
     const bridalThemes = [
         { id: 'BRIDAL_ROMANTIC', name: 'Romântico Delicado', desc: 'Tons pasteis suaves', color: 'from-pink-50 to-rose-100 border-pink-200' },
         { id: 'BRIDAL_MINIMAL', name: 'Minimalista Elegante', desc: 'Preto e branco editorial', color: 'from-slate-50 to-zinc-100 border-slate-200' },
-        { id: 'BRIDAL_RUSTIC', name: 'Doce Chá rústico', desc: 'Floral elegante', color: 'from-amber-50/70 to-orange-100/70 border-amber-200' },
+        { id: 'BRIDAL_BEAUTY', name: 'Beleza & Spa', desc: 'Toques de luxo sereno', color: 'from-amber-50/70 to-orange-100/70 border-amber-200' },
     ];
 
     const currentThemesList = isBridalShower ? bridalThemes : weddingThemes;

@@ -25,6 +25,7 @@ const ClientDashboard = lazy(() => import('./features/dashboard/ClientDashboard'
 const AuthPage = lazy(() => import('./features/auth/AuthPage').then(m => ({ default: m.AuthPage })));
 const PlansPage = lazy(() => import('./features/plans/PlansPage').then(m => ({ default: m.PlansPage })));
 const EventCreator = lazy(() => import('./features/invitation/EventCreator').then(m => ({ default: m.EventCreator })));
+const WeddingQuestionnaire = lazy(() => import('./features/invitation/WeddingQuestionnaire').then(m => ({ default: m.WeddingQuestionnaire })));
 const AdminDashboard = lazy(() => import('./features/admin/AdminDashboard').then(m => ({ default: m.AdminDashboard })));
 
 // Sleek luxury-styled minimalist loading fallback
@@ -93,6 +94,11 @@ const AnimatedRoutes: React.FC = () => {
         <Route path="/create-invitation" element={
             <ProtectedRoute>
                 <PageWrapper><EventCreator /></PageWrapper>
+            </ProtectedRoute>
+        } />
+        <Route path="/create-wedding" element={
+            <ProtectedRoute>
+                <PageWrapper><WeddingQuestionnaire /></PageWrapper>
             </ProtectedRoute>
         } />
         <Route path="/create-bridal" element={

@@ -58,6 +58,18 @@ const FAQ_ITEMS: FAQItem[] = [
     a: "Sim. No plano Premium remove a marca d'água da InoEvents dos convites. No plano Business (para agências e cerimonialistas), vai além: coloca a sua própria marca no rodapé dos convites dos seus clientes (white-label).",
     category: "features",
     icon: Eye
+  },
+  {
+    q: "Existe alternativa ao Fotify ou convite.in em Angola?",
+    a: "Sim — a InoEvents foi desenhada para Angola: preços em Kwanza com pagamento único por evento (sem mensalidade para noivos), lista de presentes por IBAN de bancos angolanos e partilha por WhatsApp. As plataformas internacionais cobram em dólares e não resolvem o recebimento local.",
+    category: "features",
+    icon: Sparkles
+  },
+  {
+    q: "Quanto custa criar um convite digital em Angola?",
+    a: "Na InoEvents, o Essencial custa 7.500 Kz, o Premium 15.000 Kz e o VIP 25.000 Kz — sempre pagamento único por evento, sem mensalidade. Para agências e cerimonialistas, o plano Business custa 39.900 Kz por mês com eventos ilimitados.",
+    category: "features",
+    icon: Heart
   }
 ];
 

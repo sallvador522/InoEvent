@@ -9,6 +9,9 @@ import { normalizePlanId, getEventCreationLimit, getValidityDays, isBusinessPlan
 import { uploadEventAudio, deleteEventAudio, isOwnStorageAudio, formatAudioSize, MAX_AUDIO_BYTES } from '../../lib/audioUpload';
 import { ArrowLeft, ArrowRight, Check, Plus, Trash2, Gift, Lock } from 'lucide-react';
 import toast from 'react-hot-toast';
+import { PlacePicker } from '../../components/PlacePicker';
+import { GOOGLE_MAPS_API_KEY } from '../../lib/maps';
+import { TravelMap } from './TravelMap';
 
 const WEDDING_LAYOUTS = [
   { id: 'CLASSIC', label: 'Essencial Moderno', premium: false },
@@ -93,6 +96,9 @@ export const WeddingQuestionnaire: React.FC = () => {
   const [locationName, setLocationName] = useState('');
   const [address, setAddress] = useState('');
   const [mapLink, setMapLink] = useState('');
+  const [latitude, setLatitude] = useState<number | null>(null);
+  const [longitude, setLongitude] = useState<number | null>(null);
+  const [placeId, setPlaceId] = useState<string | null>(null);
   const [receptionName, setReceptionName] = useState('');
   const [receptionAddress, setReceptionAddress] = useState('');
   const [description, setDescription] = useState('');
@@ -123,10 +129,24 @@ export const WeddingQuestionnaire: React.FC = () => {
       navigate('/auth');
       return null;
     }
+    // Guarda honesta: fotos em base64 contam para o limite de 1MB do documento.
+    // Barramos antes de tentar gravar para o passo não parecer "preso".
+    const approxBytes =
+      (heroImage.length + gallery.reduce((acc, g) => acc + g.length, 0)) * 0.75;
+    if (approxBytes > 800000) {
+      toast.error('As fotos estão pesadas demais. Remova algumas fotos da galeria e tente de novo.');
+      return null;
+    }
     setSaving(true);
     try {
       const id = eventId || 'evt_' + Math.random().toString(36).substring(2, 11);
       const plan = normalizePlanId(userProfile?.plan || 'essential');
+      // isoDate canónico para countdown em todos os temas (date vem do input YYYY-MM-DD)
+      let isoDate = '';
+      if (date) {
+        const d = new Date(`${date}T${time || '12:00'}:00`);
+        if (!isNaN(d.getTime())) isoDate = d.toISOString();
+      }
       const payload: Record<string, any> = {
         id,
         ownerId: user.uid,
@@ -140,10 +160,14 @@ export const WeddingQuestionnaire: React.FC = () => {
         brideParents,
         groomParents,
         date,
+        isoDate,
         time,
         locationName,
         address,
         mapLink,
+        latitude,
+        longitude,
+        placeId,
         receptionName,
         receptionAddress,
         description,
@@ -190,6 +214,26 @@ export const WeddingQuestionnaire: React.FC = () => {
     if (step === 1 && (!date || !locationName.trim())) {
       toast.error('A data e o local são obrigatórios.');
       return;
+    }
+    if (step === 2) {
+      if (!description.trim()) {
+        toast.error('Escreva a mensagem de boas-vindas (a vossa história).');
+        return;
+      }
+      if (!heroImage) {
+        toast.error('Escolha a foto principal do casal.');
+        return;
+      }
+      if (!musicTrack) {
+        toast.error('Escolha a música de fundo (ou “Sem música”).');
+        return;
+      }
+    }
+    if (step === 3) {
+      if (!bankName.trim() || !accountName.trim() || !iban.trim()) {
+        toast.error('Preencha o banco, o titular e o IBAN para os presentes. Pode editar depois no painel.');
+        return;
+      }
     }
     const id = await saveDraft();
     if (id) setStep((s) => Math.min(s + 1, STEPS.length - 1));
@@ -350,8 +394,60 @@ export const WeddingQuestionnaire: React.FC = () => {
                 </div>
                 <div className="mb-4">
                   <label className={labelCls} htmlFor="wq-loc">Local da cerimónia *</label>
-                  <input id="wq-loc" className={inputCls} value={locationName} onChange={(e) => setLocationName(e.target.value)} placeholder="Ex: Igreja da Sagrada Família" autoComplete="off" />
+                  {GOOGLE_MAPS_API_KEY ? (
+                    <PlacePicker
+                      id="wq-loc"
+                      value={locationName}
+                      onChange={(v) => {
+                        setLocationName(v);
+                        // Nome editado à mão invalida o pino anterior
+                        setLatitude(null);
+                        setLongitude(null);
+                        setPlaceId(null);
+                      }}
+                      onClear={() => {
+                        setLatitude(null);
+                        setLongitude(null);
+                        setPlaceId(null);
+                      }}
+                      inputClassName={inputCls}
+                      placeholder="Ex: Igreja da Sagrada Família — escolha uma sugestão"
+                      onSelect={(sel) => {
+                        setLocationName(sel.name || locationName);
+                        setAddress(sel.address);
+                        setLatitude(sel.latitude);
+                        setLongitude(sel.longitude);
+                        setPlaceId(sel.placeId || null);
+                        setMapLink(sel.mapLink);
+                        toast.success(sel.name ? `${sel.name} marcado no mapa!` : 'Local marcado no mapa!');
+                      }}
+                    />
+                  ) : (
+                    <input id="wq-loc" className={inputCls} value={locationName} onChange={(e) => setLocationName(e.target.value)} placeholder="Ex: Igreja da Sagrada Família" autoComplete="off" />
+                  )}
+                  {(latitude === null || longitude === null) && (
+                    <p className="text-[11px] text-slate-400 font-medium mt-2">
+                      Digite e escolha uma sugestão da lista — nome, endereço e mapa preenchem sozinhos.
+                    </p>
+                  )}
+                  {(latitude !== null && longitude !== null) && (
+                    <p className="text-xs text-emerald-600 font-medium mt-2">
+                      ✓ Marcador preciso no mapa — os convidados veem exatamente onde é.
+                    </p>
+                  )}
                 </div>
+                {(address || locationName) && (
+                  <div className="mb-4">
+                    <span className={labelCls}>Pré-visualização do mapa</span>
+                    <TravelMap
+                      chrome="map-only"
+                      event={{ latitude, longitude, address, locationName, mapLink }}
+                    />
+                  </div>
+                )}
+                <p className="text-[11px] text-slate-400 font-medium mb-2">
+                  …ou preencha o endereço manualmente abaixo
+                </p>
                 <div className="mb-4">
                   <label className={labelCls} htmlFor="wq-addr">Endereço</label>
                   <input id="wq-addr" className={inputCls} value={address} onChange={(e) => setAddress(e.target.value)} placeholder="Ex: Maianga, Luanda" autoComplete="off" />
@@ -382,11 +478,11 @@ export const WeddingQuestionnaire: React.FC = () => {
                   Uma foto, um texto e a música — o coração do convite.
                 </p>
                 <div className="mb-4">
-                  <label className={labelCls} htmlFor="wq-desc">Mensagem de boas-vindas</label>
+                  <label className={labelCls} htmlFor="wq-desc">Mensagem de boas-vindas *</label>
                   <textarea id="wq-desc" className={`${inputCls} min-h-[120px] resize-y`} value={description} onChange={(e) => setDescription(e.target.value)} placeholder="Contem aos convidados o que este dia significa…" />
                 </div>
                 <div className="mb-4">
-                  <span className={labelCls}>Foto principal</span>
+                  <span className={labelCls}>Foto principal *</span>
                   <div className="flex items-center gap-4 bg-white border border-slate-200 rounded-xl p-4">
                     {heroImage ? (
                       <img src={heroImage} alt="Foto do casal" className="w-16 h-16 object-cover rounded-lg border border-slate-200" />
@@ -472,7 +568,7 @@ export const WeddingQuestionnaire: React.FC = () => {
                 </div>
                 <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
                   <div>
-                    <label className={labelCls} htmlFor="wq-music">Música de fundo</label>
+                    <label className={labelCls} htmlFor="wq-music">Música de fundo *</label>
                     <select id="wq-music" className={inputCls} value={isOwnStorageAudio(musicTrack) ? 'custom' : musicTrack} onChange={(e) => { if (e.target.value !== 'custom') setMusicTrack(e.target.value); }}>
                       {MUSIC_OPTIONS.map((m) => (
                         <option key={m.id} value={m.id}>{m.label}</option>
@@ -556,7 +652,7 @@ export const WeddingQuestionnaire: React.FC = () => {
                 </p>
                 <div className="grid grid-cols-3 gap-4 mb-4">
                   <div>
-                    <label className={labelCls} htmlFor="wq-bank">Banco</label>
+                    <label className={labelCls} htmlFor="wq-bank">Banco *</label>
                     <select id="wq-bank" className={inputCls} value={bankName} onChange={(e) => setBankName(e.target.value)}>
                       {BANKS.map((b) => (
                         <option key={b} value={b}>{b}</option>
@@ -564,12 +660,12 @@ export const WeddingQuestionnaire: React.FC = () => {
                     </select>
                   </div>
                   <div className="col-span-2">
-                    <label className={labelCls} htmlFor="wq-holder">Titular da conta</label>
+                    <label className={labelCls} htmlFor="wq-holder">Titular da conta *</label>
                     <input id="wq-holder" className={inputCls} value={accountName} onChange={(e) => setAccountName(e.target.value)} placeholder="Ex: Ana Clara dos Santos" autoComplete="off" />
                   </div>
                 </div>
                 <div className="mb-6">
-                  <label className={labelCls} htmlFor="wq-iban">IBAN</label>
+                  <label className={labelCls} htmlFor="wq-iban">IBAN *</label>
                   <input id="wq-iban" className={`${inputCls} font-mono`} value={iban} onChange={(e) => setIban(e.target.value)} placeholder="AO06…" inputMode="numeric" autoComplete="off" />
                 </div>
                 <span className={labelCls}>Cotas de presente</span>

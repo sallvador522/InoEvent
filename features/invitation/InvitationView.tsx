@@ -47,6 +47,8 @@ import { getOptimizedImageUrl, OptimizeImageOptions } from "../../lib/imageOptim
 import { Guestbook } from "./Guestbook";
 
 import { EditableField } from "./components/EditableField";
+import { PlacePicker } from "../../components/PlacePicker";
+import { TravelMap } from "./TravelMap";
 import { ImageUploadField } from "./components/ImageUploadField";
 import { PremiumLoader } from "./components/PremiumLoader";
 import { CountdownTimer } from "./components/CountdownTimer";
@@ -1551,6 +1553,29 @@ const InvitationView: React.FC = () => {
                         </span>
                         <div>
                           <label className="block text-[10px] text-gray-400 mb-1.5 uppercase tracking-wider">
+                            Pesquisar no mapa (marca o ponto exato)
+                          </label>
+                          <PlacePicker
+                            onSelect={(sel) => {
+                              updateField("address", sel.address);
+                              updateField("latitude", sel.latitude);
+                              updateField("longitude", sel.longitude);
+                              updateField("placeId", sel.placeId || null);
+                              updateField("mapLink", sel.mapLink);
+                              if (!(localEvent?.locationName || "").trim() && sel.name) {
+                                updateField("locationName", sel.name);
+                              }
+                              toast.success(sel.name ? `${sel.name} marcado no mapa!` : "Local marcado no mapa!");
+                            }}
+                          />
+                          {(localEvent?.latitude || localEvent?.longitude) ? (
+                            <p className="text-[10px] text-emerald-400 font-medium mt-1.5">
+                              ✓ Marcador preciso ativo
+                            </p>
+                          ) : null}
+                        </div>
+                        <div>
+                          <label className="block text-[10px] text-gray-400 mb-1.5 uppercase tracking-wider">
                             Nome do Local
                           </label>
                           <input
@@ -1566,7 +1591,7 @@ const InvitationView: React.FC = () => {
                                 <label className="block text-xs font-semibold text-[#BF9B30] mb-2 uppercase tracking-widest">
                                   Horário
                                 </label>
-                                <p className="text-[10px] text-slate-500 font-light mb-1.5">Visível nos temas Moderno e Jardim.</p>
+                                <p className="text-[10px] text-slate-500 font-light mb-1.5">Visível em todos os temas.</p>
                           <input
                             type="text"
                             value={localEvent?.time || ""}
@@ -1612,7 +1637,7 @@ const InvitationView: React.FC = () => {
                               <span className="text-xs font-bold text-[#BF9B30] uppercase tracking-widest block">
                                 2. Recepção / Copo d'Água
                               </span>
-                              <p className="text-[10px] text-slate-500 font-light mt-1">Visível nos temas Moderno, Jardim e Industrial.</p>
+                              <p className="text-[10px] text-slate-500 font-light mt-1">Visível em todos os temas.</p>
                             </div>
                             <button
                               type="button"
@@ -2734,6 +2759,16 @@ guestName: string;
                   className="text-white text-lg md:text-xl tracking-widest uppercase text-center"
                 />
               </motion.p>
+              {(isEditing || event.time) ? (
+                <p className="text-sm md:text-base tracking-[0.3em] uppercase text-white/85 mt-2 px-4">
+                  <EditableField
+                    value={isEditing ? (event.time || "") : `${event.time} Horas`}
+                    onChange={(newVal) => updateField?.("time", newVal)}
+                    isEditing={isEditing}
+                    className="text-white/85 text-sm md:text-base tracking-[0.3em] uppercase text-center"
+                  />
+                </p>
+              ) : null}
             </div>
           </motion.div>
         </div>
@@ -2864,8 +2899,77 @@ guestName: string;
                 </Button>
               ) : null}
             </div>
+            <div className="mt-6">
+              <TravelMap chrome="map-only" event={event} isEditing={isEditing} onFieldChange={updateField} />
+            </div>
+            {event.receptionName ? (
+              <div className="bg-white p-6 rounded-xl shadow-lg border border-slate-100 mt-6">
+                <p className="text-[11px] font-bold uppercase tracking-[0.2em] text-slate-400 mb-2">
+                  Receção
+                </p>
+                <h3 className="font-bold text-xl mb-1 text-slate-800">
+                  <EditableField
+                    value={event.receptionName}
+                    onChange={(newVal) => updateField?.("receptionName", newVal)}
+                    isEditing={isEditing}
+                    className="font-bold text-xl mb-1 text-slate-800 text-center"
+                  />
+                </h3>
+                {((isEditing && updateField) || event.receptionAddress) ? (
+                  <p className="text-slate-500 text-sm">
+                    <EditableField
+                      value={event.receptionAddress || ""}
+                      onChange={(newVal) => updateField?.("receptionAddress", newVal)}
+                      isEditing={isEditing}
+                      className="text-slate-500 text-sm text-center"
+                      multiline
+                    />
+                  </p>
+                ) : null}
+              </div>
+            ) : null}
           </FadeInSection>
         </EditableSectionWrapper>
+
+        {event.dressCode?.description ? (
+          <FadeInSection>
+            <div className="bg-white p-6 rounded-xl shadow-lg border border-slate-100">
+              <p className="text-[11px] font-bold uppercase tracking-[0.2em] text-slate-400 mb-2">
+                Dress Code
+              </p>
+              <h3 className="font-bold text-xl mb-1 text-slate-800">
+                <EditableField
+                  value={event.dressCode?.title || "Dress Code"}
+                  onChange={(newVal) =>
+                    updateField?.("dressCode", { ...event.dressCode, title: newVal })
+                  }
+                  isEditing={isEditing}
+                  className="font-bold text-xl mb-1 text-slate-800 text-center"
+                />
+              </h3>
+              <p className="text-slate-500 text-sm">
+                <EditableField
+                  value={event.dressCode?.description || ""}
+                  onChange={(newVal) =>
+                    updateField?.("dressCode", { ...event.dressCode, description: newVal })
+                  }
+                  isEditing={isEditing}
+                  className="text-slate-500 text-sm text-center"
+                  multiline
+                />
+              </p>
+            </div>
+          </FadeInSection>
+        ) : null}
+
+        {event.isoDate && !isNaN(new Date(event.isoDate).getTime()) ? (
+          <FadeInSection>
+            <p className="text-xs font-bold uppercase tracking-[0.2em] text-slate-400 mb-2">
+              Contagem regressiva
+            </p>
+            <CountdownTimer targetDate={event.isoDate} colorClass="text-brand-blue" />
+          </FadeInSection>
+        ) : null}
 
         {/* GIFTS */}
         {event.gifts && event.gifts.length > 0 && (
@@ -2949,6 +3053,54 @@ guestName: string;
             </FadeInSection>
           </EditableSectionWrapper>
         )}
+
+        {/* GIFTS FALLBACK — IBAN avulso (sem cotas): tudo preenchido aparece */}
+        {(!event.gifts || event.gifts.length === 0) && (event as any).iban ? (
+          <EditableSectionWrapper
+            isEditing={isEditing}
+            section="gifts"
+            isHidden={(event.hiddenSections || []).includes("gifts")}
+            label="Lista de Presentes"
+            onEditSection={onEditSection}
+          >
+            <FadeInSection>
+              <div className="bg-white p-6 rounded-xl shadow-lg border border-slate-100 flex flex-col items-center text-center">
+                <h3 className="font-bold text-xl mb-1 text-slate-800">
+                  Presentes
+                </h3>
+                <p className="text-slate-500 text-sm mb-4">
+                  Sua presença é nosso maior presente.
+                </p>
+                <div className="w-full">
+                  <div className="text-xs font-mono text-gray-700 bg-gray-50 border border-dashed border-gray-200 p-2.5 rounded-xl select-all break-all mb-4">
+                    {(event as any).iban}
+                    {(event as any).bankName && (
+                      <div className="font-sans text-[10px] text-gray-500 mt-1 uppercase tracking-wider">
+                        {(event as any).bankName}
+                      </div>
+                    )}
+                    {(event as any).accountName && (
+                      <div className="font-sans text-[10px] text-gray-500">
+                        {(event as any).accountName}
+                      </div>
+                    )}
+                  </div>
+                  <Button
+                    onClick={() => {
+                      copyToClipboard((event as any).iban || "");
+                      toast.success("IBAN copiado!");
+                    }}
+                    variant="navy"
+                    fullWidth
+                    className="text-xs uppercase tracking-widest min-h-[48px]"
+                  >
+                    Copiar IBAN
+                  </Button>
+                </div>
+              </div>
+            </FadeInSection>
+          </EditableSectionWrapper>
+        ) : null}
 
         {/* GALLERY */}
         {event.gallery && event.gallery.length > 0 && (
@@ -3259,6 +3411,9 @@ const ModernLayout: React.FC<{
               </div>
             </FadeInSection>
           )}
+          <div className="max-w-3xl mx-auto">
+            <TravelMap chrome="map-only" event={event} isEditing={isEditing} onFieldChange={updateField} />
+          </div>
         </div>
       </EditableSectionWrapper>
 
@@ -3432,6 +3587,32 @@ const ModernLayout: React.FC<{
                 </button>
               </div>
             )}
+            {(!event.gifts || event.gifts.length === 0) && (event as any).iban ? (
+              <div className="flex flex-col items-center gap-4">
+                <p className="text-xs font-mono text-gray-700 bg-gray-50 border border-dashed border-gray-200 p-2.5 rounded-xl select-all max-w-[280px] break-all flex flex-col items-center">
+                  {(event as any).iban}
+                  {(event as any).bankName && (
+                    <span className="font-sans text-[10px] text-gray-500 mt-1 uppercase tracking-wider">
+                      {(event as any).bankName}
+                    </span>
+                  )}
+                  {(event as any).accountName && (
+                    <span className="font-sans text-[10px] text-gray-500">
+                      {(event as any).accountName}
+                    </span>
+                  )}
+                </p>
+                <button
+                  onClick={() => {
+                    copyToClipboard((event as any).iban || "");
+                    alert("IBAN Copiado!");
+                  }}
+                  className="px-8 py-3 bg-[#2C2C2C] text-white text-xs font-bold uppercase tracking-widest hover:bg-[#C2B280] transition-colors"
+                >
+                  Copiar IBAN
+                </button>
+              </div>
+            ) : null}
           </FadeInSection>
         </div>
       </EditableSectionWrapper>
@@ -3745,6 +3926,9 @@ const GardenLayout: React.FC<{
               </div>
             </FadeInSection>
           )}
+          <div className="max-w-3xl mx-auto px-6">
+            <TravelMap chrome="map-only" event={event} isEditing={isEditing} onFieldChange={updateField} />
+          </div>
         </div>
       </EditableSectionWrapper>
 
@@ -3844,7 +4028,7 @@ const GardenLayout: React.FC<{
         onEditSection={onEditSection}
         className="grid md:grid-cols-2 gap-8 max-w-4xl mx-auto px-6 mb-24 block"
       >
-        {event.dressCode && (
+        {(event.dressCode?.description || isEditing) && (
           <FadeInSection className="bg-white p-8 rounded-2xl shadow-sm border border-[#EAE5DF] text-center flex flex-col justify-center">
             <span className="material-symbols-outlined text-3xl mb-4 text-[#8C8C8C]">
               styler
@@ -3867,7 +4051,7 @@ const GardenLayout: React.FC<{
           </FadeInSection>
         )}
 
-        {event.gifts && (
+        {((event.gifts && event.gifts.length > 0) || (event as any).iban || isEditing) && (
           <FadeInSection className="bg-white p-8 rounded-2xl shadow-sm border border-[#EAE5DF] text-center flex flex-col justify-center">
             <span className="material-symbols-outlined text-3xl mb-4 text-[#8C8C8C]">
               card_giftcard
@@ -3892,41 +4076,49 @@ const GardenLayout: React.FC<{
                 multiline
               />
             </p>
-            <button
-              onClick={() => {
-                copyToClipboard(event.gifts?.[0]?.value || "");
-                alert("IBAN Copiado!");
-              }}
-              className={`px-6 py-2 rounded-full border border-[#D6CFC7] text-xs font-bold uppercase tracking-widest hover:bg-[#F9F6F2] transition-colors mt-auto w-fit mx-auto`}
-            >
-              Copiar IBAN
-            </button>
-            {event.gifts?.[0]?.value && (
-              <p className="text-xs font-mono text-gray-600 bg-gray-50 p-2 rounded-xl mt-4 select-all max-w-[280px] mx-auto break-all flex flex-col items-center w-full">
-                <EditableField
-                  value={event.gifts[0].value}
-                  onChange={(newVal) => {
-                    if (updateField) {
-                      const newGifts = [...event.gifts!];
-                      newGifts[0].value = newVal;
-                      updateField("gifts", newGifts);
-                    }
+            {(event.gifts?.[0]?.value || (event as any).iban) ? (
+              <>
+                <button
+                  onClick={() => {
+                    copyToClipboard(event.gifts?.[0]?.value || (event as any).iban || "");
+                    alert("IBAN Copiado!");
                   }}
-                  isEditing={isEditing}
-                  className="text-xs font-mono text-gray-600 text-center w-full bg-transparent outline-none"
-                />
-                {event.gifts[0].bankName && (
-                  <span className="font-sans text-[10px] text-gray-400 mt-1 uppercase tracking-wider">
-                    {event.gifts[0].bankName}
-                  </span>
-                )}
-                {event.gifts[0].accountName && (
-                  <span className="font-sans text-[10px] text-gray-400">
-                    {event.gifts[0].accountName}
-                  </span>
-                )}
-              </p>
-            )}
+                  className={`px-6 py-2 rounded-full border border-[#D6CFC7] text-xs font-bold uppercase tracking-widest hover:bg-[#F9F6F2] transition-colors mt-auto w-fit mx-auto`}
+                >
+                  Copiar IBAN
+                </button>
+                <p className="text-xs font-mono text-gray-600 bg-gray-50 p-2 rounded-xl mt-4 select-all max-w-[280px] mx-auto break-all flex flex-col items-center w-full">
+                  {event.gifts?.[0]?.value ? (
+                    <EditableField
+                      value={event.gifts[0].value}
+                      onChange={(newVal) => {
+                        if (updateField) {
+                          const newGifts = [...event.gifts!];
+                          newGifts[0].value = newVal;
+                          updateField("gifts", newGifts);
+                        }
+                      }}
+                      isEditing={isEditing}
+                      className="text-xs font-mono text-gray-600 text-center w-full bg-transparent outline-none"
+                    />
+                  ) : (
+                    <span className="text-xs font-mono text-gray-600 text-center w-full">
+                      {(event as any).iban}
+                    </span>
+                  )}
+                  {(event.gifts?.[0]?.bankName || (event as any).bankName) && (
+                    <span className="font-sans text-[10px] text-gray-400 mt-1 uppercase tracking-wider">
+                      {event.gifts?.[0]?.bankName || (event as any).bankName}
+                    </span>
+                  )}
+                  {(event.gifts?.[0]?.accountName || (event as any).accountName) && (
+                    <span className="font-sans text-[10px] text-gray-400">
+                      {event.gifts?.[0]?.accountName || (event as any).accountName}
+                    </span>
+                  )}
+                </p>
+              </>
+            ) : null}
           </FadeInSection>
         )}
       </EditableSectionWrapper>
@@ -4031,6 +4223,16 @@ const RusticLayout: React.FC<{
                     className="text-lg text-white text-center"
                   />
                 </p>
+                {(isEditing || event.time) ? (
+                  <p className="text-sm uppercase tracking-[0.3em] text-[#FDF5E6]/85 mt-1">
+                    <EditableField
+                      value={isEditing ? (event.time || "") : `${event.time} Horas`}
+                      onChange={(newVal) => updateField?.("time", newVal)}
+                      isEditing={isEditing}
+                      className="text-sm uppercase tracking-[0.3em] text-[#FDF5E6]/85 text-center"
+                    />
+                  </p>
+                ) : null}
               </div>
             </motion.div>
           </div>
@@ -4110,6 +4312,47 @@ const RusticLayout: React.FC<{
         </FadeInSection>
       </EditableSectionWrapper>
 
+      <FadeInSection className="px-4 md:px-8 mb-16">
+        <TravelMap chrome="map-only" event={event} isEditing={isEditing} onFieldChange={updateField} />
+      </FadeInSection>
+      {event.receptionName ? (
+        <FadeInSection className="px-4 md:px-8 mb-16">
+          <div className="bg-white p-8 rounded-3xl shadow-sm border border-[#EFEBE9] max-w-xl mx-auto text-center">
+            <span className="inline-block px-3 py-1 bg-[#EFEBE9] text-[#5D4037] text-[10px] font-bold uppercase tracking-widest rounded-full mb-4">
+              Receção
+            </span>
+            <h3 className="text-3xl font-serif mb-2 text-[#4E342E]">
+              <EditableField
+                value={event.receptionName}
+                onChange={(newVal) => updateField?.("receptionName", newVal)}
+                isEditing={isEditing}
+                className="text-3xl font-serif text-[#4E342E] text-center"
+              />
+            </h3>
+            {((isEditing && updateField) || event.receptionAddress) ? (
+              <p className="text-[#8D6E63]">
+                <EditableField
+                  value={event.receptionAddress || ""}
+                  onChange={(newVal) => updateField?.("receptionAddress", newVal)}
+                  isEditing={isEditing}
+                  className="text-[#8D6E63] text-center"
+                  multiline
+                />
+              </p>
+            ) : null}
+          </div>
+        </FadeInSection>
+      ) : null}
+
+      {event.isoDate && !isNaN(new Date(event.isoDate).getTime()) ? (
+        <FadeInSection className="max-w-2xl mx-auto text-center px-6 pb-12">
+          <p className="uppercase tracking-widest text-xs text-[#8D6E63] mb-2">
+            Contagem regressiva
+          </p>
+          <CountdownTimer targetDate={event.isoDate} colorClass="text-[#5D4037]" />
+        </FadeInSection>
+      ) : null}
+
       {/* TIMELINE - Rustic Path */}
       <EditableSectionWrapper
         isEditing={isEditing}
@@ -4180,6 +4423,7 @@ const RusticLayout: React.FC<{
         onEditSection={onEditSection}
         className="grid md:grid-cols-2 gap-4 px-4 mt-16 mb-24 block"
       >
+        {(event.dressCode?.description || isEditing) ? (
         <FadeInSection className="bg-[#5D4037] text-[#FDF5E6] p-10 rounded-3xl text-center flex flex-col items-center justify-center">
           <span className="material-symbols-outlined text-4xl mb-4">
             checkroom
@@ -4200,46 +4444,55 @@ const RusticLayout: React.FC<{
             />
           </p>
         </FadeInSection>
+        ) : null}
         <FadeInSection className="bg-white border border-[#EFEBE9] p-10 rounded-3xl text-center flex flex-col items-center justify-center">
           <span className="material-symbols-outlined text-4xl text-[#5D4037] mb-4">
             card_giftcard
           </span>
           <h3 className="text-2xl font-serif text-[#4E342E] mb-2">Presentes</h3>
-          <button
-            onClick={() => {
-              copyToClipboard(event.gifts?.[0]?.value || "");
-              alert("IBAN Copiado!");
-            }}
-            className="mt-4 px-6 py-2 border border-[#5D4037] text-[#5D4037] rounded-full text-xs font-bold uppercase tracking-widest hover:bg-[#5D4037] hover:text-white transition-colors"
-          >
-            Copiar IBAN
-          </button>
-          {event.gifts?.[0]?.value && (
-            <p className="text-xs font-mono text-[#5D4037] bg-[#FDFBF7] p-2 rounded-xl border border-dashed border-[#EFEBE9] mt-4 select-all max-w-[280px] mx-auto break-all flex flex-col items-center">
-              <EditableField
-                value={event.gifts[0].value}
-                onChange={(newVal) => {
-                  if (updateField) {
-                    const newGifts = [...event.gifts!];
-                    newGifts[0].value = newVal;
-                    updateField("gifts", newGifts);
-                  }
+          {(event.gifts?.[0]?.value || (event as any).iban) ? (
+            <>
+              <button
+                onClick={() => {
+                  copyToClipboard(event.gifts?.[0]?.value || (event as any).iban || "");
+                  alert("IBAN Copiado!");
                 }}
-                isEditing={isEditing}
-                className="text-xs font-mono text-[#5D4037] text-center w-full bg-transparent outline-none"
-              />
-              {event.gifts[0].bankName && (
-                <span className="font-sans text-[10px] text-[#8D6E63] mt-1 uppercase tracking-wider">
-                  {event.gifts[0].bankName}
-                </span>
-              )}
-              {event.gifts[0].accountName && (
-                <span className="font-sans text-[10px] text-[#8D6E63]">
-                  {event.gifts[0].accountName}
-                </span>
-              )}
-            </p>
-          )}
+                className="mt-4 px-6 py-2 border border-[#5D4037] text-[#5D4037] rounded-full text-xs font-bold uppercase tracking-widest hover:bg-[#5D4037] hover:text-white transition-colors"
+              >
+                Copiar IBAN
+              </button>
+              <p className="text-xs font-mono text-[#5D4037] bg-[#FDFBF7] p-2 rounded-xl border border-dashed border-[#EFEBE9] mt-4 select-all max-w-[280px] mx-auto break-all flex flex-col items-center">
+                {event.gifts?.[0]?.value ? (
+                  <EditableField
+                    value={event.gifts[0].value}
+                    onChange={(newVal) => {
+                      if (updateField) {
+                        const newGifts = [...event.gifts!];
+                        newGifts[0].value = newVal;
+                        updateField("gifts", newGifts);
+                      }
+                    }}
+                    isEditing={isEditing}
+                    className="text-xs font-mono text-[#5D4037] text-center w-full bg-transparent outline-none"
+                  />
+                ) : (
+                  <span className="text-xs font-mono text-[#5D4037] text-center w-full">
+                    {(event as any).iban}
+                  </span>
+                )}
+                {(event.gifts?.[0]?.bankName || (event as any).bankName) && (
+                  <span className="font-sans text-[10px] text-[#8D6E63] mt-1 uppercase tracking-wider">
+                    {event.gifts?.[0]?.bankName || (event as any).bankName}
+                  </span>
+                )}
+                {(event.gifts?.[0]?.accountName || (event as any).accountName) && (
+                  <span className="font-sans text-[10px] text-[#8D6E63]">
+                    {event.gifts?.[0]?.accountName || (event as any).accountName}
+                  </span>
+                )}
+              </p>
+            </>
+          ) : null}
         </FadeInSection>
       </EditableSectionWrapper>
 
@@ -4301,13 +4554,24 @@ const IndustrialLayout: React.FC<{
             <span className="text-xs font-bold uppercase tracking-widest border border-white px-2 py-1">
               Save The Date
             </span>
-            <span className="text-xs font-bold uppercase tracking-widest">
+            <span className="text-xs font-bold uppercase tracking-widest text-right">
               <EditableField
                 value={event.date}
                 onChange={(newVal) => updateField?.("date", newVal)}
                 isEditing={isEditing}
                 className="text-xs font-bold uppercase tracking-widest text-white"
               />
+              {(isEditing || event.time) ? (
+                <>
+                  <br />
+                  <EditableField
+                    value={isEditing ? (event.time || "") : `${event.time} Horas`}
+                    onChange={(newVal) => updateField?.("time", newVal)}
+                    isEditing={isEditing}
+                    className="text-xs font-bold uppercase tracking-widest text-gray-400"
+                  />
+                </>
+              ) : null}
             </span>
           </div>
 
@@ -4528,6 +4792,40 @@ const IndustrialLayout: React.FC<{
         </div>
       </EditableSectionWrapper>
 
+      {event.dressCode?.description ? (
+        <div className="border-b border-white/20 p-8 md:p-16 text-center">
+          <span className="text-xs text-gray-400 uppercase tracking-widest mb-4 block">
+            Dress Code
+          </span>
+          <p className="text-xl md:text-2xl font-light uppercase">
+            <EditableField
+              value={event.dressCode?.description || ""}
+              onChange={(newVal) =>
+                updateField?.("dressCode", { ...event.dressCode, description: newVal })
+              }
+              isEditing={isEditing}
+              className="text-xl md:text-2xl font-light uppercase text-white text-center"
+              multiline
+            />
+          </p>
+        </div>
+      ) : null}
+
+      {event.isoDate && !isNaN(new Date(event.isoDate).getTime()) ? (
+        <div className="border-b border-white/20 p-8 md:p-16 text-center">
+          <span className="text-xs text-gray-400 uppercase tracking-widest mb-4 block">
+            Contagem regressiva
+          </span>
+          <CountdownTimer targetDate={event.isoDate} colorClass="text-white" />
+        </div>
+      ) : null}
+
+      <div className="border-b border-white/20 p-8 md:p-16">
+        <div className="max-w-3xl mx-auto">
+          <TravelMap chrome="map-only" event={event} isEditing={isEditing} onFieldChange={updateField} />
+        </div>
+      </div>
+
       {/* GIFTS */}
       {event.gifts && event.gifts.length > 0 && (
         <EditableSectionWrapper
@@ -4596,6 +4894,34 @@ const IndustrialLayout: React.FC<{
                 </button>
               </div>
             )}
+            {(!event.gifts || event.gifts.length === 0) && (event as any).iban ? (
+              <div className="mt-8 w-full max-w-md">
+                <div className="bg-white/10 p-4 rounded-lg font-mono text-sm mb-4 border border-white/20 select-all break-all text-left flex flex-col">
+                  <span className="font-mono text-sm text-white w-full bg-transparent">
+                    {(event as any).iban}
+                  </span>
+                  {(event as any).bankName && (
+                    <span className="font-sans text-[10px] text-gray-400 mt-2 uppercase tracking-wider">
+                      {(event as any).bankName}
+                    </span>
+                  )}
+                  {(event as any).accountName && (
+                    <span className="font-sans text-[10px] text-gray-400">
+                      {(event as any).accountName}
+                    </span>
+                  )}
+                </div>
+                <button
+                  onClick={() => {
+                    copyToClipboard((event as any).iban || "");
+                    alert("IBAN Copiado!");
+                  }}
+                  className="w-full text-xs font-bold border border-white px-4 py-3 hover:bg-white hover:text-black transition-colors uppercase"
+                >
+                  Copiar IBAN
+                </button>
+              </div>
+            ) : null}
           </FadeInSection>
         </EditableSectionWrapper>
       )}
@@ -4958,7 +5284,28 @@ const LuxuryLayout: React.FC<{
           </div>
         </EditableSectionWrapper>
 
+        <FadeInSection className="w-full px-6 mb-24 max-w-md mx-auto">
+          <TravelMap chrome="map-only" event={event} isEditing={isEditing} onFieldChange={updateField} />
+        </FadeInSection>
+
         <GoldDivider />
+
+        {event.dressCode?.description ? (
+          <FadeInSection className="w-full px-6 mb-24 max-w-md mx-auto text-center">
+            <SectionTitle title="Dress Code" />
+            <p className="text-sm text-gray-300 leading-relaxed">
+              <EditableField
+                value={event.dressCode?.description || ""}
+                onChange={(newVal) =>
+                  updateField?.("dressCode", { ...event.dressCode, description: newVal })
+                }
+                isEditing={isEditing}
+                className="text-sm text-gray-300 text-center leading-relaxed"
+                multiline
+              />
+            </p>
+          </FadeInSection>
+        ) : null}
 
         {/* 8. GIFTS (Lista de Presentes) */}
         {event.gifts && event.gifts.length > 0 && (
@@ -5043,6 +5390,61 @@ const LuxuryLayout: React.FC<{
                   )}
                 </div>
               ))}
+              {(!event.gifts || event.gifts.length === 0) && (event as any).iban ? (
+                <div className="bg-[#1A1F26] p-6 rounded-xl border border-[#BF9B30]/20 text-center space-y-4">
+                  <span className="material-symbols-outlined text-3xl text-[#BF9B30]">
+                    featured_seasonal_and_gifts
+                  </span>
+                  <div>
+                    <h4 className="text-white font-bold">Presentes</h4>
+                    <p className="text-xs text-gray-400 mt-2 leading-relaxed">
+                      Sua presença é nosso maior presente.
+                    </p>
+                  </div>
+                  <div className="bg-black/60 p-4 rounded-lg border border-[#BF9B30]/30 shadow-inner">
+                    <p className="text-[10px] text-[#BF9B30] mb-2 uppercase tracking-widest font-bold">
+                      Enviar Presentes
+                    </p>
+                    <p className="text-white font-mono text-base break-all tracking-wider">
+                      {(event as any).iban}
+                    </p>
+                    <div className="mb-4">
+                      {(event as any).bankName && (
+                        <p className="text-[10px] text-gray-400 uppercase tracking-wider">
+                          {(event as any).bankName}
+                        </p>
+                      )}
+                      {(event as any).accountName && (
+                        <p className="text-[10px] text-gray-400">
+                          {(event as any).accountName}
+                        </p>
+                      )}
+                    </div>
+                    <button
+                      onClick={() => handleCopy((event as any).iban)}
+                      className={`
+                              w-full py-3 px-4 rounded-lg font-bold text-xs uppercase tracking-widest transition-all duration-300 flex items-center justify-center gap-2
+                              ${
+                                copiedKey === (event as any).iban
+                                  ? "bg-[#BF9B30] text-[#0F1419] shadow-[0_0_15px_rgba(191,155,48,0.4)] scale-105"
+                                  : "bg-transparent border border-[#BF9B30] text-[#BF9B30] hover:bg-[#BF9B30]/10"
+                              }
+                            `}
+                    >
+                      <span className="material-symbols-outlined text-sm">
+                        {copiedKey === (event as any).iban
+                          ? "check_circle"
+                          : "content_copy"}
+                      </span>
+                      <span>
+                        {copiedKey === (event as any).iban
+                          ? "IBAN Copiado"
+                          : "Copiar IBAN"}
+                      </span>
+                    </button>
+                  </div>
+                </div>
+              ) : null}
             </FadeInSection>
           </EditableSectionWrapper>
         )}
@@ -6278,6 +6680,15 @@ const LimintsoGoldLayout: React.FC<{
                 isEditing={isEditing}
               />
             </p>
+            {(isEditing || event.time) ? (
+              <p className="text-xs uppercase tracking-widest text-slate-500 font-sans mt-1">
+                <EditableField
+                  value={isEditing ? (event.time || "") : `${event.time} Horas`}
+                  onChange={(val) => updateField?.("time", val)}
+                  isEditing={isEditing}
+                />
+              </p>
+            ) : null}
             
             <div className="max-w-xl mx-auto mt-6 text-sm text-slate-600 leading-relaxed font-serif">
               <p className="min-h-[45px]">
@@ -6382,6 +6793,64 @@ const LimintsoGoldLayout: React.FC<{
               )}
             </div>
           </FadeInSection>
+          <FadeInSection className="mt-8 text-center max-w-md mx-auto">
+            <TravelMap chrome="map-only" event={event} isEditing={isEditing} onFieldChange={updateField} />
+          </FadeInSection>
+          {event.receptionName ? (
+            <FadeInSection className="mt-8 text-center max-w-md mx-auto">
+              <div className="bg-white border border-[#dcb349]/20 rounded-3xl p-8 shadow-sm">
+                <span className="material-symbols-outlined text-[#b49232] text-2xl mb-2">celebration</span>
+                <p className="text-[10px] uppercase tracking-widest text-[#b49232] font-sans font-bold mb-1">
+                  Receção
+                </p>
+                <h4 className="text-lg font-serif text-slate-800 font-semibold mb-1">
+                  <EditableField
+                    value={event.receptionName}
+                    onChange={(val) => updateField?.("receptionName", val)}
+                    isEditing={isEditing}
+                  />
+                </h4>
+                {((isEditing && updateField) || event.receptionAddress) ? (
+                  <p className="text-xs text-slate-500">
+                    <EditableField
+                      value={event.receptionAddress || ""}
+                      onChange={(val) => updateField?.("receptionAddress", val)}
+                      isEditing={isEditing}
+                      multiline
+                    />
+                  </p>
+                ) : null}
+              </div>
+            </FadeInSection>
+          ) : null}
+          {event.isoDate && !isNaN(new Date(event.isoDate).getTime()) ? (
+            <FadeInSection className="mt-16 text-center max-w-md mx-auto">
+              <p className="text-xs uppercase tracking-widest text-[#b49232] font-sans font-bold mb-2">
+                Contagem regressiva
+              </p>
+              <CountdownTimer targetDate={event.isoDate} colorClass="text-[#b49232]" />
+            </FadeInSection>
+          ) : null}
+          {event.dressCode?.description ? (
+            <FadeInSection className="mt-8 text-center max-w-md mx-auto">
+              <div className="bg-white border border-[#dcb349]/20 rounded-3xl p-8 shadow-sm">
+                <span className="material-symbols-outlined text-[#b49232] text-2xl mb-2">checkroom</span>
+                <p className="text-[10px] uppercase tracking-widest text-[#b49232] font-sans font-bold mb-1">
+                  Dress Code
+                </p>
+                <p className="text-sm text-slate-600 leading-relaxed font-serif">
+                  <EditableField
+                    value={event.dressCode?.description || ""}
+                    onChange={(val) =>
+                      updateField?.("dressCode", { ...event.dressCode, description: val })
+                    }
+                    isEditing={isEditing}
+                    multiline
+                  />
+                </p>
+              </div>
+            </FadeInSection>
+          ) : null}
         </div>
       </div>
 
@@ -6443,6 +6912,42 @@ const LimintsoGoldLayout: React.FC<{
           </div>
         </div>
       )}
+      {(!event.gifts || event.gifts.length === 0) && (event as any).iban ? (
+        <div className="py-24 bg-white border-t border-[#dcb349]/10">
+          <div className="max-w-4xl mx-auto px-6 md:px-12">
+            <FadeInSection className="text-center mb-12">
+              <span className="material-symbols-outlined text-[#b49232] text-3xl mb-2">volunteer_activism</span>
+              <h2 className="text-2xl md:text-3xl font-serif text-slate-800">Lista de Presentes</h2>
+              <p className="text-xs text-slate-500 uppercase tracking-widest mt-2">Mimos em Dinheiro / Apoio</p>
+              <div className="w-12 h-[1px] bg-[#dcb349]/30 mx-auto mt-4" />
+            </FadeInSection>
+            <FadeInSection className="bg-[#FCFAF6] border border-[#dcb349]/10 rounded-2xl p-6 shadow-sm max-w-2xl mx-auto text-center">
+              <span className="text-[10px] uppercase font-bold tracking-widest text-[#b49232] opacity-80 block mb-2">
+                Transferência Bancária
+              </span>
+              <p className="text-xs text-slate-500 leading-relaxed mb-4">Sua presença é nosso maior presente.</p>
+              <div className="bg-white border border-[#dcb349]/10 rounded-xl p-3 flex items-center justify-between gap-2 shadow-sm">
+                <div className="truncate text-left">
+                  <span className="text-[9px] uppercase font-bold text-slate-400 block">{(event as any).bankName || "Banco"}</span>
+                  <code className="text-[11px] font-mono font-bold text-slate-700 select-all">{(event as any).iban}</code>
+                  {(event as any).accountName && (
+                    <span className="text-[10px] text-slate-500 block">{(event as any).accountName}</span>
+                  )}
+                </div>
+                <button
+                  onClick={() => {
+                    navigator.clipboard.writeText((event as any).iban || "");
+                    toast.success("IBAN copiado!");
+                  }}
+                  className="text-[10px] font-sans font-bold text-[#b49232] uppercase hover:underline shrink-0"
+                >
+                  Copiar
+                </button>
+              </div>
+            </FadeInSection>
+          </div>
+        </div>
+      ) : null}
 
       {/* 8. RSVP FLOATING / FIXED ACTION CARD */}
       <div className="py-24 text-center max-w-xl mx-auto px-6">
@@ -6550,7 +7055,17 @@ const LimintsoMeLayout: React.FC<{
   const [timeLeft, setTimeLeft] = useState({ days: 0, hours: 0, minutes: 0, seconds: 0 });
 
   useEffect(() => {
-    const targetDate = event.isoDate ? new Date(event.isoDate) : new Date("2025-10-11T11:00:00");
+    const targetDate = (() => {
+      if (event.isoDate) {
+        const d = new Date(event.isoDate);
+        if (!isNaN(d.getTime())) return d;
+      }
+      if (event.date) {
+        const d = new Date(`${event.date}T${event.time || "12:00"}:00`);
+        if (!isNaN(d.getTime())) return d;
+      }
+      return new Date("2025-10-11T11:00:00");
+    })();
     
     const updateCountdown = () => {
       const now = new Date();
@@ -6973,6 +7488,16 @@ const LimintsoMeLayout: React.FC<{
                   className="text-center text-white"
                 />
               </h3>
+              {(isEditing || event.time) ? (
+                <h4 className="josefin-font text-base md:text-lg font-semibold uppercase tracking-[0.2em] text-white/80">
+                  <EditableField
+                    value={isEditing ? (event.time || "") : `${event.time} Horas`}
+                    onChange={(val) => updateField?.("time", val)}
+                    isEditing={isEditing}
+                    className="text-center text-white/80"
+                  />
+                </h4>
+              ) : null}
 
               {/* Ceremony / Timeline dynamic grid cards */}
               <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-8 max-w-5xl mx-auto pt-8 text-[#121212]">
@@ -7031,6 +7556,108 @@ const LimintsoMeLayout: React.FC<{
                     </div>
                   </motion.div>
                 ))}
+              </div>
+              {(event.timeline || []).length === 0 && event.locationName ? (
+                <div className="grid grid-cols-1 gap-8 max-w-xl mx-auto pt-8 text-[#121212]">
+                  <motion.div
+                    initial={{ opacity: 0, y: 30 }}
+                    whileInView={{ opacity: 1, y: 0 }}
+                    viewport={{ once: true }}
+                    transition={{ duration: 0.8 }}
+                    className="bg-white rounded-3xl p-8 border border-stone-100 shadow-lg relative flex flex-col justify-between min-h-[250px]"
+                  >
+                    <div className="space-y-4">
+                      <h4 className="josefin-font text-lg font-bold uppercase tracking-wider text-[#121212]">
+                        Cerimónia
+                      </h4>
+                      <div className="w-10 h-[1px] bg-[#E9BE5D] mx-auto" />
+                      <h5 className="josefin-font text-2xl font-bold text-[#E9BE5D]">
+                        <EditableField
+                          value={event.locationName}
+                          onChange={(val) => updateField?.("locationName", val)}
+                          isEditing={isEditing}
+                          className="text-center"
+                        />
+                      </h5>
+                    </div>
+                    <div className="space-y-4 mt-6">
+                      {((isEditing && updateField) || event.address) ? (
+                        <p className="montserrat-font text-xs text-slate-500 leading-relaxed">
+                          <EditableField
+                            value={event.address || ""}
+                            onChange={(val) => updateField?.("address", val)}
+                            isEditing={isEditing}
+                            multiline
+                            className="text-center"
+                          />
+                        </p>
+                      ) : null}
+                      {event.mapLink && (
+                        <button
+                          onClick={() => window.open(event.mapLink, "_blank")}
+                          className="josefin-font px-4 py-2 bg-transparent hover:bg-[#E9BE5D] text-[#E9BE5D] hover:text-white border border-[#E9BE5D] rounded-full text-[11px] uppercase tracking-wider font-bold transition-all duration-300 flex items-center justify-center gap-1.5 mx-auto"
+                        >
+                          <span className="material-symbols-outlined text-sm">map</span> Ver Mapa
+                        </button>
+                      )}
+                    </div>
+                  </motion.div>
+                </div>
+              ) : null}
+              {event.receptionName ? (
+                <div className="grid grid-cols-1 gap-8 max-w-xl mx-auto pt-8 text-[#121212]">
+                  <motion.div
+                    initial={{ opacity: 0, y: 30 }}
+                    whileInView={{ opacity: 1, y: 0 }}
+                    viewport={{ once: true }}
+                    transition={{ duration: 0.8 }}
+                    className="bg-white rounded-3xl p-8 border border-stone-100 shadow-lg relative flex flex-col justify-between min-h-[250px]"
+                  >
+                    <div className="space-y-4">
+                      <h4 className="josefin-font text-lg font-bold uppercase tracking-wider text-[#121212]">
+                        Receção
+                      </h4>
+                      <div className="w-10 h-[1px] bg-[#E9BE5D] mx-auto" />
+                      <h5 className="josefin-font text-2xl font-bold text-[#E9BE5D]">
+                        <EditableField
+                          value={event.receptionName}
+                          onChange={(val) => updateField?.("receptionName", val)}
+                          isEditing={isEditing}
+                          className="text-center"
+                        />
+                      </h5>
+                    </div>
+                    <div className="space-y-4 mt-6">
+                      {((isEditing && updateField) || event.receptionAddress) ? (
+                        <p className="montserrat-font text-xs text-slate-500 leading-relaxed">
+                          <EditableField
+                            value={event.receptionAddress || ""}
+                            onChange={(val) => updateField?.("receptionAddress", val)}
+                            isEditing={isEditing}
+                            multiline
+                            className="text-center"
+                          />
+                        </p>
+                      ) : null}
+                      {event.receptionAddress && (
+                        <button
+                          onClick={() =>
+                            window.open(
+                              `https://maps.google.com/?q=${event.receptionAddress}`,
+                              "_blank",
+                            )
+                          }
+                          className="josefin-font px-4 py-2 bg-transparent hover:bg-[#E9BE5D] text-[#E9BE5D] hover:text-white border border-[#E9BE5D] rounded-full text-[11px] uppercase tracking-wider font-bold transition-all duration-300 flex items-center justify-center gap-1.5 mx-auto"
+                        >
+                          <span className="material-symbols-outlined text-sm">map</span> Ver Mapa
+                        </button>
+                      )}
+                    </div>
+                  </motion.div>
+                </div>
+              ) : null}
+              <div className="grid grid-cols-1 gap-8 max-w-xl mx-auto pt-8">
+                <TravelMap chrome="map-only" event={event} isEditing={isEditing} onFieldChange={updateField} />
               </div>
             </FadeInSection>
           </div>
@@ -7179,6 +7806,29 @@ const LimintsoMeLayout: React.FC<{
             </div>
           )}
 
+          {event.dressCode?.description ? (
+            <div className="py-24 bg-white text-center px-6 border-b border-stone-200">
+              <FadeInSection className="max-w-xl mx-auto space-y-6">
+                <span className="material-symbols-outlined text-3xl text-[#E9BE5D]">checkroom</span>
+                <h2 className="josefin-font text-3xl md:text-4xl font-semibold uppercase tracking-[0.2em] text-[#121212]">
+                  Dress Code
+                </h2>
+                <div className="w-12 h-[1px] bg-[#E9BE5D]/30 mx-auto" />
+                <p className="montserrat-font text-sm text-slate-500 leading-relaxed">
+                  <EditableField
+                    value={event.dressCode?.description || ""}
+                    onChange={(val) =>
+                      updateField?.("dressCode", { ...event.dressCode, description: val })
+                    }
+                    isEditing={isEditing}
+                    multiline
+                    className="text-center"
+                  />
+                </p>
+              </FadeInSection>
+            </div>
+          ) : null}
+
           {/* 10. GIFTS LIST SECTION */}
           {event.gifts && event.gifts.length > 0 && (
             <div className="py-24 bg-[#FCFAF6] border-b border-stone-200">
@@ -7207,6 +7857,30 @@ const LimintsoMeLayout: React.FC<{
                     </FadeInSection>
                   ))}
                 </div>
+                {(!event.gifts || event.gifts.length === 0) && (event as any).iban ? (
+                  <FadeInSection className="bg-white border border-[#E9BE5D]/10 rounded-3xl p-8 shadow-sm text-center space-y-4 max-w-2xl mx-auto mt-6">
+                    <span className="josefin-font text-[10px] uppercase font-bold tracking-widest text-[#E9BE5D] block">
+                      Transferência Bancária
+                    </span>
+                    <h4 className="josefin-font text-lg font-bold text-slate-800">Presentes</h4>
+                    <p className="montserrat-font text-xs text-slate-500 leading-relaxed">Sua presença é nosso maior presente.</p>
+                    <div className="p-4 bg-amber-50/50 rounded-2xl border border-amber-100 inline-block w-full">
+                      <span className="montserrat-font text-sm font-semibold text-slate-800 tracking-wider select-all block break-all">
+                        {(event as any).iban}
+                      </span>
+                      {(event as any).bankName && (
+                        <span className="montserrat-font text-[10px] text-slate-500 uppercase tracking-widest block mt-1">
+                          {(event as any).bankName}
+                        </span>
+                      )}
+                      {(event as any).accountName && (
+                        <span className="montserrat-font text-[10px] text-slate-500 block">
+                          {(event as any).accountName}
+                        </span>
+                      )}
+                    </div>
+                  </FadeInSection>
+                ) : null}
               </div>
             </div>
           )}

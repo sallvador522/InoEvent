@@ -106,7 +106,10 @@ export interface EventDetails {
   // Locations
   locationName: string;
   address: string;
-  mapLink?: string; 
+  mapLink?: string;
+  latitude?: number | null;
+  longitude?: number | null;
+  placeId?: string | null;
   receptionName?: string; // Optional separate reception
   receptionAddress?: string;
 

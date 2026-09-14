@@ -12,6 +12,9 @@ import {
   Gem, X, Check
 } from 'lucide-react';
 import { LayoutMode } from '../../types';
+import { PlacePicker } from '../../components/PlacePicker';
+import { GOOGLE_MAPS_API_KEY } from '../../lib/maps';
+import { TravelMap } from './TravelMap';
 
 interface TimelineItem {
   time: string;
@@ -74,6 +77,9 @@ export const EventCreator: React.FC = () => {
   const [locationName, setLocationName] = useState('Salão Luanda Noblesse');
   const [address, setAddress] = useState('Av. Pedro de Castro Van-Dúnem Loy, Luanda');
   const [mapLink, setMapLink] = useState('');
+  const [latitude, setLatitude] = useState<number | null>(null);
+  const [longitude, setLongitude] = useState<number | null>(null);
+  const [placeId, setPlaceId] = useState<string | null>(null);
   const [musicTrack, setMusicTrack] = useState('romantic');
   const [dressCodeTitle, setDressCodeTitle] = useState('Dress Code');
   const [dressCodeDesc, setDressCodeDesc] = useState('Esporte Fino - Sugerimos tons pastéis suaves.');
@@ -207,6 +213,9 @@ export const EventCreator: React.FC = () => {
             setLocationName(data.locationName || '');
             setAddress(data.address || '');
             setMapLink(data.mapLink || '');
+            setLatitude(typeof data.latitude === 'number' ? data.latitude : null);
+            setLongitude(typeof data.longitude === 'number' ? data.longitude : null);
+            setPlaceId(typeof data.placeId === 'string' ? data.placeId : null);
             setDescription(data.description || '');
             setMusicTrack(data.musicTrack || 'romantic');
             if (data.timeline) setTimeline(data.timeline);
@@ -330,10 +339,18 @@ export const EventCreator: React.FC = () => {
           const dt = new Date(); dt.setDate(dt.getDate() + d); return dt.toISOString();
         } catch { return null; }
       })();
+      const eventIsoDate = (() => {
+        try {
+          if (!date) return '';
+          const d = new Date(`${date}T${time || '12:00'}:00`);
+          return isNaN(d.getTime()) ? '' : d.toISOString();
+        } catch { return ''; }
+      })();
       const savePayload: any = {
         id: activeEventId,
         title: title,
         date: date,
+        isoDate: eventIsoDate,
         time: time,
         type: computedFormType,
         layoutMode: selectedLayout,
@@ -350,6 +367,9 @@ export const EventCreator: React.FC = () => {
         locationName: locationName,
         address: address,
         mapLink: mapLink,
+        latitude: latitude,
+        longitude: longitude,
+        placeId: placeId,
         musicTrack: musicTrack,
         gifts: gifts,
         heroImage: heroImage || getHeroImageUrl(selectedLayout),
@@ -606,19 +626,68 @@ export const EventCreator: React.FC = () => {
                       <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                         <div className="col-span-1 md:col-span-2">
                           <label className="block text-xs font-bold text-slate-500 mb-1.5 uppercase tracking-wider">Nome de Local de Sonhos (Recepção)</label>
-                          <div className="relative">
-                            <MapPin className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-400" size={16} />
-                            <input 
-                              type="text"
+                          {GOOGLE_MAPS_API_KEY ? (
+                            <PlacePicker
                               value={locationName}
-                              onChange={(e) => setLocationName(e.target.value)}
-                              className="w-full border border-slate-200 rounded-xl p-3 pl-10 focus:border-purple-500 focus:ring-1 focus:ring-purple-500 outline-none text-sm transition-all"
-                              placeholder="e.g. Jardim das Palmeiras, Clube Bilene"
+                              onChange={(v) => {
+                                setLocationName(v);
+                                setLatitude(null);
+                                setLongitude(null);
+                                setPlaceId(null);
+                              }}
+                              onClear={() => {
+                                setLatitude(null);
+                                setLongitude(null);
+                                setPlaceId(null);
+                              }}
+                              inputClassName="w-full border border-slate-200 rounded-xl p-3 focus:border-purple-500 focus:ring-1 focus:ring-purple-500 outline-none text-sm transition-all"
+                              placeholder="Pesquise e escolha uma sugestão — ex: Jardim das Palmeiras"
+                              onSelect={(sel) => {
+                                setLocationName(sel.name || locationName);
+                                setAddress(sel.address);
+                                setLatitude(sel.latitude);
+                                setLongitude(sel.longitude);
+                                setPlaceId(sel.placeId || null);
+                                setMapLink(sel.mapLink);
+                                toast.success(sel.name ? `${sel.name} marcado no mapa!` : 'Local marcado no mapa!');
+                              }}
+                            />
+                          ) : (
+                            <div className="relative">
+                              <MapPin className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-400" size={16} />
+                              <input
+                                type="text"
+                                value={locationName}
+                                onChange={(e) => setLocationName(e.target.value)}
+                                className="w-full border border-slate-200 rounded-xl p-3 pl-10 focus:border-purple-500 focus:ring-1 focus:ring-purple-500 outline-none text-sm transition-all"
+                                placeholder="e.g. Jardim das Palmeiras, Clube Bilene"
+                              />
+                            </div>
+                          )}
+                          {(latitude === null || longitude === null) && (
+                            <p className="text-[11px] text-slate-400 font-medium mt-2">
+                              Digite e escolha uma sugestão da lista — nome, endereço e mapa preenchem sozinhos.
+                            </p>
+                          )}
+                          {(latitude !== null && longitude !== null) && (
+                            <p className="text-xs text-emerald-600 font-medium mt-2">
+                              ✓ Marcador preciso no mapa — os convidados veem exatamente onde é.
+                            </p>
+                          )}
+                        </div>
+                        {(address || locationName) && (
+                          <div className="col-span-1 md:col-span-2">
+                            <TravelMap
+                              chrome="map-only"
+                              event={{ latitude, longitude, address, locationName, mapLink }}
                             />
                           </div>
-                        </div>
+                        )}
 
                         <div className="col-span-1 md:col-span-2">
+                          <p className="text-[11px] text-slate-400 font-medium mb-2">
+                            …ou preencha o endereço manualmente abaixo
+                          </p>
                           <label className="block text-xs font-bold text-slate-500 mb-1.5 uppercase tracking-wider">Endereço Completo</label>
                           <input 
                             type="text"

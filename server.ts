@@ -23,6 +23,7 @@ import './server/lib/firebase-admin.js';
 
 // --- Route Modules ---
 import rsvpRoutes from './server/routes/rsvp.js';
+import geoRoutes from './server/routes/geo.js';
 import seoRoutes from './server/routes/seo.js';
 import ordersRoutes from './server/routes/orders.js';
 import subscriptionsRoutes from './server/routes/subscriptions.js';
@@ -118,6 +119,7 @@ app.get('/robots.txt', (_req, res) => {
 });
 
 // --- Mount Route Modules ---
+app.use(geoRoutes);       // /api/geo/search — proxy keyless de zonas (antes do SEO)
 app.use(seoRoutes);      // SEO routes BEFORE API (they intercept /plans and /invite/:id)
 app.use(rsvpRoutes);      // /api/events/:id/guests, /api/events/:id/rsvp, /api/events/:id/rsvp-status
 app.use(ordersRoutes);    // /api/orders, /api/events/:id/order, /api/events/:id/upgrade, /api/events/:id/renew, /api/webhooks/payment

@@ -167,7 +167,7 @@ export async function createSubscription(userId: string, plan: Extract<PlanId, '
       subscriptionId: id,
       updatedAt: now.toISOString(),
     } as any);
-  } catch {}
+  } catch { void 0; }
   return sub;
 }
 

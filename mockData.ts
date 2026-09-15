@@ -24,6 +24,17 @@ export interface EventDetails {
   receptionName?: string;
   receptionAddress?: string;
   mapLink?: string;
+  latitude?: number | null;
+  longitude?: number | null;
+  placeId?: string | null;
+  formattedAddress?: string | null;
+  plusCode?: string | null;
+  rating?: number | null;
+  userRatingsTotal?: number | null;
+  mapsUrl?: string | null;
+  placePhotoUrl?: string | null;
+  locationSource?: 'google' | 'osm' | 'gps' | 'link' | 'mapa' | null;
+  locationUpdatedAt?: string | null;
   heroImage: string;
   description: string;
   musicTrack?: string;

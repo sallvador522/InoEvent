@@ -12,9 +12,8 @@ import {
   Gem, X, Check
 } from 'lucide-react';
 import { LayoutMode } from '../../types';
-import { PlacePicker } from '../../components/PlacePicker';
-import { GOOGLE_MAPS_API_KEY } from '../../lib/maps';
-import { TravelMap } from './TravelMap';
+import { LocationPinPicker } from '../../components/LocationPinPicker';
+import { MapsProvider } from '../../components/MapsProvider';
 
 interface TimelineItem {
   time: string;
@@ -75,11 +74,20 @@ export const EventCreator: React.FC = () => {
         : 'Estamos muito entusiasmados e ansiosos para celebrar este momento perfeito com vocês!'
   );
   const [locationName, setLocationName] = useState('Salão Luanda Noblesse');
-  const [address, setAddress] = useState('Av. Pedro de Castro Van-Dúnem Loy, Luanda');
+  // Legado: eventos antigos têm endereço; novos usam só zona + pino.
+  const [address, setAddress] = useState('');
   const [mapLink, setMapLink] = useState('');
   const [latitude, setLatitude] = useState<number | null>(null);
   const [longitude, setLongitude] = useState<number | null>(null);
   const [placeId, setPlaceId] = useState<string | null>(null);
+  // Detalhes ricos do lugar — visíveis para o convidado no convite
+  const [formattedAddress, setFormattedAddress] = useState<string | null>(null);
+  const [plusCode, setPlusCode] = useState<string | null>(null);
+  const [rating, setRating] = useState<number | null>(null);
+  const [userRatingsTotal, setUserRatingsTotal] = useState<number | null>(null);
+  const [mapsUrl, setMapsUrl] = useState<string | null>(null);
+  const [placePhotoUrl, setPlacePhotoUrl] = useState<string | null>(null);
+  const [locationSource, setLocationSource] = useState<'google' | 'osm' | 'gps' | 'link' | 'mapa' | null>(null);
   const [musicTrack, setMusicTrack] = useState('romantic');
   const [dressCodeTitle, setDressCodeTitle] = useState('Dress Code');
   const [dressCodeDesc, setDressCodeDesc] = useState('Esporte Fino - Sugerimos tons pastéis suaves.');
@@ -216,6 +224,17 @@ export const EventCreator: React.FC = () => {
             setLatitude(typeof data.latitude === 'number' ? data.latitude : null);
             setLongitude(typeof data.longitude === 'number' ? data.longitude : null);
             setPlaceId(typeof data.placeId === 'string' ? data.placeId : null);
+            setFormattedAddress(typeof data.formattedAddress === 'string' ? data.formattedAddress : null);
+            setPlusCode(typeof data.plusCode === 'string' ? data.plusCode : null);
+            setRating(typeof data.rating === 'number' ? data.rating : null);
+            setUserRatingsTotal(typeof data.userRatingsTotal === 'number' ? data.userRatingsTotal : null);
+            setMapsUrl(typeof data.mapsUrl === 'string' ? data.mapsUrl : (typeof data.mapLink === 'string' ? data.mapLink : null));
+            setPlacePhotoUrl(typeof data.placePhotoUrl === 'string' ? data.placePhotoUrl : null);
+            setLocationSource(
+              data.locationSource === 'google' || data.locationSource === 'osm' || data.locationSource === 'gps' || data.locationSource === 'link' || data.locationSource === 'mapa'
+                ? data.locationSource
+                : (typeof data.latitude === 'number' ? 'mapa' : null),
+            );
             setDescription(data.description || '');
             setMusicTrack(data.musicTrack || 'romantic');
             if (data.timeline) setTimeline(data.timeline);
@@ -370,6 +389,14 @@ export const EventCreator: React.FC = () => {
         latitude: latitude,
         longitude: longitude,
         placeId: placeId,
+        formattedAddress: formattedAddress,
+        plusCode: plusCode,
+        rating: rating,
+        userRatingsTotal: userRatingsTotal,
+        mapsUrl: mapsUrl || mapLink || null,
+        placePhotoUrl: placePhotoUrl,
+        locationSource: locationSource,
+        locationUpdatedAt: latitude !== null && longitude !== null ? new Date().toISOString() : null,
         musicTrack: musicTrack,
         gifts: gifts,
         heroImage: heroImage || getHeroImageUrl(selectedLayout),
@@ -425,6 +452,7 @@ export const EventCreator: React.FC = () => {
   };
 
   return (
+    <MapsProvider>
     <div className="min-h-screen bg-slate-50 text-slate-800 font-sans pb-16">
       {/* Header Bar */}
       <header className="bg-white/80 backdrop-blur-md border-b border-slate-200/80 sticky top-0 z-40 px-6 py-4 flex items-center justify-between">
@@ -622,93 +650,51 @@ export const EventCreator: React.FC = () => {
                     </div>
 
                     <div className="border-t border-slate-100 pt-6">
-                      <h3 className="text-base font-serif font-bold text-slate-900 mb-4">Logística Urbana</h3>
-                      <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                        <div className="col-span-1 md:col-span-2">
-                          <label className="block text-xs font-bold text-slate-500 mb-1.5 uppercase tracking-wider">Nome de Local de Sonhos (Recepção)</label>
-                          {GOOGLE_MAPS_API_KEY ? (
-                            <PlacePicker
-                              value={locationName}
-                              onChange={(v) => {
-                                setLocationName(v);
-                                setLatitude(null);
-                                setLongitude(null);
-                                setPlaceId(null);
-                              }}
-                              onClear={() => {
-                                setLatitude(null);
-                                setLongitude(null);
-                                setPlaceId(null);
-                              }}
-                              inputClassName="w-full border border-slate-200 rounded-xl p-3 focus:border-purple-500 focus:ring-1 focus:ring-purple-500 outline-none text-sm transition-all"
-                              placeholder="Pesquise e escolha uma sugestão — ex: Jardim das Palmeiras"
-                              onSelect={(sel) => {
-                                setLocationName(sel.name || locationName);
-                                setAddress(sel.address);
-                                setLatitude(sel.latitude);
-                                setLongitude(sel.longitude);
-                                setPlaceId(sel.placeId || null);
-                                setMapLink(sel.mapLink);
-                                toast.success(sel.name ? `${sel.name} marcado no mapa!` : 'Local marcado no mapa!');
-                              }}
-                            />
-                          ) : (
-                            <div className="relative">
-                              <MapPin className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-400" size={16} />
-                              <input
-                                type="text"
-                                value={locationName}
-                                onChange={(e) => setLocationName(e.target.value)}
-                                className="w-full border border-slate-200 rounded-xl p-3 pl-10 focus:border-purple-500 focus:ring-1 focus:ring-purple-500 outline-none text-sm transition-all"
-                                placeholder="e.g. Jardim das Palmeiras, Clube Bilene"
-                              />
-                            </div>
-                          )}
-                          {(latitude === null || longitude === null) && (
-                            <p className="text-[11px] text-slate-400 font-medium mt-2">
-                              Digite e escolha uma sugestão da lista — nome, endereço e mapa preenchem sozinhos.
-                            </p>
-                          )}
-                          {(latitude !== null && longitude !== null) && (
-                            <p className="text-xs text-emerald-600 font-medium mt-2">
-                              ✓ Marcador preciso no mapa — os convidados veem exatamente onde é.
-                            </p>
-                          )}
-                        </div>
-                        {(address || locationName) && (
-                          <div className="col-span-1 md:col-span-2">
-                            <TravelMap
-                              chrome="map-only"
-                              event={{ latitude, longitude, address, locationName, mapLink }}
-                            />
-                          </div>
-                        )}
-
-                        <div className="col-span-1 md:col-span-2">
-                          <p className="text-[11px] text-slate-400 font-medium mb-2">
-                            …ou preencha o endereço manualmente abaixo
-                          </p>
-                          <label className="block text-xs font-bold text-slate-500 mb-1.5 uppercase tracking-wider">Endereço Completo</label>
-                          <input 
-                            type="text"
-                            value={address}
-                            onChange={(e) => setAddress(e.target.value)}
-                            className="w-full border border-slate-200 rounded-xl p-3 focus:border-purple-500 focus:ring-1 focus:ring-purple-500 outline-none text-sm transition-all"
-                            placeholder="e.g. Avenida Pedro de Castro Van-Dúnem Loy, Luanda"
-                          />
-                        </div>
-
-                        <div className="col-span-1 md:col-span-2">
-                          <label className="block text-xs font-bold text-slate-500 mb-1.5 uppercase tracking-wider">URL Google Maps Link (Opcional)</label>
-                          <input 
-                            type="text"
-                            value={mapLink}
-                            onChange={(e) => setMapLink(e.target.value)}
-                            className="w-full border border-slate-200 rounded-xl p-3 focus:border-purple-500 focus:ring-1 focus:ring-purple-500 outline-none text-sm transition-all"
-                            placeholder="e.g. https://goo.gl/maps/..."
-                          />
-                        </div>
-                      </div>
+                      <h3 className="text-base font-serif font-bold text-slate-900 mb-4">Localização do Evento *</h3>
+                      <LocationPinPicker
+                        latitude={latitude}
+                        longitude={longitude}
+                        mapLink={mapLink}
+                        zone={locationName}
+                        placeName={locationName}
+                        formattedAddress={formattedAddress}
+                        plusCode={plusCode}
+                        rating={rating}
+                        userRatingsTotal={userRatingsTotal}
+                        placeId={placeId}
+                        mapsUrl={mapsUrl}
+                        locationSource={locationSource}
+                        onZoneSuggest={(name) => setLocationName(name)}
+                        onChange={(pin) => {
+                          const derivedName = (pin.name || pin.formattedAddress || '').trim() || locationName;
+                          if (derivedName) setLocationName(derivedName);
+                          setLatitude(pin.latitude);
+                          setLongitude(pin.longitude);
+                          setMapLink(pin.mapLink);
+                          setPlaceId(pin.placeId || null);
+                          setFormattedAddress(pin.formattedAddress || null);
+                          setPlusCode(pin.plusCode || null);
+                          setRating(typeof pin.rating === 'number' ? pin.rating : null);
+                          setUserRatingsTotal(typeof pin.userRatingsTotal === 'number' ? pin.userRatingsTotal : null);
+                          setMapsUrl(pin.mapsUrl || pin.mapLink || null);
+                          setPlacePhotoUrl(pin.placePhotoUrl || null);
+                          setLocationSource(pin.locationSource || null);
+                          toast.success('Pino fixado no mapa!');
+                        }}
+                        onClear={() => {
+                          setLatitude(null);
+                          setLongitude(null);
+                          setMapLink('');
+                          setPlaceId(null);
+                          setFormattedAddress(null);
+                          setPlusCode(null);
+                          setRating(null);
+                          setUserRatingsTotal(null);
+                          setMapsUrl(null);
+                          setPlacePhotoUrl(null);
+                          setLocationSource(null);
+                        }}
+                      />
                     </div>
 
                     {!isBridalShower && !isBabyShower && (
@@ -1322,5 +1308,6 @@ export const EventCreator: React.FC = () => {
         )}
       </AnimatePresence>
     </div>
+    </MapsProvider>
   );
 };

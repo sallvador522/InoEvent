@@ -46,9 +46,9 @@ export function usePlanVerification(eventId: string | undefined) {
         isBlocked: !!raw.isBlocked || !!raw.isExpired,
         features: {
           rsvpLimit: raw.guestLimit ?? raw.rsvpLimit ?? 100,
-          backgroundMusic: raw.features?.includes('music') ?? !!raw.features?.music ?? false,
-          customDomain: raw.features?.includes('custom_domain') ?? false,
-          tableMaps: raw.features?.includes('tables') ?? raw.features?.tableMaps ?? false,
+          backgroundMusic: raw.features?.includes('music') || !!raw.features?.music || false,
+          customDomain: raw.features?.includes('custom_domain') || false,
+          tableMaps: raw.features?.includes('tables') || raw.features?.tableMaps || false,
           guestBook: raw.features?.includes('guestbook') ?? false,
           whiteLabel: raw.features?.includes('remove_branding') ?? false,
           staffAccess: raw.features?.includes('team_management') ?? false,

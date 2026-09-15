@@ -20,9 +20,9 @@ export const ExecutiveReportModal: React.FC<ExecutiveReportModalProps> = ({
     agencyName,
     agencyLogo
 }) => {
-    if (!isOpen || !event) return null;
-
     const [isGenerating, setIsGenerating] = useState(false);
+
+    if (!isOpen || !event) return null;
 
     // Calculate core statistics
     const totalGuests = guests.length;

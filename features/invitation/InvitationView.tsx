@@ -47,7 +47,8 @@ import { getOptimizedImageUrl, OptimizeImageOptions } from "../../lib/imageOptim
 import { Guestbook } from "./Guestbook";
 
 import { EditableField } from "./components/EditableField";
-import { PlacePicker } from "../../components/PlacePicker";
+import { LocationPinPicker } from "../../components/LocationPinPicker";
+import { MapsProvider } from "../../components/MapsProvider";
 import { TravelMap } from "./TravelMap";
 import { ImageUploadField } from "./components/ImageUploadField";
 import { PremiumLoader } from "./components/PremiumLoader";
@@ -984,7 +985,7 @@ const InvitationView: React.FC = () => {
 
   if (isEditing) {
     return (
-      
+      <MapsProvider>
       <div className="min-h-screen bg-slate-900 text-slate-100 flex flex-col font-sans relative">
         <Joyride
           steps={tourSteps}
@@ -1553,38 +1554,53 @@ const InvitationView: React.FC = () => {
                         </span>
                         <div>
                           <label className="block text-[10px] text-gray-400 mb-1.5 uppercase tracking-wider">
-                            Pesquisar no mapa (marca o ponto exato)
+                            Local do evento *
                           </label>
-                          <PlacePicker
-                            onSelect={(sel) => {
-                              updateField("address", sel.address);
-                              updateField("latitude", sel.latitude);
-                              updateField("longitude", sel.longitude);
-                              updateField("placeId", sel.placeId || null);
-                              updateField("mapLink", sel.mapLink);
-                              if (!(localEvent?.locationName || "").trim() && sel.name) {
-                                updateField("locationName", sel.name);
-                              }
-                              toast.success(sel.name ? `${sel.name} marcado no mapa!` : "Local marcado no mapa!");
+                          <LocationPinPicker
+                            tone="dark"
+                            latitude={typeof localEvent?.latitude === 'number' ? localEvent.latitude : null}
+                            longitude={typeof localEvent?.longitude === 'number' ? localEvent.longitude : null}
+                            mapLink={localEvent?.mapLink || ''}
+                            zone={localEvent?.locationName || ''}
+                            placeName={localEvent?.locationName || ''}
+                            formattedAddress={localEvent?.formattedAddress || null}
+                            plusCode={localEvent?.plusCode || null}
+                            rating={typeof localEvent?.rating === 'number' ? localEvent.rating : null}
+                            userRatingsTotal={typeof localEvent?.userRatingsTotal === 'number' ? localEvent.userRatingsTotal : null}
+                            placeId={localEvent?.placeId || null}
+                            mapsUrl={localEvent?.mapsUrl || localEvent?.mapLink || null}
+                            locationSource={localEvent?.locationSource || null}
+                            onZoneSuggest={(name) => updateField('locationName', name)}
+                            onChange={(pin) => {
+                              const derivedName = (pin.name || pin.formattedAddress || '').trim();
+                              if (derivedName) updateField("locationName", derivedName);
+                              updateField("latitude", pin.latitude);
+                              updateField("longitude", pin.longitude);
+                              updateField("mapLink", pin.mapLink);
+                              updateField("placeId", pin.placeId || null);
+                              updateField("formattedAddress", pin.formattedAddress || null);
+                              updateField("plusCode", pin.plusCode || null);
+                              updateField("rating", typeof pin.rating === 'number' ? pin.rating : null);
+                              updateField("userRatingsTotal", typeof pin.userRatingsTotal === 'number' ? pin.userRatingsTotal : null);
+                              updateField("mapsUrl", pin.mapsUrl || pin.mapLink || null);
+                              updateField("placePhotoUrl", pin.placePhotoUrl || null);
+                              updateField("locationSource", pin.locationSource || null);
+                              updateField("locationUpdatedAt", new Date().toISOString());
+                              toast.success("Pino fixado no mapa!");
                             }}
-                          />
-                          {(localEvent?.latitude || localEvent?.longitude) ? (
-                            <p className="text-[10px] text-emerald-400 font-medium mt-1.5">
-                              ✓ Marcador preciso ativo
-                            </p>
-                          ) : null}
-                        </div>
-                        <div>
-                          <label className="block text-[10px] text-gray-400 mb-1.5 uppercase tracking-wider">
-                            Nome do Local
-                          </label>
-                          <input
-                            type="text"
-                            value={localEvent?.locationName || ""}
-                            onChange={(e) =>
-                              updateField("locationName", e.target.value)
-                            }
-                            className="w-full bg-[#0F1419] border border-[#BF9B30]/20 rounded-xl px-4 py-2.5 text-sm text-white focus:outline-none focus:border-[#BF9B30] transition-colors"
+                            onClear={() => {
+                              updateField("latitude", null);
+                              updateField("longitude", null);
+                              updateField("mapLink", "");
+                              updateField("placeId", null);
+                              updateField("formattedAddress", null);
+                              updateField("plusCode", null);
+                              updateField("rating", null);
+                              updateField("userRatingsTotal", null);
+                              updateField("mapsUrl", null);
+                              updateField("placePhotoUrl", null);
+                              updateField("locationSource", null);
+                            }}
                           />
                         </div>
                               <div>
@@ -1599,32 +1615,6 @@ const InvitationView: React.FC = () => {
                               updateField("time", e.target.value)
                             }
                             className="w-full bg-[#0F1419] border border-[#BF9B30]/20 rounded-xl px-4 py-2.5 text-sm text-white focus:outline-none focus:border-[#BF9B30] transition-colors"
-                          />
-                        </div>
-                        <div>
-                          <label className="block text-[10px] text-gray-400 mb-1.5 uppercase tracking-wider">
-                            Endereço Completo
-                          </label>
-                          <input
-                            type="text"
-                            value={localEvent?.address || ""}
-                            onChange={(e) =>
-                              updateField("address", e.target.value)
-                            }
-                            className="w-full bg-[#0F1419] border border-[#BF9B30]/20 rounded-xl px-4 py-2.5 text-sm text-white focus:outline-none focus:border-[#BF9B30] transition-colors"
-                          />
-                        </div>
-                        <div>
-                          <label className="block text-[10px] text-gray-400 mb-1.5 uppercase tracking-wider">
-                            Link Google Maps (Ver Localização)
-                          </label>
-                          <input
-                            type="text"
-                            value={localEvent?.mapLink || ""}
-                            onChange={(e) =>
-                              updateField("mapLink", e.target.value)
-                            }
-                            className="w-full bg-[#0F1419] border border-[#BF9B30]/20 rounded-xl px-4 py-2.5 text-sm text-white focus:outline-none focus:border-[#BF9B30] transition-colors text-xs"
                           />
                         </div>
                       </div>
@@ -2184,6 +2174,7 @@ const InvitationView: React.FC = () => {
           />
         </BottomSheet>
       </div>
+      </MapsProvider>
     );
   }
 
@@ -2384,12 +2375,12 @@ const FadeInSection: React.FC<{
   delay?: number;
 }> = ({ children, className = "", delay = 0 }) => (
   <motion.div
-    initial={{ opacity: 0, y: 12 }}
-    whileInView={{ opacity: 1, y: 0 }}
-    viewport={{ once: true, margin: "-40px" }} // Trigger leve, sem blur (blur congela em Android fraco)
+    initial={{ opacity: 0, y: 16, scale: 0.98 }}
+    whileInView={{ opacity: 1, y: 0, scale: 1 }}
+    viewport={{ once: true, margin: "-60px" }}
     transition={{
-      duration: 0.5,
-      ease: "easeOut",
+      duration: 0.6,
+      ease: [0.22, 1, 0.36, 1] as any,
       delay,
     }}
     className={`${className}`}
@@ -2879,15 +2870,17 @@ guestName: string;
                   className="font-bold text-xl mb-1 text-slate-800 text-center"
                 />
               </h3>
+              {event.address ? (
               <p className="text-slate-500 text-sm mb-4">
                 <EditableField
                   value={event.address}
                   onChange={(newVal) => updateField?.("address", newVal)}
-                  isEditing={isEditing}
+                  isEditing={false}
                   className="text-slate-500 text-sm mb-4 text-center"
                   multiline
                 />
               </p>
+              ) : null}
               {event.mapLink ? (
                 <Button
                   onClick={() => window.open(event.mapLink, "_blank")}
@@ -2898,9 +2891,6 @@ guestName: string;
                   Ver Mapa
                 </Button>
               ) : null}
-            </div>
-            <div className="mt-6">
-              <TravelMap chrome="map-only" event={event} isEditing={isEditing} onFieldChange={updateField} />
             </div>
             {event.receptionName ? (
               <div className="bg-white p-6 rounded-xl shadow-lg border border-slate-100 mt-6">
@@ -3145,6 +3135,12 @@ guestName: string;
             </FadeInSection>
           </EditableSectionWrapper>
         )}
+
+        {/* LOCAL + MAPA — por último, 100% só-leitura, card adaptativo bonito */}
+        <FadeInSection delay={0.1} className="pt-4">
+          <p className="text-[11px] font-bold uppercase tracking-[0.2em] text-slate-400 mb-4">Como chegar</p>
+          <TravelMap chrome="guest" tone="classic" event={event} isEditing={isEditing} onFieldChange={updateField} />
+        </FadeInSection>
       </div>
 
       <div className="fixed bottom-0 inset-x-0 z-50 flex flex-col items-center gap-2 px-6 pt-2" style={{ paddingBottom: 'max(1.25rem, env(safe-area-inset-bottom))' }}>
@@ -3340,15 +3336,17 @@ const ModernLayout: React.FC<{
                   className="text-[#C2B280] font-display uppercase tracking-widest text-sm text-center md:text-left"
                 />
               </p>
+              {event.address ? (
               <p className="text-gray-500 leading-relaxed font-light text-lg">
                 <EditableField
                   value={event.address}
                   onChange={(newVal) => updateField?.("address", newVal)}
-                  isEditing={isEditing}
+                  isEditing={false}
                   className="text-gray-500 leading-relaxed font-light text-lg text-center md:text-left"
                   multiline
                 />
               </p>
+              ) : null}
               <button
                 onClick={() => window.open(event.mapLink || "#", "_blank")}
                 className="mt-4 inline-block border-b border-black pb-1 text-xs font-bold uppercase tracking-widest hover:text-[#C2B280] hover:border-[#C2B280] transition-colors"
@@ -3411,9 +3409,6 @@ const ModernLayout: React.FC<{
               </div>
             </FadeInSection>
           )}
-          <div className="max-w-3xl mx-auto">
-            <TravelMap chrome="map-only" event={event} isEditing={isEditing} onFieldChange={updateField} />
-          </div>
         </div>
       </EditableSectionWrapper>
 
@@ -3659,6 +3654,12 @@ const ModernLayout: React.FC<{
         </FadeInSection>
       )}
 
+      {/* LOCAL + MAPA — por último, 100% só-leitura, card adaptativo bonito */}
+      <FadeInSection delay={0.1} className="max-w-3xl mx-auto px-6 mt-16">
+        <p className="text-center text-[11px] font-bold uppercase tracking-[0.2em] text-[#C2B280] mb-4">Como chegar</p>
+        <TravelMap chrome="guest" tone="classic" event={event} isEditing={isEditing} onFieldChange={updateField} />
+      </FadeInSection>
+
       {/* FOOTER ACTION */}
       <div className="fixed bottom-8 left-1/2 -translate-x-1/2 z-50">
         <button
@@ -3845,15 +3846,17 @@ const GardenLayout: React.FC<{
                   className="text-[#8C8C8C] font-sans text-sm mb-1 text-center md:text-right"
                 />
               </p>
+              {event.address ? (
               <p className="text-[#5D5C61] mb-6 leading-relaxed">
                 <EditableField
                   value={event.address}
                   onChange={(newVal) => updateField?.("address", newVal)}
-                  isEditing={isEditing}
+                  isEditing={false}
                   className="text-[#5D5C61] mb-6 leading-relaxed text-center md:text-right"
                   multiline
                 />
               </p>
+              ) : null}
               <button
                 onClick={() => window.open(event.mapLink || "#", "_blank")}
                 className={`text-xs font-bold border-b border-[#2C2C2C] pb-0.5 hover:opacity-50 transition-opacity uppercase tracking-widest`}
@@ -3926,9 +3929,6 @@ const GardenLayout: React.FC<{
               </div>
             </FadeInSection>
           )}
-          <div className="max-w-3xl mx-auto px-6">
-            <TravelMap chrome="map-only" event={event} isEditing={isEditing} onFieldChange={updateField} />
-          </div>
         </div>
       </EditableSectionWrapper>
 
@@ -4123,6 +4123,12 @@ const GardenLayout: React.FC<{
         )}
       </EditableSectionWrapper>
 
+      {/* LOCAL + MAPA — por último, 100% só-leitura, card adaptativo bonito */}
+      <FadeInSection delay={0.1} className="max-w-3xl mx-auto px-6 mt-16">
+        <p className="text-center text-[11px] font-bold uppercase tracking-[0.2em] text-[#9AA89E] mb-4">Como chegar</p>
+        <TravelMap chrome="guest" tone="garden" event={event} isEditing={isEditing} onFieldChange={updateField} />
+      </FadeInSection>
+
       {/* FIXED BOTTOM BAR */}
       <div className="fixed bottom-0 left-0 w-full bg-white/90 backdrop-blur-md border-t border-[#EAE5DF] p-4 z-50 flex items-center justify-center">
         <Button
@@ -4286,15 +4292,17 @@ const RusticLayout: React.FC<{
                 className="text-3xl font-serif text-[#4E342E] text-center md:text-left"
               />
             </h3>
+            {event.address ? (
             <p className="text-[#8D6E63] mb-4">
               <EditableField
                 value={event.address}
                 onChange={(newVal) => updateField?.("address", newVal)}
-                isEditing={isEditing}
+                isEditing={false}
                 className="text-[#8D6E63] text-center md:text-left"
                 multiline
               />
             </p>
+            ) : null}
             <button
               onClick={() => window.open(event.mapLink || "#", "_blank")}
               className="text-xs font-bold border-b border-[#5D4037] pb-1 uppercase tracking-widest"
@@ -4312,9 +4320,6 @@ const RusticLayout: React.FC<{
         </FadeInSection>
       </EditableSectionWrapper>
 
-      <FadeInSection className="px-4 md:px-8 mb-16">
-        <TravelMap chrome="map-only" event={event} isEditing={isEditing} onFieldChange={updateField} />
-      </FadeInSection>
       {event.receptionName ? (
         <FadeInSection className="px-4 md:px-8 mb-16">
           <div className="bg-white p-8 rounded-3xl shadow-sm border border-[#EFEBE9] max-w-xl mx-auto text-center">
@@ -4495,6 +4500,12 @@ const RusticLayout: React.FC<{
           ) : null}
         </FadeInSection>
       </EditableSectionWrapper>
+
+      {/* LOCAL + MAPA — por último, 100% só-leitura, card adaptativo bonito */}
+      <FadeInSection delay={0.1} className="max-w-3xl mx-auto px-6 mt-16">
+        <p className="text-center text-[11px] font-bold uppercase tracking-[0.2em] text-[#8D6E63] mb-4">Como chegar</p>
+        <TravelMap chrome="guest" tone="classic" event={event} isEditing={isEditing} onFieldChange={updateField} />
+      </FadeInSection>
 
       {/* FIXED ACTION */}
       <div className="fixed bottom-6 left-1/2 -translate-x-1/2 z-50 w-full max-w-sm px-4">
@@ -4820,12 +4831,6 @@ const IndustrialLayout: React.FC<{
         </div>
       ) : null}
 
-      <div className="border-b border-white/20 p-8 md:p-16">
-        <div className="max-w-3xl mx-auto">
-          <TravelMap chrome="map-only" event={event} isEditing={isEditing} onFieldChange={updateField} />
-        </div>
-      </div>
-
       {/* GIFTS */}
       {event.gifts && event.gifts.length > 0 && (
         <EditableSectionWrapper
@@ -4971,6 +4976,12 @@ const IndustrialLayout: React.FC<{
           </FadeInSection>
         </EditableSectionWrapper>
       )}
+
+      {/* LOCAL + MAPA — por último, 100% só-leitura, card adaptativo bonito */}
+      <FadeInSection delay={0.1} className="max-w-3xl mx-auto px-6 py-16">
+        <p className="text-center text-[11px] font-bold uppercase tracking-[0.2em] text-gray-400 mb-4">Como chegar</p>
+        <TravelMap chrome="guest" tone="classic" event={event} isEditing={isEditing} onFieldChange={updateField} />
+      </FadeInSection>
 
       {/* RSVP BUTTON */}
       <div className="fixed bottom-8 right-8 z-50">
@@ -5203,21 +5214,23 @@ const LuxuryLayout: React.FC<{
                   </div>
                 </div>
                 <div className="p-4 flex flex-col gap-3">
+                  {event.address ? (
                   <p className="text-xs text-gray-500 text-center leading-relaxed">
                     <EditableField
                       value={event.address}
                       onChange={(newVal) => updateField?.("address", newVal)}
-                      isEditing={isEditing}
+                      isEditing={false}
                       className="text-xs text-gray-500 text-center leading-relaxed"
                       multiline
                     />
                   </p>
+                  ) : null}
                   <Button
                     className="w-full bg-[#BF9B30] text-[#0F1419] hover:bg-white hover:text-black text-xs font-bold uppercase tracking-widest h-10 border-none shadow-lg"
                     onClick={() =>
                       window.open(
                         event.mapLink ||
-                          `https://maps.google.com/?q=${event.address}`,
+                          `https://www.google.com/maps/search/?api=1&query=${encodeURIComponent(event.locationName || 'Local do Evento')}`,
                         "_blank",
                       )
                     }
@@ -5283,12 +5296,7 @@ const LuxuryLayout: React.FC<{
             )}
           </div>
         </EditableSectionWrapper>
-
-        <FadeInSection className="w-full px-6 mb-24 max-w-md mx-auto">
-          <TravelMap chrome="map-only" event={event} isEditing={isEditing} onFieldChange={updateField} />
-        </FadeInSection>
-
-        <GoldDivider />
+<GoldDivider />
 
         {event.dressCode?.description ? (
           <FadeInSection className="w-full px-6 mb-24 max-w-md mx-auto text-center">
@@ -5475,6 +5483,12 @@ const LuxuryLayout: React.FC<{
             </FadeInSection>
           </EditableSectionWrapper>
         )}
+
+        {/* LOCAL + MAPA — por último, 100% só-leitura, card adaptativo bonito */}
+        <FadeInSection delay={0.1} className="max-w-md mx-auto px-6 mt-16 mb-24">
+          <p className="text-center text-[11px] font-bold uppercase tracking-[0.2em] text-[#BF9B30] mb-4">Como chegar</p>
+          <TravelMap chrome="guest" tone="gold" event={event} isEditing={isEditing} onFieldChange={updateField} />
+        </FadeInSection>
 
         {/* Gold Action Button (Fixed Bottom Bar) */}
         <div className="fixed bottom-0 left-0 w-full bg-[#0F1419]/95 backdrop-blur-md border-t border-[#BF9B30]/20 p-4 z-50 flex items-center justify-center">
@@ -5677,15 +5691,17 @@ const BridalShowerLayout: React.FC<{
                   `${event.time} Hrs`
                 )}
               </p>
+              {event.address ? (
               <p className={`${secondaryText} leading-relaxed mb-8`}>
                 <EditableField
                   value={event.address}
                   onChange={(newVal) => updateField?.("address", newVal)}
-                  isEditing={isEditing}
+                  isEditing={false}
                   className={`${secondaryText} leading-relaxed text-left`}
                   multiline
                 />
               </p>
+              ) : null}
               <button
                 onClick={() => window.open(event.mapLink || "#", "_blank")}
                 className="mt-auto text-xs font-bold uppercase tracking-widest border-b border-current pb-1 hover:opacity-50 transition-opacity"
@@ -5823,6 +5839,12 @@ const BridalShowerLayout: React.FC<{
           </div>
         </EditableSectionWrapper>
       )}
+
+      {/* LOCAL + MAPA — por último, 100% só-leitura, card adaptativo bonito */}
+      <FadeInSection delay={0.1} className="max-w-md mx-auto px-6 mt-16">
+        <p className="text-center text-[11px] font-bold uppercase tracking-[0.2em] text-[#C9A8A8] mb-4">Como chegar</p>
+        <TravelMap chrome="guest" tone="bridal" event={event} isEditing={isEditing} onFieldChange={updateField} />
+      </FadeInSection>
 
       {/* FLOATING ACTION BAR */}
       <div className="fixed bottom-6 left-1/2 -translate-x-1/2 z-50 w-full max-w-sm px-6">
@@ -6024,15 +6046,17 @@ const BabyShowerLayout: React.FC<{
                   className="text-2xl font-serif text-left"
                 />
               </h3>
+              {event.address ? (
               <p className={`text-sm ${secondaryText} mb-6 leading-relaxed flex-1 text-left`}>
                 <EditableField
                   value={event.address}
                   onChange={(newVal) => updateField?.("address", newVal)}
-                  isEditing={isEditing}
+                  isEditing={false}
                   className={`text-sm ${secondaryText} leading-relaxed text-left`}
                   multiline
                 />
               </p>
+              ) : null}
               <div className="flex gap-4 w-full mt-auto pt-6 border-t border-black/5">
                 <div className="flex-1 text-left">
                   <span className="uppercase tracking-widest text-[9px] font-bold opacity-40 block mb-1">
@@ -6215,6 +6239,12 @@ const BabyShowerLayout: React.FC<{
           </div>
         </EditableSectionWrapper>
       )}
+
+      {/* LOCAL + MAPA — por último, 100% só-leitura, card adaptativo bonito */}
+      <FadeInSection delay={0.1} className="max-w-md mx-auto px-6 mt-16">
+        <p className="text-center text-[11px] font-bold uppercase tracking-[0.2em] text-[#8FA8B8] mb-4">Como chegar</p>
+        <TravelMap chrome="guest" tone="bridal" event={event} isEditing={isEditing} onFieldChange={updateField} />
+      </FadeInSection>
 
       {/* FLOATING ACTION BAR */}
       <div className="fixed bottom-6 left-1/2 -translate-x-1/2 z-50 w-full max-w-sm px-6">
@@ -6774,14 +6804,16 @@ const LimintsoGoldLayout: React.FC<{
                   isEditing={isEditing}
                 />
               </h4>
+              {event.address ? (
               <p className="text-xs text-slate-500 mb-6">
                 <EditableField
                   value={event.address}
                   onChange={(val) => updateField?.("address", val)}
-                  isEditing={isEditing}
+                  isEditing={false}
                   multiline
                 />
               </p>
+              ) : null}
               
               {event.mapLink && (
                 <button
@@ -6792,9 +6824,6 @@ const LimintsoGoldLayout: React.FC<{
                 </button>
               )}
             </div>
-          </FadeInSection>
-          <FadeInSection className="mt-8 text-center max-w-md mx-auto">
-            <TravelMap chrome="map-only" event={event} isEditing={isEditing} onFieldChange={updateField} />
           </FadeInSection>
           {event.receptionName ? (
             <FadeInSection className="mt-8 text-center max-w-md mx-auto">
@@ -6971,6 +7000,12 @@ const LimintsoGoldLayout: React.FC<{
           </button>
         </FadeInSection>
       </div>
+
+      {/* LOCAL + MAPA — por último, 100% só-leitura, card adaptativo bonito */}
+      <FadeInSection delay={0.1} className="max-w-md mx-auto px-6 mb-16">
+        <p className="text-center text-[11px] font-bold uppercase tracking-[0.2em] text-[#b49232] mb-4">Como chegar</p>
+        <TravelMap chrome="guest" tone="gold" event={event} isEditing={isEditing} onFieldChange={updateField} />
+      </FadeInSection>
 
       {/* FOOTER */}
       <footer className="text-center py-12 text-[10px] text-slate-400 tracking-wider font-sans uppercase">
@@ -7581,7 +7616,7 @@ const LimintsoMeLayout: React.FC<{
                       </h5>
                     </div>
                     <div className="space-y-4 mt-6">
-                      {((isEditing && updateField) || event.address) ? (
+                      {event.address ? (
                         <p className="montserrat-font text-xs text-slate-500 leading-relaxed">
                           <EditableField
                             value={event.address || ""}
@@ -7656,9 +7691,6 @@ const LimintsoMeLayout: React.FC<{
                   </motion.div>
                 </div>
               ) : null}
-              <div className="grid grid-cols-1 gap-8 max-w-xl mx-auto pt-8">
-                <TravelMap chrome="map-only" event={event} isEditing={isEditing} onFieldChange={updateField} />
-              </div>
             </FadeInSection>
           </div>
 
@@ -7884,6 +7916,12 @@ const LimintsoMeLayout: React.FC<{
               </div>
             </div>
           )}
+
+          {/* LOCAL + MAPA — por último, 100% só-leitura, card adaptativo bonito */}
+          <FadeInSection delay={0.1} className="max-w-md mx-auto px-6 py-16">
+            <p className="text-center text-[11px] font-bold uppercase tracking-[0.2em] text-[#E9BE5D] mb-4">Como chegar</p>
+            <TravelMap chrome="guest" tone="gold" event={event} isEditing={isEditing} onFieldChange={updateField} />
+          </FadeInSection>
 
           {/* 11. ENDING FOOTER HERO SECTION */}
           <div

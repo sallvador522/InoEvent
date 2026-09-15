@@ -9,9 +9,8 @@ import { normalizePlanId, getEventCreationLimit, getValidityDays, isBusinessPlan
 import { uploadEventAudio, deleteEventAudio, isOwnStorageAudio, formatAudioSize, MAX_AUDIO_BYTES } from '../../lib/audioUpload';
 import { ArrowLeft, ArrowRight, Check, Plus, Trash2, Gift, Lock } from 'lucide-react';
 import toast from 'react-hot-toast';
-import { PlacePicker } from '../../components/PlacePicker';
-import { GOOGLE_MAPS_API_KEY } from '../../lib/maps';
-import { TravelMap } from './TravelMap';
+import { LocationPinPicker } from '../../components/LocationPinPicker';
+import { MapsProvider } from '../../components/MapsProvider';
 
 const WEDDING_LAYOUTS = [
   { id: 'CLASSIC', label: 'Essencial Moderno', premium: false },
@@ -94,11 +93,19 @@ export const WeddingQuestionnaire: React.FC = () => {
   const [date, setDate] = useState('');
   const [time, setTime] = useState('');
   const [locationName, setLocationName] = useState('');
-  const [address, setAddress] = useState('');
+  // Legado: mantidos no payload para eventos antigos; o editor usa só zona + pino.
+  const [address] = useState('');
   const [mapLink, setMapLink] = useState('');
   const [latitude, setLatitude] = useState<number | null>(null);
   const [longitude, setLongitude] = useState<number | null>(null);
   const [placeId, setPlaceId] = useState<string | null>(null);
+  const [formattedAddress, setFormattedAddress] = useState<string | null>(null);
+  const [plusCode, setPlusCode] = useState<string | null>(null);
+  const [rating, setRating] = useState<number | null>(null);
+  const [userRatingsTotal, setUserRatingsTotal] = useState<number | null>(null);
+  const [mapsUrl, setMapsUrl] = useState<string | null>(null);
+  const [placePhotoUrl, setPlacePhotoUrl] = useState<string | null>(null);
+  const [locationSource, setLocationSource] = useState<'google' | 'osm' | 'gps' | 'link' | 'mapa' | null>(null);
   const [receptionName, setReceptionName] = useState('');
   const [receptionAddress, setReceptionAddress] = useState('');
   const [description, setDescription] = useState('');
@@ -168,6 +175,14 @@ export const WeddingQuestionnaire: React.FC = () => {
         latitude,
         longitude,
         placeId,
+        formattedAddress,
+        plusCode,
+        rating,
+        userRatingsTotal,
+        mapsUrl: mapsUrl || mapLink || null,
+        placePhotoUrl,
+        locationSource,
+        locationUpdatedAt: latitude !== null && longitude !== null ? new Date().toISOString() : null,
         receptionName,
         receptionAddress,
         description,
@@ -311,6 +326,7 @@ export const WeddingQuestionnaire: React.FC = () => {
   };
 
   return (
+    <MapsProvider>
     <div className="min-h-screen bg-[#FDFBF7] text-slate-900 font-display">
       <SEO
         title="Criar convite de casamento"
@@ -393,68 +409,51 @@ export const WeddingQuestionnaire: React.FC = () => {
                   </div>
                 </div>
                 <div className="mb-4">
-                  <label className={labelCls} htmlFor="wq-loc">Local da cerimónia *</label>
-                  {GOOGLE_MAPS_API_KEY ? (
-                    <PlacePicker
-                      id="wq-loc"
-                      value={locationName}
-                      onChange={(v) => {
-                        setLocationName(v);
-                        // Nome editado à mão invalida o pino anterior
-                        setLatitude(null);
-                        setLongitude(null);
-                        setPlaceId(null);
-                      }}
-                      onClear={() => {
-                        setLatitude(null);
-                        setLongitude(null);
-                        setPlaceId(null);
-                      }}
-                      inputClassName={inputCls}
-                      placeholder="Ex: Igreja da Sagrada Família — escolha uma sugestão"
-                      onSelect={(sel) => {
-                        setLocationName(sel.name || locationName);
-                        setAddress(sel.address);
-                        setLatitude(sel.latitude);
-                        setLongitude(sel.longitude);
-                        setPlaceId(sel.placeId || null);
-                        setMapLink(sel.mapLink);
-                        toast.success(sel.name ? `${sel.name} marcado no mapa!` : 'Local marcado no mapa!');
-                      }}
-                    />
-                  ) : (
-                    <input id="wq-loc" className={inputCls} value={locationName} onChange={(e) => setLocationName(e.target.value)} placeholder="Ex: Igreja da Sagrada Família" autoComplete="off" />
-                  )}
-                  {(latitude === null || longitude === null) && (
-                    <p className="text-[11px] text-slate-400 font-medium mt-2">
-                      Digite e escolha uma sugestão da lista — nome, endereço e mapa preenchem sozinhos.
-                    </p>
-                  )}
-                  {(latitude !== null && longitude !== null) && (
-                    <p className="text-xs text-emerald-600 font-medium mt-2">
-                      ✓ Marcador preciso no mapa — os convidados veem exatamente onde é.
-                    </p>
-                  )}
-                </div>
-                {(address || locationName) && (
-                  <div className="mb-4">
-                    <span className={labelCls}>Pré-visualização do mapa</span>
-                    <TravelMap
-                      chrome="map-only"
-                      event={{ latitude, longitude, address, locationName, mapLink }}
-                    />
-                  </div>
-                )}
-                <p className="text-[11px] text-slate-400 font-medium mb-2">
-                  …ou preencha o endereço manualmente abaixo
-                </p>
-                <div className="mb-4">
-                  <label className={labelCls} htmlFor="wq-addr">Endereço</label>
-                  <input id="wq-addr" className={inputCls} value={address} onChange={(e) => setAddress(e.target.value)} placeholder="Ex: Maianga, Luanda" autoComplete="off" />
-                </div>
-                <div className="mb-4">
-                  <label className={labelCls} htmlFor="wq-map">Link do mapa</label>
-                  <input id="wq-map" className={inputCls} value={mapLink} onChange={(e) => setMapLink(e.target.value)} placeholder="Link do Google Maps (opcional)" inputMode="url" autoComplete="off" />
+                  <span className={labelCls}>Local do evento *</span>
+                  <LocationPinPicker
+                    latitude={latitude}
+                    longitude={longitude}
+                    mapLink={mapLink}
+                    zone={locationName}
+                    placeName={locationName}
+                    formattedAddress={formattedAddress}
+                    plusCode={plusCode}
+                    rating={rating}
+                    userRatingsTotal={userRatingsTotal}
+                    placeId={placeId}
+                    mapsUrl={mapsUrl}
+                    locationSource={locationSource}
+                    onZoneSuggest={(name) => setLocationName(name)}
+                    onChange={(pin) => {
+                      const derivedName = (pin.name || pin.formattedAddress || '').trim();
+                      if (derivedName) setLocationName(derivedName);
+                      setLatitude(pin.latitude);
+                      setLongitude(pin.longitude);
+                      setMapLink(pin.mapLink);
+                      setPlaceId(pin.placeId || null);
+                      setFormattedAddress(pin.formattedAddress || null);
+                      setPlusCode(pin.plusCode || null);
+                      setRating(typeof pin.rating === 'number' ? pin.rating : null);
+                      setUserRatingsTotal(typeof pin.userRatingsTotal === 'number' ? pin.userRatingsTotal : null);
+                      setMapsUrl(pin.mapsUrl || pin.mapLink || null);
+                      setPlacePhotoUrl(pin.placePhotoUrl || null);
+                      setLocationSource(pin.locationSource || null);
+                      toast.success('Pino fixado no mapa!');
+                    }}
+                    onClear={() => {
+                      setLatitude(null);
+                      setLongitude(null);
+                      setMapLink('');
+                      setPlaceId(null);
+                      setFormattedAddress(null);
+                      setPlusCode(null);
+                      setRating(null);
+                      setUserRatingsTotal(null);
+                      setMapsUrl(null);
+                      setPlacePhotoUrl(null);
+                      setLocationSource(null);
+                    }}
+                  />
                 </div>
                 <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
                   <div>
@@ -809,5 +808,6 @@ export const WeddingQuestionnaire: React.FC = () => {
         </div>
       </main>
     </div>
+    </MapsProvider>
   );
 };

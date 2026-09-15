@@ -116,19 +116,21 @@ router.get('/invite/:id', async (req, res, next) => {
     
     if (eventData) {
       const eventTitle = eventData.title || 'Convite Especial';
+      const venue = eventData.locationName || eventData.formattedAddress || '';
+      const venueSuffix = venue ? ` Local: ${venue}.` : '';
       
       // Determine elegant localized invitation message
-      let eventDesc = 'Você está a ser convidado para este grande evento. Confirme sua presença e confira todos os detalhes!';
+      let eventDesc = `Você está a ser convidado para este grande evento. Confirme sua presença e confira todos os detalhes!${venueSuffix}`;
       if (eventData.type === 'BRIDAL_SHOWER') {
         const bride = eventData.brideName || eventData.title;
-        eventDesc = `Você está a ser convidado para o Chá de Panela de ${bride}. Confirme sua presença e confira todos os detalhes!`;
+        eventDesc = `Você está a ser convidado para o Chá de Panela de ${bride}. Confirme sua presença e confira todos os detalhes!${venueSuffix}`;
       } else if (eventData.type === 'BABY_SHOWER') {
-        eventDesc = `Você está a ser convidado para o Chá de Bebê de ${eventData.title}. Confirme sua presença e confira todos os detalhes!`;
+        eventDesc = `Você está a ser convidado para o Chá de Bebê de ${eventData.title}. Confirme sua presença e confira todos os detalhes!${venueSuffix}`;
       } else if (eventData.type === 'WEDDING') {
         const couple = (eventData.brideName && eventData.groomName) ? `${eventData.brideName} & ${eventData.groomName}` : eventData.title;
-        eventDesc = `Você está a ser convidado para o Casamento de ${couple}. Confirme sua presença e confira todos os detalhes!`;
+        eventDesc = `Você está a ser convidado para o Casamento de ${couple}. Confirme sua presença e confira todos os detalhes!${venueSuffix}`;
       } else {
-        eventDesc = `Você está a ser convidado para o evento "${eventData.title}". Confirme sua presença e confira todos os detalhes!`;
+        eventDesc = `Você está a ser convidado para o evento "${eventData.title}". Confirme sua presença e confira todos os detalhes!${venueSuffix}`;
       }
       
       // Determine the image to display

@@ -110,6 +110,20 @@ export interface EventDetails {
   latitude?: number | null;
   longitude?: number | null;
   placeId?: string | null;
+  /** Endereço formatado vindo do Google/OSM (ex: "Via Expressa, Luanda") */
+  formattedAddress?: string | null;
+  /** Plus Code global (ex: "45CP+J88 Luanda") — útil em Angola sem número */
+  plusCode?: string | null;
+  /** Avaliação Google 0-5 + total de avaliações (só Google) */
+  rating?: number | null;
+  userRatingsTotal?: number | null;
+  /** URL oficial do lugar no Google Maps (details.url) ou link gerado */
+  mapsUrl?: string | null;
+  /** Foto do lugar (primeira foto do Places) — URL temporária */
+  placePhotoUrl?: string | null;
+  /** Origem do pino: google | osm | gps | link | mapa */
+  locationSource?: 'google' | 'osm' | 'gps' | 'link' | 'mapa' | null;
+  locationUpdatedAt?: string | null;
   receptionName?: string; // Optional separate reception
   receptionAddress?: string;
 

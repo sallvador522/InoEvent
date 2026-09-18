@@ -213,15 +213,16 @@ Cada passo que damos é promessa de que ele será sempre o alicerce da nossa Fam
     time: "18:00",
     locationName: "Espaço Elegance",
     address: "Talatona, Luanda",
-    heroImage: "https://images.unsplash.com/photo-1519225421980-715cb02151ff?q=80&w=2670&auto=format&fit=crop",
+    heroImage: "/templaClassic/classPrinci-1.webp",
     description:
       "Um dia inesquecível de celebração do nosso amor. Junte-se a nós para brindarmos à vida e à felicidade (Modelo Essencial).",
     musicTrack: "A Thousand Years - Christina Perri",
     themeColor: "#4A4A4A",
     gallery: [
-      "https://images.unsplash.com/photo-1519225421980-715cb02151ff?q=80&w=2670&auto=format&fit=crop",
-      "https://images.unsplash.com/photo-1511285560982-1356c11d4606?q=80&w=2670&auto=format&fit=crop",
-      "https://images.unsplash.com/photo-1522413452208-996901845bb0?q=80&w=2670&auto=format&fit=crop"
+      "/templaClassic/classPrinci-1.webp",
+      "/templaClassic/classPrinci-2.webp",
+      "/templaClassic/classPrinci-3.webp",
+      "/templaClassic/classPrinci-4.webp"
     ],
     timeline: [
       { time: "18:00", title: "Cerimônia", description: "Jardim" },

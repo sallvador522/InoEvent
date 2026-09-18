@@ -121,7 +121,7 @@ export const TemplateGalleryPage: React.FC = () => {
                             const badge = getBadgeConfig(event.type);
                             return (
                                 <MotionLink
-                                    to={`/invite/${event.id}`}
+                                    to={event.type === ThemeType.WEDDING ? `/create-wedding?template=${event.layoutMode}` : `/invite/${event.id}`}
                                     key={event.id}
                                     className="flex flex-col gap-2 md:gap-4 group cursor-pointer"
                                     initial={{ opacity: 0, y: 30 }}

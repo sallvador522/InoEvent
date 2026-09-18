@@ -213,18 +213,22 @@ const InvitationView: React.FC = () => {
       target: '.tour-editor-header',
       content: 'Bem-vindo ao Estúdio de Criação! Aqui no topo você encontra o painel principal para salvar e gerenciar seu convite.',
       disableBeacon: true,
+      placement: 'bottom' as const,
     },
     {
       target: '.tour-wysiwyg',
       content: 'Para personalizar, basta clicar em qualquer texto ou imagem! Você edita diretamente na tela e vê o resultado na hora.',
+      placement: 'top' as const,
     },
     {
       target: '.tour-save-draft',
       content: 'Ainda não terminou? Salve como rascunho para continuar depois sem que ninguém veja.',
+      placement: 'bottom' as const,
     },
     {
       target: '.tour-publish',
       content: 'Tudo pronto? Clique em Publicar para que seus convidados possam acessar e confirmar presença!',
+      placement: 'bottom' as const,
     }
   ];
 
@@ -261,6 +265,12 @@ const InvitationView: React.FC = () => {
   const [isSignUp, setIsSignUp] = useState(true);
   const [authLoading, setAuthLoading] = useState(false);
   const [isEditorBarExpanded, setIsEditorBarExpanded] = useState(false);
+
+  // O tour aponta para os botões rascunho/publicar, que vivem dentro da barra:
+  // sem barra aberta os alvos medem 0x0 e os tooltips descolam. Abrir é obrigatório.
+  useEffect(() => {
+    if (runTour) setIsEditorBarExpanded(true);
+  }, [runTour]);
 
   // Scroll to top on mount & enforce authorized domain redirect
   useEffect(() => {
@@ -2180,18 +2190,18 @@ const InvitationView: React.FC = () => {
 
   return (
     <>
-      {/* WELCOME ENVELOPE OVERLAY */}
+      {/* WELCOME ENVELOPE OVERLAY (os Limintso têm capa própria — sem envelope duplo) */}
       <AnimatePresence>
-        {!hasOpened && !isEditing && (
+        {!hasOpened && !isEditing && activeEvent.layoutMode !== "LIMINTSO_GOLD" && activeEvent.layoutMode !== "LIMINTSO_ME" && (
           <motion.div
             initial={{ opacity: 1 }}
             exit={{ opacity: 0, y: -50 }}
             transition={{ duration: 0.8, ease: "easeInOut" }}
             className="fixed inset-0 z-[9999] flex flex-col items-center justify-center bg-slate-900 text-white"
             style={{
-               backgroundImage: 'linear-gradient(rgba(0,0,0,0.6), rgba(0,0,0,0.8)), url(' + getImageUrl(activeEvent.heroImage) + ')',
+               backgroundImage: "linear-gradient(rgba(0,0,0,0.6), rgba(0,0,0,0.8)), url('" + getImageUrl(activeEvent.heroImage) + "')",
                backgroundSize: 'cover',
-               backgroundPosition: 'center',
+               backgroundPosition: 'center 25%',
             }}
           >
             <motion.div 
@@ -3136,11 +3146,18 @@ guestName: string;
           </EditableSectionWrapper>
         )}
 
-        {/* LOCAL + MAPA — por último, 100% só-leitura, card adaptativo bonito */}
+        {/* LOCAL + MAPA — por último, 100% só-leitura, card adaptativo bonito (clica para editar no Estúdio) */}
+        <EditableSectionWrapper
+          isEditing={isEditing}
+          section="locations"
+          label="Localização"
+          onEditSection={onEditSection}
+        >
         <FadeInSection delay={0.1} className="pt-4">
           <p className="text-[11px] font-bold uppercase tracking-[0.2em] text-slate-400 mb-4">Como chegar</p>
           <TravelMap chrome="guest" tone="classic" event={event} isEditing={isEditing} onFieldChange={updateField} />
         </FadeInSection>
+        </EditableSectionWrapper>
       </div>
 
       <div className="fixed bottom-0 inset-x-0 z-50 flex flex-col items-center gap-2 px-6 pt-2" style={{ paddingBottom: 'max(1.25rem, env(safe-area-inset-bottom))' }}>
@@ -3654,11 +3671,18 @@ const ModernLayout: React.FC<{
         </FadeInSection>
       )}
 
-      {/* LOCAL + MAPA — por último, 100% só-leitura, card adaptativo bonito */}
-      <FadeInSection delay={0.1} className="max-w-3xl mx-auto px-6 mt-16">
-        <p className="text-center text-[11px] font-bold uppercase tracking-[0.2em] text-[#C2B280] mb-4">Como chegar</p>
-        <TravelMap chrome="guest" tone="classic" event={event} isEditing={isEditing} onFieldChange={updateField} />
-      </FadeInSection>
+        {/* LOCAL + MAPA — por último, 100% só-leitura, card adaptativo bonito (clica para editar no Estúdio) */}
+        <EditableSectionWrapper
+          isEditing={isEditing}
+          section="locations"
+          label="Localização"
+          onEditSection={onEditSection}
+        >
+        <FadeInSection delay={0.1} className="max-w-3xl mx-auto px-6 mt-16">
+          <p className="text-center text-[11px] font-bold uppercase tracking-[0.2em] text-[#C2B280] mb-4">Como chegar</p>
+          <TravelMap chrome="guest" tone="classic" event={event} isEditing={isEditing} onFieldChange={updateField} />
+        </FadeInSection>
+        </EditableSectionWrapper>
 
       {/* FOOTER ACTION */}
       <div className="fixed bottom-8 left-1/2 -translate-x-1/2 z-50">
@@ -4123,11 +4147,18 @@ const GardenLayout: React.FC<{
         )}
       </EditableSectionWrapper>
 
-      {/* LOCAL + MAPA — por último, 100% só-leitura, card adaptativo bonito */}
-      <FadeInSection delay={0.1} className="max-w-3xl mx-auto px-6 mt-16">
-        <p className="text-center text-[11px] font-bold uppercase tracking-[0.2em] text-[#9AA89E] mb-4">Como chegar</p>
-        <TravelMap chrome="guest" tone="garden" event={event} isEditing={isEditing} onFieldChange={updateField} />
-      </FadeInSection>
+        {/* LOCAL + MAPA — por último, 100% só-leitura, card adaptativo bonito (clica para editar no Estúdio) */}
+        <EditableSectionWrapper
+          isEditing={isEditing}
+          section="locations"
+          label="Localização"
+          onEditSection={onEditSection}
+        >
+        <FadeInSection delay={0.1} className="max-w-3xl mx-auto px-6 mt-16">
+          <p className="text-center text-[11px] font-bold uppercase tracking-[0.2em] text-[#9AA89E] mb-4">Como chegar</p>
+          <TravelMap chrome="guest" tone="garden" event={event} isEditing={isEditing} onFieldChange={updateField} />
+        </FadeInSection>
+        </EditableSectionWrapper>
 
       {/* FIXED BOTTOM BAR */}
       <div className="fixed bottom-0 left-0 w-full bg-white/90 backdrop-blur-md border-t border-[#EAE5DF] p-4 z-50 flex items-center justify-center">
@@ -4501,11 +4532,18 @@ const RusticLayout: React.FC<{
         </FadeInSection>
       </EditableSectionWrapper>
 
-      {/* LOCAL + MAPA — por último, 100% só-leitura, card adaptativo bonito */}
-      <FadeInSection delay={0.1} className="max-w-3xl mx-auto px-6 mt-16">
-        <p className="text-center text-[11px] font-bold uppercase tracking-[0.2em] text-[#8D6E63] mb-4">Como chegar</p>
-        <TravelMap chrome="guest" tone="classic" event={event} isEditing={isEditing} onFieldChange={updateField} />
-      </FadeInSection>
+        {/* LOCAL + MAPA — por último, 100% só-leitura, card adaptativo bonito (clica para editar no Estúdio) */}
+        <EditableSectionWrapper
+          isEditing={isEditing}
+          section="locations"
+          label="Localização"
+          onEditSection={onEditSection}
+        >
+        <FadeInSection delay={0.1} className="max-w-3xl mx-auto px-6 mt-16">
+          <p className="text-center text-[11px] font-bold uppercase tracking-[0.2em] text-[#8D6E63] mb-4">Como chegar</p>
+          <TravelMap chrome="guest" tone="classic" event={event} isEditing={isEditing} onFieldChange={updateField} />
+        </FadeInSection>
+        </EditableSectionWrapper>
 
       {/* FIXED ACTION */}
       <div className="fixed bottom-6 left-1/2 -translate-x-1/2 z-50 w-full max-w-sm px-4">
@@ -4977,11 +5015,18 @@ const IndustrialLayout: React.FC<{
         </EditableSectionWrapper>
       )}
 
-      {/* LOCAL + MAPA — por último, 100% só-leitura, card adaptativo bonito */}
-      <FadeInSection delay={0.1} className="max-w-3xl mx-auto px-6 py-16">
-        <p className="text-center text-[11px] font-bold uppercase tracking-[0.2em] text-gray-400 mb-4">Como chegar</p>
-        <TravelMap chrome="guest" tone="classic" event={event} isEditing={isEditing} onFieldChange={updateField} />
-      </FadeInSection>
+        {/* LOCAL + MAPA — por último, 100% só-leitura, card adaptativo bonito (clica para editar no Estúdio) */}
+        <EditableSectionWrapper
+          isEditing={isEditing}
+          section="locations"
+          label="Localização"
+          onEditSection={onEditSection}
+        >
+        <FadeInSection delay={0.1} className="max-w-3xl mx-auto px-6 py-16">
+          <p className="text-center text-[11px] font-bold uppercase tracking-[0.2em] text-gray-400 mb-4">Como chegar</p>
+          <TravelMap chrome="guest" tone="classic" event={event} isEditing={isEditing} onFieldChange={updateField} />
+        </FadeInSection>
+        </EditableSectionWrapper>
 
       {/* RSVP BUTTON */}
       <div className="fixed bottom-8 right-8 z-50">
@@ -5484,11 +5529,18 @@ const LuxuryLayout: React.FC<{
           </EditableSectionWrapper>
         )}
 
-        {/* LOCAL + MAPA — por último, 100% só-leitura, card adaptativo bonito */}
+        {/* LOCAL + MAPA — por último, 100% só-leitura, card adaptativo bonito (clica para editar no Estúdio) */}
+        <EditableSectionWrapper
+          isEditing={isEditing}
+          section="locations"
+          label="Localização"
+          onEditSection={onEditSection}
+        >
         <FadeInSection delay={0.1} className="max-w-md mx-auto px-6 mt-16 mb-24">
           <p className="text-center text-[11px] font-bold uppercase tracking-[0.2em] text-[#BF9B30] mb-4">Como chegar</p>
           <TravelMap chrome="guest" tone="gold" event={event} isEditing={isEditing} onFieldChange={updateField} />
         </FadeInSection>
+        </EditableSectionWrapper>
 
         {/* Gold Action Button (Fixed Bottom Bar) */}
         <div className="fixed bottom-0 left-0 w-full bg-[#0F1419]/95 backdrop-blur-md border-t border-[#BF9B30]/20 p-4 z-50 flex items-center justify-center">
@@ -5840,11 +5892,18 @@ const BridalShowerLayout: React.FC<{
         </EditableSectionWrapper>
       )}
 
-      {/* LOCAL + MAPA — por último, 100% só-leitura, card adaptativo bonito */}
-      <FadeInSection delay={0.1} className="max-w-md mx-auto px-6 mt-16">
-        <p className="text-center text-[11px] font-bold uppercase tracking-[0.2em] text-[#C9A8A8] mb-4">Como chegar</p>
-        <TravelMap chrome="guest" tone="bridal" event={event} isEditing={isEditing} onFieldChange={updateField} />
-      </FadeInSection>
+        {/* LOCAL + MAPA — por último, 100% só-leitura, card adaptativo bonito (clica para editar no Estúdio) */}
+        <EditableSectionWrapper
+          isEditing={isEditing}
+          section="locations"
+          label="Localização"
+          onEditSection={onEditSection}
+        >
+        <FadeInSection delay={0.1} className="max-w-md mx-auto px-6 mt-16">
+          <p className="text-center text-[11px] font-bold uppercase tracking-[0.2em] text-[#C9A8A8] mb-4">Como chegar</p>
+          <TravelMap chrome="guest" tone="bridal" event={event} isEditing={isEditing} onFieldChange={updateField} />
+        </FadeInSection>
+        </EditableSectionWrapper>
 
       {/* FLOATING ACTION BAR */}
       <div className="fixed bottom-6 left-1/2 -translate-x-1/2 z-50 w-full max-w-sm px-6">
@@ -6240,11 +6299,18 @@ const BabyShowerLayout: React.FC<{
         </EditableSectionWrapper>
       )}
 
-      {/* LOCAL + MAPA — por último, 100% só-leitura, card adaptativo bonito */}
-      <FadeInSection delay={0.1} className="max-w-md mx-auto px-6 mt-16">
-        <p className="text-center text-[11px] font-bold uppercase tracking-[0.2em] text-[#8FA8B8] mb-4">Como chegar</p>
-        <TravelMap chrome="guest" tone="bridal" event={event} isEditing={isEditing} onFieldChange={updateField} />
-      </FadeInSection>
+        {/* LOCAL + MAPA — por último, 100% só-leitura, card adaptativo bonito (clica para editar no Estúdio) */}
+        <EditableSectionWrapper
+          isEditing={isEditing}
+          section="locations"
+          label="Localização"
+          onEditSection={onEditSection}
+        >
+        <FadeInSection delay={0.1} className="max-w-md mx-auto px-6 mt-16">
+          <p className="text-center text-[11px] font-bold uppercase tracking-[0.2em] text-[#8FA8B8] mb-4">Como chegar</p>
+          <TravelMap chrome="guest" tone="bridal" event={event} isEditing={isEditing} onFieldChange={updateField} />
+        </FadeInSection>
+        </EditableSectionWrapper>
 
       {/* FLOATING ACTION BAR */}
       <div className="fixed bottom-6 left-1/2 -translate-x-1/2 z-50 w-full max-w-sm px-6">
@@ -6292,6 +6358,7 @@ const LimintsoGoldLayout: React.FC<{
   isEditing,
   isOpenCover,
   setIsOpenCover,
+  onEditSection,
   updateField,
   deleteTimelineItem,
   updateTimelineItem,
@@ -6338,7 +6405,7 @@ const LimintsoGoldLayout: React.FC<{
                 className="absolute inset-0"
               >
                 <div
-                  className="absolute inset-0 bg-cover bg-center transition-transform duration-[12s] ease-out-quad scale-105"
+                  className="absolute inset-0 bg-cover bg-[position:center_25%] transition-transform duration-[12s] ease-out-quad scale-105"
                   style={{ backgroundImage: `url('${getImageUrl(event.heroImage || "/casalModel.webp", { width: 1200, quality: 80 })}')` }}
                 />
               </EditableImageWrapper>
@@ -6405,7 +6472,14 @@ const LimintsoGoldLayout: React.FC<{
               className="z-10 flex flex-col items-center space-y-4 mb-4"
             >
               <button
-                onClick={() => setIsOpen(true)}
+                onClick={() => {
+                  setIsOpen(true);
+                  // Mesma regra do envelope: liberta o áudio no gesto do convidado
+                  const audioEls = document.getElementsByTagName('audio');
+                  for (let i = 0; i < audioEls.length; i++) {
+                    audioEls[i].play().catch(e => console.log('Audio play failed on open', e));
+                  }
+                }}
                 className="group relative px-10 py-4.5 bg-[#C5A880] hover:bg-[#b49232] text-slate-950 rounded-full shadow-[0_10px_35px_rgba(0,0,0,0.4)] text-xs uppercase tracking-[0.25em] font-sans font-bold transition-all duration-500 hover:scale-105 active:scale-95 flex items-center space-x-2.5 cursor-pointer border border-[#C5A880]/20"
               >
                 <span className="material-symbols-outlined text-sm text-slate-950 transition-colors">
@@ -6434,7 +6508,7 @@ const LimintsoGoldLayout: React.FC<{
               className="absolute inset-0"
             >
               <div
-                className="absolute inset-0 bg-cover bg-center transition-transform duration-[12s] scale-105 hover:scale-110"
+                className="absolute inset-0 bg-cover bg-[position:center_25%] transition-transform duration-[12s] scale-105 hover:scale-110"
                 style={{ backgroundImage: `url('${getImageUrl(event.heroImage, { width: 1200, quality: 80 })}')` }}
               />
             </EditableImageWrapper>
@@ -6794,6 +6868,13 @@ const LimintsoGoldLayout: React.FC<{
           </div>
 
           {/* Location details card */}
+          <EditableSectionWrapper
+            isEditing={isEditing}
+            section="locations"
+            isHidden={(event.hiddenSections || []).includes("locations")}
+            label="Localização"
+            onEditSection={onEditSection}
+          >
           <FadeInSection className="mt-16 text-center max-w-md mx-auto">
             <div className="bg-white border border-[#dcb349]/20 rounded-3xl p-8 shadow-sm">
               <span className="material-symbols-outlined text-[#b49232] text-2xl mb-2">location_on</span>
@@ -6825,6 +6906,7 @@ const LimintsoGoldLayout: React.FC<{
               )}
             </div>
           </FadeInSection>
+          </EditableSectionWrapper>
           {event.receptionName ? (
             <FadeInSection className="mt-8 text-center max-w-md mx-auto">
               <div className="bg-white border border-[#dcb349]/20 rounded-3xl p-8 shadow-sm">
@@ -7001,11 +7083,18 @@ const LimintsoGoldLayout: React.FC<{
         </FadeInSection>
       </div>
 
-      {/* LOCAL + MAPA — por último, 100% só-leitura, card adaptativo bonito */}
-      <FadeInSection delay={0.1} className="max-w-md mx-auto px-6 mb-16">
-        <p className="text-center text-[11px] font-bold uppercase tracking-[0.2em] text-[#b49232] mb-4">Como chegar</p>
-        <TravelMap chrome="guest" tone="gold" event={event} isEditing={isEditing} onFieldChange={updateField} />
-      </FadeInSection>
+        {/* LOCAL + MAPA — por último, 100% só-leitura, card adaptativo bonito (clica para editar no Estúdio) */}
+        <EditableSectionWrapper
+          isEditing={isEditing}
+          section="locations"
+          label="Localização"
+          onEditSection={onEditSection}
+        >
+        <FadeInSection delay={0.1} className="max-w-md mx-auto px-6 mb-16">
+          <p className="text-center text-[11px] font-bold uppercase tracking-[0.2em] text-[#b49232] mb-4">Como chegar</p>
+          <TravelMap chrome="guest" tone="gold" event={event} isEditing={isEditing} onFieldChange={updateField} />
+        </FadeInSection>
+        </EditableSectionWrapper>
 
       {/* FOOTER */}
       <footer className="text-center py-12 text-[10px] text-slate-400 tracking-wider font-sans uppercase">
@@ -7041,6 +7130,7 @@ const LimintsoMeLayout: React.FC<{
   isEditing,
   isOpenCover,
   setIsOpenCover,
+  onEditSection,
   updateField,
   deleteTimelineItem,
   updateTimelineItem,
@@ -7170,7 +7260,7 @@ const LimintsoMeLayout: React.FC<{
                 className="absolute inset-0"
               >
                 <div
-                  className="absolute inset-0 bg-cover bg-center transition-transform duration-[15s] ease-out-quad scale-105"
+                  className="absolute inset-0 bg-cover bg-[position:center_25%] transition-transform duration-[15s] ease-out-quad scale-105"
                   style={{ backgroundImage: `url('${getImageUrl(event.heroImage || "https://in.limintso.com/wp-content/uploads/2025/08/cav33.jpg", { width: 1200, quality: 80 })}')` }}
                 />
               </EditableImageWrapper>
@@ -7251,7 +7341,14 @@ const LimintsoMeLayout: React.FC<{
               </p>
 
               <button
-                onClick={() => setIsOpen(true)}
+                onClick={() => {
+                  setIsOpen(true);
+                  // Mesma regra do envelope: liberta o áudio no gesto do convidado
+                  const audioEls = document.getElementsByTagName('audio');
+                  for (let i = 0; i < audioEls.length; i++) {
+                    audioEls[i].play().catch(e => console.log('Audio play failed on open', e));
+                  }
+                }}
                 className="josefin-font w-full py-4 bg-transparent hover:bg-white text-white hover:text-black border border-white hover:border-transparent rounded-full text-sm uppercase tracking-[0.2em] font-medium transition-all duration-300 transform active:scale-[0.98] shadow-md hover:shadow-xl hover:-translate-y-[2px]"
               >
                 Ver Convite
@@ -7593,6 +7690,13 @@ const LimintsoMeLayout: React.FC<{
                 ))}
               </div>
               {(event.timeline || []).length === 0 && event.locationName ? (
+              <EditableSectionWrapper
+                isEditing={isEditing}
+                section="locations"
+                isHidden={(event.hiddenSections || []).includes("locations")}
+                label="Localização"
+                onEditSection={onEditSection}
+              >
                 <div className="grid grid-cols-1 gap-8 max-w-xl mx-auto pt-8 text-[#121212]">
                   <motion.div
                     initial={{ opacity: 0, y: 30 }}
@@ -7638,6 +7742,7 @@ const LimintsoMeLayout: React.FC<{
                     </div>
                   </motion.div>
                 </div>
+              </EditableSectionWrapper>
               ) : null}
               {event.receptionName ? (
                 <div className="grid grid-cols-1 gap-8 max-w-xl mx-auto pt-8 text-[#121212]">
@@ -7917,11 +8022,18 @@ const LimintsoMeLayout: React.FC<{
             </div>
           )}
 
-          {/* LOCAL + MAPA — por último, 100% só-leitura, card adaptativo bonito */}
-          <FadeInSection delay={0.1} className="max-w-md mx-auto px-6 py-16">
-            <p className="text-center text-[11px] font-bold uppercase tracking-[0.2em] text-[#E9BE5D] mb-4">Como chegar</p>
-            <TravelMap chrome="guest" tone="gold" event={event} isEditing={isEditing} onFieldChange={updateField} />
-          </FadeInSection>
+        {/* LOCAL + MAPA — por último, 100% só-leitura, card adaptativo bonito (clica para editar no Estúdio) */}
+        <EditableSectionWrapper
+          isEditing={isEditing}
+          section="locations"
+          label="Localização"
+          onEditSection={onEditSection}
+        >
+        <FadeInSection delay={0.1} className="max-w-md mx-auto px-6 py-16">
+          <p className="text-center text-[11px] font-bold uppercase tracking-[0.2em] text-[#E9BE5D] mb-4">Como chegar</p>
+          <TravelMap chrome="guest" tone="gold" event={event} isEditing={isEditing} onFieldChange={updateField} />
+        </FadeInSection>
+        </EditableSectionWrapper>
 
           {/* 11. ENDING FOOTER HERO SECTION */}
           <div

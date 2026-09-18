@@ -1,5 +1,5 @@
 import React, { useState, useEffect, useRef } from 'react';
-import { useNavigate } from 'react-router-dom';
+import { useNavigate, useSearchParams } from 'react-router-dom';
 import { motion, AnimatePresence } from 'framer-motion';
 import { doc, setDoc, collection, query, where, getDocs } from 'firebase/firestore';
 import { useFirebase, db } from '../../components/FirebaseProvider';
@@ -11,6 +11,8 @@ import { ArrowLeft, ArrowRight, Check, Plus, Trash2, Gift, Lock } from 'lucide-r
 import toast from 'react-hot-toast';
 import { LocationPinPicker } from '../../components/LocationPinPicker';
 import { MapsProvider } from '../../components/MapsProvider';
+import type { TimelineItem } from '../../types';
+import { layoutSupports, hiddenSectionsFor, SECTION_LABELS } from './lib/layoutSchemas';
 
 const WEDDING_LAYOUTS = [
   { id: 'CLASSIC', label: 'Essencial Moderno', premium: false },
@@ -40,7 +42,14 @@ interface GiftItem {
   emoji: string;
 }
 
-const STEPS = ['O casal', 'Quando e onde', 'História e foto', 'Presentes', 'Tema'];
+const STEP_DEFS = [
+  { id: 'couple', label: 'O casal' },
+  { id: 'when', label: 'Quando e onde' },
+  { id: 'story', label: 'História e foto' },
+  { id: 'timeline', label: 'Programação' },
+  { id: 'gifts', label: 'Presentes' },
+  { id: 'theme', label: 'Tema' },
+] as const;
 
 const inputCls =
   'w-full bg-white border border-slate-200 rounded-xl px-4 py-3 text-slate-900 outline-none focus:border-[#C5A028] focus:ring-2 focus:ring-[#C5A028]/20 font-light';
@@ -120,7 +129,30 @@ export const WeddingQuestionnaire: React.FC = () => {
   const [bankName, setBankName] = useState('BAI');
   const [iban, setIban] = useState('');
   const [accountName, setAccountName] = useState('');
-  const [layout, setLayout] = useState('CLASSIC');
+  // Template primeiro: ?template= vindo da galeria (validado); o passo Tema continua editável
+  const [searchParams] = useSearchParams();
+  const [layout, setLayout] = useState(() => {
+    const t = searchParams.get('template');
+    return WEDDING_LAYOUTS.some((l) => l.id === t) ? (t as string) : 'CLASSIC';
+  });
+  // Programação — mesmos defaults do template CLASSIC (mockData), editável; vazio esconde a secção no convite
+  const [timeline, setTimeline] = useState<TimelineItem[]>([
+    { time: '18:00', title: 'Cerimônia', description: 'Jardim' },
+    { time: '20:00', title: 'Recepção', description: 'Salão Principal' },
+  ]);
+  const [newTime, setNewTime] = useState('');
+  const [newTitle, setNewTitle] = useState('');
+  const [newDesc, setNewDesc] = useState('');
+  // Só conta como "preenchido" o que o utilizador tocou (defaults do template não disparam avisos)
+  const [timelineTouched, setTimelineTouched] = useState(false);
+
+  // Passos visíveis conforme o contrato do tema escolhido (nunca se pede o que não aparece)
+  const visibleSteps = STEP_DEFS.filter((s) => s.id !== 'timeline' || layoutSupports(layout, 'timeline'));
+  const currentStepId = visibleSteps[Math.min(step, visibleSteps.length - 1)]?.id;
+
+  useEffect(() => {
+    if (step >= visibleSteps.length) setStep(visibleSteps.length - 1);
+  }, [visibleSteps.length, step]);
 
   useEffect(() => {
     if (brideName && groomName && !titleTouched) {
@@ -190,6 +222,7 @@ export const WeddingQuestionnaire: React.FC = () => {
         gallery,
         musicTrack,
         dressCode: { title: 'Dress Code', description: dressCode },
+        timeline: timeline.map((t) => ({ time: t.time, title: t.title, description: t.description || '' })),
         bankName,
         iban,
         accountName,
@@ -222,15 +255,16 @@ export const WeddingQuestionnaire: React.FC = () => {
   };
 
   const next = async () => {
-    if (step === 0 && (!brideName.trim() || !groomName.trim())) {
+    // Validação por passo (id, não índice — a lista muda com o tema escolhido)
+    if (currentStepId === 'couple' && (!brideName.trim() || !groomName.trim())) {
       toast.error('Diga-nos o nome da noiva e do noivo.');
       return;
     }
-    if (step === 1 && (!date || !locationName.trim())) {
+    if (currentStepId === 'when' && (!date || !locationName.trim())) {
       toast.error('A data e o local são obrigatórios.');
       return;
     }
-    if (step === 2) {
+    if (currentStepId === 'story') {
       if (!description.trim()) {
         toast.error('Escreva a mensagem de boas-vindas (a vossa história).');
         return;
@@ -244,14 +278,14 @@ export const WeddingQuestionnaire: React.FC = () => {
         return;
       }
     }
-    if (step === 3) {
+    if (currentStepId === 'gifts') {
       if (!bankName.trim() || !accountName.trim() || !iban.trim()) {
         toast.error('Preencha o banco, o titular e o IBAN para os presentes. Pode editar depois no painel.');
         return;
       }
     }
     const id = await saveDraft();
-    if (id) setStep((s) => Math.min(s + 1, STEPS.length - 1));
+    if (id) setStep((s) => Math.min(s + 1, visibleSteps.length - 1));
   };
 
   const publish = async () => {
@@ -322,7 +356,14 @@ export const WeddingQuestionnaire: React.FC = () => {
       toast.error('Este tema é Premium. Faça upgrade para o usar.');
       return;
     }
+    // Trocar de tema preserva os dados; avisa o que fica escondido (schema, sem apagar nada)
+    const hidden = hiddenSectionsFor(layout, layoutId).filter((s) =>
+      s === 'timeline' ? timelineTouched && timeline.length > 0 : s === 'gallery' ? gallery.length > 0 : false,
+    );
     setLayout(layoutId);
+    if (hidden.length > 0) {
+      toast(`Este tema não mostra ${hidden.map((s) => SECTION_LABELS[s]).join(' e ')} — fica guardado se voltares atrás.`, { icon: '👁' });
+    }
   };
 
   return (
@@ -335,13 +376,13 @@ export const WeddingQuestionnaire: React.FC = () => {
       <Navbar />
       <main className="max-w-2xl mx-auto px-6 pt-28 md:pt-32 pb-20">
         <p className="text-[11px] font-bold uppercase tracking-[0.22em] text-slate-500 text-center">
-          Passo {step + 1} de {STEPS.length} · {STEPS[step]}
+          Passo {step + 1} de {visibleSteps.length} · {visibleSteps[Math.min(step, visibleSteps.length - 1)]?.label}
         </p>
         <div className="h-px bg-slate-200 mt-4 mb-10 relative">
           <div
             className="absolute left-0 top-0 h-px bg-[#C5A028]"
             style={{
-              width: `${((step + 1) / STEPS.length) * 100}%`,
+              width: `${((step + 1) / visibleSteps.length) * 100}%`,
               transition: 'width 300ms ease',
             }}
           />
@@ -355,7 +396,7 @@ export const WeddingQuestionnaire: React.FC = () => {
             exit={{ opacity: 0, x: -24 }}
             transition={{ duration: 0.25, ease: 'easeOut' }}
           >
-            {step === 0 && (
+            {currentStepId === 'couple' && (
               <div>
                 <h1 className="font-serif text-3xl md:text-4xl font-bold text-[#1B365D] tracking-tight mb-2">
                   Quem casa?
@@ -390,7 +431,7 @@ export const WeddingQuestionnaire: React.FC = () => {
               </div>
             )}
 
-            {step === 1 && (
+            {currentStepId === 'when' && (
               <div>
                 <h1 className="font-serif text-3xl md:text-4xl font-bold text-[#1B365D] tracking-tight mb-2">
                   Quando e onde?
@@ -468,7 +509,7 @@ export const WeddingQuestionnaire: React.FC = () => {
               </div>
             )}
 
-            {step === 2 && (
+            {currentStepId === 'story' && (
               <div>
                 <h1 className="font-serif text-3xl md:text-4xl font-bold text-[#1B365D] tracking-tight mb-2">
                   A vossa história
@@ -516,6 +557,7 @@ export const WeddingQuestionnaire: React.FC = () => {
                     />
                   </div>
                 </div>
+                {layoutSupports(layout, 'gallery') && (
                 <div className="mb-4">
                   <span className={labelCls}>Galeria (até 6 fotos)</span>
                   <div className="grid grid-cols-3 gap-2">
@@ -565,6 +607,7 @@ export const WeddingQuestionnaire: React.FC = () => {
                     className="hidden"
                   />
                 </div>
+                )}
                 <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
                   <div>
                     <label className={labelCls} htmlFor="wq-music">Música de fundo *</label>
@@ -577,10 +620,12 @@ export const WeddingQuestionnaire: React.FC = () => {
                       )}
                     </select>
                   </div>
+                  {layoutSupports(layout, 'dressCode') && (
                   <div>
                     <label className={labelCls} htmlFor="wq-dress">Dress code</label>
                     <input id="wq-dress" className={inputCls} value={dressCode} onChange={(e) => setDressCode(e.target.value)} placeholder="Ex: Traje formal, tons claros" autoComplete="off" />
                   </div>
+                  )}
                 </div>
                 <div className="mt-4 bg-white border border-slate-200 rounded-xl p-4">
                   <span className={labelCls}>Ou enviem a vossa música (mp3, até {formatAudioSize(MAX_AUDIO_BYTES)})</span>
@@ -641,7 +686,89 @@ export const WeddingQuestionnaire: React.FC = () => {
               </div>
             )}
 
-            {step === 3 && (
+            {currentStepId === 'timeline' && (
+              <div>
+                <h1 className="font-serif text-3xl md:text-4xl font-bold text-[#1B365D] tracking-tight mb-2">
+                  Programação
+                </h1>
+                <p className="text-slate-500 font-light mb-8">
+                  Momentos do grande dia, por ordem. Aparecem no convite como no modelo.
+                </p>
+                <div className="bg-white border border-slate-200 rounded-xl p-4 mb-4 space-y-3">
+                  <span className={labelCls}>Adicionar momento</span>
+                  <div className="grid grid-cols-3 gap-2">
+                    <input
+                      className={inputCls}
+                      value={newTime}
+                      onChange={(e) => setNewTime(e.target.value)}
+                      placeholder="Ex: 18:00"
+                      aria-label="Hora do momento"
+                    />
+                    <input
+                      className={`${inputCls} col-span-2`}
+                      value={newTitle}
+                      onChange={(e) => setNewTitle(e.target.value)}
+                      placeholder="Ex: Cerimônia"
+                      aria-label="Título do momento"
+                    />
+                  </div>
+                  <input
+                    className={inputCls}
+                    value={newDesc}
+                    onChange={(e) => setNewDesc(e.target.value)}
+                    placeholder="Ex: Jardim (opcional)"
+                    aria-label="Descrição do momento"
+                  />
+                  <button
+                    type="button"
+                    onClick={() => {
+                      if (!newTime.trim() || !newTitle.trim()) {
+                        toast.error('Diga a hora e o título do momento.');
+                        return;
+                      }
+                      setTimeline((list) => [...list, { time: newTime.trim(), title: newTitle.trim(), description: newDesc.trim() }]);
+                      setTimelineTouched(true);
+                      setNewTime('');
+                      setNewTitle('');
+                      setNewDesc('');
+                      toast.success('Atividade incluída no cronograma!');
+                    }}
+                    className="w-full min-h-[48px] rounded-xl font-bold bg-[#1B365D] text-white hover:bg-[#224373] text-xs uppercase tracking-wider cursor-pointer flex items-center justify-center gap-2"
+                    style={{ transition: 'background-color 200ms ease' }}
+                  >
+                    <Plus size={16} /> Adicionar momento
+                  </button>
+                </div>
+                {timeline.length === 0 ? (
+                  <p className="text-slate-400 text-xs text-center py-6">Sem programação — a secção fica escondida no convite.</p>
+                ) : (
+                  <ul className="flex flex-col gap-2">
+                    {timeline.map((item, idx) => (
+                      <li key={idx} className="flex items-center gap-3 bg-white border border-slate-200 rounded-xl px-4 py-3">
+                        <span className="font-mono text-xs font-bold text-[#1B365D] bg-slate-100 px-2 py-0.5 rounded shrink-0">{item.time}</span>
+                        <span className="flex-1 min-w-0">
+                          <span className="block font-bold text-sm text-slate-800">{item.title}</span>
+                          {item.description ? (
+                            <span className="block text-xs text-slate-500 font-light">{item.description}</span>
+                          ) : null}
+                        </span>
+                        <button
+                          type="button"
+                          onClick={() => { setTimeline((list) => list.filter((_, i) => i !== idx)); setTimelineTouched(true); }}
+                          aria-label={`Remover ${item.title}`}
+                          className="text-slate-300 hover:text-red-500 cursor-pointer p-1"
+                          style={{ transition: 'color 200ms ease' }}
+                        >
+                          <Trash2 size={16} />
+                        </button>
+                      </li>
+                    ))}
+                  </ul>
+                )}
+              </div>
+            )}
+
+            {currentStepId === 'gifts' && (
               <div>
                 <h1 className="font-serif text-3xl md:text-4xl font-bold text-[#1B365D] tracking-tight mb-2">
                   Presentes
@@ -727,7 +854,7 @@ export const WeddingQuestionnaire: React.FC = () => {
               </div>
             )}
 
-            {step === 4 && (
+            {currentStepId === 'theme' && (
               <div>
                 <h1 className="font-serif text-3xl md:text-4xl font-bold text-[#1B365D] tracking-tight mb-2">
                   Escolha o tema
@@ -755,6 +882,11 @@ export const WeddingQuestionnaire: React.FC = () => {
                           <span className="block text-xs text-slate-500 font-light mt-0.5">
                             {l.premium ? 'Tema Premium' : 'Incluído no Essencial'}
                           </span>
+                          {hiddenSectionsFor('CLASSIC', l.id).length > 0 && (
+                            <span className="block text-[11px] text-amber-600 font-medium mt-0.5">
+                              Sem {hiddenSectionsFor('CLASSIC', l.id).map((s) => SECTION_LABELS[s]).join(', ')}
+                            </span>
+                          )}
                         </span>
                         {locked ? (
                           <Lock size={18} className="text-slate-300 shrink-0" />
@@ -784,7 +916,7 @@ export const WeddingQuestionnaire: React.FC = () => {
           >
             <ArrowLeft size={16} /> Voltar
           </button>
-          {step < STEPS.length - 1 ? (
+          {step < visibleSteps.length - 1 ? (
             <button
               type="button"
               onClick={next}

@@ -1,7 +1,7 @@
 /* Hallmark · pre-emit critique: P5 H5 E5 S4 R5 V5 · macrostructure: Workbench · theme: Linen · genre: editorial */
 import React, { useState } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
-import { HelpCircle, ChevronDown, Sparkles, Sliders, Eye, Heart, BellRing, QrCode } from 'lucide-react';
+import { HelpCircle, ChevronDown, Sparkles, Sliders, Eye, Heart, BellRing, QrCode, MapPin } from 'lucide-react';
 
 interface FAQItem {
   q: string;
@@ -70,6 +70,12 @@ const FAQ_ITEMS: FAQItem[] = [
     a: "Na InoEvents, o Essencial custa 7.500 Kz, o Premium 15.000 Kz e o VIP 25.000 Kz — sempre pagamento único por evento, sem mensalidade. Para agências e cerimonialistas, o plano Business custa 39.900 Kz por mês com eventos ilimitados.",
     category: "features",
     icon: Heart
+  },
+  {
+    q: "O convite inclui mapa?",
+    a: "Sim. Todo o convite traz o mapa bonito da zona com foto do espaço, endereço, avaliação e Plus Code, mais o botão Como chegar que abre as direções no Google Maps. O mapa do convidado é 100% só leitura — ele vê onde é e chega sem ligar.",
+    category: "features",
+    icon: MapPin
   }
 ];
 

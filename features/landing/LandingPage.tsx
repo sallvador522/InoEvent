@@ -7,8 +7,10 @@ import { Navbar } from '../../components/Navbar';
 import { SEO } from '../../components/SEO';
 import { FAQSection } from './FAQSection';
 import { SupportModal } from '../../components/SupportModal';
+import { MapEmbed } from '../../components/MapEmbed';
+import { buildEmbedSrc, buildDirectionsUrl, DEFAULT_CENTER } from '../../lib/maps';
 import { EVENTS } from '../../mockData';
-import { X, Copy, MessageSquare, ArrowRight, Award, CheckCircle2, Gem, Utensils, Briefcase, QrCode, Gift, Users, BookOpen, Globe, ChevronLeft, ChevronRight } from 'lucide-react';
+import { X, Copy, MessageSquare, ArrowRight, Award, CheckCircle2, Gem, Utensils, Briefcase, QrCode, Gift, Users, BookOpen, Globe, ChevronLeft, ChevronRight, MapPin, Navigation } from 'lucide-react';
 import toast from 'react-hot-toast';
 import { copyToClipboard } from '../../lib/clipboard';
 import { PLANS } from '../../config/plans';
@@ -261,7 +263,7 @@ export const LandingPage: React.FC = () => {
     <div className="flex-1 min-h-screen flex flex-col justify-between relative font-display overflow-x-hidden bg-[#FDFBF7] text-slate-900">
       <SEO 
         title="InoEvents Angola | Convites Digitais de Casamento, Chá de Panela e Gestão de Eventos" 
-        description="A plataforma mais elegante de Angola para criar convites digitais de casamento e chás de panela a partir de 7.500 Kz, com RSVP online, QR Code de acesso, check-in presencial no evento, lista de convidados e presentes por IBAN."
+        description="A plataforma mais elegante de Angola para criar convites digitais de casamento e chás de panela a partir de 7.500 Kz, com RSVP online, QR Code de acesso, mapa da zona com botão Como chegar, check-in presencial no evento, lista de convidados e presentes por IBAN."
       />
 
       <Navbar />
@@ -312,7 +314,7 @@ export const LandingPage: React.FC = () => {
                   transition={{ duration: 0.8, ease: "easeOut", delay: 0.4 }}
                   className="text-lg md:text-xl text-white/85 max-w-xl mx-auto leading-relaxed mb-10 font-light text-center"
                >
-                  Convites digitais de casamento e chá de panela, com confirmação de presença e lista de presentes — tudo num só link.
+                  Convites digitais de casamento e chá de panela, com confirmação de presença, lista de presentes e mapa com Como chegar — tudo num só link.
                </motion.p>
                <motion.div 
                  initial={{ opacity: 0, y: 20 }}
@@ -331,19 +333,24 @@ export const LandingPage: React.FC = () => {
                      <ArrowRight size={16} className="group-hover:translate-x-0.5 shrink-0" style={{ transition: 'transform 160ms ease-out' }} />
                   </button>
 
-                  {/* Secundário — botão fantasma com peso de botão */}
-                  <div className="flex flex-col sm:flex-row items-stretch sm:items-center gap-3 w-full sm:w-auto">
-                    <button
-                       onClick={handleConcierge}
-                       className="w-full sm:w-auto min-h-[48px] inline-flex items-center justify-center gap-2 px-7 rounded-full border-2 border-white/70 text-white text-xs font-bold uppercase tracking-wider hover:bg-white hover:text-[#1B365D] hover:border-white active:scale-[0.97] cursor-pointer"
-                       style={{ transition: 'transform 160ms ease-out, background-color 200ms ease, color 200ms ease' }}
-                    >
-                       <Award size={15} className="shrink-0" />
-                       Concierge: criamos por si
-                    </button>
-                  </div>
-                </div>
-              </motion.div>
+                   {/* Secundário — botão fantasma com peso de botão */}
+                   <div className="flex flex-col sm:flex-row items-stretch sm:items-center gap-3 w-full sm:w-auto">
+                     <button
+                        onClick={handleConcierge}
+                        className="w-full sm:w-auto min-h-[48px] inline-flex items-center justify-center gap-2 px-7 rounded-full border-2 border-white/70 text-white text-xs font-bold uppercase tracking-wider hover:bg-white hover:text-[#1B365D] hover:border-white active:scale-[0.97] cursor-pointer"
+                        style={{ transition: 'transform 160ms ease-out, background-color 200ms ease, color 200ms ease' }}
+                     >
+                        <Award size={15} className="shrink-0" />
+                        Concierge: criamos por si
+                     </button>
+                   </div>
+                 </div>
+                 {/* Selo MAP — prova no hero, sem iframe para não pesar o LCP */}
+                 <span className="mt-4 inline-flex items-center gap-2 rounded-full bg-white/10 backdrop-blur-md border border-white/20 px-4 py-2 text-[11px] font-bold uppercase tracking-[0.14em] text-white/90">
+                   <MapPin size={14} className="text-[#E9BE5D] shrink-0" />
+                   Mapa + Como chegar incluído
+                 </span>
+               </motion.div>
            </div>
 
             {/* Composição por cima do banner — painel de templates + telemóvel + confirmação */}
@@ -505,13 +512,68 @@ export const LandingPage: React.FC = () => {
                 </div>
               </li>
               <li className="flex gap-4 py-6 border-t border-[#C5A028]/30">
-                <Globe size={20} className="text-[#8a6d1c] shrink-0 mt-1" />
+                <MapPin size={20} className="text-[#8a6d1c] shrink-0 mt-1" />
                 <div>
-                  <h3 className="font-bold text-slate-900 mb-1">Contagem regressiva e localização</h3>
-                  <p className="text-sm text-slate-600 font-light leading-relaxed">Countdown no convite e botão de mapa para os convidados chegarem sem ligar.</p>
+                  <h3 className="font-bold text-slate-900 mb-1">Mapa e Como chegar</h3>
+                  <p className="text-sm text-slate-600 font-light leading-relaxed">Mapa bonito da zona com foto, endereço e botão Como chegar — o convidado chega sem ligar.</p>
                 </div>
               </li>
             </ul>
+          </div>
+        </section>
+
+        {/* Prova MAP — exemplo real lazy, fora do hero para não pesar o LCP */}
+        <section id="mapa" className="px-6 py-16 md:py-24 w-full scroll-mt-24" aria-label="Exemplo de mapa do convite">
+          <div className="max-w-3xl mx-auto text-center">
+            <span className="inline-flex items-center gap-2 rounded-full bg-emerald-50 border border-emerald-200 px-4 py-1.5 text-[11px] font-bold uppercase tracking-[0.14em] text-emerald-700">
+              <MapPin size={14} className="text-emerald-600 shrink-0" />
+              Exemplo real
+            </span>
+            <h2 className="mt-4 text-3xl md:text-[2.75rem] font-serif font-bold text-[#1B365D] tracking-tight leading-[1.1]">
+              O convite vem com <span className="italic font-medium text-[#8a6d1c]">mapa bonito</span>
+            </h2>
+            <p className="mt-3 text-slate-600 font-light text-lg leading-relaxed max-w-xl mx-auto">
+              Zona da festa com foto, endereço e botão Como chegar. O convidado vê onde é e chega sem ligar — 100% só leitura.
+            </p>
+            <div className="mt-8 mx-auto max-w-xl text-left">
+              <div className="rounded-[1.5rem] border border-slate-200/60 shadow-lg overflow-hidden bg-white">
+                <div className="relative w-full aspect-[16/10] min-h-[220px] bg-slate-100">
+                  <MapEmbed
+                    src={buildEmbedSrc({ latitude: DEFAULT_CENTER.lat, longitude: DEFAULT_CENTER.lng, locationName: 'Luanda' })}
+                    title="Exemplo de mapa do convite — Luanda"
+                  />
+                  <div className="absolute bottom-3 right-3 pointer-events-none">
+                    <span className="inline-flex items-center gap-1.5 rounded-full px-2.5 py-1 text-[10px] font-bold uppercase tracking-widest bg-white/90 backdrop-blur-md border border-slate-200 text-slate-600 shadow-sm">
+                      <MapPin size={10} /> Só leitura
+                    </span>
+                  </div>
+                </div>
+                <div className="p-5 space-y-2.5">
+                  <p className="flex items-start gap-2 font-bold text-slate-900 text-[15px] leading-snug">
+                    <MapPin size={16} className="text-[#8a6d1c] shrink-0 mt-0.5" />
+                    <span>Zona da festa com foto e endereço</span>
+                  </p>
+                  <p className="text-xs text-slate-500 leading-relaxed ml-6">No convite real aparece a sua zona, com foto do espaço, avaliação e Plus Code.</p>
+                  <div className="flex flex-col sm:flex-row gap-2 pt-2">
+                    <a
+                      href={buildDirectionsUrl(DEFAULT_CENTER.lat, DEFAULT_CENTER.lng)}
+                      target="_blank"
+                      rel="noreferrer"
+                      className="flex-1 min-h-[48px] inline-flex items-center justify-center gap-2 rounded-xl bg-[#1B365D] text-white text-xs font-bold uppercase tracking-widest hover:bg-[#224373] active:scale-[0.97] px-6 py-3"
+                      style={{ transition: 'transform 160ms ease-out, background-color 200ms ease' }}
+                    >
+                      <Navigation size={16} /> Como chegar
+                    </a>
+                    <Link
+                      to="/templates"
+                      className="flex-1 min-h-[48px] inline-flex items-center justify-center gap-2 rounded-xl border-2 border-slate-200 text-slate-800 bg-white text-xs font-bold uppercase tracking-widest hover:bg-slate-50 active:scale-[0.97] px-6 py-3"
+                    >
+                      Ver convites
+                    </Link>
+                  </div>
+                </div>
+              </div>
+            </div>
           </div>
         </section>
 
@@ -771,7 +833,9 @@ export const LandingPage: React.FC = () => {
                   <button
                     key={item.id}
                     onClick={() => {
-                      navigate(item.id === 'wedding' ? '/create-wedding' : `/templates?category=${item.id}`);
+                      // Template primeiro (padrão Evite/Paperless): os dois tipos passam pela galeria;
+                      // o questionário/editor mostra só os campos que o tema escolhido renderiza.
+                      navigate(`/templates?category=${item.id}`);
                       setShowTypeModal(false);
                     }}
                     className="flex items-center gap-4 p-4 rounded-2xl border border-slate-200 hover:border-[#C5A028]/60 hover:bg-white text-left cursor-pointer w-full bg-white"

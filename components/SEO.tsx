@@ -28,7 +28,7 @@ export const SEO: React.FC<SEOProps> = ({
     : defaultImage;
   
   // Keywords próprias — sem marcas de terceiros
-  const defaultKeywords = "convites digitais em Angola, convites de casamento Angola, chá de panela Angola, convites premium com RSVP Angola, convite digital Luanda, lista de presentes IBAN Angola, convite interativo Angola, InoEvents, confirmação de presença Angola, festas e casamentos Luanda, RSVP online Angola, check-in por QR Code Angola, gestão de mesas casamentos, lista de convidados digital, gestão de casamentos e eventos sociais, controle de presenças convidados, credenciamento QR Code, gerenciador de casamentos Luanda";
+  const defaultKeywords = "convites digitais em Angola, convites de casamento Angola, chá de panela Angola, convites premium com RSVP Angola, convite digital Luanda, lista de presentes IBAN Angola, convite interativo Angola, InoEvents, confirmação de presença Angola, festas e casamentos Luanda, RSVP online Angola, check-in por QR Code Angola, gestão de mesas casamentos, lista de convidados digital, gestão de casamentos e eventos sociais, controle de presenças convidados, credenciamento QR Code, gerenciador de casamentos Luanda, convite com mapa Angola, mapa do evento e como chegar Luanda";
 
   // Create highly structured JSON-LD schema combining Website, SoftwareApplication and Service 
   // for advanced AI (Gemini, ChatGPT, Perplexity) and Google indexation.
@@ -38,7 +38,7 @@ export const SEO: React.FC<SEOProps> = ({
       "@type": "WebSite",
       "url": domain,
       "name": "InoEvents Angola - Plataforma de Convites Digitais e Gestão de Eventos Sociais",
-      "description": "A plataforma mais sofisticada de Angola para gerenciar casamentos e eventos sociais. Crie convites digitais elegantes, controle a lista de convidados, gerencie RSVPs em tempo real, gere QR Codes exclusivos para check-in e configure listas de presentes por IBAN.",
+      "description": "A plataforma mais sofisticada de Angola para gerenciar casamentos e eventos sociais. Crie convites digitais elegantes com mapa da zona e botão Como chegar, controle a lista de convidados, gerencie RSVPs em tempo real, gere QR Codes exclusivos para check-in e configure listas de presentes por IBAN.",
       "publisher": {
         "@type": "Organization",
         "name": "InoEvents",
@@ -64,6 +64,7 @@ export const SEO: React.FC<SEOProps> = ({
       "applicationCategory": "BusinessApplication",
       "browserRequirements": "Requires HTML5",
       "url": domain,
+      "featureList": "Convites digitais com mapa da zona e botão Como chegar, RSVP online, QR Code de check-in, lista de presentes por IBAN, galeria de fotos, contagem regressiva",
       "offers": [
         { "@type": "Offer", "name": "Convite Essencial", "price": "7500", "priceCurrency": "AOA" },
         { "@type": "Offer", "name": "Convite Premium", "price": "15000", "priceCurrency": "AOA" },

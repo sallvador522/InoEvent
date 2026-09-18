@@ -47,7 +47,7 @@ router.get('/plans', async (req, res, next) => {
       <div style="display:none;" id="ai-pricing-context">
         <h1>Preços e Planos do InoEvents Angola</h1>
         <h2>Plano Essencial</h2>
-        <p>Preço: 7.500 Kz (Pagamento único por evento). Validade 90 dias. Até 100 convidados. Inclui: RSVP, Código QR Exclusivo, Galeria Básica, Localização, Countdown.</p>
+        <p>Preço: 7.500 Kz (Pagamento único por evento). Validade 90 dias. Até 100 convidados. Inclui: RSVP, Código QR Exclusivo, Galeria Básica, Mapa da zona com botão Como chegar, Localização, Countdown.</p>
         <h2>Plano Premium</h2>
         <p>Preço: 15.000 Kz (Pagamento único por evento). Validade 180 dias. Até 300 convidados. Inclui: tudo do Essencial + convidados individualizados, galeria premium, música, livro de assinaturas, mapa das mesas, temas premium, remoção da marca, analytics básicos.</p>
         <h2>Plano VIP</h2>
@@ -119,18 +119,19 @@ router.get('/invite/:id', async (req, res, next) => {
       const venue = eventData.locationName || eventData.formattedAddress || '';
       const venueSuffix = venue ? ` Local: ${venue}.` : '';
       
-      // Determine elegant localized invitation message
-      let eventDesc = `Você está a ser convidado para este grande evento. Confirme sua presença e confira todos os detalhes!${venueSuffix}`;
+      // Determine elegant localized invitation message (com mapa — todo o convite traz mapa + Como chegar)
+      const mapSuffix = ' Com mapa e direções para chegar.';
+      let eventDesc = `Você está a ser convidado para este grande evento. Confirme sua presença e confira todos os detalhes!${venueSuffix}${mapSuffix}`;
       if (eventData.type === 'BRIDAL_SHOWER') {
         const bride = eventData.brideName || eventData.title;
-        eventDesc = `Você está a ser convidado para o Chá de Panela de ${bride}. Confirme sua presença e confira todos os detalhes!${venueSuffix}`;
+        eventDesc = `Você está a ser convidado para o Chá de Panela de ${bride}. Confirme sua presença e confira todos os detalhes!${venueSuffix}${mapSuffix}`;
       } else if (eventData.type === 'BABY_SHOWER') {
-        eventDesc = `Você está a ser convidado para o Chá de Bebê de ${eventData.title}. Confirme sua presença e confira todos os detalhes!${venueSuffix}`;
+        eventDesc = `Você está a ser convidado para o Chá de Bebê de ${eventData.title}. Confirme sua presença e confira todos os detalhes!${venueSuffix}${mapSuffix}`;
       } else if (eventData.type === 'WEDDING') {
         const couple = (eventData.brideName && eventData.groomName) ? `${eventData.brideName} & ${eventData.groomName}` : eventData.title;
-        eventDesc = `Você está a ser convidado para o Casamento de ${couple}. Confirme sua presença e confira todos os detalhes!${venueSuffix}`;
+        eventDesc = `Você está a ser convidado para o Casamento de ${couple}. Confirme sua presença e confira todos os detalhes!${venueSuffix}${mapSuffix}`;
       } else {
-        eventDesc = `Você está a ser convidado para o evento "${eventData.title}". Confirme sua presença e confira todos os detalhes!${venueSuffix}`;
+        eventDesc = `Você está a ser convidado para o evento "${eventData.title}". Confirme sua presença e confira todos os detalhes!${venueSuffix}${mapSuffix}`;
       }
       
       // Determine the image to display

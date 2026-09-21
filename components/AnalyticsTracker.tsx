@@ -2,6 +2,7 @@ import React, { useEffect } from 'react';
 import { useLocation } from 'react-router-dom';
 import { db } from './FirebaseProvider';
 import { collection, addDoc } from 'firebase/firestore';
+import { initPixel, trackPixelPageView, trackPixelViewContent } from '../lib/metaPixel';
 
 declare global {
   interface Window {
@@ -88,6 +89,15 @@ export const AnalyticsTracker: React.FC = () => {
             page_path: path + search,
             page_title: document.title
           });
+        }
+
+        // Meta Pixel PageView (SPA) — só dispara com consentimento (no-op sem aceite)
+        initPixel();
+        trackPixelPageView(path + search);
+
+        // Meta Pixel ViewContent na abertura de convite — 1x por sessão (mesma chave acima)
+        if (inviteMatch && eventId) {
+          trackPixelViewContent(eventId);
         }
 
         // Set session storage to prevent double tracking during this session

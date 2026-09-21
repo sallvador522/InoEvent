@@ -10,6 +10,26 @@
 
       gtag('config', 'G-8P6CGLFLLJ');
     </script>
+    <!-- Meta Pixel: stub sem init/track (o init só corre após consentimento em lib/metaPixel.ts) -->
+    <link rel="preconnect" href="https://connect.facebook.net" crossorigin />
+    <script>
+      !(function (f, b, e, v, n, t, s) {
+        if (f.fbq) return;
+        n = f.fbq = function () {
+          n.callMethod ? n.callMethod.apply(n, arguments) : n.queue.push(arguments);
+        };
+        if (!f._fbq) f._fbq = n;
+        n.push = n;
+        n.loaded = !0;
+        n.version = '2.0';
+        n.queue = [];
+        t = b.createElement(e);
+        t.async = !0;
+        t.src = v;
+        s = b.getElementsByTagName(e)[0];
+        s.parentNode.insertBefore(t, s);
+      })(window, document, 'script', 'https://connect.facebook.net/en_US/fbevents.js');
+    </script>
     <meta charset="UTF-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no" />
     <title>InoEvents Angola | Convites Digitais Premium, RSVP e Eventos</title>
@@ -21,14 +41,19 @@
     <meta property="og:type" content="website" />
     <meta property="og:title" content="InoEvents Angola | Convites Digitais Premium, QR Code e Eventos" />
     <meta property="og:description" content="Plataforma premium líder em Angola para gerir casamentos e eventos. Crie convites digitais exclusivos com RSVP, mapa da zona com botão Como chegar, ofereça check-in via QR Code na recepção, e receba presentes em dinheiro por IBAN." />
-    <meta property="og:image" content="https://www.inoevent.online/logo-192.png" />
+    <meta property="og:image" content="https://www.inoevent.online/inoOG.png" />
+    <meta property="og:image:width" content="1424" />
+    <meta property="og:image:height" content="752" />
+    <meta property="og:image:alt" content="InoEvents Angola — Convites Digitais Premium com RSVP e QR Code" />
     <meta property="og:url" content="https://www.inoevent.online" />
     <meta property="og:site_name" content="InoEvents Angola" />
+    <meta property="og:locale" content="pt_AO" />
     <!-- Twitter -->
     <meta name="twitter:card" content="summary_large_image" />
     <meta name="twitter:title" content="InoEvents Angola | Convites Digitais Premium, QR Code e Eventos" />
     <meta name="twitter:description" content="Plataforma premium líder em Angola para gerir casamentos e eventos. Crie convites digitais exclusivos com RSVP, mapa da zona com botão Como chegar, ofereça check-in via QR Code e receba presentes em dinheiro por IBAN." />
-    <meta name="twitter:image" content="https://www.inoevent.online/logo-192.png" />
+    <meta name="twitter:image" content="https://www.inoevent.online/inoOG.png" />
+    <meta name="twitter:image:alt" content="InoEvents Angola — Convites Digitais Premium com RSVP e QR Code" />
 
     <!-- Google Search Console Verification -->
     <meta name="google-site-verification" content="COLE_O_SEU_ID_AQUI" />
@@ -136,6 +161,7 @@
   
 </head>
   <body class="bg-[#0f172a] text-slate-900 selection:bg-brand-blue selection:text-white">
+    <noscript><img height="1" width="1" style="display:none" src="https://www.facebook.com/tr?id=2309059223221498&ev=PageView&noscript=1" alt="" /></noscript>
     <div id="root"></div>
   <script type="module" src="/index.tsx"></script>
 </body>

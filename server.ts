@@ -26,6 +26,7 @@ import rsvpRoutes from './server/routes/rsvp.js';
 import geoRoutes from './server/routes/geo.js';
 import seoRoutes from './server/routes/seo.js';
 import ordersRoutes from './server/routes/orders.js';
+import metaRoutes from './server/routes/meta.js';
 import subscriptionsRoutes from './server/routes/subscriptions.js';
 
 // --- Express App ---
@@ -45,11 +46,11 @@ app.use(helmet({
   contentSecurityPolicy: {
     directives: {
       defaultSrc: ["'self'"],
-      scriptSrc: ["'self'", "'unsafe-inline'", "'unsafe-eval'", "https://maps.googleapis.com", "https://cdn.tailwindcss.com", "https://www.googletagmanager.com"],
+      scriptSrc: ["'self'", "'unsafe-inline'", "'unsafe-eval'", "https://maps.googleapis.com", "https://cdn.tailwindcss.com", "https://www.googletagmanager.com", "https://connect.facebook.net"],
       styleSrc: ["'self'", "'unsafe-inline'", "https://fonts.googleapis.com"],
       fontSrc: ["'self'", "https://fonts.gstatic.com", "data:"],
       imgSrc: ["'self'", "data:", "blob:", "https:", "http:"],
-      connectSrc: ["'self'", "https://firebasestorage.googleapis.com", "https://firestore.googleapis.com", "https://identitytoolkit.googleapis.com", "https://securetoken.googleapis.com", "https://*.googleapis.com", "wss://*.firebaseio.com", "https://*.google-analytics.com", "https://www.google-analytics.com"],
+      connectSrc: ["'self'", "https://firebasestorage.googleapis.com", "https://firestore.googleapis.com", "https://identitytoolkit.googleapis.com", "https://securetoken.googleapis.com", "https://*.googleapis.com", "wss://*.firebaseio.com", "https://*.google-analytics.com", "https://www.google-analytics.com", "https://connect.facebook.net", "https://www.facebook.com"],
       mediaSrc: ["'self'", "https:", "http:", "data:", "blob:"],
       frameSrc: ["'self'", "https://maps.googleapis.com", "https://www.google.com", "https://www.youtube.com"],
       frameAncestors: ["'self'", "https://*.google.com", "https://*.googleusercontent.com", "https://*.run.app"],
@@ -123,6 +124,7 @@ app.use(geoRoutes);       // /api/geo/search — proxy keyless de zonas (antes d
 app.use(seoRoutes);      // SEO routes BEFORE API (they intercept /plans and /invite/:id)
 app.use(rsvpRoutes);      // /api/events/:id/guests, /api/events/:id/rsvp, /api/events/:id/rsvp-status
 app.use(ordersRoutes);    // /api/orders, /api/events/:id/order, /api/events/:id/upgrade, /api/events/:id/renew, /api/webhooks/payment
+app.use(metaRoutes);      // POST /api/meta/events — relay da Conversions API (deduplicado via event_id)
 app.use(subscriptionsRoutes); // /api/subscriptions/*
 
 // --- Global Error Handler ---

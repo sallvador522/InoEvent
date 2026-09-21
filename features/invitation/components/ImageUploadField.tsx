@@ -1,5 +1,6 @@
 import React, { useState, useRef } from "react";
 import toast from "react-hot-toast";
+import { IMAGE_ACCEPT, validateImageFile } from "../../../lib/imageValidation";
 
 const compressImage = (file: File): Promise<string> => {
   return new Promise((resolve, reject) => {
@@ -55,6 +56,12 @@ export const ImageUploadField = ({
 
   const handleFileChange = async (e: React.ChangeEvent<HTMLInputElement>) => {
     if (!e.target.files?.length) return;
+    const validation = validateImageFile(e.target.files[0]);
+    if (!validation.ok) {
+      toast.error(validation.error);
+      e.target.value = '';
+      return;
+    }
     setIsUploading(true);
     try {
       const base64 = await compressImage(e.target.files[0]);
@@ -98,7 +105,7 @@ export const ImageUploadField = ({
             type="file"
             ref={fileInputRef}
             onChange={handleFileChange}
-            accept="image/*"
+            accept={IMAGE_ACCEPT}
             className="hidden"
           />
         </div>

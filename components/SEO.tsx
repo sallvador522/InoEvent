@@ -5,6 +5,7 @@ interface SEOProps {
   title: string;
   description: string;
   image?: string;
+  imageAlt?: string;
   type?: string;
   url?: string;
   keywords?: string;
@@ -14,6 +15,7 @@ export const SEO: React.FC<SEOProps> = ({
   title,
   description,
   image,
+  imageAlt,
   type = 'website',
   url,
   keywords,
@@ -23,9 +25,14 @@ export const SEO: React.FC<SEOProps> = ({
   const finalUrl = url || (typeof window !== 'undefined' ? window.location.href.replace(window.location.origin, domain) : domain);
   
   const defaultImage = `${domain}/inoOG.png`;
-  const finalImage = image 
+  const rawImage = image
     ? (image.startsWith('http') ? image : `${domain}${image.startsWith('/') ? '' : '/'}${image}`)
     : defaultImage;
+  // Scrapers (WhatsApp/Facebook) não leem data:/blob: — cai para a imagem padrão
+  const finalImage =
+    rawImage.startsWith('data:') || rawImage.startsWith('blob:') ? defaultImage : rawImage;
+  const isDefaultImage = finalImage === defaultImage;
+  const finalImageAlt = imageAlt || 'InoEvents Angola — Convites Digitais Premium com RSVP e QR Code';
   
   // Keywords próprias — sem marcas de terceiros
   const defaultKeywords = "convites digitais em Angola, convites de casamento Angola, chá de panela Angola, convites premium com RSVP Angola, convite digital Luanda, lista de presentes IBAN Angola, convite interativo Angola, InoEvents, confirmação de presença Angola, festas e casamentos Luanda, RSVP online Angola, check-in por QR Code Angola, gestão de mesas casamentos, lista de convidados digital, gestão de casamentos e eventos sociais, controle de presenças convidados, credenciamento QR Code, gerenciador de casamentos Luanda, convite com mapa Angola, mapa do evento e como chegar Luanda";
@@ -132,6 +139,9 @@ export const SEO: React.FC<SEOProps> = ({
       <meta property="og:description" content={description} />
       {finalUrl && <meta property="og:url" content={finalUrl} />}
       {finalImage && <meta property="og:image" content={finalImage} />}
+      {finalImage && isDefaultImage && <meta property="og:image:width" content="1424" />}
+      {finalImage && isDefaultImage && <meta property="og:image:height" content="752" />}
+      {finalImage && <meta property="og:image:alt" content={finalImageAlt} />}
       <meta property="og:site_name" content="InoEvents Angola" />
 
       {/* Twitter */}
@@ -139,6 +149,7 @@ export const SEO: React.FC<SEOProps> = ({
       <meta name="twitter:title" content={finalTitle} />
       <meta name="twitter:description" content={description} />
       {finalImage && <meta name="twitter:image" content={finalImage} />}
+      {finalImage && <meta name="twitter:image:alt" content={finalImageAlt} />}
 
       {/* Schema.org JSON-LD */}
       <script type="application/ld+json">

@@ -57,6 +57,9 @@ import { EditableImageWrapper } from "./components/EditableImageWrapper";
 import { compressImage } from "./components/EditableImageWrapper";
 import { getRSVPText } from "./lib/rsvpText";
 import { CheckStatusModal } from "./CheckStatusModal";
+import { trackPixelLead } from "../../lib/metaPixel";
+import { IMAGE_ACCEPT, validateImageFile } from "../../lib/imageValidation";
+import { migrateCoverToStorage } from "../../lib/imageStorage";
 
   // Formata ISO (YYYY-MM-DD) para "17 de Setembro de 2026" — só display, edição usa o ISO
 const formatDateLong = (iso: any): string => {
@@ -611,7 +614,12 @@ const InvitationView: React.FC = () => {
       setIsAuthOpen(true);
       return;
     }
-    // Elevate templates choice directly to the free interactive builder
+    // Casamento: preview → questionário (todos os campos do template) → publicar → editor
+    if (activeEvent.type === "WEDDING") {
+      navigate(`/create-wedding?template=${activeEvent.layoutMode}`);
+      return;
+    }
+    // Demais tipos: caminho direto ao editor interativo
     const newId = `evt_${Math.random().toString(36).substr(2, 9)}`;
     navigate(
       `/invite/${newId}?edit=true&new=true&baseId=${activeEvent.id}&template=${activeEvent.layoutMode}&theme=${activeEvent.type}`,
@@ -722,24 +730,30 @@ const InvitationView: React.FC = () => {
       const snap = await getDoc(eventRef);
       const isNewSave = !snap.exists();
 
+      // Capa → Firebase Storage (URL pública p/ preview do link; base64 parte o OG e o doc 1MB)
+      const prevHero = snap.exists() ? ((snap.data() as any)?.heroImage as string | undefined) : undefined;
+      const cover = await migrateCoverToStorage(localEvent.heroImage, user.uid, localEvent.id, prevHero);
+      const eventToSave = cover.migrated ? { ...localEvent, heroImage: cover.url } : localEvent;
+      if (cover.migrated) setLocalEvent(eventToSave);
+
       if (isNewSave) {
         // Just create the document directly, it's unpublished until they click 'Publicar' — §9 rascunho
         const normPlanDraft = normalizePlanId((localEvent as any).plan || (localEvent as any).planId || userProfile?.plan || 'essential');
         const savedPayload = {
-          ...localEvent,
+          ...eventToSave,
           plan: normPlanDraft,
           planId: normPlanDraft,
           status: 'active',
           billingStatus: 'pending',
           ownerId: user.uid,
           updatedAt: new Date().toISOString(),
-          draftData: localEvent,
+          draftData: eventToSave,
           isPublished: false
         };
         await setDoc(eventRef, savedPayload);
       } else {
         await updateDoc(eventRef, {
-          draftData: localEvent,
+          draftData: eventToSave,
           updatedAt: new Date().toISOString(),
         });
       }
@@ -775,6 +789,12 @@ const InvitationView: React.FC = () => {
       const eventRef = doc(db, "events", localEvent.id);
       const snap = await getDoc(eventRef);
       const isNewSave = !snap.exists();
+
+      // Capa → Firebase Storage (URL pública p/ preview do link; base64 parte o OG e o doc 1MB)
+      const prevHeroWs = snap.exists() ? ((snap.data() as any)?.heroImage as string | undefined) : undefined;
+      const coverWs = await migrateCoverToStorage(localEvent.heroImage, user.uid, localEvent.id, prevHeroWs);
+      const eventToSaveWs = coverWs.migrated ? { ...localEvent, heroImage: coverWs.url } : localEvent;
+      if (coverWs.migrated) setLocalEvent(eventToSaveWs);
 
       if (isNewSave) {
         // Check plan limits (bypass if it's a baby shower or bridal shower template)
@@ -818,7 +838,7 @@ const InvitationView: React.FC = () => {
         const dt = new Date(); dt.setDate(dt.getDate() + d); return dt.toISOString();
       })();
       const savedPayload = {
-        ...localEvent,
+        ...eventToSaveWs,
         plan: normalizedPlanInv,
         planId: normalizedPlanInv,
         status: (localEvent as any).status || 'active',
@@ -934,6 +954,11 @@ const InvitationView: React.FC = () => {
     }
     if (!file) {
       toast.error('Escolha uma foto do dispositivo.');
+      return;
+    }
+    const validation = validateImageFile(file);
+    if (!validation.ok) {
+      toast.error(validation.error);
       return;
     }
     try {
@@ -1460,7 +1485,7 @@ const InvitationView: React.FC = () => {
                             Adicionar Foto
                             <input
                               type="file"
-                              accept="image/*"
+                              accept={IMAGE_ACCEPT}
                               className="hidden"
                               onChange={(e) => {
                                 addGalleryImage(e.target.files?.[0]);
@@ -3010,6 +3035,21 @@ guestName: string;
                     multiline
                   />
                 </p>
+                <ul className="w-full mb-4 space-y-1.5">
+                  {event.gifts.map((g: any, i: number) => (
+                    <li key={g.id || i} className="flex items-center justify-between gap-2 text-sm border-b border-slate-100 last:border-0 pb-1.5 last:pb-0">
+                      <span className="font-bold text-slate-800 text-left">
+                        {g.title}
+                        {g.emoji ? ` ${g.emoji}` : ''}
+                      </span>
+                      {Number(g.price) > 0 && (
+                        <span className="text-slate-500 whitespace-nowrap">
+                          {Number(g.price).toLocaleString('pt-AO')} Kz
+                        </span>
+                      )}
+                    </li>
+                  ))}
+                </ul>
                 {event.gifts?.[0]?.value && (
                   <div className="w-full">
                     <div className="text-xs font-mono text-gray-700 bg-gray-50 border border-dashed border-gray-200 p-2.5 rounded-xl select-all break-all mb-4">
@@ -6363,7 +6403,8 @@ const LimintsoGoldLayout: React.FC<{
   deleteTimelineItem,
   updateTimelineItem,
 }) => {
-  const isPremium = isEditing || (event && EVENTS.some((e) => e.id === event.id)) || (event && (event as any).plan && ((event as any).plan === "Premium" || (event as any).plan === "Business" || (event as any).plan === "Corporate"));
+  // Livro de assinaturas é benefício tech (planos com guestbook); plano normalizado (Firestore grava minúsculas)
+  const isPremium = isEditing || (event && EVENTS.some((e) => e.id === event.id)) || canUseFeature(normalizePlanId((event as any)?.plan ?? (event as any)?.planId), 'guestbook');
   const [localIsOpen, setLocalIsOpen] = useState(isEditing ? true : false);
   const isOpen = isOpenCover !== undefined ? isOpenCover : localIsOpen;
   const setIsOpen = setIsOpenCover !== undefined ? setIsOpenCover : setLocalIsOpen;
@@ -6965,7 +7006,8 @@ const LimintsoGoldLayout: React.FC<{
         </div>
       </div>
 
-      {/* 6. GUESTBOOK / MURAL DE RECADOS (FELICITAÇÕES) */}
+      {/* 6. GUESTBOOK / MURAL DE RECADOS (FELICITAÇÕES) — só em planos com guestbook */}
+      {isPremium && (
       <div className="py-24 max-w-4xl mx-auto px-6 md:px-12">
         <FadeInSection>
           <div className="text-center mb-12">
@@ -6976,9 +7018,10 @@ const LimintsoGoldLayout: React.FC<{
             <div className="w-12 h-[1px] bg-[#dcb349]/30 mx-auto mt-4" />
           </div>
 
-          {isPremium && <Guestbook eventId={event.id} layoutMode={event.layoutMode} />}
+          <Guestbook eventId={event.id} layoutMode={event.layoutMode} />
         </FadeInSection>
       </div>
+      )}
 
       {/* 7. GIFTS / PRESENTES (IBAN INFO) */}
       {event.gifts && event.gifts.length > 0 && (
@@ -7136,7 +7179,8 @@ const LimintsoMeLayout: React.FC<{
   updateTimelineItem,
   guestName,
 }) => {
-  const isPremium = isEditing || (event && EVENTS.some((e) => e.id === event.id)) || (event && (event as any).plan && ((event as any).plan === "Premium" || (event as any).plan === "Business" || (event as any).plan === "Corporate"));
+  // Livro de assinaturas é benefício tech (planos com guestbook); plano normalizado (Firestore grava minúsculas)
+  const isPremium = isEditing || (event && EVENTS.some((e) => e.id === event.id)) || canUseFeature(normalizePlanId((event as any)?.plan ?? (event as any)?.planId), 'guestbook');
   const [localIsOpen, setLocalIsOpen] = useState(isEditing ? true : false);
   const isOpen = isOpenCover !== undefined ? isOpenCover : localIsOpen;
   const setIsOpen = setIsOpenCover !== undefined ? setIsOpenCover : setLocalIsOpen;
@@ -7882,7 +7926,8 @@ const LimintsoMeLayout: React.FC<{
             </FadeInSection>
           </div>
 
-          {/* 8. FELICITAÇÕES / GUESTBOOK SECTION */}
+          {/* 8. FELICITAÇÕES / GUESTBOOK SECTION — só em planos com guestbook */}
+          {isPremium && (
           <div className="py-24 bg-[#FCFAF6] px-6 md:px-12 border-b border-stone-200">
             <FadeInSection className="max-w-4xl mx-auto">
               <div className="text-center mb-12 space-y-4">
@@ -7893,9 +7938,10 @@ const LimintsoMeLayout: React.FC<{
                 <div className="w-12 h-[1px] bg-[#E9BE5D]/30 mx-auto" />
               </div>
 
-              {isPremium && <Guestbook eventId={event.id} layoutMode={event.layoutMode} />}
+              <Guestbook eventId={event.id} layoutMode={event.layoutMode} />
             </FadeInSection>
           </div>
+          )}
 
           {/* 9. GALERIA (MASONRY GALLERY) SECTION */}
           {event.gallery && event.gallery.length > 0 && (
@@ -7994,8 +8040,19 @@ const LimintsoMeLayout: React.FC<{
                     </FadeInSection>
                   ))}
                 </div>
-                {(!event.gifts || event.gifts.length === 0) && (event as any).iban ? (
-                  <FadeInSection className="bg-white border border-[#E9BE5D]/10 rounded-3xl p-8 shadow-sm text-center space-y-4 max-w-2xl mx-auto mt-6">
+              </div>
+            </div>
+          )}
+          {(!event.gifts || event.gifts.length === 0) && (event as any).iban ? (
+            <div className="py-24 bg-[#FCFAF6] border-b border-stone-200">
+              <div className="max-w-4xl mx-auto px-6 md:px-12">
+                <FadeInSection className="text-center mb-12 space-y-4">
+                  <span className="material-symbols-outlined text-3xl text-[#E9BE5D]">volunteer_activism</span>
+                  <h2 className="josefin-font text-3xl md:text-4xl font-semibold uppercase tracking-[0.2em] text-[#121212]">Lista de Presentes</h2>
+                  <p className="montserrat-font text-xs text-slate-500 uppercase tracking-widest mt-2">Mimos em Dinheiro / Apoio</p>
+                  <div className="w-12 h-[1px] bg-[#E9BE5D]/30 mx-auto" />
+                </FadeInSection>
+                <FadeInSection className="bg-white border border-[#E9BE5D]/10 rounded-3xl p-8 shadow-sm text-center space-y-4 max-w-2xl mx-auto mt-6">
                     <span className="josefin-font text-[10px] uppercase font-bold tracking-widest text-[#E9BE5D] block">
                       Transferência Bancária
                     </span>
@@ -8017,10 +8074,9 @@ const LimintsoMeLayout: React.FC<{
                       )}
                     </div>
                   </FadeInSection>
-                ) : null}
               </div>
             </div>
-          )}
+          ) : null}
 
         {/* LOCAL + MAPA — por último, 100% só-leitura, card adaptativo bonito (clica para editar no Estúdio) */}
         <EditableSectionWrapper
@@ -8261,6 +8317,16 @@ const RSVPForm: React.FC<{ event: EventDetails; onClose: () => void }> = ({
           : "Sua justificativa foi enviada com sucesso.",
         { id: toastId },
       );
+
+      if (status === "yes") {
+        trackPixelLead(
+          { content_ids: [event.id], content_name: event.title, status: "yes" },
+          {
+            user_data: { phone: normalizedPhone },
+            custom_data: { content_ids: [event.id], content_name: event.title, status: "yes" },
+          },
+        );
+      }
 
       if (status === "yes") {
         setSuccessData({ id: guestId, name: name.trim() });

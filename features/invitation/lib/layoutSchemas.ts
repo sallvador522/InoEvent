@@ -60,8 +60,8 @@ export const LAYOUT_SECTIONS: Record<LayoutMode, SectionKey[]> = {
   BABY_NEUTRAL: ['gifts', 'gallery', 'map'],
   // Ouro Imperial não tem galeria
   LIMINTSO_GOLD: ['timeline', 'dressCode', 'gifts', 'reception', 'countdown', 'map'],
-  // Nobreza de Luanda não tem contagem regressiva
-  LIMINTSO_ME: ['timeline', 'dressCode', 'gifts', 'gallery', 'reception', 'map'],
+  // Nobreza de Luanda tem contagem regressiva (secção "Falta Pouco" no render)
+  LIMINTSO_ME: ['timeline', 'dressCode', 'gifts', 'gallery', 'reception', 'countdown', 'map'],
 };
 
 /** O layout renderiza esta secção no convite? */

@@ -19,6 +19,7 @@ import { Navbar } from "../../components/Navbar";
 import { SEO } from "../../components/SEO";
 import toast from "react-hot-toast";
 import { PLANS, ADDONS } from "../../config/plans";
+import { trackPixelInitiateCheckout, trackPixelLead } from "../../lib/metaPixel";
 
 const plans = [
   {
@@ -54,7 +55,7 @@ const plans = [
     description: PLANS.premium.description,
     features: [
       "Acesso por Evento Específico",
-      "Todos os Temas Premium Liberados",
+      "Todos os 8 Temas Incluídos",
       `RSVP Até ${PLANS.premium.guestLimit} convidados`,
       "Convidados Individualizados",
       "Galeria Premium",
@@ -253,6 +254,34 @@ export const PlansPage: React.FC = () => {
 
     const cleanNumber = whatsappNumber.replace(/\D/g, "");
     const url = `https://wa.me/${cleanNumber}?text=${encodeURIComponent(messageText)}`;
+    const planPrice = PLANS[whatsappModal.planId as keyof typeof PLANS]?.price ?? 0;
+    const capiUser = user?.email ? { user_data: { email: user.email } } : {};
+    trackPixelInitiateCheckout(
+      {
+        content_ids: [whatsappModal.planId],
+        content_name: whatsappModal.name,
+        value: planPrice,
+        currency: 'AOA',
+      },
+      {
+        ...capiUser,
+        custom_data: {
+          content_ids: [whatsappModal.planId],
+          content_name: whatsappModal.name,
+          value: planPrice,
+          currency: 'AOA',
+        },
+      },
+    );
+    if (orderId) {
+      trackPixelLead(
+        { content_ids: [whatsappModal.planId], order_id: orderId },
+        {
+          ...capiUser,
+          custom_data: { content_ids: [whatsappModal.planId], order_id: orderId },
+        },
+      );
+    }
     window.open(url, "_blank", "noopener,noreferrer");
     setWhatsappModal(null);
     if (activatingEventId) {

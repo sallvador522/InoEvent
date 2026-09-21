@@ -5,6 +5,7 @@ import { Link, useNavigate, useLocation } from 'react-router-dom';
 import { GoogleAuthProvider, signInWithPopup, signInWithEmailAndPassword, createUserWithEmailAndPassword, updateProfile } from 'firebase/auth';
 import { auth, db } from '../../components/FirebaseProvider';
 import { SEO } from '../../components/SEO';
+import { trackPixelCompleteRegistration } from '../../lib/metaPixel';
 
 export const AuthPage: React.FC = () => {
   const [isLogin, setIsLogin] = useState(true);
@@ -37,6 +38,10 @@ export const AuthPage: React.FC = () => {
               email: result.user.email || 'no-email@example.com',
               plan: 'Essencial'
           });
+          trackPixelCompleteRegistration(
+            { method: 'google' },
+            { user_data: { email: result.user.email || undefined } },
+          );
       }
       navigate(from, { replace: true });
     } catch (err: any) {
@@ -78,6 +83,10 @@ export const AuthPage: React.FC = () => {
             email: email,
             plan: 'Essencial'
         });
+        trackPixelCompleteRegistration(
+          { method: 'email' },
+          { user_data: { email } },
+        );
         
         navigate(from, { replace: true });
       }

@@ -7,22 +7,25 @@ import { Navbar } from '../../components/Navbar';
 import { SEO } from '../../components/SEO';
 import { normalizePlanId, getEventCreationLimit, getValidityDays, isBusinessPlan } from '../../config/plans';
 import { uploadEventAudio, deleteEventAudio, isOwnStorageAudio, formatAudioSize, MAX_AUDIO_BYTES } from '../../lib/audioUpload';
-import { ArrowLeft, ArrowRight, Check, Plus, Trash2, Gift, Lock } from 'lucide-react';
+import { ArrowLeft, ArrowRight, Check, Plus, Trash2, Gift } from 'lucide-react';
 import toast from 'react-hot-toast';
 import { LocationPinPicker } from '../../components/LocationPinPicker';
 import { MapsProvider } from '../../components/MapsProvider';
 import type { TimelineItem } from '../../types';
 import { layoutSupports, hiddenSectionsFor, SECTION_LABELS } from './lib/layoutSchemas';
+import { IMAGE_ACCEPT, validateImageFile } from '../../lib/imageValidation';
+import { migrateCoverToStorage } from '../../lib/imageStorage';
 
+// Todos os temas livres para escolher — o pagamento acontece na ativação (planos)
 const WEDDING_LAYOUTS = [
   { id: 'CLASSIC', label: 'Essencial Moderno', premium: false },
   { id: 'MODERN', label: 'Cosmopolita', premium: false },
-  { id: 'LUXURY', label: 'Luxo de Realeza', premium: true },
-  { id: 'GARDEN', label: 'Jardim Encantado', premium: true },
-  { id: 'RUSTIC', label: 'Rústico Natural', premium: true },
-  { id: 'INDUSTRIAL', label: 'Industrial Loft', premium: true },
-  { id: 'LIMINTSO_GOLD', label: 'Ouro Imperial', premium: true },
-  { id: 'LIMINTSO_ME', label: 'Nobreza de Luanda', premium: true },
+  { id: 'LUXURY', label: 'Luxo de Realeza', premium: false },
+  { id: 'GARDEN', label: 'Jardim Encantado', premium: false },
+  { id: 'RUSTIC', label: 'Rústico Natural', premium: false },
+  { id: 'INDUSTRIAL', label: 'Industrial Loft', premium: false },
+  { id: 'LIMINTSO_GOLD', label: 'Ouro Imperial', premium: false },
+  { id: 'LIMINTSO_ME', label: 'Nobreza de Luanda', premium: false },
 ];
 
 const MUSIC_OPTIONS = [
@@ -89,8 +92,7 @@ export const WeddingQuestionnaire: React.FC = () => {
   const navigate = useNavigate();
   const [step, setStep] = useState(0);
   const [eventId, setEventId] = useState<string | null>(null);
-  const [saving, setSaving] = useState(false);
-  const fileRef = useRef<HTMLInputElement>(null);
+  const [saving, setSaving] = useState(false);  const fileRef = useRef<HTMLInputElement>(null);
   const galleryRef = useRef<HTMLInputElement>(null);
 
   const [brideName, setBrideName] = useState('');
@@ -119,6 +121,8 @@ export const WeddingQuestionnaire: React.FC = () => {
   const [receptionAddress, setReceptionAddress] = useState('');
   const [description, setDescription] = useState('');
   const [heroImage, setHeroImage] = useState('');
+  // Última capa gravada (para limpar o ficheiro antigo do Storage ao substituir)
+  const lastCoverRef = useRef<string>('');
   const [gallery, setGallery] = useState<string[]>([]);
   const [musicTrack, setMusicTrack] = useState('romantic');
   const [uploadingMusic, setUploadingMusic] = useState(false);
@@ -135,6 +139,12 @@ export const WeddingQuestionnaire: React.FC = () => {
     const t = searchParams.get('template');
     return WEDDING_LAYOUTS.some((l) => l.id === t) ? (t as string) : 'CLASSIC';
   });
+  // Veio da galeria com tema válido → passo Tema mostra confirmação em vez da grelha
+  const cameWithTemplate = useRef(
+    WEDDING_LAYOUTS.some((l) => l.id === searchParams.get('template')),
+  ).current;
+  const [showThemeGrid, setShowThemeGrid] = useState(false);
+  const chosenLayout = WEDDING_LAYOUTS.find((l) => l.id === layout);
   // Programação — mesmos defaults do template CLASSIC (mockData), editável; vazio esconde a secção no convite
   const [timeline, setTimeline] = useState<TimelineItem[]>([
     { time: '18:00', title: 'Cerimônia', description: 'Jardim' },
@@ -159,8 +169,6 @@ export const WeddingQuestionnaire: React.FC = () => {
       setTitle(`${brideName} & ${groomName}`);
     }
   }, [brideName, groomName, titleTouched]);
-
-  const canUsePremium = normalizePlanId(userProfile?.plan) !== 'essential';
 
   const saveDraft = async (extra: Record<string, any> = {}) => {
     if (!user) {
@@ -241,6 +249,18 @@ export const WeddingQuestionnaire: React.FC = () => {
           accountName,
           value: iban,
         }));
+      }
+      // Capa → Firebase Storage (URL pública p/ preview do link; base64 parte o OG e o doc 1MB)
+      const cover = await migrateCoverToStorage(
+        payload.heroImage,
+        user.uid,
+        id,
+        lastCoverRef.current || undefined,
+      );
+      payload.heroImage = cover.url;
+      if (cover.migrated) {
+        setHeroImage(cover.url);
+        lastCoverRef.current = cover.url;
       }
       await setDoc(doc(db, 'events', id), payload, { merge: true });
       setEventId(id);
@@ -332,7 +352,7 @@ export const WeddingQuestionnaire: React.FC = () => {
         createdAt: new Date().toISOString(),
       });
       if (!id) return;
-      toast.success('Convite publicado!');
+      toast.success('Convite pronto! Escolhe o plano para partilhar.');
       navigate(`/dashboard/${id}`);
     } finally {
       setSaving(false);
@@ -351,12 +371,8 @@ export const WeddingQuestionnaire: React.FC = () => {
     setNewGift({ title: '', price: '', emoji: '🎁' });
   };
 
-  const pickLayout = (layoutId: string, premium: boolean) => {
-    if (premium && !canUsePremium) {
-      toast.error('Este tema é Premium. Faça upgrade para o usar.');
-      return;
-    }
-    // Trocar de tema preserva os dados; avisa o que fica escondido (schema, sem apagar nada)
+  const pickLayout = (layoutId: string) => {
+    // Todos os temas livres — trocar preserva os dados; avisa o que fica escondido (schema, sem apagar nada)
     const hidden = hiddenSectionsFor(layout, layoutId).filter((s) =>
       s === 'timeline' ? timelineTouched && timeline.length > 0 : s === 'gallery' ? gallery.length > 0 : false,
     );
@@ -545,6 +561,12 @@ export const WeddingQuestionnaire: React.FC = () => {
                       onChange={async (e) => {
                         const file = e.target.files?.[0];
                         if (!file) return;
+                        const validation = validateImageFile(file);
+                        if (!validation.ok) {
+                          toast.error(validation.error);
+                          e.target.value = '';
+                          return;
+                        }
                         try {
                           setHeroImage(await compressImage(file));
                           toast.success('Foto pronta!');
@@ -552,7 +574,7 @@ export const WeddingQuestionnaire: React.FC = () => {
                           toast.error('Não foi possível ler a foto.');
                         }
                       }}
-                      accept="image/*"
+                      accept={IMAGE_ACCEPT}
                       className="hidden"
                     />
                   </div>
@@ -593,6 +615,14 @@ export const WeddingQuestionnaire: React.FC = () => {
                     onChange={async (e) => {
                       const files = Array.from(e.target.files || []).slice(0, 6 - gallery.length);
                       if (files.length === 0) return;
+                      for (const f of files) {
+                        const validation = validateImageFile(f);
+                        if (!validation.ok) {
+                          toast.error(validation.error);
+                          e.target.value = '';
+                          return;
+                        }
+                      }
                       try {
                         const imgs = await Promise.all(files.map((f) => compressImage(f)));
                         setGallery((g) => [...g, ...imgs].slice(0, 6));
@@ -602,7 +632,7 @@ export const WeddingQuestionnaire: React.FC = () => {
                       }
                       e.target.value = '';
                     }}
-                    accept="image/*"
+                    accept={IMAGE_ACCEPT}
                     multiple
                     className="hidden"
                   />
@@ -857,20 +887,56 @@ export const WeddingQuestionnaire: React.FC = () => {
             {currentStepId === 'theme' && (
               <div>
                 <h1 className="font-serif text-3xl md:text-4xl font-bold text-[#1B365D] tracking-tight mb-2">
-                  Escolha o tema
+                  {cameWithTemplate && !showThemeGrid ? 'Confirme o tema' : 'Escolha o tema'}
                 </h1>
                 <p className="text-slate-500 font-light mb-8">
-                  Os vossos dados vestem qualquer um — trocam de tema quando quiserem, sem preencher de novo.
+                  {cameWithTemplate && !showThemeGrid
+                    ? 'Os vossos dados vestem este tema — publiquem assim ou troquem se quiserem.'
+                    : 'Os vossos dados vestem qualquer um — trocam de tema quando quiserem, sem preencher de novo.'}
                 </p>
+                {cameWithTemplate && !showThemeGrid ? (
+                  <div className="bg-white border-2 border-[#C5A028] rounded-2xl p-6">
+                    <div className="flex items-center justify-between gap-3 mb-4">
+                      <div>
+                        <p className="text-[11px] font-bold uppercase tracking-[0.18em] text-slate-400">Tema escolhido</p>
+                        <p className="font-serif text-2xl font-bold text-[#1B365D]">{chosenLayout?.label || layout}</p>
+                      </div>
+                      <Check size={22} className="text-[#8a6d1c] shrink-0" />
+                    </div>
+                    <div className="border-t border-slate-100 pt-4 space-y-1.5 text-sm">
+                      <p className="text-slate-700">
+                        <span className="font-bold">Noivos:</span>{' '}
+                        {[brideName.trim(), groomName.trim()].filter(Boolean).join(' & ') || '—'}
+                      </p>
+                      <p className="text-slate-700">
+                        <span className="font-bold">Data:</span>{' '}
+                        {date ? `${date}${time ? ` · ${time}` : ''}` : '—'}
+                      </p>
+                      <p className="text-slate-700">
+                        <span className="font-bold">Local:</span> {locationName.trim() || '—'}
+                      </p>
+                      <p className="text-slate-700">
+                        <span className="font-bold">Foto principal:</span> {heroImage ? 'escolhida ✓' : 'em falta'}
+                      </p>
+                    </div>
+                    <button
+                      type="button"
+                      onClick={() => setShowThemeGrid(true)}
+                      className="mt-5 w-full min-h-[48px] rounded-xl border-2 border-slate-200 font-bold text-xs uppercase tracking-wider text-slate-600 hover:border-[#C5A028] hover:text-[#1B365D] cursor-pointer"
+                      style={{ transition: 'border-color 200ms ease, color 200ms ease' }}
+                    >
+                      Trocar de tema
+                    </button>
+                  </div>
+                ) : (
                 <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
                   {WEDDING_LAYOUTS.map((l) => {
-                    const locked = l.premium && !canUsePremium;
                     const active = layout === l.id;
                     return (
                       <button
                         key={l.id}
                         type="button"
-                        onClick={() => pickLayout(l.id, l.premium)}
+                        onClick={() => pickLayout(l.id)}
                         aria-pressed={active}
                         className={`flex items-center justify-between gap-3 p-4 rounded-2xl border text-left cursor-pointer bg-white ${
                           active ? 'border-[#C5A028]' : 'border-slate-200 hover:border-[#C5A028]/60'
@@ -879,28 +945,17 @@ export const WeddingQuestionnaire: React.FC = () => {
                       >
                         <span>
                           <span className="block font-bold text-slate-900 text-sm">{l.label}</span>
-                          <span className="block text-xs text-slate-500 font-light mt-0.5">
-                            {l.premium ? 'Tema Premium' : 'Incluído no Essencial'}
-                          </span>
                           {hiddenSectionsFor('CLASSIC', l.id).length > 0 && (
                             <span className="block text-[11px] text-amber-600 font-medium mt-0.5">
                               Sem {hiddenSectionsFor('CLASSIC', l.id).map((s) => SECTION_LABELS[s]).join(', ')}
                             </span>
                           )}
                         </span>
-                        {locked ? (
-                          <Lock size={18} className="text-slate-300 shrink-0" />
-                        ) : (
-                          active && <Check size={18} className="text-[#8a6d1c] shrink-0" />
-                        )}
+                        {active && <Check size={18} className="text-[#8a6d1c] shrink-0" />}
                       </button>
                     );
                   })}
                 </div>
-                {!canUsePremium && (
-                  <p className="text-xs text-slate-500 font-light mt-4">
-                    Temas Premium desbloqueiam com o plano Premium ou superior.
-                  </p>
                 )}
               </div>
             )}

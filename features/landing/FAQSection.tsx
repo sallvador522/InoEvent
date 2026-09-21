@@ -25,7 +25,7 @@ const FAQ_ITEMS: FAQItem[] = [
   },
   {
     q: "Como posso personalizar o design dos meus convites?",
-    a: "O InoEvents oferece controle estético refinado. Pode escolher entre vários temas premium meticulosamente desenhados (Classic, Modern, Luxury, Garden, Rustic, Industrial, Essential) que trazem combinações tipográficas profissionais (como serifas elegantes e fontes minimalistas), carregar belas fotos para a galeria interativa com likes de convidados, configurar botões de mapas interativos e definir músicas de fundo personalizadas com o player integrado TocaPlayer.",
+    a: "O InoEvents oferece controle estético refinado. Pode escolher entre 8 temas meticulosamente desenhados (Essencial Moderno, Cosmopolita, Luxo de Realeza, Jardim Encantado, Rústico Natural, Industrial Loft, Ouro Imperial, Nobreza de Luanda) que trazem combinações tipográficas profissionais (como serifas elegantes e fontes minimalistas), carregar belas fotos para a galeria interativa com likes de convidados, configurar botões de mapas interativos e definir músicas de fundo personalizadas com o player integrado TocaPlayer.",
     category: "customization",
     icon: Sliders
   },

@@ -1,6 +1,7 @@
 import React, { useRef, useState } from 'react';
 import { Camera, X } from 'lucide-react';
 import toast from 'react-hot-toast';
+import { IMAGE_ACCEPT, validateImageFile } from '../lib/imageValidation';
 
 export const ImageUploader: React.FC<{
   images: Array<string | { id: string; url: string; likes: number }>;
@@ -60,6 +61,15 @@ export const ImageUploader: React.FC<{
     
     const files = Array.from<File>(e.target.files);
     
+    for (const file of files) {
+      const validation = validateImageFile(file);
+      if (!validation.ok) {
+        toast.error(validation.error);
+        if (fileInputRef.current) fileInputRef.current.value = "";
+        return;
+      }
+    }
+
     if (normalizedImages.length + files.length > maxPhotos) {
       toast.error(`Você pode adicionar no máximo ${maxPhotos} fotos.`);
       return;
@@ -122,7 +132,7 @@ export const ImageUploader: React.FC<{
             type="file" 
             ref={fileInputRef}
             onChange={handleFileChange}
-            accept="image/*"
+            accept={IMAGE_ACCEPT}
             multiple
             className="hidden" 
           />

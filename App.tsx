@@ -6,6 +6,7 @@ import { ProtectedRoute } from './components/ProtectedRoute';
 import { AdminRoute } from './components/AdminRoute';
 import { WhatsAppSupport } from './components/WhatsAppSupport';
 import { AnalyticsTracker } from './components/AnalyticsTracker';
+import { CookieConsent } from './components/CookieConsent';
 import { ErrorBoundary } from './components/ErrorBoundary';
 import { NotFound } from './components/NotFound';
 
@@ -126,6 +127,7 @@ const App: React.FC = () => {
         <AnalyticsTracker />
         <AnimatedRoutes />
         <WhatsAppSupport />
+        <CookieConsent />
       </Router>
       </MotionConfig>
     </ErrorBoundary>

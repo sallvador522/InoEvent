@@ -1,5 +1,7 @@
 import React, { useState, useRef, useEffect, ReactNode } from 'react';
 import { DateTimePickerModal } from './DateTimePickerModal';
+import toast from 'react-hot-toast';
+import { IMAGE_ACCEPT, validateImageFile } from '../lib/imageValidation';
 
 interface InlineTextProps {
   value: string;
@@ -321,6 +323,12 @@ export const InlineImage: React.FC<InlineImageProps> = ({
 
   const handleFileChange = async (e: React.ChangeEvent<HTMLInputElement>) => {
     if (!e.target.files?.length) return;
+    const validation = validateImageFile(e.target.files[0]);
+    if (!validation.ok) {
+      toast.error(validation.error);
+      if (fileInputRef.current) fileInputRef.current.value = '';
+      return;
+    }
     setIsProcessing(true);
     try {
       const compressed = await compressImage(e.target.files[0]);
@@ -361,7 +369,7 @@ export const InlineImage: React.FC<InlineImageProps> = ({
         type="file" 
         ref={fileInputRef}
         onChange={handleFileChange}
-        accept="image/*"
+        accept={IMAGE_ACCEPT}
         className="hidden" 
       />
     </div>

@@ -121,7 +121,7 @@ export const TemplateGalleryPage: React.FC = () => {
                             const badge = getBadgeConfig(event.type);
                             return (
                                 <MotionLink
-                                    to={event.type === ThemeType.WEDDING ? `/create-wedding?template=${event.layoutMode}` : `/invite/${event.id}`}
+                                    to={`/invite/${event.id}`}
                                     key={event.id}
                                     className="flex flex-col gap-2 md:gap-4 group cursor-pointer"
                                     initial={{ opacity: 0, y: 30 }}
@@ -141,11 +141,6 @@ export const TemplateGalleryPage: React.FC = () => {
                                             <span className={`inline-block px-2 py-1 md:px-3 md:py-1.5 backdrop-blur-md rounded-full text-[8px] md:text-xs font-bold shadow-sm ${badge.className}`}>
                                                 {getLayoutLabel(event.layoutMode)}
                                             </span>
-                                            {!['MODERN', 'CLASSIC', 'ESSENTIAL'].includes(event.layoutMode) && (
-                                                <span className="inline-block px-2 py-1 md:px-3 md:py-1.5 bg-gradient-to-r from-amber-200 to-amber-400 text-amber-900 rounded-full text-[8px] md:text-xs font-bold shadow-sm">
-                                                    PRO
-                                                </span>
-                                            )}
                                         </div>
                                     </div>
                                     <div className="px-1 md:px-2">

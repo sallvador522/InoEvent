@@ -1,6 +1,7 @@
 import React, { useState, useEffect, useRef } from "react";
 import { createPortal } from "react-dom";
 import toast from "react-hot-toast";
+import { IMAGE_ACCEPT, validateImageFile } from "../../../lib/imageValidation";
 
 export const compressImage = (file: File, maxDim = 1200): Promise<string> => {
   return new Promise((resolve, reject) => {
@@ -65,6 +66,12 @@ export const EditableImageWrapper: React.FC<{
 
   const handleFileChange = async (e: React.ChangeEvent<HTMLInputElement>) => {
     if (!e.target.files?.length) return;
+    const validation = validateImageFile(e.target.files[0]);
+    if (!validation.ok) {
+      toast.error(validation.error);
+      e.target.value = '';
+      return;
+    }
     setIsUploading(true);
     try {
       const base64 = await compressImage(e.target.files[0]);
@@ -166,7 +173,7 @@ export const EditableImageWrapper: React.FC<{
                   type="file"
                   ref={fileInputRef}
                   onChange={handleFileChange}
-                  accept="image/*"
+                  accept={IMAGE_ACCEPT}
                   className="hidden"
                 />
 

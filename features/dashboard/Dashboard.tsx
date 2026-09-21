@@ -1,5 +1,5 @@
 import React, { useState, useEffect, useRef } from 'react';
-import { useParams, Link, useNavigate } from 'react-router-dom';
+import { useParams, Link, useNavigate, useSearchParams } from 'react-router-dom';
 import { Users, CheckCircle2, QrCode, Share2, Download, Clock, Search, MessageSquare, ArrowLeft, MoreHorizontal, Settings, Copy, Check, Edit2, Trash2, Plus, MessageCircle, UploadCloud, Gem, Camera, Bell, BellOff, Volume2, Printer } from 'lucide-react';
 import { motion, AnimatePresence } from 'framer-motion';
 import { doc, collection, onSnapshot, deleteDoc, updateDoc, setDoc } from 'firebase/firestore';
@@ -71,6 +71,32 @@ export const Dashboard = () => {
     );
     const [inAppAlerts, setInAppAlerts] = useState<any[]>([]);
     const prevGuestsRef = useRef<any[]>([]);
+
+    // Pedido acabado de fazer (?orderPending=1 vindo dos Planos) — mostra estado real do pedido
+    const [searchParams] = useSearchParams();
+    const orderJustPlaced = searchParams.get('orderPending') === '1';
+    const [eventOrder, setEventOrder] = useState<any>(null);
+    useEffect(() => {
+        if (!orderJustPlaced || !id) return;
+        let cancelled = false;
+        const loadOrder = async () => {
+            try {
+                const res = await fetch(`/api/events/${id}/order`);
+                if (!res.ok) return;
+                const data = await res.json();
+                if (!cancelled) setEventOrder(data.order || null);
+            } catch {
+                /* sem pedido visível — mantém banner genérico */
+            }
+        };
+        loadOrder();
+        const timer = setInterval(loadOrder, 30000);
+        return () => {
+            cancelled = true;
+            clearInterval(timer);
+        };
+    }, [orderJustPlaced, id]);
+    const hasPendingOrder = !!eventOrder && eventOrder.billingStatus !== 'paid' && eventOrder.billingStatus !== 'failed';
 
     const playNotificationSound = () => {
         try {
@@ -235,6 +261,11 @@ export const Dashboard = () => {
     const isFreeAccount =
         normalizePlanId(userProfile?.plan) === 'free' ||
         normalizePlanId((event as any)?.plan || (event as any)?.planId) === 'free';
+
+    // Plano do evento normalizado (Firestore grava minúsculas) — usar SEMPRE isto em vez de comparar strings literais
+    const eventPlanId = normalizePlanId((event as any)?.plan ?? (event as any)?.planId);
+    const isPaidPlan = eventPlanId === 'premium' || eventPlanId === 'vip' || eventPlanId === 'business';
+    const isBusinessPlan = eventPlanId === 'business';
 
     const isShareLocked =
         !!event &&
@@ -813,7 +844,7 @@ export const Dashboard = () => {
                     </div>
                 </div>
                 <div className="flex items-center gap-2 shrink-0">
-                    {(event?.plan === 'Premium' || event?.plan === 'Business' || event?.plan === 'Corporate') && (
+                    {isPaidPlan && (
                         <button 
                             onClick={() => setSupportOpen(true)}
                             className="hidden md:flex items-center gap-2 text-sm font-bold text-emerald-600 bg-emerald-50 px-4 py-2 rounded-full hover:bg-emerald-100 transition-colors cursor-pointer border-none"
@@ -946,21 +977,25 @@ export const Dashboard = () => {
                     <div className="mb-8 bg-amber-50 border border-amber-200 rounded-3xl p-5 flex flex-col sm:flex-row sm:items-center gap-4">
                         <div className="flex-1">
                             <p className="font-bold text-slate-800">
-                                {isFreeAccount ? 'Conta Free — prova à vontade' : 'Aguarda pagamento'}
+                                {isFreeAccount ? 'Conta Free — prova à vontade' : hasPendingOrder ? 'Pedido recebido!' : 'Aguarda pagamento'}
                             </p>
                             <p className="text-sm text-slate-600">
                                 {isFreeAccount
                                     ? 'Cria e prova o teu convite. Para partilhar e gerir convidados, ativa um plano.'
-                                    : 'O teu convite está pronto, mas o link público só vive após a ativação. Conclui no WhatsApp e avisamos aqui.'}
+                                    : hasPendingOrder
+                                        ? `Pedido ${eventOrder?.id || ''} em confirmação — avisamos aqui assim que o pagamento for validado.`
+                                        : 'O teu convite está pronto, mas o link público só vive após a ativação. Conclui no WhatsApp e avisamos aqui.'}
                             </p>
                         </div>
-                        <button
-                            onClick={() => navigate(`/plans?eventId=${id}&from=share`)}
-                            className="shrink-0 px-6 h-12 rounded-full bg-[#1B365D] text-white font-bold text-xs uppercase tracking-wider hover:bg-[#224373] cursor-pointer whitespace-nowrap"
-                            style={{ transition: 'background-color 200ms ease' }}
-                        >
-                            Escolher plano
-                        </button>
+                        {!hasPendingOrder && (
+                            <button
+                                onClick={() => navigate(`/plans?eventId=${id}&from=share`)}
+                                className="shrink-0 px-6 h-12 rounded-full bg-[#1B365D] text-white font-bold text-xs uppercase tracking-wider hover:bg-[#224373] cursor-pointer whitespace-nowrap"
+                                style={{ transition: 'background-color 200ms ease' }}
+                            >
+                                Escolher plano
+                            </button>
+                        )}
                     </div>
                 )}
 
@@ -1041,7 +1076,41 @@ export const Dashboard = () => {
                     <StatCard title="Recusados" value={declinedCount} icon={Users} color="bg-red-50 text-red-600" />
                 </div>
 
-                <GuestsProgressBar guests={guests} className="mb-12" />
+                <GuestsProgressBar guests={guests} className="mb-6" />
+
+                {/* Faixa do plano — quota, validade e badge sempre visíveis */}
+                {(() => {
+                    const quotaLimit = getGuestLimit(eventPlanId);
+                    const quotaLabel = quotaLimit === Infinity ? '∞' : String(quotaLimit);
+                    const planName = getPlanConfig(eventPlanId)?.name || 'Essencial';
+                    const daysLeft = event?.expiresAt
+                        ? Math.max(0, Math.ceil((new Date(event.expiresAt).getTime() - Date.now()) / 86400000))
+                        : null;
+                    return (
+                        <div className="mb-12 bg-white border border-slate-200/60 rounded-2xl px-5 py-3.5 flex flex-wrap items-center gap-x-6 gap-y-2 text-sm shadow-[0_8px_30px_rgb(0,0,0,0.03)]">
+                            <span className="inline-flex items-center gap-2 font-bold text-slate-800">
+                                <Gem size={15} className="text-[#C5A028]" />
+                                Plano {planName}
+                            </span>
+                            <span className="text-slate-500">
+                                Convidados: <strong className="text-slate-800">{guests.length}/{quotaLabel}</strong>
+                            </span>
+                            {daysLeft !== null && (
+                                <span className="text-slate-500">
+                                    Validade: <strong className={daysLeft <= 15 ? 'text-red-600' : 'text-slate-800'}>{daysLeft} dias</strong>
+                                </span>
+                            )}
+                            {event?.billingStatus !== 'paid' && (
+                                <button
+                                    onClick={() => navigate(`/plans?eventId=${id}&from=share`)}
+                                    className="ml-auto text-xs font-bold uppercase tracking-wider text-[#1B365D] hover:underline cursor-pointer"
+                                >
+                                    Gerir plano
+                                </button>
+                            )}
+                        </div>
+                    );
+                })()}
 
                 {/* Tabs UI */}
                 <div className="flex flex-wrap gap-1 bg-slate-100 rounded-2xl lg:rounded-full p-1 mb-8 w-full md:w-fit mx-auto md:mx-0">
@@ -1058,7 +1127,7 @@ export const Dashboard = () => {
                         Analytics
                     </button>
 
-                    {(event?.plan === 'Business' || event?.plan === 'Corporate' || event?.plan === 'Premium') && (
+                    {isPaidPlan && (
                         <button 
                             onClick={() => setActiveTab('tables')}
                             className={`flex-1 md:flex-none justify-center px-4 md:px-6 py-2.5 rounded-xl lg:rounded-full font-bold text-sm transition-all flex items-center gap-2 ${activeTab === 'tables' ? 'bg-white shadow-sm text-brand-blue' : 'text-slate-500 hover:text-slate-700'}`}
@@ -1073,7 +1142,7 @@ export const Dashboard = () => {
                         >
                             <Gem size={16} className={activeTab === 'gifts' ? 'text-brand-blue' : 'text-slate-400'} /> Presentes
                         </button>
-                    {(event?.plan === 'Business' || event?.plan === 'Corporate' || event?.plan === 'Premium') && (
+                    {isPaidPlan && (
                         <button 
                             onClick={() => setActiveTab('messages')}
                             className={`flex-1 md:flex-none justify-center px-4 md:px-6 py-2.5 rounded-xl lg:rounded-full font-bold text-sm transition-all flex items-center gap-2 ${activeTab === 'messages' ? 'bg-white shadow-sm text-brand-blue' : 'text-slate-500 hover:text-slate-700'}`}
@@ -1081,7 +1150,7 @@ export const Dashboard = () => {
                             <MessageSquare size={16} className={activeTab === 'messages' ? 'text-brand-blue' : 'text-slate-400'} /> Livro de Assinaturas
                         </button>
                     )}
-                    {(event?.plan === 'Business' || event?.plan === 'Corporate' || event?.plan === 'Premium') && (
+                    {isPaidPlan && (
                         <button 
                             onClick={() => setActiveTab('team')}
                             className={`flex-1 md:flex-none justify-center px-4 md:px-6 py-2.5 rounded-xl lg:rounded-full font-bold text-sm transition-all flex items-center gap-2 ${activeTab === 'team' ? 'bg-white shadow-sm text-brand-blue' : 'text-slate-500 hover:text-slate-700'}`}
@@ -1089,7 +1158,7 @@ export const Dashboard = () => {
                             <Users size={16} className={activeTab === 'team' ? 'text-brand-blue' : 'text-slate-400'} /> Equipe
                         </button>
                     )}
-                    {(event?.plan === 'Premium' || event?.plan === 'Business' || event?.plan === 'Corporate') && (
+                    {isPaidPlan && (
                         <button 
                             onClick={() => setActiveTab('premium')}
                             className={`flex-1 md:flex-none justify-center px-4 md:px-6 py-2.5 rounded-xl lg:rounded-full font-bold text-sm transition-all flex items-center gap-2 ${activeTab === 'premium' ? 'bg-amber-100 shadow-sm text-amber-700' : 'text-amber-500 hover:text-amber-600'}`}
@@ -1162,7 +1231,7 @@ export const Dashboard = () => {
                                 <button onClick={() => setShowExportModal(true)} className="justify-center text-sm font-bold text-brand-blue bg-brand-blue/5 px-4 py-2 rounded-xl hover:bg-brand-blue/10 transition-colors flex items-center gap-2 text-center">
                                     <Download size={16} /> Exportar
                                 </button>
-                                {(event?.plan === 'Business' || event?.plan === 'Corporate' || event?.plan === 'Premium') && (
+                                {isPaidPlan && (
                                     <button onClick={() => setShowReportModal(true)} className="justify-center text-sm font-bold text-slate-800 bg-slate-100 border border-slate-200 px-4 py-2 rounded-xl hover:bg-slate-200 transition-colors flex items-center gap-2 text-center cursor-pointer">
                                         <Printer size={16} className="text-slate-600" /> Relatório PDF
                                     </button>
@@ -1606,7 +1675,7 @@ export const Dashboard = () => {
 
                     {/* Sidebar Actions */}
                     <div className="flex flex-col gap-6 min-w-0">
-                        {event?.type !== 'BRIDAL_SHOWER' && (event?.plan === 'Premium' || event?.plan === 'Business' || event?.plan === 'Corporate') ? (
+                        {event?.type !== 'BRIDAL_SHOWER' && isPaidPlan ? (
                          <div className="bg-brand-blue text-white rounded-3xl p-8 relative overflow-hidden shadow-xl shadow-brand-blue/20">
                             <div className="absolute top-0 right-0 w-64 h-64 bg-white/5 rounded-full blur-3xl -mr-10 -mt-10 pointer-events-none"></div>
                             <h3 className="text-xl font-bold mb-2">Check-in Digital</h3>
@@ -1614,7 +1683,7 @@ export const Dashboard = () => {
                             <button onClick={() => setShowScanner(true)} className="w-full bg-white text-brand-blue py-3 rounded-xl font-bold flex items-center justify-center gap-2 hover:bg-blue-50 transition-colors shadow-lg mb-3">
                                 <QrCode size={18} /> Validar QRCode
                             </button>
-                            {(event?.plan === 'Business' || event?.plan === 'Corporate') && (
+                            {isBusinessPlan && (
                                 <button 
                                     onClick={async () => {
                                         let token = event.clientToken;
@@ -1763,17 +1832,17 @@ export const Dashboard = () => {
                          <div className="bg-white border border-slate-100 rounded-3xl p-6 shadow-sm">
                             <div className="flex justify-between items-center mb-4"><h3 className="font-bold text-slate-800">Suporte</h3><button onClick={() => setSupportOpen(true)} className="text-[11px] text-emerald-600 font-bold bg-emerald-50 hover:bg-emerald-100 px-2.5 py-1.5 rounded-full flex items-center gap-1 cursor-pointer border-none shadow-sm">Contacto (2 Canais)</button></div>
                             <div className="flex flex-col gap-4 text-sm font-medium">
-                                {(!event?.plan || event?.plan === 'Essencial') && (
+                                {(eventPlanId === 'essential') && (
                                    <div className="flex items-center gap-3 text-slate-600">
                                       <MessageSquare size={18} /> Via E-mail
                                    </div>
                                 )}
-                                {event?.plan === 'Premium' && (
+                                {(eventPlanId === 'premium' || eventPlanId === 'vip') && (
                                    <div className="flex items-center gap-3 text-[#BF9B30]">
                                       <MessageSquare size={18} /> WhatsApp Prioritário
                                    </div>
                                 )}
-                                {(event?.plan === 'Business' || event?.plan === 'Corporate') && (
+                                {isBusinessPlan && (
                                    <div className="flex items-center gap-3 text-brand-blue">
                                       <Users size={18} /> Gestor de Conta Dedicado
                                    </div>

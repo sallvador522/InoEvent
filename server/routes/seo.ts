@@ -49,7 +49,7 @@ router.get('/plans', async (req, res, next) => {
         <h2>Plano Essencial</h2>
         <p>Preço: 7.500 Kz (Pagamento único por evento). Validade 90 dias. Até 100 convidados. Inclui: RSVP, Código QR Exclusivo, Galeria Básica, Mapa da zona com botão Como chegar, Localização, Countdown.</p>
         <h2>Plano Premium</h2>
-        <p>Preço: 15.000 Kz (Pagamento único por evento). Validade 180 dias. Até 300 convidados. Inclui: tudo do Essencial + convidados individualizados, galeria premium, música, livro de assinaturas, mapa das mesas, temas premium, remoção da marca, analytics básicos.</p>
+        <p>Preço: 15.000 Kz (Pagamento único por evento). Validade 180 dias. Até 300 convidados. Inclui: tudo do Essencial + convidados individualizados, galeria premium, música, livro de assinaturas, mapa das mesas, remoção da marca, analytics básicos.</p>
         <h2>Plano VIP</h2>
         <p>Preço: 25.000 Kz (Pagamento único por evento). Validade 365 dias. Até 700 convidados. Inclui: tudo do Premium + QR individual, check-in, gestão +1, mesas avançadas, analytics avançados, personalização avançada, suporte prioritário.</p>
         <h2>Concierge (Add-on)</h2>
@@ -134,8 +134,36 @@ router.get('/invite/:id', async (req, res, next) => {
         eventDesc = `Você está a ser convidado para o evento "${eventData.title}". Confirme sua presença e confira todos os detalhes!${venueSuffix}${mapSuffix}`;
       }
       
-      // Determine the image to display
-      let eventImage = 'https://www.inoevent.online/inoOG.jpg';
+      // Determine the image to display — capa do evento (heroImage) com fallback para a marca.
+      // Nota: data:/blob: (uploads em base64 no Firestore) não servem para scrapers → fallback.
+      const FALLBACK_OG_IMAGE = 'https://www.inoevent.online/inoOG.png';
+      const toAbsoluteCoverUrl = (img: unknown): string | null => {
+        let src = '';
+        if (typeof img === 'string') src = img;
+        else if (img && typeof img === 'object' && typeof (img as any).url === 'string') src = (img as any).url;
+        src = (src || '').trim();
+        if (!src || src.startsWith('data:') || src.startsWith('blob:')) return null;
+        if (src.startsWith('/')) return `https://www.inoevent.online${src}`;
+        if (/^https?:\/\//i.test(src)) {
+          if (src.includes('images.unsplash.com')) {
+            try {
+              const u = new URL(src);
+              u.searchParams.set('w', '1200');
+              u.searchParams.set('q', '80');
+              u.searchParams.set('auto', 'format');
+              u.searchParams.set('fit', 'crop');
+              return u.toString();
+            } catch {
+              return src;
+            }
+          }
+          return src;
+        }
+        return null;
+      };
+      const eventImage = toAbsoluteCoverUrl((eventData as any).heroImage) || FALLBACK_OG_IMAGE;
+      const isFallbackCover = eventImage === FALLBACK_OG_IMAGE;
+      const coverAlt = `${eventTitle} | InoEvents`.replace(/"/g, '&quot;');
       
       const eventUrl = `https://www.inoevent.online/invite/${id}`;
       
@@ -143,16 +171,25 @@ router.get('/invite/:id', async (req, res, next) => {
       html = html.replace(/<title>[^<]*<\/title>/g, `<title>${eventTitle} | InoEvents</title>`);
       html = html.replace(/<meta name="description" content="[^"]*"\s*\/?>/g, `<meta name="description" content="${eventDesc.replace(/"/g, '&quot;')}" />`);
       
-      // Replace Open Graph / Facebook tags
+      // Replace Open Graph / Facebook tags (capa dinâmica; dimensões só na imagem padrão)
       html = html.replace(/<meta property="og:title" content="[^"]*"\s*\/?>/g, `<meta property="og:title" content="${eventTitle.replace(/"/g, '&quot;')}" />`);
       html = html.replace(/<meta property="og:description" content="[^"]*"\s*\/?>/g, `<meta property="og:description" content="${eventDesc.replace(/"/g, '&quot;')}" />`);
       html = html.replace(/<meta property="og:image" content="[^"]*"\s*\/?>/g, `<meta property="og:image" content="${eventImage}" />`);
+      if (isFallbackCover) {
+        if (!/<meta property="og:image:width"/.test(html)) {
+          html = html.replace(/(<meta property="og:image" content="[^"]*"\s*\/?>)/, `$1<meta property="og:image:width" content="1424" /><meta property="og:image:height" content="752" />`);
+        }
+      } else {
+        html = html.replace(/<meta property="og:image:(width|height)"[^>]*\/?>/g, '');
+      }
+      html = html.replace(/<meta property="og:image:alt" content="[^"]*"\s*\/?>/g, `<meta property="og:image:alt" content="${coverAlt}" />`);
       html = html.replace(/<meta property="og:url" content="[^"]*"\s*\/?>/g, `<meta property="og:url" content="${eventUrl}" />`);
       
       // Replace Twitter tags
       html = html.replace(/<meta name="twitter:title" content="[^"]*"\s*\/?>/g, `<meta name="twitter:title" content="${eventTitle.replace(/"/g, '&quot;')}" />`);
       html = html.replace(/<meta name="twitter:description" content="[^"]*"\s*\/?>/g, `<meta name="twitter:description" content="${eventDesc.replace(/"/g, '&quot;')}" />`);
       html = html.replace(/<meta name="twitter:image" content="[^"]*"\s*\/?>/g, `<meta name="twitter:image" content="${eventImage}" />`);
+      html = html.replace(/<meta name="twitter:image:alt" content="[^"]*"\s*\/?>/g, `<meta name="twitter:image:alt" content="${coverAlt}" />`);
     }
     
     res.setHeader('Content-Type', 'text/html');

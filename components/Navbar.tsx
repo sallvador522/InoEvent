@@ -1,6 +1,7 @@
 import React, { useState, useEffect } from 'react';
-import { Link, useNavigate } from 'react-router-dom';
+import { Link, useNavigate, useLocation } from 'react-router-dom';
 import { motion, AnimatePresence } from 'framer-motion';
+import toast from 'react-hot-toast';
 import { useFirebase, signOut, auth, db, handleFirestoreError, OperationType } from './FirebaseProvider';
 import { collection, query, where, getDocs, onSnapshot, orderBy, doc, updateDoc, deleteDoc } from 'firebase/firestore';
 import { normalizePlanId, getPlanConfig } from '../lib/entitlements';
@@ -10,9 +11,13 @@ export const Navbar: React.FC = () => {
   const [dashboardOpen, setDashboardOpen] = useState(false);
   const { user, userProfile, isOnline } = useFirebase();
   const [userEvents, setUserEvents] = useState<any[]>([]);
+  const [isEventsLoading, setIsEventsLoading] = useState(false);
   const [notifications, setNotifications] = useState<any[]>([]);
   const [notificationsOpen, setNotificationsOpen] = useState(false);
+  const [pendingNotifId, setPendingNotifId] = useState<string | null>(null);
+  const [isMarkingAll, setIsMarkingAll] = useState(false);
   const navigate = useNavigate();
+  const location = useLocation();
   const mobileMenuRef = React.useRef<HTMLDivElement>(null);
 
   // Lock body scroll and force scroll position of mobile drawer to the top on open
@@ -38,6 +43,46 @@ export const Navbar: React.FC = () => {
   const accountPlanId = normalizePlanId(userProfile?.plan);
   const accountPlanName = userProfile ? getPlanConfig(accountPlanId).name : '…';
   const isBusinessAccount = accountPlanId === 'business';
+
+  // Sair leva sempre ao início (sem piscar conteúdo protegido)
+  const handleSignOut = async () => {
+    try {
+      await signOut(auth);
+    } catch {
+      /* best-effort */
+    } finally {
+      setMobileMenuOpen(false);
+      navigate('/');
+    }
+  };
+
+  // Âncoras da landing em SPA: scroll direto em /, navega+scroll fora dela
+  const goToSection = (sectionId: string) => {
+    setMobileMenuOpen(false);
+    const doScroll = () => {
+      requestAnimationFrame(() => {
+        setTimeout(() => {
+          document.getElementById(sectionId)?.scrollIntoView({ behavior: 'smooth', block: 'start' });
+        }, 80);
+      });
+    };
+    if (location.pathname === '/') {
+      doScroll();
+    } else {
+      navigate('/');
+      setTimeout(doScroll, 450);
+    }
+  };
+
+  // Eventos ordenados (mais recentes primeiro) + selo de estado
+  const sortedEvents = [...userEvents].sort((a, b) =>
+    String(b.createdAt || b.updatedAt || '').localeCompare(String(a.createdAt || a.updatedAt || ''))
+  );
+  const eventStatus = (e: any): 'draft' | 'expired' | null => {
+    if (e.isPublished === false && e.billingStatus !== 'paid') return 'draft';
+    if (e.expiresAt && new Date(e.expiresAt) <= new Date()) return 'expired';
+    return null;
+  };
 
   useEffect(() => {
     if (!user) {
@@ -65,30 +110,61 @@ export const Navbar: React.FC = () => {
 
   const handleMarkAsRead = async (notifId: string, e: React.MouseEvent) => {
     e.stopPropagation();
-    if (!user) return;
+    if (!user || pendingNotifId) return;
+    setPendingNotifId(notifId);
     try {
       await updateDoc(doc(db, 'users', user.uid, 'notifications', notifId), { read: true });
     } catch(err) {
       console.error("Failed to mark notification as read", err);
+      toast.error("Falha ao marcar. Tenta de novo.");
+    } finally {
+      setPendingNotifId(null);
+    }
+  };
+
+  const handleMarkAllAsRead = async (e: React.MouseEvent) => {
+    e.stopPropagation();
+    if (!user || isMarkingAll) return;
+    const unread = notifications.filter((n) => !n.read);
+    if (unread.length === 0) return;
+    setIsMarkingAll(true);
+    try {
+      const { writeBatch } = await import('firebase/firestore');
+      const batch = writeBatch(db);
+      unread.forEach((n) => batch.update(doc(db, 'users', user.uid, 'notifications', n.id), { read: true }));
+      await batch.commit();
+      toast.success("Todas marcadas como lidas!");
+    } catch(err) {
+      console.error("Failed to mark all as read", err);
+      toast.error("Falha ao marcar. Tenta de novo.");
+    } finally {
+      setIsMarkingAll(false);
     }
   };
 
   const handleDeleteNotification = async (notifId: string, e: React.MouseEvent) => {
     e.stopPropagation();
-    if (!user) return;
+    if (!user || pendingNotifId) return;
+    setPendingNotifId(notifId);
     try {
       await deleteDoc(doc(db, 'users', user.uid, 'notifications', notifId));
+      toast.success("Notificação eliminada!");
     } catch(err) {
       console.error("Failed to delete notification", err);
+      toast.error("Falha ao eliminar.");
+    } finally {
+      setPendingNotifId(null);
     }
   };
 
-  useEffect(() => {
+    useEffect(() => {
     if (!user) {
       setUserEvents([]);
+      setIsEventsLoading(false);
       return;
     }
-    
+
+    setIsEventsLoading(true);
     try {
       const eventsRef = collection(db, 'events');
       const q = query(eventsRef, where("ownerId", "==", user.uid));
@@ -99,7 +175,9 @@ export const Navbar: React.FC = () => {
           id: doc.id
         }));
         setUserEvents(eventsList);
+        setIsEventsLoading(false);
       }, (error: any) => {
+        setIsEventsLoading(false);
         // Suppress missing permissions error during development if rule not exist
         if(error.message.includes("Missing or insufficient permissions")) {
             console.warn("Firestore rules test or missing index error, ignore if dev", error);
@@ -152,34 +230,52 @@ export const Navbar: React.FC = () => {
 
         {/* Desktop Navigation */}
         <div className="hidden md:flex items-center gap-8 text-sm font-medium text-blue-100">
-           <a href="/#features" className="hover:text-white transition-colors">Funcionalidades</a>
+           <button onClick={() => goToSection('features')} className="hover:text-white transition-colors cursor-pointer">Funcionalidades</button>
            <Link to="/plans" className="hover:text-white transition-colors">Preços</Link>
            <a href="https://wa.me/244952815430" target="_blank" rel="noopener noreferrer" className="hover:text-white transition-colors">Contactos</a>
-           <a href="/#faq" className="hover:text-white transition-colors">Perguntas</a>
+           <button onClick={() => goToSection('faq')} className="hover:text-white transition-colors cursor-pointer">Perguntas</button>
            <Link to="/about" className="hover:text-white transition-colors">Sobre Nós</Link>
            
            <div className="flex items-center gap-6 pl-2">
              <span className="text-white/20 text-lg font-light select-none">|</span>
              {user ? (
                <div className="flex items-center gap-4 relative group">
-                  <span className="cursor-pointer font-semibold text-white flex items-center gap-1 hover:text-blue-200 transition-colors">
+                  <button
+                    onClick={() => navigate('/dashboard')}
+                    className="cursor-pointer font-semibold text-white flex items-center gap-1 hover:text-blue-200 transition-colors"
+                    aria-haspopup="true"
+                    title="Ir para Meus Eventos"
+                  >
                     Meus Eventos <span className="material-symbols-outlined text-sm transition-transform group-hover:rotate-180">expand_more</span>
-                  </span>
+                  </button>
                   
                   {/* Dropdown Desktop */}
-                  <div className="absolute top-full right-0 mt-2 w-64 bg-white rounded-xl shadow-xl border border-slate-100 opacity-0 invisible group-hover:opacity-100 group-hover:visible transition-all duration-200 flex flex-col overflow-hidden">
-                     {userEvents.length > 0 ? (
+                  <div className="absolute top-full right-0 mt-2 w-64 bg-white rounded-xl shadow-xl border border-slate-100 opacity-0 invisible group-hover:opacity-100 group-hover:visible group-focus-within:opacity-100 group-focus-within:visible transition-all duration-200 flex flex-col overflow-hidden">
+                     {isEventsLoading ? (
+                        <div className="p-4 space-y-2.5 animate-pulse" aria-hidden="true">
+                           {[1, 2, 3].map((i) => (
+                             <div key={i} className="h-5 bg-slate-100 rounded-lg" />
+                           ))}
+                        </div>
+                     ) : sortedEvents.length > 0 ? (
                         <>
                           <div className="flex flex-col max-h-80 overflow-y-auto w-full max-w-full overflow-hidden">
-                            {[...userEvents].reverse().slice(0, 3).map(event => (
-                              <Link to={`/dashboard/${event.id}`} key={event.id} className="px-4 py-3 hover:bg-slate-50 text-slate-700 hover:text-brand-blue truncate font-medium text-sm transition-colors border-b border-slate-50 last:border-0 block w-full">
-                                {event.title}
-                              </Link>
-                            ))}
+                            {sortedEvents.slice(0, 3).map(event => {
+                              const st = eventStatus(event);
+                              return (
+                                <Link to={`/dashboard/${event.id}`} key={event.id} className="px-4 py-3 hover:bg-slate-50 text-slate-700 hover:text-brand-blue truncate font-medium text-sm transition-colors border-b border-slate-50 last:border-0 block w-full">
+                                  <span className="flex items-center gap-2">
+                                    {st === 'draft' && <span className="w-1.5 h-1.5 rounded-full bg-amber-400 shrink-0" title="Rascunho" />}
+                                    {st === 'expired' && <span className="w-1.5 h-1.5 rounded-full bg-red-400 shrink-0" title="Expirado" />}
+                                    <span className="truncate">{event.title}</span>
+                                  </span>
+                                </Link>
+                              );
+                            })}
                           </div>
-                          {userEvents.length > 3 && (
+                          {sortedEvents.length > 3 && (
                             <Link to="/dashboard" className="px-4 py-3 text-primary text-center font-bold text-xs hover:bg-slate-50 transition-colors uppercase tracking-wider bg-slate-50/50 block w-full">
-                              Ver todos os eventos ({userEvents.length})
+                              Ver todos os eventos ({sortedEvents.length})
                             </Link>
                           )}
                         </>
@@ -226,14 +322,13 @@ export const Navbar: React.FC = () => {
                               </span>
                               {notifications.filter(n => !n.read).length > 0 && (
                                 <button 
-                                  onClick={async (e) => {
-                                    e.stopPropagation();
-                                    for(const n of notifications.filter(notif => !notif.read)) {
-                                      await updateDoc(doc(db, 'users', user.uid, 'notifications', n.id), { read: true });
-                                    }
-                                  }}
-                                  className="text-[10px] font-bold text-brand-blue hover:underline uppercase tracking-wider cursor-pointer"
+                                  onClick={handleMarkAllAsRead}
+                                  disabled={isMarkingAll}
+                                  className="text-[10px] font-bold text-brand-blue hover:underline disabled:opacity-60 uppercase tracking-wider cursor-pointer inline-flex items-center gap-1"
                                 >
+                                  {isMarkingAll ? (
+                                    <span className="w-3 h-3 border-2 border-blue-200 border-t-brand-blue rounded-full animate-spin" aria-hidden="true" />
+                                  ) : null}
                                   Lidas
                                 </button>
                               )}
@@ -256,22 +351,32 @@ export const Navbar: React.FC = () => {
                                     </div>
                                     <p className="text-slate-500 text-[11px] leading-relaxed mt-1">{n.message}</p>
                                     
-                                    <div className="absolute right-2 top-1/2 -translate-y-1/2 opacity-0 group-hover:opacity-100 transition-all flex items-center gap-1 bg-white/90 backdrop-blur p-1 rounded-lg border border-slate-100 shadow-sm shadow-brand-blue/5">
+                                    <div className="absolute right-2 top-1/2 -translate-y-1/2 opacity-0 group-hover:opacity-100 group-focus-within:opacity-100 transition-all flex items-center gap-1 bg-white/90 backdrop-blur p-1 rounded-lg border border-slate-100 shadow-sm shadow-brand-blue/5">
                                       {!n.read && (
                                         <button 
                                           onClick={(e) => handleMarkAsRead(n.id, e)} 
-                                          className="p-1 hover:bg-blue-50 text-brand-blue rounded flex items-center justify-center transition-colors cursor-pointer"
+                                          disabled={pendingNotifId === n.id}
+                                          className="p-1 hover:bg-blue-50 text-brand-blue disabled:opacity-60 rounded flex items-center justify-center transition-colors cursor-pointer"
                                           title="Marcar como lida"
                                         >
-                                          <span className="material-symbols-outlined text-[13px]">done</span>
+                                          {pendingNotifId === n.id ? (
+                                            <span className="w-3 h-3 border-2 border-blue-200 border-t-brand-blue rounded-full animate-spin block" aria-hidden="true" />
+                                          ) : (
+                                            <span className="material-symbols-outlined text-[13px]">done</span>
+                                          )}
                                         </button>
                                       )}
                                       <button 
                                         onClick={(e) => handleDeleteNotification(n.id, e)} 
-                                        className="p-1 hover:bg-red-50 text-red-500 rounded flex items-center justify-center transition-colors cursor-pointer"
+                                        disabled={pendingNotifId === n.id}
+                                        className="p-1 hover:bg-red-50 text-red-500 disabled:opacity-60 rounded flex items-center justify-center transition-colors cursor-pointer"
                                         title="Eliminar"
                                       >
-                                        <span className="material-symbols-outlined text-[13px]">delete</span>
+                                        {pendingNotifId === n.id ? (
+                                          <span className="w-3 h-3 border-2 border-slate-200 border-t-red-400 rounded-full animate-spin block" aria-hidden="true" />
+                                        ) : (
+                                          <span className="material-symbols-outlined text-[13px]">delete</span>
+                                        )}
                                       </button>
                                     </div>
                                   </div>
@@ -283,6 +388,12 @@ export const Navbar: React.FC = () => {
                                 </div>
                               )}
                             </div>
+                            <button
+                              onClick={() => { setNotificationsOpen(false); navigate('/dashboard'); }}
+                              className="w-full py-3 text-center text-[11px] font-bold uppercase tracking-wider text-brand-blue hover:bg-slate-50 border-t border-slate-100 transition-colors cursor-pointer"
+                            >
+                              Ver todas no painel
+                            </button>
                           </motion.div>
                         </>
                       )}
@@ -296,7 +407,7 @@ export const Navbar: React.FC = () => {
                     </Link>
                   )}
 
-                  <button onClick={() => signOut(auth)} className="hover:text-red-400 transition-colors font-semibold text-white ml-4">Sair</button>
+                  <button onClick={handleSignOut} className="hover:text-red-400 transition-colors font-semibold text-white ml-4 cursor-pointer">Sair</button>
                </div>
              ) : (
                <Link to="/auth" className="hover:text-primary transition-colors font-semibold text-white">Entrar</Link>
@@ -341,12 +452,31 @@ export const Navbar: React.FC = () => {
                         <span className="font-bold text-xs text-slate-800 flex items-center gap-1">
                           Notificações
                         </span>
+                        {notifications.filter(n => !n.read).length > 0 && (
+                          <button
+                            onClick={handleMarkAllAsRead}
+                            disabled={isMarkingAll}
+                            className="text-[10px] font-bold text-brand-blue uppercase tracking-wider disabled:opacity-60 inline-flex items-center gap-1"
+                          >
+                            {isMarkingAll ? (
+                              <span className="w-3 h-3 border-2 border-blue-200 border-t-brand-blue rounded-full animate-spin" aria-hidden="true" />
+                            ) : null}
+                            Lidas
+                          </button>
+                        )}
                       </div>
                       <div className="max-h-56 overflow-y-auto divide-y divide-slate-100">
                         {notifications.length > 0 ? (
                           notifications.map((n) => (
-                            <div key={n.id} className="p-3 hover:bg-slate-50 relative group flex flex-col">
-                              <span className="font-bold text-xs text-brand-blue">{n.title}</span>
+                            <div
+                              key={n.id}
+                              onClick={(e) => { if (!n.read) handleMarkAsRead(n.id, e); }}
+                              className="p-3 hover:bg-slate-50 relative group flex flex-col cursor-pointer"
+                            >
+                              <span className={`font-bold text-xs ${!n.read ? 'text-brand-blue' : 'text-slate-600'}`}>
+                                {n.title}
+                                {pendingNotifId === n.id && <span className="ml-1.5 inline-block w-3 h-3 border-2 border-slate-200 border-t-brand-blue rounded-full animate-spin align-middle" aria-hidden="true" />}
+                              </span>
                               <p className="text-slate-500 text-[10px] mt-0.5">{n.message}</p>
                             </div>
                           ))
@@ -354,6 +484,12 @@ export const Navbar: React.FC = () => {
                           <div className="py-6 text-center text-slate-400 text-xs">Nenhuma notificação</div>
                         )}
                       </div>
+                      <button
+                        onClick={() => { setNotificationsOpen(false); setMobileMenuOpen(false); navigate('/dashboard'); }}
+                        className="w-full py-2.5 text-center text-[10px] font-bold uppercase tracking-wider text-brand-blue hover:bg-slate-50 border-t border-slate-100 transition-colors cursor-pointer"
+                      >
+                        Ver todas no painel
+                      </button>
                     </motion.div>
                   </>
                 )}
@@ -434,14 +570,30 @@ export const Navbar: React.FC = () => {
                         className="overflow-hidden w-full"
                       >
                         <div className="flex flex-col gap-3 ml-[38px] bg-slate-50 p-4 rounded-2xl text-base font-medium border border-slate-100 max-h-60 overflow-y-auto w-[calc(100%-38px)]">
-                          {userEvents.length > 0 ? (
-                            <>
-                              {[...userEvents].reverse().slice(0, 3).map(event => (
-                                <Link to={`/dashboard/${event.id}`} key={event.id} onClick={() => setMobileMenuOpen(false)} className="hover:text-primary truncate text-slate-600 block py-1 w-full">
-                                  {event.title}
-                                </Link>
+                          <Link to="/dashboard" onClick={() => setMobileMenuOpen(false)} className="text-brand-blue font-bold truncate block py-1 w-full">
+                            Gerir eventos
+                          </Link>
+                          {isEventsLoading ? (
+                            <div className="space-y-2.5 animate-pulse" aria-hidden="true">
+                              {[1, 2, 3].map((i) => (
+                                <div key={i} className="h-4 bg-slate-200 rounded-lg" />
                               ))}
-                              {userEvents.length > 3 && (
+                            </div>
+                          ) : sortedEvents.length > 0 ? (
+                            <>
+                              {sortedEvents.slice(0, 3).map(event => {
+                                const st = eventStatus(event);
+                                return (
+                                  <Link to={`/dashboard/${event.id}`} key={event.id} onClick={() => setMobileMenuOpen(false)} className="hover:text-primary truncate text-slate-600 block py-1 w-full">
+                                    <span className="inline-flex items-center gap-1.5">
+                                      {st === 'draft' && <span className="w-1.5 h-1.5 rounded-full bg-amber-400 shrink-0" />}
+                                      {st === 'expired' && <span className="w-1.5 h-1.5 rounded-full bg-red-400 shrink-0" />}
+                                      <span className="truncate">{event.title}</span>
+                                    </span>
+                                  </Link>
+                                );
+                              })}
+                              {sortedEvents.length > 3 && (
                                 <Link to="/dashboard" onClick={() => setMobileMenuOpen(false)} className="text-primary mt-2 flex items-center gap-1 font-bold truncate">
                                   Ver todos <span className="material-symbols-outlined text-sm">arrow_forward</span>
                                 </Link>
@@ -471,10 +623,10 @@ export const Navbar: React.FC = () => {
                   </Link>
               )}
               
-              <a href="/#features" onClick={() => setMobileMenuOpen(false)} className="hover:text-primary transition-colors flex items-center justify-between">
+              <button onClick={() => goToSection('features')} className="hover:text-primary transition-colors flex items-center justify-between w-full text-left cursor-pointer">
                 <span className="flex items-center gap-3"><span className="material-symbols-outlined text-slate-400">favorite</span> Funcionalidades</span>
                 <span className="material-symbols-outlined text-slate-300">chevron_right</span>
-              </a>
+              </button>
               <Link to="/about" onClick={() => setMobileMenuOpen(false)} className="hover:text-primary transition-colors flex items-center justify-between">
                 <span className="flex items-center gap-3"><span className="material-symbols-outlined text-slate-400">info</span> Sobre Nós</span>
                 <span className="material-symbols-outlined text-slate-300">chevron_right</span>
@@ -498,9 +650,9 @@ export const Navbar: React.FC = () => {
                             <span className="text-xs text-slate-500 font-medium whitespace-nowrap">Plano {accountPlanName}</span>
                          </div>
                        </div>
-                       <button onClick={() => { signOut(auth); setMobileMenuOpen(false); }} className="text-red-500 bg-red-50 w-10 h-10 flex-shrink-0 flex items-center justify-center rounded-xl hover:bg-red-100 transition-colors">
-                         <span className="material-symbols-outlined text-xl">logout</span>
-                       </button>
+                        <button onClick={handleSignOut} className="text-red-500 bg-red-50 w-10 h-10 flex-shrink-0 flex items-center justify-center rounded-xl hover:bg-red-100 transition-colors" title="Sair">
+                          <span className="material-symbols-outlined text-xl">logout</span>
+                        </button>
                      </div>
                      <button 
                        onClick={() => { setMobileMenuOpen(false); handleCreateEvent(); }} 

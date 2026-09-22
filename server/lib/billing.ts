@@ -62,9 +62,32 @@ export async function getOrder(orderId: string): Promise<Order | null> {
 
 export async function getOrderByEvent(eventId: string): Promise<Order | null> {
   const db = getDb();
-  const q = await db.collection('orders').where('eventId', '==', eventId).limit(1).get();
+  // Sem orderBy (evita índice composto): ordena em código, devolve o mais recente
+  const q = await db.collection('orders').where('eventId', '==', eventId).get();
   if (q.empty) return null;
-  return q.docs[0].data() as Order;
+  const sorted = q.docs
+    .map((d) => d.data() as Order)
+    .sort((a, b) => String(b.createdAt || '').localeCompare(String(a.createdAt || '')));
+  return sorted[0] || null;
+}
+
+/** Reaproveita pedido pendente ao trocar de plano (1 pendente por evento, sem duplicados). */
+export async function repurposePendingOrder(orderId: string, plan: PlanId): Promise<Order | null> {
+  const db = getDb();
+  const ref = db.collection('orders').doc(orderId);
+  const snap = await ref.get();
+  if (!snap.exists) return null;
+  const order = snap.data() as Order;
+  if (order.billingStatus !== 'pending') return null;
+  const total = calculateOrderTotal(plan, (order.addons as any) || {});
+  const patch = {
+    plan,
+    subtotal: PLANS[plan].price,
+    total,
+    amount: total,
+  } as any;
+  await ref.update(patch);
+  return { ...order, ...patch } as Order;
 }
 
 export async function listOrdersByUser(userId: string): Promise<Order[]> {

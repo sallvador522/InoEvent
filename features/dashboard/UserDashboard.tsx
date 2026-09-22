@@ -241,8 +241,10 @@ export const UserDashboard: React.FC = () => {
     }
   };
 
-  const isPartner =
-    userProfile?.plan === "Business" || userProfile?.plan === "Corporate";
+  // Plano normalizado (Firestore grava minúsculas) — usar SEMPRE isto em vez de literais
+  const accountPlanId = normalizePlanId(userProfile?.plan);
+  const isBusinessAccount = accountPlanId === 'business';
+  const isPremiumAccount = accountPlanId === 'premium' || accountPlanId === 'vip';
 
   if (loading) {
     return (
@@ -318,10 +320,9 @@ export const UserDashboard: React.FC = () => {
         <div className="mb-10">
           <div
             className={`p-6 rounded-3xl border flex flex-col md:flex-row items-center justify-between gap-6 transition-all ${
-              userProfile?.plan === "Premium"
+              isPremiumAccount
                 ? "bg-gradient-to-r from-amber-500/10 via-amber-600/5 to-transparent border-amber-500/20 shadow-sm"
-                : userProfile?.plan === "Business" ||
-                    userProfile?.plan === "Corporate"
+                : isBusinessAccount
                   ? "bg-gradient-to-r from-slate-900 via-slate-800 to-slate-900 border-slate-800 text-white shadow-xl shadow-slate-950/10"
                   : "bg-gradient-to-r from-blue-50/50 via-slate-50 to-transparent border-slate-200 shadow-sm"
             }`}
@@ -329,18 +330,16 @@ export const UserDashboard: React.FC = () => {
             <div className="flex flex-col md:flex-row items-start md:items-center gap-4 text-left w-full">
               <div
                 className={`w-12 h-12 rounded-2xl flex items-center justify-center shrink-0 shadow-inner ${
-                  userProfile?.plan === "Premium"
+                  isPremiumAccount
                     ? "bg-amber-100 text-amber-600"
-                    : userProfile?.plan === "Business" ||
-                        userProfile?.plan === "Corporate"
+                    : isBusinessAccount
                       ? "bg-white/10 text-amber-400 border border-white/10"
                       : "bg-blue-50 text-brand-blue"
                 }`}
               >
-                {userProfile?.plan === "Premium" ? (
+                {isPremiumAccount ? (
                   <Sparkles size={22} className="animate-pulse" />
-                ) : userProfile?.plan === "Business" ||
-                  userProfile?.plan === "Corporate" ? (
+                ) : isBusinessAccount ? (
                   <Award size={22} />
                 ) : (
                   <Zap size={22} />
@@ -353,15 +352,14 @@ export const UserDashboard: React.FC = () => {
                   </span>
                   <span
                     className={`text-[10px] font-bold uppercase px-2.5 py-0.5 rounded-full ${
-                      userProfile?.plan === "Premium"
+                      isPremiumAccount
                         ? "bg-amber-500/10 text-amber-700 border border-amber-500/10"
-                        : userProfile?.plan === "Business" ||
-                            userProfile?.plan === "Corporate"
+                        : isBusinessAccount
                           ? "bg-blue-500/20 text-blue-300 border border-blue-500/10"
                           : "bg-slate-200/50 text-slate-600 border border-slate-200"
                     }`}
                   >
-                    Plano {userProfile?.plan || "Essencial"}
+                    Plano {userProfile ? getPlanConfig(accountPlanId).name : "…"}
                   </span>
                   {userProfile?.planExpiresAt && (
                     <span className="text-[10px] font-bold uppercase tracking-widest text-brand-blue/80 hidden sm:inline">
@@ -375,35 +373,31 @@ export const UserDashboard: React.FC = () => {
                 </div>
                 <h3
                   className={`text-lg font-serif font-bold mt-1 ${
-                    userProfile?.plan === "Business" ||
-                    userProfile?.plan === "Corporate"
+                    isBusinessAccount
                       ? "text-white"
                       : "text-slate-800"
                   }`}
                 >
-                  {userProfile?.plan === "Premium"
+                  {isPremiumAccount
                     ? "Seu Evento Sem Limites com Elegância Absoluta"
-                    : userProfile?.plan === "Business" ||
-                        userProfile?.plan === "Corporate"
+                    : isBusinessAccount
                       ? "Cockpit de Agência de Eventos Activado"
                       : "Crie Convites Digitais Interativos Clássicos"}
                 </h3>
                 <p
                   className={`text-xs mt-1 leading-relaxed max-w-2xl ${
-                    userProfile?.plan === "Business" ||
-                    userProfile?.plan === "Corporate"
+                    isBusinessAccount
                       ? "text-slate-350"
                       : "text-slate-500 font-medium"
                   }`}
                 >
-                  {userProfile?.plan === "Business" ||
-                   userProfile?.plan === "Corporate"
+                  {isBusinessAccount
                       ? "Como parceiro certificado, usufrua de marcas brancas (white-label) dedicadas e criação de eventos ilimitados."
                       : "Pague apenas pelo evento que realizar. Crie convites com RSVP e design Premium sem subscrições mensais chatas."}
                 </p>
               </div>
             </div>
-            {(!userProfile?.plan || userProfile?.plan === "Essencial" || userProfile?.plan === "Free") && (
+            {(accountPlanId === 'essential' || accountPlanId === 'free') && (
               <Button
                 onClick={() => navigate("/plans")}
                 className="bg-brand-blue hover:bg-brand-blue/90 text-white text-xs font-bold px-6 py-3 rounded-2xl shadow-lg shadow-brand-blue/15 hover:scale-[1.02] active:scale-95 transition-all outline-none cursor-pointer select-none whitespace-nowrap self-start md:self-center"
@@ -414,8 +408,7 @@ export const UserDashboard: React.FC = () => {
           </div>
         </div>
 
-        {(userProfile?.plan === "Business" ||
-          userProfile?.plan === "Corporate") && (
+        {isBusinessAccount && (
           <div className="mb-10 bg-gradient-to-r from-brand-blue to-blue-700 rounded-3xl p-8 flex flex-col md:flex-row items-center justify-between shadow-lg shadow-brand-blue/20">
             <div className="text-white mb-6 md:mb-0">
               <h2 className="text-2xl font-bold mb-2">Acessar Painel B2B</h2>

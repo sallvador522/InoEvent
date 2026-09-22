@@ -19,6 +19,7 @@ import { Navbar } from "../../components/Navbar";
 import { SEO } from "../../components/SEO";
 import toast from "react-hot-toast";
 import { PLANS, ADDONS } from "../../config/plans";
+import { normalizePlanId } from "../../lib/entitlements";
 import { trackPixelInitiateCheckout, trackPixelLead } from "../../lib/metaPixel";
 
 const plans = [
@@ -27,7 +28,7 @@ const plans = [
     name: "Essencial",
     subtitle: "Pagamento Único por Evento",
     prices: {
-      monthly: `${PLANS.essential.price.toLocaleString('pt-AO')} Kz`,
+      monthly: `${PLANS.essential.price.toLocaleString('pt-AO')}`,
       annual: "Válido por evento",
     },
     savings: `Activo durante ${PLANS.essential.validityDays} dias • Até ${PLANS.essential.guestLimit} convidados`,
@@ -47,7 +48,7 @@ const plans = [
     name: "Premium",
     subtitle: "Pagamento Único por Evento",
     prices: {
-      monthly: `${PLANS.premium.price.toLocaleString('pt-AO')} Kz`,
+      monthly: `${PLANS.premium.price.toLocaleString('pt-AO')}`,
       annual: "Válido por evento",
     },
     savings: `Activo durante ${PLANS.premium.validityDays} dias • Até ${PLANS.premium.guestLimit} convidados`,
@@ -71,7 +72,7 @@ const plans = [
     name: "VIP",
     subtitle: "Pagamento Único por Evento",
     prices: {
-      monthly: `${PLANS.vip.price.toLocaleString('pt-AO')} Kz`,
+      monthly: `${PLANS.vip.price.toLocaleString('pt-AO')}`,
       annual: "Válido por evento",
     },
     savings: `Activo durante ${PLANS.vip.validityDays} dias • Até ${PLANS.vip.guestLimit} convidados`,
@@ -95,7 +96,7 @@ const plans = [
     displayName: "Business (B2B)",
     subtitle: "Assinatura Mensal",
     prices: {
-      monthly: `${PLANS.business.price.toLocaleString('pt-AO')} Kz`,
+      monthly: `${PLANS.business.price.toLocaleString('pt-AO')}`,
       annual: "Por mês",
     },
     savings: "Eventos ilimitados • Faturado como SaaS",
@@ -140,6 +141,7 @@ export const PlansPage: React.FC = () => {
   const { user, userProfile } = useFirebase();
   const [searchParams] = useSearchParams();
   const activatingEventId = searchParams.get("eventId");
+  const fromShare = searchParams.get("from") === "share";
   const [activatingEventTitle, setActivatingEventTitle] = useState<string | null>(null);
   const [whatsappModal, setWhatsappModal] = useState<{
     name: string;
@@ -250,7 +252,7 @@ export const PlansPage: React.FC = () => {
 
     const messageText = whatsappModal.name === "Business"
       ? `Olá! Gostaria de subscrever ao Plano ${whatsappModal.name.toUpperCase()} para a minha agência.\n\nID da Plataforma: ${user.uid}\nE-mail: ${user.email || "Não informado"}${orderRef ? `\nEvento: ${activatingEventId || "—"}${orderRef}` : ""}\n\nEstou em contacto para concluir o pagamento do meu plano. Obrigado!`
-      : `Olá! Gostaria de comprar o Plano ${whatsappModal.name.toUpperCase()} por ${whatsappModal.price}.\n\nID da Plataforma: ${user.uid}\nE-mail: ${user.email || "Não informado"}${orderRef ? `\nEvento: ${activatingEventId || "—"}${orderRef}` : ""}\n\nEstou em contacto para concluir o pagamento do meu plano. Obrigado!`;
+      : `Olá! Gostaria de comprar o Plano ${whatsappModal.name.toUpperCase()} por ${whatsappModal.price} Kz.\n\nID da Plataforma: ${user.uid}\nE-mail: ${user.email || "Não informado"}${orderRef ? `\nEvento: ${activatingEventId || "—"}${orderRef}` : ""}\n\nEstou em contacto para concluir o pagamento do meu plano. Obrigado!`;
 
     const cleanNumber = whatsappNumber.replace(/\D/g, "");
     const url = `https://wa.me/${cleanNumber}?text=${encodeURIComponent(messageText)}`;
@@ -294,7 +296,8 @@ export const PlansPage: React.FC = () => {
     }
   };
 
-  const currentPlan = userProfile?.plan || "Essencial";
+  // Plano real da conta (sem máscara) — 'free' quando a carregar/ainda sem perfil
+  const currentPlanId = normalizePlanId(userProfile?.plan);
 
   return (
     <div className="min-h-screen bg-[#FDFBF7] font-display text-slate-900 relative overflow-x-hidden flex flex-col">
@@ -350,7 +353,9 @@ export const PlansPage: React.FC = () => {
           {activatingEventTitle && (
             <div className="mt-6 inline-flex items-center gap-2 bg-[#1B365D] text-white text-sm font-bold px-5 py-3 rounded-full shadow-lg">
               <span className="w-2 h-2 rounded-full bg-[#C5A028] animate-pulse" />
-              A ativar: “{activatingEventTitle}” — escolhe o plano abaixo
+              {fromShare
+                ? `Para partilhar “${activatingEventTitle}”, ativa um plano abaixo`
+                : `A ativar: “${activatingEventTitle}” — escolhe o plano abaixo`}
             </div>
           )}
         </motion.div>
@@ -362,7 +367,7 @@ export const PlansPage: React.FC = () => {
           className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-4 items-stretch justify-center gap-6 max-w-6xl mx-auto"
         >
           {plans.map((plan) => {
-            const isCurrentPlan = currentPlan && (currentPlan.toLowerCase() === plan.name.toLowerCase() || (plan as any).id && currentPlan.toLowerCase() === (plan as any).id);
+            const isCurrentPlan = currentPlanId === normalizePlanId(plan.name) || ((plan as any).id && currentPlanId === normalizePlanId((plan as any).id));
             const isHighlighted = !!plan.popular;
             const ctaLabel = isCurrentPlan
               ? "Plano atual"
@@ -546,7 +551,7 @@ export const PlansPage: React.FC = () => {
                     Valor
                   </span>
                   <span className="text-xs font-bold text-slate-900">
-                    {whatsappModal.price}
+                    {whatsappModal.price} Kz
                   </span>
                 </div>
                 <div className="flex justify-between items-center gap-3 pt-0.5">
@@ -573,7 +578,7 @@ export const PlansPage: React.FC = () => {
                 </p>
 
                 <button
-                  onClick={() => handleOpenWhatsApp("952815430")}
+                  onClick={() => handleOpenWhatsApp("244952815430")}
                   className="w-full bg-emerald-600 hover:bg-emerald-700 text-white rounded-full py-3.5 px-5 font-bold text-xs uppercase tracking-wider transition-all duration-200 flex items-center justify-between select-none cursor-pointer active:scale-[0.98]"
                 >
                   <span className="flex items-center gap-2">
@@ -586,7 +591,7 @@ export const PlansPage: React.FC = () => {
                 </button>
 
                 <button
-                  onClick={() => handleOpenWhatsApp("939384315")}
+                  onClick={() => handleOpenWhatsApp("244939384315")}
                   className="w-full bg-emerald-600 hover:bg-emerald-700 text-white rounded-full py-3.5 px-5 font-bold text-xs uppercase tracking-wider transition-all duration-200 flex items-center justify-between select-none cursor-pointer active:scale-[0.98]"
                 >
                   <span className="flex items-center gap-2">

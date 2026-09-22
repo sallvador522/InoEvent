@@ -2,6 +2,7 @@
 import React, { useState } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
 import { HelpCircle, ChevronDown, Sparkles, Sliders, Eye, Heart, BellRing, QrCode, MapPin } from 'lucide-react';
+import { PLANS } from '../../config/plans';
 
 interface FAQItem {
   q: string;
@@ -67,7 +68,7 @@ const FAQ_ITEMS: FAQItem[] = [
   },
   {
     q: "Quanto custa criar um convite digital em Angola?",
-    a: "Na InoEvents, o Essencial custa 7.500 Kz, o Premium 15.000 Kz e o VIP 25.000 Kz — sempre pagamento único por evento, sem mensalidade. Para agências e cerimonialistas, o plano Business custa 39.900 Kz por mês com eventos ilimitados.",
+    a: `Na InoEvents, o Essencial custa ${PLANS.essential.price.toLocaleString('pt-AO')} Kz, o Premium ${PLANS.premium.price.toLocaleString('pt-AO')} Kz e o VIP ${PLANS.vip.price.toLocaleString('pt-AO')} Kz — sempre pagamento único por evento, sem mensalidade. Para agências e cerimonialistas, o plano Business custa ${PLANS.business.price.toLocaleString('pt-AO')} Kz por mês com eventos ilimitados.`,
     category: "features",
     icon: Heart
   },

@@ -72,17 +72,28 @@ service cloud.firestore {
       allow get: if true;
       
       // --- Create ---
-      // §7 limites são validados no backend (server/lib/entitlements), não só nas rules
-      allow create: if isSignedIn() && isValidId(eventId) && isValidEvent(incoming()) && incoming().ownerId == request.auth.uid;
+      // §7 limites são validados no backend (server/lib/entitlements), não só nas rules.
+      // Ativação nasce sempre pendente — publicar/pagar é via servidor (confirmPayment).
+      allow create: if isSignedIn() && isValidId(eventId) && isValidEvent(incoming()) && incoming().ownerId == request.auth.uid &&
+        incoming().get('billingStatus', 'pending') == 'pending' &&
+        incoming().get('isPublished', false) == false &&
+        incoming().get('isBlocked', false) == false;
       
       // --- Update ---
+      // Campos de ativação (isPublished/billingStatus/isBlocked/account*) só via servidor.
+      // expiresAt fica editável (fluxos legítimos de save recalculam) — o RSVP server-side lê do DB.
       allow update: if isValidId(eventId) && resource != null && (
           (
             isSignedIn() && 
             (resource.data.ownerId == request.auth.uid || exists(/databases/$(database)/documents/events/$(eventId)/team/$(request.auth.uid))) && 
             isValidEvent(incoming()) && 
             incoming().ownerId == resource.data.ownerId &&
-            incoming().get('plan', 'essential').lower() == resource.data.get('plan', 'essential').lower()
+            incoming().get('plan', 'essential').lower() == resource.data.get('plan', 'essential').lower() &&
+            incoming().get('isPublished', resource.data.get('isPublished', false)) == resource.data.get('isPublished', false) &&
+            incoming().get('billingStatus', resource.data.get('billingStatus', 'pending')) == resource.data.get('billingStatus', 'pending') &&
+            incoming().get('isBlocked', resource.data.get('isBlocked', false)) == resource.data.get('isBlocked', false) &&
+            incoming().get('accountActive', resource.data.get('accountActive', false)) == resource.data.get('accountActive', false) &&
+            incoming().get('accountExpiresAt', resource.data.get('accountExpiresAt', null)) == resource.data.get('accountExpiresAt', null)
           ) ||
           (
             isSignedIn() && 
@@ -150,8 +161,9 @@ service cloud.firestore {
     match /orders/{orderId} {
       allow get: if isSignedIn() && (resource.data.userId == request.auth.uid || isAdmin());
       allow list: if isSignedIn() && (resource.data.userId == request.auth.uid || isAdmin());
-      allow create: if isSignedIn() && isValidId(orderId) && incoming().userId == request.auth.uid && isValidOrder(incoming());
-      allow update: if isAdmin() || (isSignedIn() && resource.data.userId == request.auth.uid && incoming().diff(existing()).affectedKeys().hasOnly(['billingStatus','paidAt','providerTransactionId','metadata']));
+      // Pedidos nascem pending via servidor; billingStatus só via admin (servidor bypassa rules).
+      allow create: if isSignedIn() && isValidId(orderId) && incoming().userId == request.auth.uid && isValidOrder(incoming()) && incoming().billingStatus == 'pending';
+      allow update: if isAdmin();
     }
 
     match /subscriptions/{subId} {

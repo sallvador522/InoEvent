@@ -176,11 +176,17 @@ export const FirebaseProvider: React.FC<{ children: React.ReactNode }> = ({ chil
       if (snapshot.exists()) {
         
         let uData = snapshot.data();
-        if (uData.plan && uData.plan !== 'Essencial' && uData.plan !== 'Free' && uData.planExpiresAt) {
-          const expiresAtDate = new Date(uData.planExpiresAt);
-          if (expiresAtDate < new Date()) {
-             logger.warn('O plano premium do utilizador expirou, revertendo para Essencial de forma segura.', { category: 'AUTH' });
-             uData = { ...uData, plan: 'Essencial', planExpiresAt: null };
+        // Expirou e era pago → volta a free (trial); Essencial/Free com expiração não mexem.
+        // normalizePlanId cobre 'Essencial'/'Premium'/legados em qualquer capitalização.
+        if (uData.planExpiresAt) {
+          const paidPlans = ['essential', 'premium', 'vip', 'business'];
+          const pid = (uData.plan || '').toString().trim().toLowerCase();
+          if (paidPlans.includes(pid)) {
+            const expiresAtDate = new Date(uData.planExpiresAt);
+            if (expiresAtDate < new Date()) {
+               logger.warn('O plano pago do utilizador expirou, revertendo para Free de forma segura.', { category: 'AUTH' });
+               uData = { ...uData, plan: 'free', planExpiresAt: null };
+            }
           }
         }
         localStorage.setItem('ino_events_profile_cache', JSON.stringify(uData));

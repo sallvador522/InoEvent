@@ -6,6 +6,7 @@ import { toast } from 'react-hot-toast';
 import { motion, AnimatePresence } from 'framer-motion';
 import { Skeleton } from '../../components/ui/Skeleton';
 import { ResponsiveContainer, AreaChart, Area, XAxis, YAxis, CartesianGrid, Tooltip } from 'recharts';
+import { getValidityDays, normalizePlanId } from '../../config/plans';
 
 export const AdminDashboard: React.FC = () => {
   const [users, setUsers] = useState<any[]>([]);
@@ -24,7 +25,6 @@ export const AdminDashboard: React.FC = () => {
 
   // Notifications & Plan Upgrades State
   const [notificationTargetUserId, setNotificationTargetUserId] = useState<string | null>(null);
-  const [planCycle, setPlanCycle] = useState<'mensal' | 'anual'>('mensal');
   const [notificationTitle, setNotificationTitle] = useState('');
   const [notificationMessage, setNotificationMessage] = useState('');
   const [notificationType, setNotificationType] = useState<'plan_upgrade' | 'admin_alert' | 'system'>('admin_alert');
@@ -90,15 +90,12 @@ export const AdminDashboard: React.FC = () => {
     if (!notificationTargetUserId) return;
     try {
       if (pendingPlanChange) {
-        const date = new Date(Date.now());
-        if (planCycle === 'mensal') {
-          date.setMonth(date.getMonth() + 1);
-        } else {
-          date.setFullYear(date.getFullYear() + 1);
-        }
+        // Validade oficial do plano (config/plans) — Essencial/Free sem expiração
+        const validityDays = getValidityDays(pendingPlanChange.nextPlan);
+        const expiresAt = validityDays === null ? null : new Date(Date.now() + validityDays * 86400000).toISOString();
         await updateDoc(doc(db, 'users', pendingPlanChange.userId), { 
           plan: pendingPlanChange.nextPlan,
-          planExpiresAt: (pendingPlanChange.nextPlan === 'Essencial' || pendingPlanChange.nextPlan === 'Free') ? null : date.toISOString()
+          planExpiresAt: expiresAt
         });
         // Conta paga → carimba eventos do dono para publicar de imediato
         const next = (pendingPlanChange.nextPlan || '').toLowerCase();
@@ -117,7 +114,7 @@ export const AdminDashboard: React.FC = () => {
             /* best-effort — o backfill pode ser corrido manualmente */
           }
         }
-        setUsers(users.map(u => u.id === pendingPlanChange.userId ? { ...u, plan: pendingPlanChange.nextPlan, planExpiresAt: (pendingPlanChange.nextPlan === 'Essencial' || pendingPlanChange.nextPlan === 'Free') ? null : date.toISOString() } : u));
+        setUsers(users.map(u => u.id === pendingPlanChange.userId ? { ...u, plan: pendingPlanChange.nextPlan, planExpiresAt: (() => { const d = getValidityDays(pendingPlanChange.nextPlan); return d === null ? null : new Date(Date.now() + d * 86400000).toISOString(); })() } : u));
         if (selectedUser?.id === pendingPlanChange.userId) {
           setSelectedUser({ ...selectedUser, plan: pendingPlanChange.nextPlan });
         }
@@ -204,7 +201,11 @@ export const AdminDashboard: React.FC = () => {
                       {o.billingStatus}
                     </span>
                   </p>
-                  <p className="text-xs text-slate-500 truncate">Pedido {o.id} · Evento {o.eventId}</p>
+                  <p className="text-xs text-slate-500 truncate">
+                    Pedido {o.id} · Evento {o.eventId}
+                    {(() => { const owner = users.find((u: any) => (u.id || u.uid) === o.userId); return owner?.email ? ` · ${owner.email}` : ''; })()}
+                    {o.createdAt ? ` · ${new Date(o.createdAt).toLocaleDateString('pt-AO')}` : ''}
+                  </p>
                 </div>
                 {o.billingStatus === 'pending' && (
                   <button
@@ -250,7 +251,7 @@ export const AdminDashboard: React.FC = () => {
     );
   }
 
-  const activePlansCount = users.filter(u => u.plan && u.plan !== 'Free' && u.plan !== 'Essencial').length;
+  const activePlansCount = users.filter(u => !['free', 'essential'].includes(normalizePlanId(u.plan ?? u.planId))).length;
 
   const renderOverview = () => (
     <>
@@ -306,7 +307,7 @@ export const AdminDashboard: React.FC = () => {
                           <p className="text-xs text-slate-400">{new Date(tx.date).toLocaleDateString()}</p>
                         </div>
                         <span className={`font-bold ${tx.type === 'CREDIT' ? 'text-green-500' : 'text-slate-800'}`}>
-                            {tx.type === 'CREDIT' ? '+' : ''} R$ {(tx.amount || 0).toFixed(2)}
+                            {tx.type === 'CREDIT' ? '+' : ''} {(tx.amount || 0).toLocaleString('pt-AO')} Kz
                         </span>
                     </div>
                   ))}
@@ -405,18 +406,17 @@ export const AdminDashboard: React.FC = () => {
     }
 
     const countAll = users.length;
-    const countEssencial = users.filter(u => !u.plan || u.plan === 'Essencial').length;
-    const countPremium = users.filter(u => u.plan === 'Premium').length;
-    const countBusiness = users.filter(u => u.plan === 'Business' || u.plan === 'Corporate').length;
+    const planOf = (u: any) => normalizePlanId(u.plan ?? u.planId);
+    const countEssencial = users.filter(u => planOf(u) === 'essential').length;
+    const countPremium = users.filter(u => planOf(u) === 'premium' || planOf(u) === 'vip').length;
+    const countBusiness = users.filter(u => planOf(u) === 'business').length;
 
     const filteredUsers = users.filter(u => {
       const matchesSearch = (u.email || '').toLowerCase().includes(searchQuery.toLowerCase()) || 
                             (u.name || '').toLowerCase().includes(searchQuery.toLowerCase()) ||
                             (u.uid || '').toLowerCase().includes(searchQuery.toLowerCase());
       const matchesPlan = planFilter === 'all' || 
-                          u.plan === planFilter || 
-                          (planFilter === 'Essencial' && !u.plan) ||
-                          (planFilter === 'Business' && u.plan === 'Corporate');
+                          planOf(u) === normalizePlanId(planFilter);
       return matchesSearch && matchesPlan;
     });
 
@@ -582,7 +582,7 @@ export const AdminDashboard: React.FC = () => {
             <h2 className="text-lg font-bold text-slate-900">Histórico de Transações</h2>
             <div className="bg-white border border-slate-200 px-4 py-2 rounded-lg shadow-sm">
                <span className="text-xs uppercase tracking-widest text-slate-500 font-bold mr-2">Faturamento Total (Aproximado):</span>
-               <span className="text-lg text-green-500 font-bold">R$ {totalRevenue.toFixed(2)}</span>
+               <span className="text-lg text-green-500 font-bold">{totalRevenue.toLocaleString('pt-AO')} Kz</span>
             </div>
          </div>
          <div className="overflow-x-auto">
@@ -610,7 +610,7 @@ export const AdminDashboard: React.FC = () => {
                    </td>
                    <td className="px-6 py-4 text-right">
                       <span className={`font-bold ${tx.type === 'CREDIT' ? 'text-green-500' : 'text-slate-800'}`}>
-                          {tx.type === 'CREDIT' ? '+' : ''} R$ {(tx.amount || 0).toFixed(2)}
+                          {tx.type === 'CREDIT' ? '+' : ''} {(tx.amount || 0).toLocaleString('pt-AO')} Kz
                       </span>
                    </td>
                  </tr>
@@ -730,17 +730,11 @@ export const AdminDashboard: React.FC = () => {
                 </div>
 
                 
-                {pendingPlanChange && pendingPlanChange.nextPlan !== 'Essencial' && pendingPlanChange.nextPlan !== 'Free' && (
+                {pendingPlanChange && normalizePlanId(pendingPlanChange.nextPlan) !== 'essential' && normalizePlanId(pendingPlanChange.nextPlan) !== 'free' && (
                   <div className="mb-4">
-                    <label className="block text-xs font-bold text-slate-500 uppercase tracking-wider mb-2">Ciclo do Plano</label>
-                    <select 
-                      value={planCycle}
-                      onChange={(e) => setPlanCycle(e.target.value as 'mensal' | 'anual')}
-                      className="w-full px-3.5 py-2.5 text-sm border border-slate-200 rounded-xl focus:ring-brand-blue focus:border-brand-blue outline-none font-medium text-slate-800 bg-slate-50/50"
-                    >
-                      <option value="mensal">Mensal (1 Mês)</option>
-                      <option value="anual">Anual (1 Ano)</option>
-                    </select>
+                    <p className="text-xs text-slate-500">
+                      Validade oficial do plano: <strong className="text-slate-800">{(() => { const d = getValidityDays(pendingPlanChange.nextPlan); return d === null ? 'sem expiração' : `${d} dias`; })()}</strong>
+                    </p>
                   </div>
                 )}
 

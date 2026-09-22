@@ -2,6 +2,7 @@ import React, { useState } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
 import { Printer, Download, X, Calendar, Activity, CheckCircle2, TrendingUp, Users, Shield, Copy, Check } from 'lucide-react';
 import { ResponsiveContainer, PieChart, Pie, Cell, AreaChart, Area, XAxis, YAxis, CartesianGrid } from 'recharts';
+import { normalizePlanId, getPlanConfig, getGuestLimit } from '../../lib/entitlements';
 
 interface ExecutiveReportModalProps {
     isOpen: boolean;
@@ -163,11 +164,11 @@ export const ExecutiveReportModal: React.FC<ExecutiveReportModalProps> = ({
                                     </div>
                                     <div>
                                         <p className="font-mono text-[10px] uppercase font-bold text-slate-400">Plano de Escopo</p>
-                                        <p className="font-bold text-slate-800 text-sm mt-0.5">{event.plan || 'Business'}</p>
+                                        <p className="font-bold text-slate-800 text-sm mt-0.5">{getPlanConfig(normalizePlanId(event.plan)).name}</p>
                                     </div>
                                     <div>
                                         <p className="font-mono text-[10px] uppercase font-bold text-slate-400">Limites de RSVP</p>
-                                        <p className="font-bold text-slate-800 text-sm mt-0.5">{event.plan === 'Corporate' ? 'Sem limites' : event.plan === 'Business' ? 'Até 5.000' : 'Até 500'}</p>
+                                        <p className="font-bold text-slate-800 text-sm mt-0.5">{(() => { const lim = getGuestLimit(normalizePlanId(event.plan)); return lim === Infinity ? 'Sem limites' : `Até ${lim.toLocaleString('pt-AO')}`; })()}</p>
                                     </div>
                                     <div>
                                         <p className="font-mono text-[10px] uppercase font-bold text-slate-400">Canal Ativo</p>

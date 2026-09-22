@@ -1,6 +1,7 @@
 import React, { useEffect, useRef } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
 import { X, MessageSquare, Shield, Clock } from 'lucide-react';
+import { normalizePlanId } from '../lib/entitlements';
 
 interface SupportModalProps {
   isOpen: boolean;
@@ -9,7 +10,7 @@ interface SupportModalProps {
 }
 
 export const SupportModal: React.FC<SupportModalProps> = ({ isOpen, onClose, userPlan }) => {
-  const isBusiness = userPlan === "Business" || userPlan === "Corporate";
+  const isBusiness = normalizePlanId(userPlan) === "business";
   const panelRef = useRef<HTMLDivElement>(null);
   const lastFocusedRef = useRef<HTMLElement | null>(null);
 

@@ -14,6 +14,7 @@ import path from 'path';
 import fs from 'fs';
 import { getEventDetails } from '../lib/firebase-admin.js';
 import { logger } from '../../lib/logger.js';
+import { PLANS, ADDONS, formatPrice } from '../../config/plans.js';
 
 const router = Router();
 
@@ -37,7 +38,7 @@ router.get('/plans', async (req, res, next) => {
     }
     
     const plansTitle = "Planos e Preços de Convites Digitais Premium | InoEvents";
-    const plansDesc = "Conheça os preços do InoEvents. Essencial 7.500 Kz, Premium 15.000 Kz, VIP 25.000 Kz e Business 39.900 Kz/mês. Concierge +10.000 Kz. RSVP, QR, check-in e gestão de convidados em Angola.";
+    const plansDesc = `Conheça os preços do InoEvents. Essencial ${formatPrice(PLANS.essential.price)}, Premium ${formatPrice(PLANS.premium.price)}, VIP ${formatPrice(PLANS.vip.price)} e Business ${formatPrice(PLANS.business.price)}/mês. Concierge +${formatPrice(ADDONS.concierge.price)}. RSVP, QR, check-in e gestão de convidados em Angola.`;
     
     html = html.replace(/<title>[^<]*<\/title>/g, `<title>${plansTitle}</title>`);
     html = html.replace(/<meta name="description" content="[^"]*"\s*\/?>/g, `<meta name="description" content="${plansDesc}" />`);
@@ -47,15 +48,15 @@ router.get('/plans', async (req, res, next) => {
       <div style="display:none;" id="ai-pricing-context">
         <h1>Preços e Planos do InoEvents Angola</h1>
         <h2>Plano Essencial</h2>
-        <p>Preço: 7.500 Kz (Pagamento único por evento). Validade 90 dias. Até 100 convidados. Inclui: RSVP, Código QR Exclusivo, Galeria Básica, Mapa da zona com botão Como chegar, Localização, Countdown.</p>
+        <p>Preço: ${formatPrice(PLANS.essential.price)} (Pagamento único por evento). Validade ${PLANS.essential.validityDays} dias. Até ${PLANS.essential.guestLimit} convidados. Inclui: RSVP, Código QR Exclusivo, Galeria Básica, Mapa da zona com botão Como chegar, Localização, Countdown.</p>
         <h2>Plano Premium</h2>
-        <p>Preço: 15.000 Kz (Pagamento único por evento). Validade 180 dias. Até 300 convidados. Inclui: tudo do Essencial + convidados individualizados, galeria premium, música, livro de assinaturas, mapa das mesas, remoção da marca, analytics básicos.</p>
+        <p>Preço: ${formatPrice(PLANS.premium.price)} (Pagamento único por evento). Validade ${PLANS.premium.validityDays} dias. Até ${PLANS.premium.guestLimit} convidados. Inclui: tudo do Essencial + convidados individualizados, galeria premium, música, livro de assinaturas, mapa das mesas, remoção da marca, analytics básicos.</p>
         <h2>Plano VIP</h2>
-        <p>Preço: 25.000 Kz (Pagamento único por evento). Validade 365 dias. Até 700 convidados. Inclui: tudo do Premium + QR individual, check-in, gestão +1, mesas avançadas, analytics avançados, personalização avançada, suporte prioritário.</p>
+        <p>Preço: ${formatPrice(PLANS.vip.price)} (Pagamento único por evento). Validade ${PLANS.vip.validityDays} dias. Até ${PLANS.vip.guestLimit} convidados. Inclui: tudo do Premium + QR individual, check-in, gestão +1, mesas avançadas, analytics avançados, personalização avançada, suporte prioritário.</p>
         <h2>Concierge (Add-on)</h2>
-        <p>Preço: +10.000 Kz por evento. A equipa InoEvent configura o evento por si.</p>
+        <p>Preço: +${formatPrice(ADDONS.concierge.price)} por evento. A equipa InoEvent configura o evento por si.</p>
         <h2>Plano Business (B2B)</h2>
-        <p>Preço: 39.900 Kz por mês (subscrição). Eventos ilimitados para agências e cerimonialistas, white-label, painel de gestão, check-in, equipa.</p>
+        <p>Preço: ${formatPrice(PLANS.business.price)} por mês (subscrição). Eventos ilimitados para agências e cerimonialistas, white-label, painel de gestão, check-in, equipa.</p>
       </div>
     `;
     

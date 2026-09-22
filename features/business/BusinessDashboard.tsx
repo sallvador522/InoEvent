@@ -9,6 +9,7 @@ import { Calendar, Plus, Building2, Ticket, Settings, ArrowRight, ExternalLink, 
 import { motion, AnimatePresence } from 'framer-motion';
 import toast from 'react-hot-toast';
 import { Skeleton } from '../../components/ui/Skeleton';
+import { normalizePlanId } from '../../lib/entitlements';
 
 import { BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, Legend, ResponsiveContainer, LineChart, Line, ComposedChart } from 'recharts';
 
@@ -24,7 +25,7 @@ export const BusinessDashboard: React.FC = () => {
 
     useEffect(() => {
         if (!userProfile) return;
-        if (userProfile.plan !== 'Business' && userProfile.plan !== 'Corporate') {
+        if (normalizePlanId(userProfile.plan) !== 'business') {
             navigate('/dashboard');
         }
     }, [userProfile, navigate]);
@@ -36,7 +37,7 @@ export const BusinessDashboard: React.FC = () => {
                 const eventsRef = collection(db, 'events');
                 const q = query(eventsRef, where("ownerId", "==", user.uid));
                 const snap = await getDocs(q);
-                const eventsList = snap.docs.map(d => ({ id: d.id, ...d.data() as any })).filter(e => e.plan === 'Business' || e.plan === 'Corporate' || e.plan === 'business' || e.plan === 'corporate');
+                const eventsList = snap.docs.map(d => ({ id: d.id, ...d.data() as any })).filter(e => normalizePlanId(e.plan) === 'business');
                 setEvents(eventsList);
 
                 let totalGuestsCount = 0;

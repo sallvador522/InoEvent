@@ -948,8 +948,8 @@ const InvitationView: React.FC = () => {
   };
 
   const addGalleryImage = async (file?: File) => {
-    const plan = userProfile?.plan || 'Essencial';
-    if (plan === 'Essencial' && (localEvent?.gallery?.length || 0) >= 10) {
+    const plan = normalizePlanId(userProfile?.plan);
+    if (plan === 'essential' && (localEvent?.gallery?.length || 0) >= 10) {
       toast.error("A Galeria Básica permite até 10 fotos. Faça upgrade para adicionar mais!");
       return;
     }
@@ -3256,7 +3256,7 @@ const ModernLayout: React.FC<{
   deleteGalleryImage,
   updateTimelineItem,
 }) => {
-  const isPremium = isEditing || (event && EVENTS.some((e) => e.id === event.id)) || (event && (event as any).plan && ((event as any).plan === "Premium" || (event as any).plan === "Business" || (event as any).plan === "Corporate"));
+  const isPremium = isEditing || (event && EVENTS.some((e) => e.id === event.id)) || canUseFeature(normalizePlanId((event as any)?.plan ?? (event as any)?.planId), 'premium_themes');
   // Ethereal Color Palette
   const accentText = "text-[#8A817C]"; // Taupe gray
   const darkText = "text-[#2C2C2C]";
@@ -3774,7 +3774,7 @@ const GardenLayout: React.FC<{
   deleteGalleryImage,
   updateTimelineItem,
 }) => {
-  const isPremium = isEditing || (event && EVENTS.some((e) => e.id === event.id)) || (event && (event as any).plan && ((event as any).plan === "Premium" || (event as any).plan === "Business" || (event as any).plan === "Corporate"));
+  const isPremium = isEditing || (event && EVENTS.some((e) => e.id === event.id)) || canUseFeature(normalizePlanId((event as any)?.plan ?? (event as any)?.planId), 'premium_themes');
   const accentColor = "text-[#5D6D55]"; // Sage green
   const accentBg = "bg-[#5D6D55]";
 
@@ -4248,7 +4248,7 @@ const RusticLayout: React.FC<{
   deleteGalleryImage,
   updateTimelineItem,
 }) => {
-  const isPremium = isEditing || (event && EVENTS.some((e) => e.id === event.id)) || (event && (event as any).plan && ((event as any).plan === "Premium" || (event as any).plan === "Business" || (event as any).plan === "Corporate"));
+  const isPremium = isEditing || (event && EVENTS.some((e) => e.id === event.id)) || canUseFeature(normalizePlanId((event as any)?.plan ?? (event as any)?.planId), 'premium_themes');
   const warmText = "text-[#5D4037]"; // Dark warm brown
   const lightText = "text-[#8D6E63]"; // Lighter brown
   const bgPaper = "bg-[#FDF5E6]"; // Old Lace / Paper
@@ -4634,7 +4634,7 @@ const IndustrialLayout: React.FC<{
   deleteGalleryImage,
   updateTimelineItem,
 }) => {
-  const isPremium = isEditing || (event && EVENTS.some((e) => e.id === event.id)) || (event && (event as any).plan && ((event as any).plan === "Premium" || (event as any).plan === "Business" || (event as any).plan === "Corporate"));
+  const isPremium = isEditing || (event && EVENTS.some((e) => e.id === event.id)) || canUseFeature(normalizePlanId((event as any)?.plan ?? (event as any)?.planId), 'premium_themes');
   return (
     <div className="min-h-screen bg-[#111] text-white font-display pb-32 selection:bg-white selection:text-black">
       {/* HERO: Full Typographic */}
@@ -5135,7 +5135,7 @@ const LuxuryLayout: React.FC<{
   deleteGalleryImage,
   updateTimelineItem,
 }) => {
-  const isPremium = isEditing || (event && EVENTS.some((e) => e.id === event.id)) || (event && (event as any).plan && ((event as any).plan === "Premium" || (event as any).plan === "Business" || (event as any).plan === "Corporate"));
+  const isPremium = isEditing || (event && EVENTS.some((e) => e.id === event.id)) || canUseFeature(normalizePlanId((event as any)?.plan ?? (event as any)?.planId), 'premium_themes');
   const [copiedKey, setCopiedKey] = useState<string | null>(null);
 
   const handleCopy = (val: string) => {
@@ -5635,7 +5635,7 @@ const BridalShowerLayout: React.FC<{
   deleteGalleryImage,
   updateTimelineItem,
 }) => {
-  const isPremium = isEditing || (event && EVENTS.some((e) => e.id === event.id)) || (event && (event as any).plan && ((event as any).plan === "Premium" || (event as any).plan === "Business" || (event as any).plan === "Corporate"));
+  const isPremium = isEditing || (event && EVENTS.some((e) => e.id === event.id)) || canUseFeature(normalizePlanId((event as any)?.plan ?? (event as any)?.planId), 'premium_themes');
   const isMinimal = event.layoutMode === "BRIDAL_MINIMAL";
   const isTropical = event.layoutMode === "BRIDAL_TROPICAL";
   const isBeauty = event.layoutMode === "BRIDAL_BEAUTY";
@@ -5999,7 +5999,7 @@ const BabyShowerLayout: React.FC<{
   updateGalleryImage,
   deleteGalleryImage,
 }) => {
-  const isPremium = isEditing || (event && EVENTS.some((e) => e.id === event.id)) || (event && (event as any).plan && ((event as any).plan === "Premium" || (event as any).plan === "Business" || (event as any).plan === "Corporate"));
+  const isPremium = isEditing || (event && EVENTS.some((e) => e.id === event.id)) || canUseFeature(normalizePlanId((event as any)?.plan ?? (event as any)?.planId), 'premium_themes');
   const isBoy = event.layoutMode === "BABY_BOY";
   const isGirl = event.layoutMode === "BABY_GIRL";
 

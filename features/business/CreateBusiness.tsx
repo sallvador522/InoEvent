@@ -5,6 +5,7 @@ import { useFirebase } from '../../components/FirebaseProvider';
 import { doc, updateDoc } from 'firebase/firestore';
 import { db } from '../../components/FirebaseProvider';
 import { Button } from '../../components/ui/Button';
+import { normalizePlanId } from '../../lib/entitlements';
 import { Building2, UploadCloud, ArrowRight } from 'lucide-react';
 import toast from 'react-hot-toast';
 
@@ -18,7 +19,7 @@ export const CreateBusiness: React.FC = () => {
 
     useEffect(() => {
         if (!userProfile) return;
-        if (userProfile.plan !== 'Business' && userProfile.plan !== 'Corporate') {
+        if (normalizePlanId(userProfile.plan) !== 'business') {
             navigate('/dashboard');
         }
     }, [userProfile, navigate]);
@@ -51,7 +52,7 @@ export const CreateBusiness: React.FC = () => {
                 await setDoc(userRef, {
                     uid: user.uid,
                     email: user.email || 'no-email@example.com',
-                    plan: userProfile?.plan || 'Essencial',
+                    plan: normalizePlanId(userProfile?.plan),
                     whiteLabelName: businessName,
                     whiteLabelLogo: businessLogo
                 });

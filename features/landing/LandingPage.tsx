@@ -2,6 +2,7 @@ import React, { useState, useEffect, useRef } from 'react';
 import { Link, useNavigate, useLocation } from 'react-router-dom';
 import { motion, AnimatePresence } from 'framer-motion';
 import { useFirebase, signOut, auth, db, handleFirestoreError, OperationType } from '../../components/FirebaseProvider';
+import { normalizePlanId } from '../../lib/entitlements';
 import { collection, query, where, getDocs, onSnapshot } from 'firebase/firestore';
 import { Navbar } from '../../components/Navbar';
 import { SEO } from '../../components/SEO';
@@ -13,7 +14,7 @@ import { EVENTS } from '../../mockData';
 import { X, Copy, MessageSquare, ArrowRight, Award, CheckCircle2, Gem, Utensils, Briefcase, QrCode, Gift, Users, BookOpen, Globe, ChevronLeft, ChevronRight, MapPin, Navigation } from 'lucide-react';
 import toast from 'react-hot-toast';
 import { copyToClipboard } from '../../lib/clipboard';
-import { PLANS } from '../../config/plans';
+import { PLANS, ADDONS } from '../../config/plans';
 
 // NOTA: depoimentos ilustrativos — trocar por clientes reais com nome, foto e autorização assim que existirem.
 const QUOTES = [
@@ -184,9 +185,9 @@ export const LandingPage: React.FC = () => {
       return;
     }
 
-    const currentPlan = userProfile?.plan || "Essencial";
+    const currentPlanId = normalizePlanId(userProfile?.plan);
 
-    if (currentPlan === planName) {
+    if (currentPlanId === normalizePlanId(planName)) {
       toast.error(`Você já possui o plano ${planName} ativo na sua conta.`);
       return;
     }
@@ -255,7 +256,7 @@ export const LandingPage: React.FC = () => {
   }
 
   const handleConcierge = () => {
-    const msg = "Olá InoEvents! Quero o serviço Concierge (+10.000 Kz) — que a vossa equipa crie o meu convite por mim.";
+    const msg = `Olá InoEvents! Quero o serviço Concierge (+${ADDONS.concierge.price.toLocaleString('pt-AO')} Kz) — que a vossa equipa crie o meu convite por mim.`;
     window.open(`https://wa.me/244952815430?text=${encodeURIComponent(msg)}`, "_blank", "noopener,noreferrer");
   }
 
@@ -598,7 +599,7 @@ export const LandingPage: React.FC = () => {
                  <ul className="flex flex-col gap-3 mb-8 flex-1">
                      <li className="flex items-center gap-3 text-[13px] text-slate-600">
                         <CheckCircle2 size={18} className="text-[#C5A028] shrink-0" />
-                        <span>Até 100 convidados</span>
+                        <span>Até {PLANS.essential.guestLimit} convidados</span>
                      </li>
                      <li className="flex items-center gap-3 text-[13px] text-slate-600">
                         <CheckCircle2 size={18} className="text-[#C5A028] shrink-0" />
@@ -614,7 +615,7 @@ export const LandingPage: React.FC = () => {
                       </li>
                   </ul>
                   <button
-                     onClick={() => confirmPlanSelection("Essencial", "7.500 Kz")}
+                     onClick={() => confirmPlanSelection("Essencial", `${PLANS.essential.price.toLocaleString('pt-AO')} Kz`)}
                      className="w-full py-3.5 rounded-full border border-[#1B365D]/30 text-[#1B365D] font-bold text-xs uppercase tracking-wider hover:bg-[#1B365D] hover:text-white active:scale-[0.97] cursor-pointer"
                      style={{ transition: 'transform 160ms ease-out, background-color 200ms ease, color 200ms ease' }}
                   >
@@ -641,7 +642,7 @@ export const LandingPage: React.FC = () => {
                      </li>
                      <li className="flex items-center gap-3 text-[13px] text-blue-50">
                         <CheckCircle2 size={18} className="text-[#C5A028] shrink-0" />
-                        <span>Temas premium e luxury</span>
+                        <span>Todos os 8 temas incluídos</span>
                      </li>
                      <li className="flex items-center gap-3 text-[13px] text-blue-50">
                         <CheckCircle2 size={18} className="text-[#C5A028] shrink-0" />
@@ -661,7 +662,7 @@ export const LandingPage: React.FC = () => {
                      </li>
                   </ul>
                  <button
-                     onClick={() => confirmPlanSelection("Premium", "15.000 Kz")}
+                     onClick={() => confirmPlanSelection("Premium", `${PLANS.premium.price.toLocaleString('pt-AO')} Kz`)}
                      className="w-full py-3.5 rounded-full bg-[#C5A028] text-[#1B365D] font-bold text-xs uppercase tracking-wider hover:bg-[#d4af37] active:scale-[0.97] cursor-pointer"
                      style={{ transition: 'transform 160ms ease-out, background-color 200ms ease' }}
                   >
@@ -740,7 +741,7 @@ export const LandingPage: React.FC = () => {
                      </li>
                   </ul>
                   <button
-                     onClick={() => confirmPlanSelection("Business", "39.900 Kz", "monthly")}
+                     onClick={() => confirmPlanSelection("Business", `${PLANS.business.price.toLocaleString('pt-AO')} Kz`, "monthly")}
                      className="w-full py-3.5 rounded-full border border-[#1B365D]/30 text-[#1B365D] font-bold text-xs uppercase tracking-wider hover:bg-[#1B365D] hover:text-white active:scale-[0.97] cursor-pointer"
                      style={{ transition: 'transform 160ms ease-out, background-color 200ms ease, color 200ms ease' }}
                   >

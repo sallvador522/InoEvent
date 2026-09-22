@@ -484,7 +484,7 @@ export const EventCreator: React.FC = () => {
 
         <div className="flex items-center gap-3">
           {/* Plan indication */}
-          {(userProfile?.plan === 'Business' || userProfile?.plan === 'Corporate') && (
+          {isBusinessPlan(userProfile?.plan) && (
             <span className="hidden sm:inline-flex items-center gap-1 text-[11px] font-bold text-emerald-700 bg-emerald-50 border border-emerald-200 rounded-full py-1 px-3">
               <Globe size={12} /> Canal ilimitado [{userProfile.plan}]
             </span>

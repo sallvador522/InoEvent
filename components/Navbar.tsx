@@ -3,6 +3,7 @@ import { Link, useNavigate } from 'react-router-dom';
 import { motion, AnimatePresence } from 'framer-motion';
 import { useFirebase, signOut, auth, db, handleFirestoreError, OperationType } from './FirebaseProvider';
 import { collection, query, where, getDocs, onSnapshot, orderBy, doc, updateDoc, deleteDoc } from 'firebase/firestore';
+import { normalizePlanId, getPlanConfig } from '../lib/entitlements';
 
 export const Navbar: React.FC = () => {
   const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
@@ -33,6 +34,10 @@ export const Navbar: React.FC = () => {
   }, [mobileMenuOpen]);
   
   const isAdmin = user?.email?.toLowerCase() === 'antoniosalvador522@gmail.com' || user?.email === (import.meta as any).env.VITE_ADMIN_EMAIL;
+  // Plano normalizado (Firestore grava minúsculas) — nome real para exibição
+  const accountPlanId = normalizePlanId(userProfile?.plan);
+  const accountPlanName = userProfile ? getPlanConfig(accountPlanId).name : '…';
+  const isBusinessAccount = accountPlanId === 'business';
 
   useEffect(() => {
     if (!user) {
@@ -129,7 +134,7 @@ export const Navbar: React.FC = () => {
             <div className="flex items-center gap-1.5 ml-1 sm:ml-2">
               <span className="px-2 py-0.5 md:px-2.5 md:py-1 rounded-full text-[10px] md:text-xs font-bold leading-none bg-gradient-to-r from-amber-500/20 to-amber-600/30 text-amber-300 border border-amber-500/20 shadow-sm uppercase tracking-wider flex items-center gap-1 scale-95 md:scale-100">
                 <span className="material-symbols-outlined text-[10px] md:text-[12px] text-amber-400">verified</span>
-                <span>{userProfile?.plan || 'Essencial'}</span>
+                <span>{accountPlanName}</span>
               </span>
             </div>
           )}
@@ -181,7 +186,7 @@ export const Navbar: React.FC = () => {
                      ) : (
                         <div className="px-4 py-4 text-slate-400 text-sm text-center">Nenhum evento criado.</div>
                      )}
-                     {(userProfile?.plan === 'Business' || userProfile?.plan === 'Corporate') && (
+                     {(isBusinessAccount) && (
                         <Link to="/b2b" className="px-4 py-3 text-brand-blue border-t border-slate-100 text-center font-bold text-xs hover:bg-slate-50 transition-colors uppercase tracking-wider bg-blue-50/50 block w-full">
                            Meu Negócio
                         </Link>
@@ -452,7 +457,7 @@ export const Navbar: React.FC = () => {
                 </div>
               )}
               
-              {(userProfile?.plan === 'Business' || userProfile?.plan === 'Corporate') && (
+              {(isBusinessAccount) && (
                   <Link to="/b2b" onClick={() => setMobileMenuOpen(false)} className="hover:text-primary transition-colors flex items-center justify-between">
                     <span className="flex items-center gap-3"><span className="material-symbols-outlined text-brand-blue">business_center</span> <span className="font-bold text-brand-blue">Meu Negócio</span></span>
                     <span className="material-symbols-outlined text-slate-300">chevron_right</span>
@@ -490,7 +495,7 @@ export const Navbar: React.FC = () => {
                          </div>
                          <div className="flex flex-col overflow-hidden w-full">
                            <span className="text-sm font-bold text-brand-blue truncate w-full">{userProfile?.name || user.email}</span>
-                           <span className="text-xs text-slate-500 font-medium whitespace-nowrap">Plano {userProfile?.plan || 'Essencial'}</span>
+                            <span className="text-xs text-slate-500 font-medium whitespace-nowrap">Plano {accountPlanName}</span>
                          </div>
                        </div>
                        <button onClick={() => { signOut(auth); setMobileMenuOpen(false); }} className="text-red-500 bg-red-50 w-10 h-10 flex-shrink-0 flex items-center justify-center rounded-xl hover:bg-red-100 transition-colors">

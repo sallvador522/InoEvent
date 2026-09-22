@@ -123,7 +123,7 @@ app.get('/robots.txt', (_req, res) => {
 app.use(geoRoutes);       // /api/geo/search — proxy keyless de zonas (antes do SEO)
 app.use(seoRoutes);      // SEO routes BEFORE API (they intercept /plans and /invite/:id)
 app.use(rsvpRoutes);      // /api/events/:id/guests, /api/events/:id/rsvp, /api/events/:id/rsvp-status
-app.use(ordersRoutes);    // /api/orders, /api/events/:id/order, /api/events/:id/upgrade, /api/events/:id/renew, /api/webhooks/payment
+app.use(ordersRoutes);    // /api/orders, /api/events/:id/order, /api/webhooks/payment
 app.use(metaRoutes);      // POST /api/meta/events — relay da Conversions API (deduplicado via event_id)
 app.use(subscriptionsRoutes); // /api/subscriptions/*
 

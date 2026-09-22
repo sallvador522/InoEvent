@@ -13,7 +13,7 @@
 import { Router } from 'express';
 import { getDb } from '../lib/firebase-admin.js';
 import { apiRateLimiter } from '../middleware/index.js';
-import { createOrder, getOrder, getOrderByEvent, confirmPayment, failPayment } from '../lib/billing.js';
+import { createOrder, getOrder, getOrderByEvent, confirmPayment, failPayment, backfillAccountStamps } from '../lib/billing.js';
 import { getPlanConfig, normalizePlanId, calculateOrderTotal, calculateExpiresAt, PLANS } from '../../config/plans.js';
 import { canUpgrade, canDowngrade, isEventExpired } from '../lib/entitlements.js';
 import { logger } from '../../lib/logger.js';
@@ -131,6 +131,29 @@ router.post('/api/orders/:id/fail', apiRateLimiter, async (req, res) => {
     return res.json({ success: true });
   } catch (err: any) {
     return res.status(500).json({ error: 'Erro' });
+  }
+});
+
+// ---------------------------------------------------------------------------
+// POST /api/admin/backfill-accounts — carimba eventos de contas pagas (retroativos)
+// Body opcional: { userId } para um utilizador; sem body = todas as contas pagas.
+// Admin estrito: exige Bearer de admin (sem modo dev permissivo — escrita em massa).
+// ---------------------------------------------------------------------------
+router.post('/api/admin/backfill-accounts', apiRateLimiter, async (req, res) => {
+  const authUser = await getAuthUser(req);
+  if (!authUser || authUser.email !== 'antoniosalvador522@gmail.com') {
+    return res.status(403).json({ error: 'Apenas admin' });
+  }
+  try {
+    const { userId } = (req.body || {}) as any;
+    if (userId && typeof userId !== 'string') {
+      return res.status(400).json({ error: 'userId inválido' });
+    }
+    const result = await backfillAccountStamps(userId);
+    return res.json({ success: true, ...result });
+  } catch (err: any) {
+    logger.error('Backfill contas erro', { category: 'SYSTEM', data: err?.message || err });
+    return res.status(500).json({ error: 'Erro no backfill' });
   }
 });
 

@@ -114,8 +114,69 @@ export async function confirmPayment(orderId: string, providerTxId?: string): Pr
     logger.error(`Falha ao activar evento após pagamento ${orderId}`, { category: 'DATABASE', data: e });
   }
 
+  // Ativa a CONTA: plano pago publica todos os eventos do dono (com validade do plano).
+  // Retrocompatível: planExpiresAt null (atribuído manualmente) conta como válido.
+  try {
+    const accountExpiresAt = calculateExpiresAt(plan, new Date(now));
+    await db.collection('users').doc(order.userId).update({
+      plan: plan,
+      planId: plan,
+      planExpiresAt: accountExpiresAt ? accountExpiresAt.toISOString() : null,
+      updatedAt: now,
+    } as any);
+    // Carimba todos os eventos do dono para leitura event-local (sem fetch extra no convidado)
+    const owned = await db.collection('events').where('ownerId', '==', order.userId).get();
+    const batch = db.batch();
+    owned.docs.forEach((d) => {
+      batch.update(d.ref, {
+        accountActive: true,
+        accountExpiresAt: accountExpiresAt ? accountExpiresAt.toISOString() : null,
+        updatedAt: now,
+      } as any);
+    });
+    await batch.commit();
+    logger.success(`Conta activada user=${order.userId} plan=${plan} eventos=${owned.size}`, { category: 'SYSTEM' });
+  } catch (e) {
+    logger.error(`Falha ao activar conta após pagamento ${orderId}`, { category: 'DATABASE', data: e });
+  }
+
   logger.success(`Pagamento confirmado order=${orderId} event=${order.eventId}`, { category: 'SYSTEM' });
   return { ...order, ...paidOrder } as Order;
+}
+
+/**
+ * Backfill conta activa — carimba eventos de utilizadores com plano pago.
+ * Uso: uma vez (retroativos) + após troca manual de plano no admin.
+ * Mantém planExpiresAt existente (null = válido, sem inventar validades).
+ */
+export async function backfillAccountStamps(userId?: string): Promise<{ users: number; events: number }> {
+  const db = getDb();
+  const allUsers = await db.collection('users').get();
+  const targets = allUsers.docs.filter((d) => {
+    if (userId && d.id !== userId) return false;
+    const data = d.data() as any;
+    const p = normalizePlanId(data?.plan ?? data?.planId);
+    return p === 'essential' || p === 'premium' || p === 'vip' || p === 'business';
+  });
+  let stamped = 0;
+  for (const u of targets) {
+    const accountExpiresAt: string | null = (u.data() as any)?.planExpiresAt || null;
+    const owned = await db.collection('events').where('ownerId', '==', u.id).get();
+    if (owned.empty) continue;
+    const batch = db.batch();
+    const nowIso = new Date().toISOString();
+    owned.docs.forEach((d) => {
+      batch.update(d.ref, {
+        accountActive: true,
+        accountExpiresAt,
+        updatedAt: nowIso,
+      } as any);
+    });
+    await batch.commit();
+    stamped += owned.size;
+  }
+  logger.success(`Backfill contas: users=${targets.length} eventos=${stamped}`, { category: 'SYSTEM' });
+  return { users: targets.length, events: stamped };
 }
 
 export async function failPayment(orderId: string, reason?: string): Promise<void> {

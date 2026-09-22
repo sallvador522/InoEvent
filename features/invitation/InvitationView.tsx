@@ -19,7 +19,7 @@ import { TocaPlayer } from "../../components/music/TocaPlayer";
 import { BottomSheet } from "../../components/ui/BottomSheet";
 import { Button } from "../../components/ui/Button";
 import { db, useFirebase } from "../../components/FirebaseProvider";
-import { getGuestLimit, normalizePlanId, getPlanConfig, canUseFeature, getEventCreationLimit, isBusinessPlan, isEventExpired } from "../../lib/entitlements";
+import { getGuestLimit, normalizePlanId, getPlanConfig, canUseFeature, getEventCreationLimit, isBusinessPlan, isEventExpired, isAccountActive } from "../../lib/entitlements";
 import {
   doc,
   getDoc,
@@ -535,13 +535,14 @@ const InvitationView: React.FC = () => {
   );
 
   const isTemporarilyBlocked = !isEditing && !isTemplate && activeEvent && !isOwnerPreview && (
-    activeEvent.isBlocked || activeEvent.isPublished === false || 
+    activeEvent.isBlocked || (activeEvent.isPublished === false && !isAccountActive(activeEvent as any)) || 
     isEventExpired(activeEvent as any)
   );
   const isPendingActivation = !isEditing && !isTemplate && activeEvent &&
     !activeEvent.isBlocked &&
     activeEvent.isPublished === false &&
     (activeEvent as any).billingStatus !== 'paid' &&
+    !isAccountActive(activeEvent as any) &&
     !isEventExpired(activeEvent as any);
 
   if (isTemporarilyBlocked) {

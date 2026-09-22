@@ -36,7 +36,7 @@ export const AuthPage: React.FC = () => {
               uid: result.user.uid,
               name: result.user.displayName || '',
               email: result.user.email || 'no-email@example.com',
-              plan: 'Essencial'
+              plan: 'free'
           });
           trackPixelCompleteRegistration(
             { method: 'google' },
@@ -81,7 +81,7 @@ export const AuthPage: React.FC = () => {
             uid: userCredential.user.uid,
             name: name,
             email: email,
-            plan: 'Essencial'
+            plan: 'free'
         });
         trackPixelCompleteRegistration(
           { method: 'email' },

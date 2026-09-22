@@ -21,7 +21,7 @@ import { ExecutiveReportModal } from './ExecutiveReportModal';
 import { GuestDetailsModal } from './GuestDetailsModal';
 
 import { copyToClipboard } from '../../lib/clipboard';
-import { getGuestLimit, normalizePlanId, canUseFeature, getPlanConfig } from '../../lib/entitlements';
+import { getGuestLimit, normalizePlanId, canUseFeature, getPlanConfig, isAccountActive } from '../../lib/entitlements';
 
 export const Dashboard = () => {
     const { id } = useParams<{ id: string }>();
@@ -272,6 +272,7 @@ export const Dashboard = () => {
         (isFreeAccount ||
             (event.isPublished === false &&
                 event.billingStatus !== 'paid' &&
+                !isAccountActive(event) &&
                 normalizePlanId(userProfile?.plan) !== 'business'));
 
     const requirePaidForShare = () => {

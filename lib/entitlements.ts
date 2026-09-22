@@ -84,6 +84,18 @@ export function isEventActive(event: { expiresAt?: string | null; isBlocked?: bo
   return !isEventExpired(event);
 }
 
+// ---------------------------------------------------------------------------
+// Conta activa (§12) — pedido pago activa a CONTA (com validade); conta paga publica.
+// Leitura event-local: confirmPayment carimba accountActive/accountExpiresAt.
+// planExpiresAt null (atribuído manualmente) conta como válido (retrocompatível).
+// ---------------------------------------------------------------------------
+
+export function isAccountActive(event: { accountActive?: boolean; accountExpiresAt?: string | null } | null | undefined): boolean {
+  if (!event || event.accountActive !== true) return false;
+  if (!event.accountExpiresAt) return true;
+  return new Date(event.accountExpiresAt) > new Date();
+}
+
 export function getDaysUntilExpiration(event: { expiresAt?: string | null }): number | null {
   if (!event.expiresAt) return null;
   const diff = new Date(event.expiresAt).getTime() - Date.now();

@@ -100,6 +100,23 @@ export const AdminDashboard: React.FC = () => {
           plan: pendingPlanChange.nextPlan,
           planExpiresAt: (pendingPlanChange.nextPlan === 'Essencial' || pendingPlanChange.nextPlan === 'Free') ? null : date.toISOString()
         });
+        // Conta paga → carimba eventos do dono para publicar de imediato
+        const next = (pendingPlanChange.nextPlan || '').toLowerCase();
+        if (next && next !== 'free') {
+          try {
+            const token = await auth.currentUser?.getIdToken();
+            await fetch('/api/admin/backfill-accounts', {
+              method: 'POST',
+              headers: {
+                'Content-Type': 'application/json',
+                ...(token ? { Authorization: `Bearer ${token}` } : {}),
+              },
+              body: JSON.stringify({ userId: pendingPlanChange.userId }),
+            });
+          } catch {
+            /* best-effort — o backfill pode ser corrido manualmente */
+          }
+        }
         setUsers(users.map(u => u.id === pendingPlanChange.userId ? { ...u, plan: pendingPlanChange.nextPlan, planExpiresAt: (pendingPlanChange.nextPlan === 'Essencial' || pendingPlanChange.nextPlan === 'Free') ? null : date.toISOString() } : u));
         if (selectedUser?.id === pendingPlanChange.userId) {
           setSelectedUser({ ...selectedUser, plan: pendingPlanChange.nextPlan });

@@ -126,6 +126,8 @@ export const WeddingQuestionnaire: React.FC = () => {
   const [gallery, setGallery] = useState<string[]>([]);
   const [musicTrack, setMusicTrack] = useState('romantic');
   const [uploadingMusic, setUploadingMusic] = useState(false);
+  const [uploadingPhoto, setUploadingPhoto] = useState(false);
+  const [uploadingGallery, setUploadingGallery] = useState(false);
   const musicRef = useRef<HTMLInputElement>(null);
   const [dressCode, setDressCode] = useState('');
   const [gifts, setGifts] = useState<GiftItem[]>([]);
@@ -550,10 +552,18 @@ export const WeddingQuestionnaire: React.FC = () => {
                     <button
                       type="button"
                       onClick={() => fileRef.current?.click()}
-                      className="px-4 py-2.5 rounded-xl font-bold bg-[#1B365D] text-white hover:bg-[#224373] text-xs cursor-pointer"
+                      disabled={uploadingPhoto}
+                      className="px-4 py-2.5 rounded-xl font-bold bg-[#1B365D] text-white hover:bg-[#224373] disabled:opacity-70 text-xs cursor-pointer inline-flex items-center gap-2"
                       style={{ transition: 'background-color 200ms ease' }}
                     >
-                      Escolher foto
+                      {uploadingPhoto ? (
+                        <>
+                          <span className="w-3.5 h-3.5 border-2 border-white/40 border-t-white rounded-full animate-spin" aria-hidden="true" />
+                          A processar…
+                        </>
+                      ) : (
+                        'Escolher foto'
+                      )}
                     </button>
                     <input
                       type="file"
@@ -567,11 +577,14 @@ export const WeddingQuestionnaire: React.FC = () => {
                           e.target.value = '';
                           return;
                         }
+                        setUploadingPhoto(true);
                         try {
                           setHeroImage(await compressImage(file));
                           toast.success('Foto pronta!');
                         } catch {
                           toast.error('Não foi possível ler a foto.');
+                        } finally {
+                          setUploadingPhoto(false);
                         }
                       }}
                       accept={IMAGE_ACCEPT}
@@ -601,11 +614,21 @@ export const WeddingQuestionnaire: React.FC = () => {
                       <button
                         type="button"
                         onClick={() => galleryRef.current?.click()}
-                        className="aspect-square rounded-xl border border-dashed border-slate-300 flex flex-col items-center justify-center gap-1 text-slate-400 hover:text-[#1B365D] hover:border-[#C5A028] cursor-pointer"
+                        disabled={uploadingGallery}
+                        className="aspect-square rounded-xl border border-dashed border-slate-300 flex flex-col items-center justify-center gap-1 text-slate-400 hover:text-[#1B365D] hover:border-[#C5A028] disabled:opacity-70 cursor-pointer"
                         style={{ transition: 'color 200ms ease, border-color 200ms ease' }}
                       >
-                        <Plus size={20} />
-                        <span className="text-[10px] font-bold uppercase tracking-wider">Foto</span>
+                        {uploadingGallery ? (
+                          <>
+                            <span className="w-5 h-5 border-2 border-slate-300 border-t-[#1B365D] rounded-full animate-spin" aria-hidden="true" />
+                            <span className="text-[10px] font-bold uppercase tracking-wider">A processar…</span>
+                          </>
+                        ) : (
+                          <>
+                            <Plus size={20} />
+                            <span className="text-[10px] font-bold uppercase tracking-wider">Foto</span>
+                          </>
+                        )}
                       </button>
                     )}
                   </div>
@@ -623,12 +646,15 @@ export const WeddingQuestionnaire: React.FC = () => {
                           return;
                         }
                       }
+                      setUploadingGallery(true);
                       try {
                         const imgs = await Promise.all(files.map((f) => compressImage(f)));
                         setGallery((g) => [...g, ...imgs].slice(0, 6));
                         toast.success('Fotos prontas!');
                       } catch {
                         toast.error('Não foi possível ler as fotos.');
+                      } finally {
+                        setUploadingGallery(false);
                       }
                       e.target.value = '';
                     }}
@@ -664,16 +690,24 @@ export const WeddingQuestionnaire: React.FC = () => {
                       <audio src={musicTrack} controls preload="metadata" className="flex-1 h-10 min-w-0" />
                       <button
                         type="button"
+                        disabled={saving}
                         onClick={async () => {
                           const old = musicTrack;
                           setMusicTrack('romantic');
                           await saveDraft({ musicTrack: 'romantic' });
                           await deleteEventAudio(old);
                         }}
-                        className="shrink-0 text-xs font-bold text-slate-400 hover:text-red-500 uppercase tracking-wider cursor-pointer px-2 min-h-[44px]"
+                        className="shrink-0 text-xs font-bold text-slate-400 hover:text-red-500 uppercase tracking-wider cursor-pointer px-2 min-h-[44px] disabled:opacity-60 inline-flex items-center gap-1.5"
                         style={{ transition: 'color 200ms ease' }}
                       >
-                        Tirar
+                        {saving ? (
+                          <>
+                            <span className="w-3.5 h-3.5 border-2 border-slate-300 border-t-red-400 rounded-full animate-spin" aria-hidden="true" />
+                            A remover…
+                          </>
+                        ) : (
+                          'Tirar'
+                        )}
                       </button>
                     </div>
                   ) : (
@@ -979,7 +1013,14 @@ export const WeddingQuestionnaire: React.FC = () => {
               className="min-h-[48px] inline-flex items-center gap-2 px-7 rounded-full font-bold bg-[#1B365D] text-white hover:bg-[#224373] disabled:opacity-60 text-xs uppercase tracking-wider cursor-pointer"
               style={{ transition: 'background-color 200ms ease' }}
             >
-              {saving ? 'A guardar…' : 'Continuar'} <ArrowRight size={16} />
+              {saving ? (
+                <>
+                  <span className="w-4 h-4 border-2 border-white/40 border-t-white rounded-full animate-spin" aria-hidden="true" />
+                  A guardar…
+                </>
+              ) : (
+                <>Continuar <ArrowRight size={16} /></>
+              )}
             </button>
           ) : (
             <button
@@ -989,7 +1030,14 @@ export const WeddingQuestionnaire: React.FC = () => {
               className="min-h-[48px] inline-flex items-center gap-2 px-7 rounded-full font-bold bg-[#C5A028] text-[#1B365D] hover:bg-[#d4af37] disabled:opacity-60 text-xs uppercase tracking-wider cursor-pointer"
               style={{ transition: 'background-color 200ms ease' }}
             >
-              {saving ? 'A publicar…' : 'Publicar convite'} <Check size={16} />
+              {saving ? (
+                <>
+                  <span className="w-4 h-4 border-2 border-[#1B365D]/30 border-t-[#1B365D] rounded-full animate-spin" aria-hidden="true" />
+                  A publicar…
+                </>
+              ) : (
+                <>Publicar convite <Check size={16} /></>
+              )}
             </button>
           )}
         </div>

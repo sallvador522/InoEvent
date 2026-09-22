@@ -17,6 +17,9 @@ export const VirtualGiftsManager: React.FC<{ event: any }> = ({ event }) => {
    const [isEditing, setIsEditing] = useState(false);
    const [newGift, setNewGift] = useState({ title: '', price: '', emoji: '🎁' });
    const [contributions, setContributions] = useState<any[]>([]);
+   const [isLoadingContribs, setIsLoadingContribs] = useState(true);
+   const [isSavingGift, setIsSavingGift] = useState(false);
+   const [deletingGiftId, setDeletingGiftId] = useState<string | null>(null);
 
    useEffect(() => {
        if (event.gifts) {
@@ -24,54 +27,65 @@ export const VirtualGiftsManager: React.FC<{ event: any }> = ({ event }) => {
        }
    }, [event.gifts]);
 
-   useEffect(() => {
-       const fetchContributions = async () => {
-           try {
-               const contRef = collection(db, 'events', event.id, 'contributions');
-               const q = query(contRef, orderBy('date', 'desc'));
-               const snapshot = await getDocs(q);
-               setContributions(snapshot.docs.map(d => ({id: d.id, ...d.data()})));
-           } catch(e) {
-               console.warn("Could not fetch contributions", e);
-           }
-       };
-       fetchContributions();
-   }, [event.id]);
+    useEffect(() => {
+        const fetchContributions = async () => {
+            setIsLoadingContribs(true);
+            try {
+                const contRef = collection(db, 'events', event.id, 'contributions');
+                const q = query(contRef, orderBy('date', 'desc'));
+                const snapshot = await getDocs(q);
+                setContributions(snapshot.docs.map(d => ({id: d.id, ...d.data()})));
+            } catch(e) {
+                console.warn("Could not fetch contributions", e);
+            } finally {
+                setIsLoadingContribs(false);
+            }
+        };
+        fetchContributions();
+    }, [event.id]);
 
-   const handleAddGift = async () => {
-       if (!newGift.title || !newGift.price) {
-           toast.error('Preencha os campos de nome e valor.');
-           return;
-       }
+    const handleAddGift = async () => {
+        if (!newGift.title || !newGift.price) {
+            toast.error('Preencha os campos de nome e valor.');
+            return;
+        }
+        if (isSavingGift) return;
 
-       const updatedGifts = [...gifts, { 
-           id: Math.random().toString(36).substr(2, 9), 
-           title: newGift.title, 
-           price: Number(newGift.price), 
-           emoji: newGift.emoji 
-       }];
-       
-       try {
-           await updateDoc(doc(db, 'events', event.id), { gifts: updatedGifts });
-           setGifts(updatedGifts);
-           setNewGift({ title: '', price: '', emoji: '🎁' });
-           toast.success('Lista de Presentes atualizada!');
-           setIsEditing(false);
-       } catch(e) {
-           toast.error('Erro ao salvar presente.');
-       }
-   };
+        const updatedGifts = [...gifts, { 
+            id: Math.random().toString(36).substr(2, 9), 
+            title: newGift.title, 
+            price: Number(newGift.price), 
+            emoji: newGift.emoji 
+        }];
+        
+        setIsSavingGift(true);
+        try {
+            await updateDoc(doc(db, 'events', event.id), { gifts: updatedGifts });
+            setGifts(updatedGifts);
+            setNewGift({ title: '', price: '', emoji: '🎁' });
+            toast.success('Lista de Presentes atualizada!');
+            setIsEditing(false);
+        } catch(e) {
+            toast.error('Erro ao salvar presente.');
+        } finally {
+            setIsSavingGift(false);
+        }
+    };
 
-   const handleDeleteGift = async (id: string) => {
-       const updatedGifts = gifts.filter(g => g.id !== id);
-       try {
-           await updateDoc(doc(db, 'events', event.id), { gifts: updatedGifts });
-           setGifts(updatedGifts);
-           toast.success('Item removido com sucesso!');
-       } catch(e) {
-           toast.error('Erro ao remover presente.');
-       }
-   };
+    const handleDeleteGift = async (id: string) => {
+        if (deletingGiftId) return;
+        const updatedGifts = gifts.filter(g => g.id !== id);
+        setDeletingGiftId(id);
+        try {
+            await updateDoc(doc(db, 'events', event.id), { gifts: updatedGifts });
+            setGifts(updatedGifts);
+            toast.success('Item removido com sucesso!');
+        } catch(e) {
+            toast.error('Erro ao remover presente.');
+        } finally {
+            setDeletingGiftId(null);
+        }
+    };
 
    return (
        <div className="bg-white rounded-3xl p-6 md:p-8 shadow-sm border border-slate-100 flex flex-col gap-6">
@@ -126,10 +140,13 @@ export const VirtualGiftsManager: React.FC<{ event: any }> = ({ event }) => {
                                    value={newGift.price} onChange={e => setNewGift({...newGift, price: e.target.value})} 
                                />
                            </div>
-                           <div className="sm:col-span-12 flex justify-end gap-2 mt-2">
-                               <button onClick={() => setIsEditing(false)} className="px-5 py-2.5 rounded-xl font-bold bg-slate-200 text-slate-600 hover:bg-slate-300">Cancelar</button>
-                               <button onClick={handleAddGift} className="px-5 py-2.5 rounded-xl font-bold bg-brand-blue text-white hover:bg-blue-700">Salvar Item</button>
-                           </div>
+                            <div className="sm:col-span-12 flex justify-end gap-2 mt-2">
+                                <button onClick={() => setIsEditing(false)} className="px-5 py-2.5 rounded-xl font-bold bg-slate-200 text-slate-600 hover:bg-slate-300">Cancelar</button>
+                                <button onClick={handleAddGift} disabled={isSavingGift} className="px-5 py-2.5 rounded-xl font-bold bg-brand-blue text-white hover:bg-blue-700 disabled:opacity-60 inline-flex items-center gap-2">
+                                  {isSavingGift && <span className="w-4 h-4 border-2 border-white/40 border-t-white rounded-full animate-spin" aria-hidden="true" />}
+                                  {isSavingGift ? 'A salvar…' : 'Salvar Item'}
+                                </button>
+                            </div>
                        </div>
                    </motion.div>
                )}
@@ -143,11 +160,15 @@ export const VirtualGiftsManager: React.FC<{ event: any }> = ({ event }) => {
                       <button onClick={() => setIsEditing(true)} className="text-brand-blue font-bold mt-2 hover:underline">Criar a primeira</button>
                    </div>
                )}
-               {gifts.map((gift, idx) => (
-                   <div key={gift.id || 'gift-' + idx} className="border border-slate-200 rounded-2xl p-5 flex flex-col justify-between bg-white shadow-sm hover:shadow-md transition-shadow relative group">
-                       <button onClick={() => handleDeleteGift(gift.id)} className="absolute top-4 right-4 text-slate-300 hover:text-red-500 opacity-0 group-hover:opacity-100 transition-opacity">
-                           <Trash2 size={16} />
-                       </button>
+                {gifts.map((gift, idx) => (
+                    <div key={gift.id || 'gift-' + idx} className="border border-slate-200 rounded-2xl p-5 flex flex-col justify-between bg-white shadow-sm hover:shadow-md transition-shadow relative group">
+                        <button onClick={() => handleDeleteGift(gift.id)} disabled={deletingGiftId === gift.id} className="absolute top-4 right-4 text-slate-300 hover:text-red-500 disabled:opacity-60 opacity-0 group-hover:opacity-100 transition-opacity">
+                            {deletingGiftId === gift.id ? (
+                              <span className="w-4 h-4 border-2 border-slate-300 border-t-red-400 rounded-full animate-spin block" aria-hidden="true" />
+                            ) : (
+                              <Trash2 size={16} />
+                            )}
+                        </button>
                        <div className="text-4xl mb-4 text-center mt-2">{gift.emoji}</div>
                        <div className="text-center">
                            <h4 className="font-bold text-slate-800 line-clamp-2">{gift.title}</h4>
@@ -157,7 +178,12 @@ export const VirtualGiftsManager: React.FC<{ event: any }> = ({ event }) => {
                ))}
            </div>
 
-           {contributions.length > 0 && (
+            {isLoadingContribs ? (
+                <div className="mt-8 border-t border-slate-100 pt-8 space-y-3 animate-pulse" aria-hidden="true">
+                    <div className="h-5 w-48 bg-slate-200 rounded-lg" />
+                    <div className="h-16 bg-slate-100 rounded-2xl" />
+                </div>
+            ) : contributions.length > 0 && (
                <div className="mt-8 border-t border-slate-100 pt-8">
                    <h3 className="font-bold text-slate-800 mb-4 flex items-center gap-2">
                        <CheckCircle2 size={18} className="text-emerald-500" />

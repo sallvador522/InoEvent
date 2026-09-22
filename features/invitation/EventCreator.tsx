@@ -496,8 +496,17 @@ export const EventCreator: React.FC = () => {
             disabled={isLoading}
             className="flex items-center gap-1.5 bg-gradient-to-r from-purple-600 to-indigo-600 hover:from-purple-700 hover:to-indigo-700 hover:shadow-lg hover:shadow-indigo-500/20 text-white font-semibold text-xs md:text-sm py-2 px-5 rounded-xl transition-all duration-300 disabled:opacity-50 cursor-pointer border-none shadow-md"
           >
-            <Save size={16} />
-            <span>Salvar Convite</span>
+            {isLoading ? (
+              <>
+                <span className="w-4 h-4 border-2 border-white/40 border-t-white rounded-full animate-spin" aria-hidden="true" />
+                <span>Salvando…</span>
+              </>
+            ) : (
+              <>
+                <Save size={16} />
+                <span>Salvar Convite</span>
+              </>
+            )}
           </button>
         </div>
       </header>

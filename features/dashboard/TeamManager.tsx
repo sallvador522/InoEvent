@@ -35,6 +35,7 @@ export const TeamManager: React.FC<TeamManagerProps> = ({ event }) => {
     const [newRole, setNewRole] = useState<'admin' | 'editor' | 'scanner' | 'viewer'>('editor');
     const [isSubmitting, setIsSubmitting] = useState(false);
     const [copiedId, setCopiedId] = useState<string | null>(null);
+    const [pendingMemberId, setPendingMemberId] = useState<string | null>(null);
 
     // Limit check by Plan
     const maxMembers = isBusinessPlan(eventPlan) ? 10 : 3;
@@ -106,7 +107,8 @@ export const TeamManager: React.FC<TeamManagerProps> = ({ event }) => {
 
     const handleRemoveMember = async (memberId: string, name: string) => {
         if (!window.confirm(`Tem certeza que deseja remover ${name} da equipe?`)) return;
-
+        if (pendingMemberId) return;
+        setPendingMemberId(memberId);
         try {
             const memberRef = doc(db, 'events', eventId, 'team', memberId);
             await deleteDoc(memberRef);
@@ -114,10 +116,14 @@ export const TeamManager: React.FC<TeamManagerProps> = ({ event }) => {
         } catch (error) {
             console.error(error);
             toast.error("Ocorreu um erro ao remover o colaborador.");
+        } finally {
+            setPendingMemberId(null);
         }
     };
 
     const handleUpdateRole = async (memberId: string, role: 'admin' | 'editor' | 'scanner' | 'viewer') => {
+        if (pendingMemberId) return;
+        setPendingMemberId(memberId);
         try {
             const memberRef = doc(db, 'events', eventId, 'team', memberId);
             await updateDoc(memberRef, { role });
@@ -125,6 +131,8 @@ export const TeamManager: React.FC<TeamManagerProps> = ({ event }) => {
         } catch (error) {
             console.error(error);
             toast.error("Erro ao atualizar permissão.");
+        } finally {
+            setPendingMemberId(null);
         }
     };
 
@@ -134,14 +142,20 @@ export const TeamManager: React.FC<TeamManagerProps> = ({ event }) => {
     };
 
     const handleCopyLink = async (member: TeamMember) => {
+        if (pendingMemberId) return;
         let token = event?.clientToken || '';
         if (!token && (member.role === 'scanner' || member.role === 'viewer')) {
-            token = Math.random().toString(36).substring(2, 8).toUpperCase();
+            setPendingMemberId(member.id);
             try {
+                token = Math.random().toString(36).substring(2, 8).toUpperCase();
                 await updateDoc(doc(db, 'events', event.id), { clientToken: token });
             } catch (error) {
                 console.error("Error generating token", error);
+                toast.error("Falha ao gerar link.");
+                setPendingMemberId(null);
+                return;
             }
+            setPendingMemberId(null);
         }
         
         const path = member.role === 'viewer'
@@ -314,10 +328,11 @@ export const TeamManager: React.FC<TeamManagerProps> = ({ event }) => {
                                             <div className="flex items-center gap-2 self-end sm:self-auto shrink-0 bg-slate-50 p-1 rounded-xl border border-slate-100">
                                                 <select
                                                     value={member.role}
+                                                    disabled={pendingMemberId === member.id}
                                                     onChange={e => handleUpdateRole(member.id, e.target.value as any)}
-                                                    className="bg-white text-xs font-bold text-slate-600 border border-slate-200 rounded-lg px-2 py-1.5 focus:outline-none"
+                                                    className="bg-white text-xs font-bold text-slate-600 border border-slate-200 rounded-lg px-2 py-1.5 focus:outline-none disabled:opacity-60"
                                                 >
-                                                    <option value="viewer">Visualizador</option>
+                                                    <option value="viewer">Visualizador{pendingMemberId === member.id ? ' (a gravar…)' : ''}</option>
                                                     <option value="scanner">Portaria Scanner</option>
                                                     <option value="editor">Editor</option>
                                                     <option value="admin">Administrador</option>
@@ -326,7 +341,8 @@ export const TeamManager: React.FC<TeamManagerProps> = ({ event }) => {
                                                 <button
                                                     onClick={() => handleCopyLink(member)}
                                                     type="button"
-                                                    className="p-1.5 text-slate-400 hover:text-brand-blue rounded-lg transition-colors cursor-pointer"
+                                                    disabled={pendingMemberId === member.id}
+                                                    className="p-1.5 text-slate-400 hover:text-brand-blue disabled:opacity-60 rounded-lg transition-colors cursor-pointer"
                                                     title="Copiar Link de Acesso Customizado"
                                                 >
                                                     {copiedId === member.id ? <Check size={14} className="text-emerald-500 animate-pulse" /> : <Link2 size={14} />}
@@ -335,10 +351,15 @@ export const TeamManager: React.FC<TeamManagerProps> = ({ event }) => {
                                                 <button
                                                     onClick={() => handleRemoveMember(member.id, member.name)}
                                                     type="button"
-                                                    className="p-1.5 text-slate-400 hover:text-red-500 rounded-lg transition-colors cursor-pointer"
+                                                    disabled={pendingMemberId === member.id}
+                                                    className="p-1.5 text-slate-400 hover:text-red-500 disabled:opacity-60 rounded-lg transition-colors cursor-pointer"
                                                     title="Remover da Equipe"
                                                 >
-                                                    <Trash2 size={14} />
+                                                    {pendingMemberId === member.id ? (
+                                                      <span className="w-3.5 h-3.5 border-2 border-slate-300 border-t-red-400 rounded-full animate-spin block" aria-hidden="true" />
+                                                    ) : (
+                                                      <Trash2 size={14} />
+                                                    )}
                                                 </button>
                                             </div>
                                         </motion.div>

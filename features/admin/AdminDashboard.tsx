@@ -16,6 +16,7 @@ export const AdminDashboard: React.FC = () => {
   const [visits, setVisits] = useState<any[]>([]);
   const [loading, setLoading] = useState(true);
   const [confirmingOrderId, setConfirmingOrderId] = useState<string | null>(null);
+  const [isSendingNotif, setIsSendingNotif] = useState(false);
   
   const [activeTab, setActiveTab] = useState<'overview' | 'users' | 'events' | 'transactions' | 'orders' | 'analytics'>('overview');
   const [selectedUser, setSelectedUser] = useState<any | null>(null);
@@ -87,7 +88,8 @@ export const AdminDashboard: React.FC = () => {
   };
 
   const handleConfirmAndSendNotification = async () => {
-    if (!notificationTargetUserId) return;
+    if (!notificationTargetUserId || isSendingNotif) return;
+    setIsSendingNotif(true);
     try {
       if (pendingPlanChange) {
         // Validade oficial do plano (config/plans) — Essencial/Free sem expiração
@@ -138,6 +140,8 @@ export const AdminDashboard: React.FC = () => {
     } catch (error) {
       console.error('Error upgrading plan/sending notification:', error);
       toast.error('Erro ao processar alteração ou enviar notificação.');
+    } finally {
+      setIsSendingNotif(false);
     }
   };
 
@@ -795,10 +799,15 @@ export const AdminDashboard: React.FC = () => {
                   </button>
                   <button 
                     onClick={handleConfirmAndSendNotification}
-                    className="flex items-center gap-1.5 bg-brand-blue text-white text-xs font-bold px-5 py-2.5 rounded-xl shadow-lg shadow-brand-blue/20 hover:bg-brand-blue/90 hover:scale-[1.01] active:translate-y-0 active:scale-95 transition-all outline-none cursor-pointer"
+                    disabled={isSendingNotif}
+                    className="flex items-center gap-1.5 bg-brand-blue text-white text-xs font-bold px-5 py-2.5 rounded-xl shadow-lg shadow-brand-blue/20 hover:bg-brand-blue/90 hover:scale-[1.01] active:translate-y-0 active:scale-95 transition-all outline-none cursor-pointer disabled:opacity-60"
                   >
-                    <span className="material-symbols-outlined text-[16px]">send</span>
-                    Confirmar e Enviar
+                    {isSendingNotif ? (
+                      <span className="w-4 h-4 border-2 border-white/40 border-t-white rounded-full animate-spin" aria-hidden="true" />
+                    ) : (
+                      <span className="material-symbols-outlined text-[16px]">send</span>
+                    )}
+                    {isSendingNotif ? 'A enviar…' : 'Confirmar e Enviar'}
                   </button>
                 </div>
               </motion.div>

@@ -7,6 +7,7 @@ import { CheckCircle, XCircle, ArrowLeft, ScanLine, Clock, CheckCircle2, Users, 
 import { Button } from '../../components/ui/Button';
 import { QRScanner } from '../../components/QRScanner';
 import { playScanSound } from '../../lib/sound';
+import toast from 'react-hot-toast';
 
 
 const ConfettiBurst: React.FC<{ count?: number }> = ({ count = 30 }) => {
@@ -97,6 +98,8 @@ export const CheckinScanner: React.FC = () => {
     const [activeTab, setActiveTab] = useState<'scanner' | 'list'>('scanner');
     const [guests, setGuests] = useState<any[]>([]);
     const [searchQuery, setSearchQuery] = useState('');
+    const [isGuestsLoading, setIsGuestsLoading] = useState(true);
+    const [pendingCheckInId, setPendingCheckInId] = useState<string | null>(null);
 
     useEffect(() => {
         const processCheckin = async () => {
@@ -195,13 +198,15 @@ export const CheckinScanner: React.FC = () => {
 
     useEffect(() => {
         if (status === 'reception_mode' && id) {
+            setIsGuestsLoading(true);
             const unsubscribe = onSnapshot(collection(db, `events/${id}/guests`), (snapshot) => {
                 const guestsList = snapshot.docs.map(doc => ({
                     id: doc.id,
                     ...doc.data()
                 }));
                 setGuests(guestsList);
-            });
+                setIsGuestsLoading(false);
+            }, () => setIsGuestsLoading(false));
             return () => unsubscribe();
         }
     }, [status, id]);
@@ -273,7 +278,8 @@ export const CheckinScanner: React.FC = () => {
     };
 
     const handleManualCheckIn = async (guest: any) => {
-        if (!id) return;
+        if (!id || pendingCheckInId) return;
+        setPendingCheckInId(guest.id);
         try {
             const guestRef = doc(db, 'events', id, 'guests', guest.id);
             await updateDoc(guestRef, {
@@ -284,6 +290,9 @@ export const CheckinScanner: React.FC = () => {
             });
         } catch (e) {
             console.error("Error manually checking in guest", e);
+            toast.error("Falha ao registar. Tenta de novo.");
+        } finally {
+            setPendingCheckInId(null);
         }
     };
 
@@ -456,17 +465,32 @@ export const CheckinScanner: React.FC = () => {
                                     </div>
                                     <button 
                                         onClick={() => handleManualCheckIn(guest)}
-                                        className={`w-14 h-14 rounded-2xl flex items-center justify-center shrink-0 transition-colors ${guest.checkedIn ? 'bg-emerald-500/20 text-emerald-500 border border-emerald-500/30' : 'bg-slate-700 text-slate-400 hover:bg-slate-600'}`}
+                                        disabled={pendingCheckInId !== null}
+                                        className={`w-14 h-14 rounded-2xl flex items-center justify-center shrink-0 transition-colors disabled:opacity-60 ${guest.checkedIn ? 'bg-emerald-500/20 text-emerald-500 border border-emerald-500/30' : 'bg-slate-700 text-slate-400 hover:bg-slate-600'}`}
                                     >
-                                        {guest.checkedIn ? <CheckCircle2 size={28} /> : <div className="w-7 h-7 rounded-full border-2 border-current opacity-50" />}
+                                        {pendingCheckInId === guest.id ? (
+                                          <span className="w-7 h-7 rounded-full border-2 border-current border-t-transparent animate-spin" aria-hidden="true" />
+                                        ) : guest.checkedIn ? <CheckCircle2 size={28} /> : <div className="w-7 h-7 rounded-full border-2 border-current opacity-50" />}
                                     </button>
                                 </div>
                             ))}
                             
-                            {filteredGuests.length === 0 && (
+                            {isGuestsLoading ? (
+                                <div className="flex flex-col gap-3 pb-20" aria-hidden="true">
+                                    {[1, 2, 3].map((i) => (
+                                        <div key={i} className="bg-slate-800/80 border border-slate-700 rounded-2xl p-4 flex items-center justify-between animate-pulse">
+                                            <div className="flex-1 min-w-0 pr-4 space-y-2">
+                                                <div className="h-5 w-2/3 bg-slate-700 rounded-lg" />
+                                                <div className="h-4 w-1/3 bg-slate-700/70 rounded-md" />
+                                            </div>
+                                            <div className="w-14 h-14 rounded-2xl bg-slate-700" />
+                                        </div>
+                                    ))}
+                                </div>
+                            ) : filteredGuests.length === 0 && (
                                 <div className="text-center py-12">
                                     <Users size={48} className="mx-auto text-slate-700 mb-4" />
-                                    <p className="text-slate-400 font-medium text-lg">Nenhum convidado encontrado.</p>
+                                    <p className="text-slate-400 font-medium text-lg">{searchQuery ? 'Nada encontrado para esta busca.' : 'Nenhum convidado encontrado.'}</p>
                                 </div>
                             )}
                         </div>

@@ -57,6 +57,12 @@ export const Dashboard = () => {
     const [showExportModal, setShowExportModal] = useState(false);
     const [exportFilter, setExportFilter] = useState<'all' | 'confirmed' | 'pending' | 'declined'>('confirmed');
     const [exportFormat, setExportFormat] = useState<'csv' | 'excel'>('excel');
+    const [isAddingGuest, setIsAddingGuest] = useState(false);
+    const [updatingStatusId, setUpdatingStatusId] = useState<string | null>(null);
+    const [deletingGuestId, setDeletingGuestId] = useState<string | null>(null);
+    const [isGenLink, setIsGenLink] = useState(false);
+    const [isImporting, setIsImporting] = useState(false);
+    const [pendingInline, setPendingInline] = useState<string | null>(null);
 
     const [activeTab, setActiveTab] = useState<'guests' | 'analytics' | 'gifts' | 'messages' | 'team' | 'premium' | 'tables'>('guests');
 
@@ -300,6 +306,8 @@ export const Dashboard = () => {
     const confirmDelete = () => setShowDeleteConfirm(true);
 
     const handleExport = (filter: 'all' | 'confirmed' | 'pending' | 'declined', format: 'csv' | 'excel') => {
+        const toastId = toast.loading("A gerar ficheiro…");
+        try {
         let filtered = guests;
         if (filter === 'confirmed') {
             filtered = guests.filter(g => g.status === 'CONFIRMED');
@@ -334,7 +342,7 @@ export const Dashboard = () => {
             document.body.appendChild(link);
             link.click();
             document.body.removeChild(link);
-            toast.success("Arquivo CSV exportado com sucesso!");
+            toast.success("Arquivo CSV exportado com sucesso!", { id: toastId });
         } else {
             let html = `<html xmlns:o="urn:schemas-microsoft-com:office:office" xmlns:x="urn:schemas-microsoft-com:office:excel" xmlns="http://www.w3.org/TR/REC-html40">
 <head>
@@ -403,7 +411,10 @@ export const Dashboard = () => {
             document.body.appendChild(link);
             link.click();
             document.body.removeChild(link);
-            toast.success("Planilha Excel exportada com sucesso!");
+            toast.success("Planilha Excel exportada com sucesso!", { id: toastId });
+        }
+        } catch {
+            toast.error("Falha ao gerar ficheiro.", { id: toastId });
         }
     };
 
@@ -420,6 +431,7 @@ export const Dashboard = () => {
         }
 
         try {
+            setIsAddingGuest(true);
             const guestRef = doc(collection(db, 'events', id, 'guests'));
             await setDoc(guestRef, {
                 name: newGuestName,
@@ -435,6 +447,8 @@ export const Dashboard = () => {
         } catch (error) {
             handleFirestoreError(error, OperationType.CREATE, 'guests');
             toast.error("Erro ao adicionar convidado");
+        } finally {
+            setIsAddingGuest(false);
         }
     };
 
@@ -561,6 +575,7 @@ export const Dashboard = () => {
 
     const handleDeleteGuest = async (guestId: string) => {
         setIsDeleting(true);
+        setDeletingGuestId(guestId);
         try {
             const guestRef = doc(db, 'events', id!, 'guests', guestId);
             await deleteDoc(guestRef);
@@ -572,10 +587,13 @@ export const Dashboard = () => {
             handleFirestoreError(error, OperationType.DELETE, `events/${id}/guests/${guestId}`);
             toast.error('Falha ao remover o convidado.');
             setIsDeleting(false);
+        } finally {
+            setDeletingGuestId(null);
         }
     };
 
     const handleUpdateGuestStatus = async (guestId: string, newStatus: string) => {
+        setUpdatingStatusId(`${guestId}:${newStatus}`);
         try {
             const guestRef = doc(db, 'events', id!, 'guests', guestId);
             await updateDoc(guestRef, { status: newStatus });
@@ -584,6 +602,8 @@ export const Dashboard = () => {
         } catch (error) {
             handleFirestoreError(error, OperationType.UPDATE, `events/${id}/guests/${guestId}`);
             toast.error("Erro ao atualizar status.");
+        } finally {
+            setUpdatingStatusId(null);
         }
     };
 
@@ -958,18 +978,32 @@ export const Dashboard = () => {
                         <button 
                             onClick={async () => {
                                 if (!requirePaidForShare()) return;
-                                let token = event.clientToken;
-                                if (!token) {
-                                    token = Math.random().toString(36).substring(2, 8).toUpperCase();
-                                    await updateDoc(doc(db, 'events', event.id), { clientToken: token });
+                                if (isGenLink) return;
+                                setIsGenLink(true);
+                                try {
+                                    let token = event.clientToken;
+                                    if (!token) {
+                                        token = Math.random().toString(36).substring(2, 8).toUpperCase();
+                                        await updateDoc(doc(db, 'events', event.id), { clientToken: token });
+                                    }
+                                    const link = `${getPublicOrigin()}/client-dashboard/${event.id}?token=${token}`;
+                                    copyToClipboard(link);
+                                    toast.success("Link do cliente copiado para a área de transferência!");
+                                } catch {
+                                    toast.error("Falha ao gerar link.");
+                                } finally {
+                                    setIsGenLink(false);
                                 }
-                                const link = `${getPublicOrigin()}/client-dashboard/${event.id}?token=${token}`;
-                                copyToClipboard(link);
-                                toast.success("Link do cliente copiado para a área de transferência!");
                             }}
-                            className="h-14 px-6 bg-[#BF9B30] text-slate-900 rounded-2xl font-bold text-sm hover:bg-[#BF9B30]/90 shadow-md transition-all flex items-center justify-center gap-2 whitespace-nowrap"
+                            disabled={isGenLink}
+                            className="h-14 px-6 bg-[#BF9B30] text-slate-900 rounded-2xl font-bold text-sm hover:bg-[#BF9B30]/90 disabled:opacity-60 shadow-md transition-all flex items-center justify-center gap-2 whitespace-nowrap"
                         >
-                            <Share2 size={16} /> Link do Cliente
+                            {isGenLink ? (
+                              <span className="w-4 h-4 border-2 border-slate-700/30 border-t-slate-900 rounded-full animate-spin" aria-hidden="true" />
+                            ) : (
+                              <Share2 size={16} />
+                            )}
+                            {isGenLink ? 'A gerar…' : 'Link do Cliente'}
                         </button>
                     </div>
                 </div>
@@ -1184,14 +1218,18 @@ export const Dashboard = () => {
                                 </button>
                                 <button onClick={() => {
                                     if (!requireGuestsAllowed()) return;
+                                    if (isImporting) return;
                                     const input = document.createElement("input");
                                     input.type = "file";
                                     input.accept = ".csv";
                                     input.onchange = (e: any) => {
                                         const file = e.target.files[0];
                                         if (file) {
+                                            setIsImporting(true);
+                                            const toastId = toast.loading("A importar convidados…");
                                             const reader = new FileReader();
                                             reader.onload = async (event: any) => {
+                                                try {
                                                 const text = event.target.result;
                                                 const rows = text.split("\n");
                                                 const guestsCollection = collection(db, "events", id!, "guests");
@@ -1201,7 +1239,7 @@ export const Dashboard = () => {
                                                 const maxToAdd = maxGuests - currentCount;
                                                 for (let i = 1; i < rows.length; i++) {
                                                     if (added >= maxToAdd) {
-                                                        toast.error("O limite de convidados do seu plano foi atingido. (" + added + " adicionados)");
+                                                        toast.error("O limite de convidados do seu plano foi atingido. (" + added + " adicionados)", { id: toastId });
                                                         break;
                                                     }
                                                     const row = rows[i].split(",");
@@ -1220,14 +1258,24 @@ export const Dashboard = () => {
                                                         }
                                                     }
                                                 }
-                                                toast.success("Importação concluída.");
+                                                toast.success(`Importação concluída: ${added} adicionados.`, { id: toastId });
+                                                } catch {
+                                                    toast.error("Falha na importação.", { id: toastId });
+                                                } finally {
+                                                    setIsImporting(false);
+                                                }
                                             };
                                             reader.readAsText(file);
                                         }
                                     };
                                     input.click();
-                                }} className="justify-center text-sm font-bold text-white bg-emerald-600 px-4 py-2 rounded-xl hover:bg-emerald-700 transition-colors flex items-center gap-2 shadow-sm text-center">
-                                    <UploadCloud size={16} /> Importar CSV
+                                }} disabled={isImporting} className="justify-center text-sm font-bold text-white bg-emerald-600 px-4 py-2 rounded-xl hover:bg-emerald-700 disabled:opacity-60 transition-colors flex items-center gap-2 shadow-sm text-center">
+                                    {isImporting ? (
+                                      <span className="w-4 h-4 border-2 border-white/40 border-t-white rounded-full animate-spin" aria-hidden="true" />
+                                    ) : (
+                                      <UploadCloud size={16} />
+                                    )}
+                                    {isImporting ? 'A importar…' : 'Importar CSV'}
                                 </button>
                                 <button onClick={() => setShowExportModal(true)} className="justify-center text-sm font-bold text-brand-blue bg-brand-blue/5 px-4 py-2 rounded-xl hover:bg-brand-blue/10 transition-colors flex items-center gap-2 text-center">
                                     <Download size={16} /> Exportar
@@ -1687,18 +1735,32 @@ export const Dashboard = () => {
                             {isBusinessPlan && (
                                 <button 
                                     onClick={async () => {
-                                        let token = event.clientToken;
-                                        if (!token) {
-                                            token = Math.random().toString(36).substring(2, 8).toUpperCase();
-                                            await updateDoc(doc(db, 'events', event.id), { clientToken: token });
+                                        if (isGenLink) return;
+                                        setIsGenLink(true);
+                                        try {
+                                            let token = event.clientToken;
+                                            if (!token) {
+                                                token = Math.random().toString(36).substring(2, 8).toUpperCase();
+                                                await updateDoc(doc(db, 'events', event.id), { clientToken: token });
+                                            }
+                                            const link = `${getPublicOrigin()}/checkin/${event.id}?token=${token}&mode=reception`;
+                                            copyToClipboard(link);
+                                            toast.success("Link de Recepcionista copiado para a área de transferência!");
+                                        } catch {
+                                            toast.error("Falha ao gerar link.");
+                                        } finally {
+                                            setIsGenLink(false);
                                         }
-                                        const link = `${getPublicOrigin()}/checkin/${event.id}?token=${token}&mode=reception`;
-                                        copyToClipboard(link);
-                                        toast.success("Link de Recepcionista copiado para a área de transferência!");
                                     }}
-                                    className="w-full bg-[#BF9B30] text-slate-900 py-3 rounded-xl font-bold flex items-center justify-center gap-2 hover:bg-[#BF9B30]/90 transition-colors shadow-lg"
+                                    disabled={isGenLink}
+                                    className="w-full bg-[#BF9B30] text-slate-900 py-3 rounded-xl font-bold flex items-center justify-center gap-2 hover:bg-[#BF9B30]/90 disabled:opacity-60 transition-colors shadow-lg"
                                 >
-                                    <Copy size={16} /> Link p/ Staff (Recepção)
+                                    {isGenLink ? (
+                                      <span className="w-4 h-4 border-2 border-slate-700/30 border-t-slate-900 rounded-full animate-spin" aria-hidden="true" />
+                                    ) : (
+                                      <Copy size={16} />
+                                    )}
+                                    {isGenLink ? 'A gerar…' : 'Link p/ Staff (Recepção)'}
                                 </button>
                             )}
                          </div>
@@ -1741,15 +1803,20 @@ export const Dashboard = () => {
                                         <span className="font-medium text-slate-700">Bloquear Convite</span>
                                         <button 
                                             onClick={async () => {
+                                                if (pendingInline) return;
                                                 const newStatus = !event?.isBlocked;
+                                                setPendingInline('isBlocked');
                                                 try {
                                                     await updateDoc(doc(db, 'events', event.id), { isBlocked: newStatus });
                                                     toast.success(newStatus ? "Convite bloqueado com sucesso." : "Convite desbloqueado.");
                                                 } catch(err) {
                                                     toast.error("Erro ao alterar bloqueio.");
+                                                } finally {
+                                                    setPendingInline(null);
                                                 }
                                             }}
-                                            className={`relative inline-flex h-6 w-11 items-center rounded-full transition-colors ${event?.isBlocked ? 'bg-red-500' : 'bg-slate-200'}`}
+                                            disabled={pendingInline === 'isBlocked'}
+                                            className={`relative inline-flex h-6 w-11 items-center rounded-full transition-colors disabled:opacity-60 ${event?.isBlocked ? 'bg-red-500' : 'bg-slate-200'}`}
                                         >
                                             <span className={`inline-block h-4 w-4 transform rounded-full bg-white transition-transform ${event?.isBlocked ? 'translate-x-6' : 'translate-x-1'}`} />
                                         </button>
@@ -1760,16 +1827,20 @@ export const Dashboard = () => {
                                         <input 
                                             type="datetime-local" 
                                             value={event?.scheduledBlockDate || ''}
+                                            disabled={pendingInline === 'scheduledBlockDate'}
                                             onChange={async (e) => {
                                                 const val = e.target.value;
+                                                setPendingInline('scheduledBlockDate');
                                                 try {
                                                     await updateDoc(doc(db, 'events', event.id), { scheduledBlockDate: val });
                                                     toast.success("Data de bloqueio agendada!");
                                                 } catch(err) {
                                                     toast.error("Erro ao agendar bloqueio.");
+                                                } finally {
+                                                    setPendingInline(null);
                                                 }
                                             }}
-                                            className="w-full bg-slate-50 border border-slate-200 rounded-lg px-3 py-2 text-slate-700 text-xs focus:outline-none focus:border-brand-blue"
+                                            className="w-full bg-slate-50 border border-slate-200 rounded-lg px-3 py-2 text-slate-700 text-xs focus:outline-none focus:border-brand-blue disabled:opacity-60"
                                         />
                                     </div>
 
@@ -1781,13 +1852,17 @@ export const Dashboard = () => {
                                             value={event?.blockedTitle || ''}
                                             onChange={(e) => setEvent({...event, blockedTitle: e.target.value})}
                                             onBlur={async (e) => {
+                                                setPendingInline('blockedTitle');
                                                 try {
                                                     await updateDoc(doc(db, 'events', event.id), { blockedTitle: e.target.value });
                                                 } catch(err) {
                                                     toast.error("Erro ao salvar o título.");
+                                                } finally {
+                                                    setPendingInline(null);
                                                 }
                                             }}
-                                            className="w-full bg-slate-50 border border-slate-200 rounded-lg px-3 py-2 text-slate-700 text-xs focus:outline-none focus:border-brand-blue"
+                                            className="w-full bg-slate-50 border border-slate-200 rounded-lg px-3 py-2 text-slate-700 text-xs focus:outline-none focus:border-brand-blue disabled:opacity-60"
+                                            disabled={pendingInline === 'blockedTitle'}
                                         />
                                     </div>
                                     <div className="flex flex-col gap-1.5 mt-2">
@@ -1798,13 +1873,17 @@ export const Dashboard = () => {
                                             rows={2}
                                             onChange={(e) => setEvent({...event, blockedMessage: e.target.value})}
                                             onBlur={async (e) => {
+                                                setPendingInline('blockedMessage');
                                                 try {
                                                     await updateDoc(doc(db, 'events', event.id), { blockedMessage: e.target.value });
                                                 } catch(err) {
                                                     toast.error("Erro ao salvar a mensagem.");
+                                                } finally {
+                                                    setPendingInline(null);
                                                 }
                                             }}
-                                            className="w-full bg-slate-50 border border-slate-200 rounded-lg px-3 py-2 text-slate-700 text-xs focus:outline-none focus:border-brand-blue resize-none"
+                                            className="w-full bg-slate-50 border border-slate-200 rounded-lg px-3 py-2 text-slate-700 text-xs focus:outline-none focus:border-brand-blue resize-none disabled:opacity-60"
+                                            disabled={pendingInline === 'blockedMessage'}
                                         />
                                     </div>
 
@@ -1959,16 +2038,19 @@ export const Dashboard = () => {
                                         const label = st === 'CONFIRMED' ? 'Confirmado' : st === 'PENDING' ? 'Pendente' : 'Recusado';
                                         const color = st === 'CONFIRMED' ? 'text-green-600 bg-white shadow-sm' : st === 'PENDING' ? 'text-orange-600 bg-white shadow-sm' : 'text-red-500 bg-white shadow-sm';
                                         const active = selectedGuest.status === st;
+                                        const busy = updatingStatusId === `${selectedGuest.id}:${st}`;
                                         return (
                                             <button
                                                 key={st}
                                                 onClick={() => handleUpdateGuestStatus(selectedGuest.id, st)}
-                                                className={`py-2 px-1 rounded-xl text-xs font-bold transition-all border-none cursor-pointer ${
+                                                disabled={updatingStatusId !== null}
+                                                className={`py-2 px-1 rounded-xl text-xs font-bold transition-all border-none cursor-pointer disabled:opacity-60 inline-flex items-center justify-center gap-1 ${
                                                     active
                                                         ? `${color} shadow-sm border border-slate-200/50`
                                                         : 'text-slate-500 hover:text-slate-800'
                                                 }`}
                                             >
+                                                {busy && <span className="w-3 h-3 border-2 border-current border-t-transparent rounded-full animate-spin" aria-hidden="true" />}
                                                 {label}
                                             </button>
                                         );
@@ -1984,8 +2066,10 @@ export const Dashboard = () => {
                                 </button>
                                 <button 
                                     onClick={() => handleDeleteGuest(selectedGuest.id)}
-                                    className="w-full py-3 rounded-xl font-bold bg-red-50 text-red-600 hover:bg-red-100 transition-colors"
+                                    disabled={deletingGuestId !== null}
+                                    className="w-full py-3 rounded-xl font-bold bg-red-50 text-red-600 hover:bg-red-100 disabled:opacity-60 transition-colors inline-flex items-center justify-center gap-2"
                                 >
+                                    {deletingGuestId === selectedGuest.id && <span className="w-4 h-4 border-2 border-red-300 border-t-red-600 rounded-full animate-spin" aria-hidden="true" />}
                                     Apagar Convidado
                                 </button>
                                 <button 
@@ -2047,9 +2131,11 @@ export const Dashboard = () => {
                                 </button>
                                 <button 
                                     onClick={handleManualAddGuest}
-                                    className="flex-1 py-3 rounded-xl font-bold bg-brand-blue text-white hover:bg-blue-600 transition-colors"
+                                    disabled={isAddingGuest}
+                                    className="flex-1 py-3 rounded-xl font-bold bg-brand-blue text-white hover:bg-blue-600 disabled:opacity-60 transition-colors inline-flex items-center justify-center gap-2"
                                 >
-                                    Adicionar
+                                    {isAddingGuest && <span className="w-4 h-4 border-2 border-white/40 border-t-white rounded-full animate-spin" aria-hidden="true" />}
+                                    {isAddingGuest ? 'A adicionar…' : 'Adicionar'}
                                 </button>
                             </div>
                         </motion.div>

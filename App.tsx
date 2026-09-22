@@ -60,7 +60,7 @@ const AnimatedRoutes: React.FC = () => {
   const location = useLocation();
   
   return (
-    <AnimatePresence mode="wait">
+    <AnimatePresence>
       <Routes location={location} /* key={location.pathname} */>
         <Route path="/" element={<PageWrapper><LandingPage /></PageWrapper>} />
         <Route path="/templates" element={<PageWrapper><TemplateGalleryPage /></PageWrapper>} />

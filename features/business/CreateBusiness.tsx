@@ -132,7 +132,14 @@ export const CreateBusiness: React.FC = () => {
 
                     <div className="pt-6 border-t border-slate-100">
                         <Button fullWidth disabled={isSaving} type="submit" className="h-12 flex items-center justify-center gap-2">
-                           {isSaving ? "Salvando..." : <>{userProfile?.whiteLabelName ? 'Salvar Configurações' : 'Criar Meu Negócio'} <ArrowRight size={18} /></>}
+                           {isSaving ? (
+                             <>
+                               <span className="w-4 h-4 border-2 border-white/40 border-t-white rounded-full animate-spin" aria-hidden="true" />
+                               Salvando…
+                             </>
+                           ) : (
+                             <>{userProfile?.whiteLabelName ? 'Salvar Configurações' : 'Criar Meu Negócio'} <ArrowRight size={18} /></>
+                           )}
                         </Button>
                     </div>
                 </form>

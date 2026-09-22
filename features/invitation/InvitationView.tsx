@@ -188,7 +188,7 @@ const InvitationView: React.FC = () => {
   const [isRSVPOpen, setRSVPOpen] = useState(false);
   const [hasOpened, setHasOpened] = useState(false);
   const [isCheckStatusOpen, setCheckStatusOpen] = useState(false);
-  const [isBannerCollapsed, setIsBannerCollapsed] = useState(true);
+  const [isBannerCollapsed, setIsBannerCollapsed] = useState(false);
   const [isOpenCover, setIsOpenCover] = useState(() => {
     return editParam;
   });
@@ -257,6 +257,7 @@ const InvitationView: React.FC = () => {
   };
   const [showLayersPanel, setShowLayersPanel] = useState(true);
   const [isSaving, setIsSaving] = useState(false);
+  const [isAddingPhoto, setIsAddingPhoto] = useState(false);
   const [mobileView, setMobileView] = useState<"editor" | "preview">("preview");
   const [showGuideTip, setShowGuideTip] = useState(true);
 
@@ -962,6 +963,7 @@ const InvitationView: React.FC = () => {
       toast.error(validation.error);
       return;
     }
+    setIsAddingPhoto(true);
     try {
       const dataUrl = await compressImage(file, 1200);
       setLocalEvent((prev) => {
@@ -972,6 +974,8 @@ const InvitationView: React.FC = () => {
       toast.success('Foto adicionada!');
     } catch {
       toast.error('Não foi possível ler a foto.');
+    } finally {
+      setIsAddingPhoto(false);
     }
   };
 
@@ -991,7 +995,15 @@ const InvitationView: React.FC = () => {
   // Common Props passed to layouts
   const layoutProps = {
     event: proxiedEvent,
-    onRSVP: () => setRSVPOpen(true),
+    onRSVP: () => {
+      // Preview de modelo: RSVP é demonstração — não grava nem dispara Pixel
+      if (isTemplate) {
+        toast('Isto é uma demonstração — usa o modelo para criar o teu convite.', { icon: '👁' });
+        handleUseTemplate();
+        return;
+      }
+      setRSVPOpen(true);
+    },
     onCheckStatus: () => setCheckStatusOpen(true),
     guestName,
     isEditing,
@@ -1135,9 +1147,16 @@ const InvitationView: React.FC = () => {
                 type="button"
                 onClick={handleSaveDraft}
                 disabled={isSaving}
-                className="tour-save-draft px-3 md:px-4 py-2 bg-slate-200 hover:bg-slate-300 text-slate-800 text-[9px] md:text-xs font-bold uppercase tracking-widest rounded-full transition-all cursor-pointer whitespace-nowrap active:scale-95 disabled:opacity-50 shrink-0"
+                className="tour-save-draft px-3 md:px-4 py-2 bg-slate-200 hover:bg-slate-300 text-slate-800 text-[9px] md:text-xs font-bold uppercase tracking-widest rounded-full transition-all cursor-pointer whitespace-nowrap active:scale-95 disabled:opacity-50 shrink-0 flex items-center gap-1"
               >
-                Salvar Rascunho
+                {isSaving ? (
+                  <>
+                    <span className="w-3 h-3 border-2 border-slate-500 border-t-transparent rounded-full animate-spin"></span>
+                    <span>Salvando</span>
+                  </>
+                ) : (
+                  <span>Salvar Rascunho</span>
+                )}
               </button>
               <button
                 type="button"
@@ -1482,8 +1501,15 @@ const InvitationView: React.FC = () => {
                           <label className="block text-xs font-semibold text-[#BF9B30] uppercase tracking-widest">
                             Galeria de Fotos do Casal
                           </label>
-                          <label className="px-3 py-2.5 min-h-[44px] inline-flex items-center bg-[#BF9B30]/10 hover:bg-[#BF9B30]/20 border border-[#BF9B30]/30 text-[#BF9B30] text-[10px] font-bold rounded-lg cursor-pointer" style={{ transition: 'background-color 200ms ease' }}>
-                            Adicionar Foto
+                          <label className={`px-3 py-2.5 min-h-[44px] inline-flex items-center gap-2 bg-[#BF9B30]/10 hover:bg-[#BF9B30]/20 border border-[#BF9B30]/30 text-[#BF9B30] text-[10px] font-bold rounded-lg ${isAddingPhoto ? 'opacity-70 pointer-events-none' : 'cursor-pointer'}`} style={{ transition: 'background-color 200ms ease' }}>
+                            {isAddingPhoto ? (
+                              <>
+                                <span className="w-3.5 h-3.5 border-2 border-[#BF9B30]/40 border-t-[#BF9B30] rounded-full animate-spin" aria-hidden="true" />
+                                A processar…
+                              </>
+                            ) : (
+                              'Adicionar Foto'
+                            )}
                             <input
                               type="file"
                               accept={IMAGE_ACCEPT}
@@ -8209,9 +8235,13 @@ const RSVPForm: React.FC<{ event: EventDetails; onClose: () => void }> = ({
   event,
   onClose,
 }) => {
+  // Ramo escuro (sheet preta): só LUXURY/INDUSTRIAL. LIMINTSO usa sheet clara
+  // (ver BottomSheet themeClasses) e tem tema ouro-sobre-marfim próprio abaixo.
   const isLuxury =
-    event.layoutMode === "LUXURY" ||
-    event.layoutMode === "INDUSTRIAL" ||
+    event.layoutMode === "LUXURY" || event.layoutMode === "INDUSTRIAL";
+  // LIMINTSO usa sheet clara (ver BottomSheet themeClasses) → tema ouro-sobre-marfim próprio,
+  // com texto escuro legível (o ramo isLuxury escuro deixava letras brancas sobre fundo branco)
+  const isLimintso =
     event.layoutMode === "LIMINTSO_GOLD" ||
     event.layoutMode === "LIMINTSO_ME";
   const isBridal = event.type === "BRIDAL_SHOWER";
@@ -8240,6 +8270,12 @@ const RSVPForm: React.FC<{ event: EventDetails; onClose: () => void }> = ({
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
+    // Cinto de segurança: IDs de mock (preview) nunca gravam nem disparam Pixel
+    if (EVENTS.some((m) => m.id === event.id)) {
+      toast.error("Demonstração — cria o teu convite para confirmar presenças reais.");
+      onClose();
+      return;
+    };
     const cleanName = sanitizeInput(name);
     const cleanMessage = sanitizeInput(message);
     const cleanDietary = sanitizeInput(dietaryRestrictions);
@@ -8404,10 +8440,12 @@ const RSVPForm: React.FC<{ event: EventDetails; onClose: () => void }> = ({
           className={`w-20 h-20 rounded-full flex items-center justify-center mb-6 shadow-md ${
             isLuxury 
               ? "bg-[#BF9B30]/10 border-2 border-[#BF9B30]/40 text-[#BF9B30]" 
-              : "bg-emerald-50 border-2 border-emerald-500/20 text-emerald-500"
+              : isLimintso
+                ? "bg-[#b49232]/10 border-2 border-[#b49232]/40 text-[#8a6d1c]"
+                : "bg-emerald-50 border-2 border-emerald-500/20 text-emerald-500"
           }`}
         >
-          <AnimatedCheckmark className={`w-10 h-10 ${isLuxury ? "text-[#BF9B30]" : "text-emerald-500"}`} />
+          <AnimatedCheckmark className={`w-10 h-10 ${isLuxury ? "text-[#BF9B30]" : isLimintso ? "text-[#8a6d1c]" : "text-emerald-500"}`} />
         </motion.div>
 
         <motion.h3 
@@ -8466,7 +8504,9 @@ const RSVPForm: React.FC<{ event: EventDetails; onClose: () => void }> = ({
             className={`flex-1 py-3.5 rounded-2xl font-bold text-sm transition-all active:scale-[0.98] flex items-center justify-center gap-2 ${
               isLuxury
                 ? "bg-transparent border-2 border-[#BF9B30] text-[#BF9B30] hover:bg-[#BF9B30]/10"
-                : "bg-white border border-slate-200 text-brand-blue hover:bg-slate-50 shadow-sm"
+                : isLimintso
+                  ? "bg-white border-2 border-[#b49232]/50 text-[#8a6d1c] hover:bg-[#b49232]/10 shadow-sm"
+                  : "bg-white border border-slate-200 text-brand-blue hover:bg-slate-50 shadow-sm"
             }`}
           >
             <span className="material-symbols-outlined text-sm">download</span>
@@ -8477,7 +8517,9 @@ const RSVPForm: React.FC<{ event: EventDetails; onClose: () => void }> = ({
             className={`flex-1 py-3.5 rounded-2xl font-bold text-sm transition-all active:scale-[0.98] ${
               isLuxury
                 ? "bg-[#BF9B30] text-black hover:bg-[#BF9B30]/90 shadow-md"
-                : "bg-slate-900 text-white hover:bg-slate-800 shadow-md"
+                : isLimintso
+                  ? "bg-[#b49232] text-white hover:bg-[#a37f2a] shadow-[0_10px_25px_rgba(180,146,50,0.35)]"
+                  : "bg-slate-900 text-white hover:bg-slate-800 shadow-md"
             }`}
           >
             Fechar
@@ -8489,25 +8531,29 @@ const RSVPForm: React.FC<{ event: EventDetails; onClose: () => void }> = ({
 
   return (
     <form className="space-y-6" onSubmit={handleSubmit}>
-      <p className={`text-sm ${isLuxury ? "text-gray-400" : "opacity-70"}`}>
+      <p className={`text-sm leading-relaxed ${isLuxury ? "text-gray-400" : isLimintso ? "text-slate-500 font-serif italic" : "opacity-70"}`}>
         {isBridal
           ? "Por favor, confirme sua presença no chá de panela."
           : `Por favor, confirme sua presença para o evento de ${event.title}.`}
       </p>
 
-      <div className="flex gap-4">
+      <div className="flex gap-3">
         <button
           type="button"
           onClick={() => setStatus("yes")}
           disabled={loading}
-          className={`flex-1 py-3 border rounded-lg text-sm font-bold transition-all ${
+          className={`flex-1 py-3.5 border rounded-2xl text-sm font-bold transition-all active:scale-[0.98] disabled:opacity-60 ${
             status === "yes"
               ? isLuxury
                 ? "bg-[#BF9B30] text-black border-[#BF9B30]"
-                : "bg-brand-blue text-white border-brand-blue"
+                : isLimintso
+                  ? "bg-[#b49232] text-white border-[#b49232] shadow-[0_8px_20px_rgba(180,146,50,0.35)]"
+                  : "bg-brand-blue text-white border-brand-blue"
               : isLuxury
                 ? "border-gray-600 text-gray-300 hover:border-gray-500"
-                : "border-gray-200 text-gray-400"
+                : isLimintso
+                  ? "border-slate-200 text-slate-500 hover:border-[#b49232]/60 bg-white"
+                  : "border-gray-200 text-gray-400"
           }`}
         >
           {isBridal ? "Vou no Chá!" : "Sim, estarei lá"}
@@ -8516,14 +8562,16 @@ const RSVPForm: React.FC<{ event: EventDetails; onClose: () => void }> = ({
           type="button"
           onClick={() => setStatus("no")}
           disabled={loading}
-          className={`flex-1 py-3 border rounded-lg text-sm font-bold transition-all ${
+          className={`flex-1 py-3.5 border rounded-2xl text-sm font-bold transition-all active:scale-[0.98] disabled:opacity-60 ${
             status === "no"
               ? isLuxury
                 ? "bg-red-900/80 text-white border-red-800"
                 : "bg-red-50 text-red-600 border-red-200"
               : isLuxury
                 ? "border-gray-600 text-gray-300 hover:border-gray-500"
-                : "border-gray-200 text-gray-400"
+                : isLimintso
+                  ? "border-slate-200 text-slate-500 hover:border-[#b49232]/60 bg-white"
+                  : "border-gray-200 text-gray-400"
           }`}
         >
           {isBridal ? "Não vou poder ir" : "Não poderei ir"}
@@ -8533,7 +8581,7 @@ const RSVPForm: React.FC<{ event: EventDetails; onClose: () => void }> = ({
       <div className="space-y-4">
         <div>
           <label
-            className={`text-xs font-bold uppercase tracking-wider mb-1 block ${isLuxury ? "text-[#BF9B30]" : "opacity-50"}`}
+            className={`text-xs font-bold uppercase tracking-wider mb-1.5 block ${isLuxury ? "text-[#BF9B30]" : isLimintso ? "text-[#8a6d1c]" : "opacity-50"}`}
           >
             Nome Completo
           </label>
@@ -8541,7 +8589,7 @@ const RSVPForm: React.FC<{ event: EventDetails; onClose: () => void }> = ({
             type="text"
             value={name}
             onChange={(e) => setName(e.target.value)}
-            className={`w-full bg-transparent border-b py-2 focus:outline-none ${isLuxury ? "border-gray-600 text-white focus:border-[#BF9B30]" : "border-gray-300 text-black focus:border-black"}`}
+            className={`w-full border py-3 px-4 rounded-xl focus:outline-none focus:ring-2 transition-all ${isLuxury ? "bg-transparent border-gray-600 text-white focus:border-[#BF9B30] focus:ring-[#BF9B30]/20" : isLimintso ? "bg-[#FCFAF6] border-[#dcb349]/40 text-slate-900 placeholder:text-slate-400 focus:border-[#b49232] focus:ring-[#b49232]/20" : "bg-transparent border-gray-300 text-black focus:border-black"}`}
             placeholder="Seu nome completo"
             required
             disabled={loading}
@@ -8550,7 +8598,7 @@ const RSVPForm: React.FC<{ event: EventDetails; onClose: () => void }> = ({
 
         <div>
           <label
-            className={`text-xs font-bold uppercase tracking-wider mb-1 block ${isLuxury ? "text-[#BF9B30]" : "opacity-50"}`}
+            className={`text-xs font-bold uppercase tracking-wider mb-1.5 block ${isLuxury ? "text-[#BF9B30]" : isLimintso ? "text-[#8a6d1c]" : "opacity-50"}`}
           >
             Telefone / Contacto
           </label>
@@ -8558,7 +8606,7 @@ const RSVPForm: React.FC<{ event: EventDetails; onClose: () => void }> = ({
             type="tel"
             value={phone}
             onChange={(e) => setPhone(e.target.value)}
-            className={`w-full bg-transparent border-b py-2 focus:outline-none ${isLuxury ? "border-gray-600 text-white focus:border-[#BF9B30]" : "border-gray-300 text-black focus:border-black"}`}
+            className={`w-full border py-3 px-4 rounded-xl focus:outline-none focus:ring-2 transition-all ${isLuxury ? "bg-transparent border-gray-600 text-white focus:border-[#BF9B30] focus:ring-[#BF9B30]/20" : isLimintso ? "bg-[#FCFAF6] border-[#dcb349]/40 text-slate-900 placeholder:text-slate-400 focus:border-[#b49232] focus:ring-[#b49232]/20" : "bg-transparent border-gray-300 text-black focus:border-black"}`}
             placeholder="Ex: 923 000 000"
             required
             disabled={loading}
@@ -8568,14 +8616,14 @@ const RSVPForm: React.FC<{ event: EventDetails; onClose: () => void }> = ({
         {status === "yes" && !isBridal && (
           <div>
             <label
-              className={`text-xs font-bold uppercase tracking-wider mb-1 block ${isLuxury ? "text-[#BF9B30]" : "opacity-50"}`}
+              className={`text-xs font-bold uppercase tracking-wider mb-1.5 block ${isLuxury ? "text-[#BF9B30]" : isLimintso ? "text-[#8a6d1c]" : "opacity-50"}`}
             >
               Acompanhantes
             </label>
             <select
               value={companions}
               onChange={(e) => setCompanions(parseInt(e.target.value))}
-              className={`w-full bg-transparent border-b py-2 focus:outline-none ${isLuxury ? "border-gray-600 text-white focus:border-[#BF9B30] [&>option]:text-black" : "border-gray-300 text-black focus:border-black"}`}
+              className={`w-full border py-3 px-4 rounded-xl focus:outline-none focus:ring-2 transition-all ${isLuxury ? "bg-transparent border-gray-600 text-white focus:border-[#BF9B30] focus:ring-[#BF9B30]/20 [&>option]:text-black" : isLimintso ? "bg-[#FCFAF6] border-[#dcb349]/40 text-slate-900 focus:border-[#b49232] focus:ring-[#b49232]/20 [&>option]:text-slate-900" : "bg-transparent border-gray-300 text-black focus:border-black"}`}
               disabled={loading}
             >
               <option value="0">Apenas eu</option>
@@ -8589,7 +8637,7 @@ const RSVPForm: React.FC<{ event: EventDetails; onClose: () => void }> = ({
         {status === "yes" && (
           <div>
             <label
-              className={`text-xs font-bold uppercase tracking-wider mb-1 block ${isLuxury ? "text-[#BF9B30]" : "opacity-50"}`}
+              className={`text-xs font-bold uppercase tracking-wider mb-1.5 block ${isLuxury ? "text-[#BF9B30]" : isLimintso ? "text-[#8a6d1c]" : "opacity-50"}`}
             >
               Restrições Alimentares (Opcional)
             </label>
@@ -8598,14 +8646,14 @@ const RSVPForm: React.FC<{ event: EventDetails; onClose: () => void }> = ({
               placeholder="Ex: Vegetariano, alergia a glúten, nenhuma..."
               value={dietaryRestrictions}
               onChange={(e) => setDietaryRestrictions(e.target.value)}
-              className={`w-full bg-transparent border-b py-2 focus:outline-none ${isLuxury ? "border-gray-600 text-white focus:border-[#BF9B30] placeholder-gray-600" : "border-gray-300 text-black focus:border-black placeholder-gray-400"}`}
+              className={`w-full border py-3 px-4 rounded-xl focus:outline-none focus:ring-2 transition-all ${isLuxury ? "bg-transparent border-gray-600 text-white focus:border-[#BF9B30] focus:ring-[#BF9B30]/20 placeholder-gray-600" : isLimintso ? "bg-[#FCFAF6] border-[#dcb349]/40 text-slate-900 placeholder:text-slate-400 focus:border-[#b49232] focus:ring-[#b49232]/20" : "bg-transparent border-gray-300 text-black focus:border-black placeholder-gray-400"}`}
               disabled={loading}
             />
           </div>
         )}
         <div>
           <label
-            className={`text-xs font-bold uppercase tracking-wider mb-1 block ${isLuxury ? "text-[#BF9B30]" : "opacity-50"}`}
+            className={`text-xs font-bold uppercase tracking-wider mb-1.5 block ${isLuxury ? "text-[#BF9B30]" : isLimintso ? "text-[#8a6d1c]" : "opacity-50"}`}
           >
             {isBridal
               ? "Mensagem para a Noiva (Opcional)"
@@ -8615,7 +8663,7 @@ const RSVPForm: React.FC<{ event: EventDetails; onClose: () => void }> = ({
             rows={3}
             value={message}
             onChange={(e) => setMessage(e.target.value)}
-            className={`w-full bg-transparent border rounded-lg p-3 focus:outline-none text-sm ${isLuxury ? "border-gray-600 text-white focus:border-[#BF9B30]" : "border-gray-200 text-black focus:border-black"}`}
+            className={`w-full border rounded-2xl p-4 focus:outline-none focus:ring-2 text-sm transition-all ${isLuxury ? "bg-transparent border-gray-600 text-white focus:border-[#BF9B30] focus:ring-[#BF9B30]/20" : isLimintso ? "bg-[#FCFAF6] border-[#dcb349]/40 text-slate-900 focus:border-[#b49232] focus:ring-[#b49232]/20" : "bg-transparent border-gray-200 text-black focus:border-black"}`}
             placeholder={
               status === "yes"
                 ? "Mal posso esperar..."
@@ -8634,11 +8682,18 @@ const RSVPForm: React.FC<{ event: EventDetails; onClose: () => void }> = ({
         className={
           isLuxury
             ? "border-[#BF9B30] text-[#BF9B30] hover:bg-[#BF9B30] hover:text-black font-bold uppercase tracking-widest"
-            : ""
+            : isLimintso
+              ? "bg-[#b49232] hover:bg-[#a37f2a] text-white font-bold uppercase tracking-widest rounded-2xl shadow-[0_10px_25px_rgba(180,146,50,0.35)]"
+              : ""
         }
       >
         {loading
-          ? "ENVIANDO..."
+          ? (
+            <span className="inline-flex items-center justify-center gap-2">
+              <span className="w-4 h-4 border-2 border-current opacity-40 border-t-current rounded-full animate-spin" aria-hidden="true" />
+              ENVIANDO…
+            </span>
+          )
           : status === "yes"
             ? "ENVIAR RESPOSTA"
             : "ENVIAR JUSTIFICATIVA"}

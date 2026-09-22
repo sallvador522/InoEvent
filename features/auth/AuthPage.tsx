@@ -233,10 +233,14 @@ export const AuthPage: React.FC = () => {
           onClick={handleGoogleSignIn}
           type="button"
           disabled={loading}
-          className="w-full h-12 bg-white border border-slate-200 text-slate-700 font-bold rounded-xl shadow-sm hover:bg-slate-50 flex items-center justify-center gap-3 transition-colors"
+          className="w-full h-12 bg-white border border-slate-200 text-slate-700 font-bold rounded-xl shadow-sm hover:bg-slate-50 disabled:opacity-70 flex items-center justify-center gap-3 transition-colors"
         >
-          <img src="https://www.gstatic.com/firebasejs/ui/2.0.0/images/auth/google.svg" alt="Google" className="w-5 h-5" />
-          {isLogin ? 'Entrar com Google' : 'Cadastrar com Google'}
+          {loading ? (
+            <span className="w-5 h-5 border-2 border-slate-300 border-t-brand-blue rounded-full animate-spin" aria-hidden="true" />
+          ) : (
+            <img src="https://www.gstatic.com/firebasejs/ui/2.0.0/images/auth/google.svg" alt="Google" className="w-5 h-5" />
+          )}
+          {loading ? 'A entrar…' : isLogin ? 'Entrar com Google' : 'Cadastrar com Google'}
         </button>
 
         <div className="mt-8 text-center text-sm text-slate-500">

@@ -13,12 +13,16 @@ interface Table {
 export const TableManager: React.FC<{ event: EventDetails; guests: any[] }> = ({ event, guests }) => {
     const [tables, setTables] = useState<Table[]>([]);
     const [loading, setLoading] = useState(false);
+    const [isFetching, setIsFetching] = useState(true);
+    const [deletingTableId, setDeletingTableId] = useState<string | null>(null);
+    const [movingGuestId, setMovingGuestId] = useState<string | null>(null);
     const [newTableName, setNewTableName] = useState('');
     const [newTableCapacity, setNewTableCapacity] = useState<number | string>(8);
     const [tableToDelete, setTableToDelete] = useState<Table | null>(null);
 
     useEffect(() => {
         if (!event?.id) return;
+        setIsFetching(true);
         const q = query(collection(db, `events/${event.id}/tables`));
         const unsubscribe = onSnapshot(q, (snapshot) => {
             const loadedTables: Table[] = [];
@@ -27,7 +31,8 @@ export const TableManager: React.FC<{ event: EventDetails; guests: any[] }> = ({
             });
             loadedTables.sort((a, b) => a.name.localeCompare(b.name));
             setTables(loadedTables);
-        });
+            setIsFetching(false);
+        }, () => setIsFetching(false));
         return () => unsubscribe();
     }, [event?.id]);
 
@@ -55,6 +60,8 @@ export const TableManager: React.FC<{ event: EventDetails; guests: any[] }> = ({
 
     const handleDeleteTable = async (tableId: string) => {
         setTableToDelete(null);
+        if (deletingTableId) return;
+        setDeletingTableId(tableId);
         try {
             const guestsInTable = guests.filter(g => (g as any).tableId === tableId);
             for (const g of guestsInTable) {
@@ -67,11 +74,14 @@ export const TableManager: React.FC<{ event: EventDetails; guests: any[] }> = ({
         } catch(error) {
             console.error(error);
             toast.error('Erro ao apagar mesa.');
+        } finally {
+            setDeletingTableId(null);
         }
     };
 
     
     const moveGuestToTable = async (guestId: string, tableId: string | null) => {
+        if (movingGuestId) return;
         if (tableId) {
             const table = tables.find(t => t.id === tableId);
             const currentCount = guests.filter(g => (g as any).tableId === tableId).length;
@@ -80,6 +90,7 @@ export const TableManager: React.FC<{ event: EventDetails; guests: any[] }> = ({
                 return;
             }
         }
+        setMovingGuestId(guestId);
         try {
             const guestRef = doc(db, `events/${event.id}/guests`, guestId);
             await updateDoc(guestRef, { tableId: tableId });
@@ -87,6 +98,8 @@ export const TableManager: React.FC<{ event: EventDetails; guests: any[] }> = ({
         } catch (error) {
             console.error(error);
             toast.error('Erro ao mover convidado.');
+        } finally {
+            setMovingGuestId(null);
         }
     };
 
@@ -226,7 +239,16 @@ export const TableManager: React.FC<{ event: EventDetails; guests: any[] }> = ({
 
                     {/* Tables grid */}
                     <div className="grid sm:grid-cols-2 gap-4">
-                        {tables.map(table => {
+                        {isFetching && (
+                            [1, 2].map((i) => (
+                                <div key={i} className="bg-white border border-slate-100 rounded-3xl p-5 shadow-sm animate-pulse space-y-3" aria-hidden="true">
+                                    <div className="h-5 w-1/2 bg-slate-200 rounded-lg" />
+                                    <div className="h-24 bg-slate-100 rounded-xl" />
+                                </div>
+                            ))
+                        )}
+                        {!isFetching &&
+                        tables.map(table => {
                             const tableGuests = attendingGuests.filter(g => (g as any).tableId === table.id);
                             const isFull = tableGuests.length >= table.capacity;
                             
@@ -300,7 +322,7 @@ export const TableManager: React.FC<{ event: EventDetails; guests: any[] }> = ({
                                 </div>
                             );
                         })}
-                        {tables.length === 0 && (
+                        {tables.length === 0 && !isFetching && (
                             <div className="col-span-full py-12 px-6 text-center border-2 border-dashed border-slate-200 rounded-3xl min-w-0 overflow-hidden">
                                 <span className="material-symbols-outlined text-4xl text-slate-300 mb-2">table_restaurant</span>
                                 <p className="text-slate-500 font-medium">Nenhuma mesa criada ainda.</p>
@@ -330,9 +352,11 @@ export const TableManager: React.FC<{ event: EventDetails; guests: any[] }> = ({
                             </button>
                             <button 
                                 onClick={() => handleDeleteTable(tableToDelete.id)}
-                                className="flex-1 px-4 py-3 bg-red-600 hover:bg-red-700 text-white font-bold rounded-xl transition-colors text-sm shadow-md shadow-red-200"
+                                disabled={deletingTableId !== null}
+                                className="flex-1 px-4 py-3 bg-red-600 hover:bg-red-700 disabled:opacity-60 text-white font-bold rounded-xl transition-colors text-sm shadow-md shadow-red-200 inline-flex items-center justify-center gap-2"
                             >
-                                Apagar Mesa
+                                {deletingTableId !== null && <span className="w-4 h-4 border-2 border-white/40 border-t-white rounded-full animate-spin" aria-hidden="true" />}
+                                {deletingTableId !== null ? 'A apagar…' : 'Apagar Mesa'}
                             </button>
                         </div>
                     </div>

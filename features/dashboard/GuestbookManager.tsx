@@ -8,6 +8,9 @@ import { toast } from 'react-hot-toast';
 export const GuestbookManager: React.FC<{ event: any }> = ({ event }) => {
     const [messages, setMessages] = useState<any[]>([]);
     const [moderationEnabled, setModerationEnabled] = useState(event.moderationEnabled || false);
+    const [isLoading, setIsLoading] = useState(true);
+    const [isToggling, setIsToggling] = useState(false);
+    const [pendingMsgId, setPendingMsgId] = useState<string | null>(null);
 
     useEffect(() => {
         setModerationEnabled(event.moderationEnabled || false);
@@ -23,12 +26,15 @@ export const GuestbookManager: React.FC<{ event: any }> = ({ event }) => {
                 ...d.data()
             }));
             setMessages(msgs);
-        });
+            setIsLoading(false);
+        }, () => setIsLoading(false));
 
         return () => unsubscribe();
     }, [event.id]);
 
     const handleToggleModeration = async () => {
+        if (isToggling) return;
+        setIsToggling(true);
         try {
             const nextState = !moderationEnabled;
             setModerationEnabled(nextState);
@@ -40,10 +46,14 @@ export const GuestbookManager: React.FC<{ event: any }> = ({ event }) => {
             console.error(err);
             toast.error('Erro ao salvar configuração de moderação.');
             setModerationEnabled(event.moderationEnabled || false);
+        } finally {
+            setIsToggling(false);
         }
     };
 
     const handleUpdateStatus = async (messageId: string, status: 'APPROVED' | 'HIDDEN') => {
+        if (pendingMsgId) return;
+        setPendingMsgId(messageId);
         try {
             await updateDoc(doc(db, 'events', event.id, 'messages', messageId), {
                 status
@@ -52,18 +62,23 @@ export const GuestbookManager: React.FC<{ event: any }> = ({ event }) => {
         } catch (err) {
             console.error(err);
             toast.error('Erro ao atualizar status do recado.');
+        } finally {
+            setPendingMsgId(null);
         }
     };
 
     const handleDelete = async (messageId: string) => {
         if (!window.confirm('Tem certeza que deseja apagar esta mensagem permanentemente?')) return;
-
+        if (pendingMsgId) return;
+        setPendingMsgId(messageId);
         try {
             await deleteDoc(doc(db, 'events', event.id, 'messages', messageId));
             toast.success('Mensagem apagada.');
         } catch (error) {
             console.error(error);
             toast.error('Erro ao apagar a mensagem.');
+        } finally {
+            setPendingMsgId(null);
         }
     };
 
@@ -102,7 +117,8 @@ export const GuestbookManager: React.FC<{ event: any }> = ({ event }) => {
                     <button
                         type="button"
                         onClick={handleToggleModeration}
-                        className={`w-12 h-6 flex items-center rounded-full p-0.5 cursor-pointer transition-colors duration-300 outline-none ${
+                        disabled={isToggling}
+                        className={`w-12 h-6 flex items-center rounded-full p-0.5 cursor-pointer transition-colors duration-300 outline-none disabled:opacity-60 ${
                             moderationEnabled ? 'bg-emerald-500' : 'bg-slate-300'
                         }`}
                         aria-label="Ativar moderação de recados"
@@ -117,7 +133,17 @@ export const GuestbookManager: React.FC<{ event: any }> = ({ event }) => {
                 </div>
             </div>
 
-            {messages.length === 0 ? (
+            {isLoading ? (
+                <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6" aria-hidden="true">
+                    {[1, 2, 3].map((i) => (
+                        <div key={i} className="bg-slate-50 p-6 rounded-2xl border border-slate-200 animate-pulse space-y-3">
+                            <div className="h-4 w-3/4 bg-slate-200 rounded-lg" />
+                            <div className="h-4 w-full bg-slate-200/70 rounded-lg" />
+                            <div className="h-4 w-1/2 bg-slate-200/70 rounded-lg" />
+                        </div>
+                    ))}
+                </div>
+            ) : messages.length === 0 ? (
                 <div className="text-center py-16 text-slate-400 bg-slate-50 border border-slate-100 rounded-3xl border-dashed">
                     <Heart size={40} className="mx-auto mb-4 opacity-20 text-slate-600" />
                     <p className="text-lg font-medium text-slate-600">Nenhum recado ainda.</p>
@@ -146,10 +172,15 @@ export const GuestbookManager: React.FC<{ event: any }> = ({ event }) => {
                             >
                                 <button 
                                     onClick={() => handleDelete(msg.id)}
-                                    className="absolute top-4 right-4 text-slate-300 hover:text-red-500 opacity-0 group-hover:opacity-100 transition-opacity p-2 rounded-full hover:bg-neutral-100"
+                                    disabled={pendingMsgId === msg.id}
+                                    className="absolute top-4 right-4 text-slate-300 hover:text-red-500 disabled:opacity-60 opacity-0 group-hover:opacity-100 transition-opacity p-2 rounded-full hover:bg-neutral-100"
                                     title="Apagar permanentemente"
                                 >
-                                    <Trash2 size={16} />
+                                    {pendingMsgId === msg.id ? (
+                                      <span className="w-4 h-4 border-2 border-slate-300 border-t-red-400 rounded-full animate-spin block" aria-hidden="true" />
+                                    ) : (
+                                      <Trash2 size={16} />
+                                    )}
                                 </button>
 
                                 <div>
@@ -190,19 +221,31 @@ export const GuestbookManager: React.FC<{ event: any }> = ({ event }) => {
                                         {!isApproved && (
                                             <button
                                                 onClick={() => handleUpdateStatus(msg.id, 'APPROVED')}
-                                                className="flex-1 py-1.5 bg-emerald-50 hover:bg-emerald-100 text-emerald-700 rounded-lg text-xs font-bold transition-all flex items-center justify-center gap-1"
+                                                disabled={pendingMsgId === msg.id}
+                                                className="flex-1 py-1.5 bg-emerald-50 hover:bg-emerald-100 disabled:opacity-60 text-emerald-700 rounded-lg text-xs font-bold transition-all flex items-center justify-center gap-1"
                                                 title="Aprovar Mensagem"
                                             >
-                                                <Check size={14} /> Aprovar
+                                                {pendingMsgId === msg.id ? (
+                                                  <span className="w-3.5 h-3.5 border-2 border-emerald-300 border-t-emerald-600 rounded-full animate-spin" aria-hidden="true" />
+                                                ) : (
+                                                  <Check size={14} />
+                                                )}
+                                                Aprovar
                                             </button>
                                         )}
                                         {!isHidden && (
                                             <button
                                                 onClick={() => handleUpdateStatus(msg.id, 'HIDDEN')}
-                                                className="flex-1 py-1.5 bg-slate-100 hover:bg-slate-200 text-slate-600 rounded-lg text-xs font-bold transition-all flex items-center justify-center gap-1"
+                                                disabled={pendingMsgId === msg.id}
+                                                className="flex-1 py-1.5 bg-slate-100 hover:bg-slate-200 disabled:opacity-60 text-slate-600 rounded-lg text-xs font-bold transition-all flex items-center justify-center gap-1"
                                                 title="Ocultar Mensagem"
                                             >
-                                                <EyeOff size={14} /> Ocultar
+                                                {pendingMsgId === msg.id ? (
+                                                  <span className="w-3.5 h-3.5 border-2 border-slate-300 border-t-slate-500 rounded-full animate-spin" aria-hidden="true" />
+                                                ) : (
+                                                  <EyeOff size={14} />
+                                                )}
+                                                Ocultar
                                             </button>
                                         )}
                                     </div>

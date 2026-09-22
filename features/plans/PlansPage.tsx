@@ -143,6 +143,8 @@ export const PlansPage: React.FC = () => {
   const activatingEventId = searchParams.get("eventId");
   const fromShare = searchParams.get("from") === "share";
   const [activatingEventTitle, setActivatingEventTitle] = useState<string | null>(null);
+  const [isFetchingTitle, setIsFetchingTitle] = useState(false);
+  const [isOrdering, setIsOrdering] = useState(false);
   const [whatsappModal, setWhatsappModal] = useState<{
     name: string;
     price: string;
@@ -155,6 +157,7 @@ export const PlansPage: React.FC = () => {
       setActivatingEventTitle(null);
       return;
     }
+    setIsFetchingTitle(true);
     getDoc(doc(db, "events", activatingEventId))
       .then((snap) => {
         if (snap.exists() && snap.data().ownerId === user?.uid) {
@@ -163,7 +166,8 @@ export const PlansPage: React.FC = () => {
           setActivatingEventTitle(null);
         }
       })
-      .catch(() => setActivatingEventTitle(null));
+      .catch(() => setActivatingEventTitle(null))
+      .finally(() => setIsFetchingTitle(false));
   }, [activatingEventId, user]);
 
   const handleCopy = (text: string) => {
@@ -245,9 +249,17 @@ export const PlansPage: React.FC = () => {
   };
 
   const handleOpenWhatsApp = async (whatsappNumber: string) => {
-    if (!whatsappModal || !user) return;
+    if (!whatsappModal || !user || isOrdering) return;
 
-    const orderId = await createOrderForEvent(whatsappModal.planId);
+    setIsOrdering(true);
+    const toastId = toast.loading("A registar pedido…");
+    const orderId: string | null = await createOrderForEvent(whatsappModal.planId).catch(() => null);
+    setIsOrdering(false);
+    toast.dismiss(toastId);
+    if (activatingEventId && !orderId) {
+      toast.error("Falha ao registar o pedido. Tenta de novo.");
+      return;
+    }
     const orderRef = orderId ? `\nPedido: ${orderId}` : "";
 
     const messageText = whatsappModal.name === "Business"
@@ -350,14 +362,18 @@ export const PlansPage: React.FC = () => {
           <p className="text-slate-600 font-light text-lg md:text-xl max-w-2xl mx-auto">
             Pagamento único por evento. Sem mensalidades para noivos.
           </p>
-          {activatingEventTitle && (
+          {activatingEventId && (activatingEventTitle ? (
             <div className="mt-6 inline-flex items-center gap-2 bg-[#1B365D] text-white text-sm font-bold px-5 py-3 rounded-full shadow-lg">
               <span className="w-2 h-2 rounded-full bg-[#C5A028] animate-pulse" />
               {fromShare
                 ? `Para partilhar “${activatingEventTitle}”, ativa um plano abaixo`
                 : `A ativar: “${activatingEventTitle}” — escolhe o plano abaixo`}
             </div>
-          )}
+          ) : isFetchingTitle ? (
+            <div className="mt-6 inline-flex items-center gap-2 bg-[#1B365D]/10 text-transparent text-sm font-bold px-5 py-3 rounded-full animate-pulse select-none" aria-hidden="true">
+              A carregar evento…
+            </div>
+          ) : null)}
         </motion.div>
 
         <motion.div
@@ -579,11 +595,16 @@ export const PlansPage: React.FC = () => {
 
                 <button
                   onClick={() => handleOpenWhatsApp("244952815430")}
-                  className="w-full bg-emerald-600 hover:bg-emerald-700 text-white rounded-full py-3.5 px-5 font-bold text-xs uppercase tracking-wider transition-all duration-200 flex items-center justify-between select-none cursor-pointer active:scale-[0.98]"
+                  disabled={isOrdering}
+                  className="w-full bg-emerald-600 hover:bg-emerald-700 disabled:opacity-70 text-white rounded-full py-3.5 px-5 font-bold text-xs uppercase tracking-wider transition-all duration-200 flex items-center justify-between select-none cursor-pointer active:scale-[0.98]"
                 >
                   <span className="flex items-center gap-2">
-                    <MessageSquare size={16} aria-hidden="true" />
-                    WhatsApp (952 815 430)
+                    {isOrdering ? (
+                      <span className="w-4 h-4 border-2 border-white/40 border-t-white rounded-full animate-spin" aria-hidden="true" />
+                    ) : (
+                      <MessageSquare size={16} aria-hidden="true" />
+                    )}
+                    {isOrdering ? "A registar…" : "WhatsApp (952 815 430)"}
                   </span>
                   <span className="bg-white/20 text-white text-[9px] font-black uppercase px-2 py-0.5 rounded-full tracking-wide">
                     Canal 1
@@ -592,11 +613,16 @@ export const PlansPage: React.FC = () => {
 
                 <button
                   onClick={() => handleOpenWhatsApp("244939384315")}
-                  className="w-full bg-emerald-600 hover:bg-emerald-700 text-white rounded-full py-3.5 px-5 font-bold text-xs uppercase tracking-wider transition-all duration-200 flex items-center justify-between select-none cursor-pointer active:scale-[0.98]"
+                  disabled={isOrdering}
+                  className="w-full bg-emerald-600 hover:bg-emerald-700 disabled:opacity-70 text-white rounded-full py-3.5 px-5 font-bold text-xs uppercase tracking-wider transition-all duration-200 flex items-center justify-between select-none cursor-pointer active:scale-[0.98]"
                 >
                   <span className="flex items-center gap-2">
-                    <MessageSquare size={16} aria-hidden="true" />
-                    WhatsApp (939 384 315)
+                    {isOrdering ? (
+                      <span className="w-4 h-4 border-2 border-white/40 border-t-white rounded-full animate-spin" aria-hidden="true" />
+                    ) : (
+                      <MessageSquare size={16} aria-hidden="true" />
+                    )}
+                    {isOrdering ? "A registar…" : "WhatsApp (939 384 315)"}
                   </span>
                   <span className="bg-white/20 text-white text-[9px] font-black uppercase px-2 py-0.5 rounded-full tracking-wide">
                     Canal 2

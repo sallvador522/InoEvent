@@ -57,6 +57,8 @@ export const UserDashboard: React.FC = () => {
   const [eventToDelete, setEventToDelete] = useState<any | null>(null);
   const [isDeleting, setIsDeleting] = useState(false);
   const [notifications, setNotifications] = useState<any[]>([]);
+  const [pendingNotifId, setPendingNotifId] = useState<string | null>(null);
+  const [isClearingNotifs, setIsClearingNotifs] = useState(false);
   const [subTab, setSubTab] = useState<"events" | "notifications">("events");
   const [supportOpen, setSupportOpen] = useState(false);
   const navigate = useNavigate();
@@ -99,14 +101,20 @@ export const UserDashboard: React.FC = () => {
 
   const handleMarkAsRead = async (notifId: string, e: React.MouseEvent) => {
     e.stopPropagation();
-    if (!user) return;
+    if (!user || pendingNotifId) return;
+    // Otimista: marca já, reverte só em erro (o snapshot confirma)
+    setNotifications((prev) => prev.map((n) => (n.id === notifId ? { ...n, read: true } : n)));
+    setPendingNotifId(notifId);
     try {
       await updateDoc(doc(db, "users", user.uid, "notifications", notifId), {
         read: true,
       });
-      toast.success("Notificação lida!");
     } catch (err) {
       console.error("Failed to mark notification as read", err);
+      toast.error("Falha ao marcar. Tenta de novo.");
+      setNotifications((prev) => prev.map((n) => (n.id === notifId ? { ...n, read: false } : n)));
+    } finally {
+      setPendingNotifId(null);
     }
   };
 
@@ -115,12 +123,19 @@ export const UserDashboard: React.FC = () => {
     e: React.MouseEvent,
   ) => {
     e.stopPropagation();
-    if (!user) return;
+    if (!user || pendingNotifId) return;
+    const backup = notifications;
+    setNotifications((prev) => prev.filter((n) => n.id !== notifId));
+    setPendingNotifId(notifId);
     try {
       await deleteDoc(doc(db, "users", user.uid, "notifications", notifId));
       toast.success("Notificação eliminada!");
     } catch (err) {
       console.error("Failed to delete notification", err);
+      toast.error("Falha ao eliminar.");
+      setNotifications(backup);
+    } finally {
+      setPendingNotifId(null);
     }
   };
 
@@ -603,7 +618,8 @@ export const UserDashboard: React.FC = () => {
               {notifications.length > 0 && (
                 <button
                   onClick={async () => {
-                    if (!user) return;
+                    if (!user || isClearingNotifs) return;
+                    setIsClearingNotifs(true);
                     try {
                       const { writeBatch, collection, getDocs } =
                         await import("firebase/firestore");
@@ -616,11 +632,22 @@ export const UserDashboard: React.FC = () => {
                       toast.success("Histórico limpo!");
                     } catch (err) {
                       console.error(err);
+                      toast.error("Falha ao limpar. Tenta de novo.");
+                    } finally {
+                      setIsClearingNotifs(false);
                     }
                   }}
-                  className="text-xs text-red-500 hover:text-red-700 font-bold hover:underline cursor-pointer"
+                  disabled={isClearingNotifs}
+                  className="text-xs text-red-500 hover:text-red-700 disabled:opacity-60 font-bold hover:underline cursor-pointer inline-flex items-center gap-1.5"
                 >
-                  Limpar Todas as Notificações
+                  {isClearingNotifs ? (
+                    <>
+                      <span className="w-3 h-3 border-2 border-red-300 border-t-red-500 rounded-full animate-spin" aria-hidden="true" />
+                      A limpar…
+                    </>
+                  ) : (
+                    'Limpar Todas as Notificações'
+                  )}
                 </button>
               )}
             </div>
@@ -716,10 +743,15 @@ export const UserDashboard: React.FC = () => {
                       <div className="flex gap-2 shrink-0 relative z-20">
                         <button
                           onClick={(e) => handleDeleteNotification(notif.id, e)}
-                          className="w-8 h-8 rounded-full hover:bg-red-50 text-slate-300 hover:text-red-500 flex items-center justify-center transition-colors"
+                          disabled={pendingNotifId === notif.id}
+                          className="w-8 h-8 rounded-full hover:bg-red-50 text-slate-300 hover:text-red-500 disabled:opacity-60 flex items-center justify-center transition-colors"
                           title="Eliminar"
                         >
-                          <Trash2 size={16} />
+                          {pendingNotifId === notif.id ? (
+                            <span className="w-4 h-4 border-2 border-slate-300 border-t-red-400 rounded-full animate-spin" aria-hidden="true" />
+                          ) : (
+                            <Trash2 size={16} />
+                          )}
                         </button>
                       </div>
                     </motion.div>

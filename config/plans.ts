@@ -62,7 +62,10 @@ export interface PlanConfig {
   /** validade em dias a partir de paidAt/publishedAt — §8 */
   validityDays: number | null; // null = ilimitado (business)
   guestLimit: number;         // §7 — Infinity para business
-  popular?: boolean;          // §2 Premium é o mais popular
+  popular?: boolean;          // §2 VIP é o mais popular
+  /** fora de venda (legado): não listar em catálogos, mas continua válido
+      para fichas/eventos antigos (quota e validade originais). */
+  retired?: boolean;
   subtitle?: string;
   description?: string;
   features: FeatureId[];
@@ -101,8 +104,9 @@ export const PLANS: Record<PlanId, PlanConfig> = {
     price: 7500,
     currency: 'AOA',
     billingType: 'one_time',
-    validityDays: 90,          // §8: 90 dias
-    guestLimit: 100,           // §7
+    validityDays: 90,          // §8: 90 dias (legado)
+    guestLimit: 100,           // §7 (legado)
+    retired: true,             // FORA DE VENDA — só fichas/eventos antigos
     subtitle: 'Pagamento Único por Evento',
     description: 'O convite digital profissional para o seu evento.',
     features: [
@@ -121,8 +125,7 @@ export const PLANS: Record<PlanId, PlanConfig> = {
     currency: 'AOA',
     billingType: 'one_time',
     validityDays: 180,         // §8: 180 dias
-    guestLimit: 300,           // §7
-    popular: true,             // §2: mais popular/recomendado
+    guestLimit: 50,            // §7 — 1 casamento por plano, até 50 nomes
     subtitle: 'Pagamento Único por Evento',
     description: 'Tenha controlo total dos seus convidados.',
     features: [
@@ -133,13 +136,12 @@ export const PLANS: Record<PlanId, PlanConfig> = {
       'location',
       'countdown',
       'sharing',
-      // + premium
+      // + premium (sem marca SÓ no Business: 'white_label' é business-only)
       'individual_guests',
       'gallery_premium',
       'music',
       'guestbook',
       'tables',
-      'remove_branding',
       'basic_analytics',
       'guest_management',
       'premium_themes',
@@ -152,11 +154,12 @@ export const PLANS: Record<PlanId, PlanConfig> = {
     currency: 'AOA',
     billingType: 'one_time',
     validityDays: 365,         // §8: 365 dias
-    guestLimit: 700,           // §7
+    guestLimit: 200,           // §7 — 1 casamento por plano, até 200 nomes
+    popular: true,             // §2: mais popular/recomendado
     subtitle: 'Pagamento Único por Evento',
     description: 'Experiência premium completa com controlo absoluto.',
     features: [
-      // tudo do premium
+      // tudo do premium (sem marca SÓ no Business)
       'rsvp',
       'qr',
       'gallery_basic',
@@ -168,7 +171,6 @@ export const PLANS: Record<PlanId, PlanConfig> = {
       'music',
       'guestbook',
       'tables',
-      'remove_branding',
       'basic_analytics',
       'guest_management',
       'premium_themes',
@@ -177,6 +179,8 @@ export const PLANS: Record<PlanId, PlanConfig> = {
       'checkin',
       'plus_one',
       'advanced_tables',
+      // 'reminders' e 'custom_domain' removidos do catálogo (sem implementação);
+      // mantidos aqui como reserva técnica, sem efeito em gates.
       'reminders',
       'advanced_analytics',
       'advanced_customization',
@@ -246,16 +250,18 @@ export const ADDONS: Record<AddonId, AddonConfig> = {
 // Helpers — nunca fazer `if (plan === "premium")` espalhado. Usar isto:
 // ---------------------------------------------------------------------------
 
-/** Normaliza valores legados: "Essencial" | "Premium" | "Business" | "Corporate" → planId */
+/** Normaliza valores legados: "Essencial" | "Premium" | "Business" | "Corporate" → planId.
+ *  Omissão/desconhecido = 'free' (identidade do registo em AuthPage): por defeito
+ *  nega-se (0 convidados) em vez de se oferecer Essencial (100). */
 export function normalizePlanId(raw: unknown): PlanId {
-  if (!raw || typeof raw !== 'string') return 'essential';
+  if (!raw || typeof raw !== 'string') return 'free';
   const v = raw.trim().toLowerCase();
   if (v === 'essential' || v === 'essencial') return 'essential';
   if (v === 'free' || v === 'gratis' || v === 'grátis' || v === 'gratuito') return 'free';
   if (v === 'premium') return 'premium';
   if (v === 'vip') return 'vip';
   if (v === 'business' || v === 'corporate' || v === 'b2b') return 'business';
-  return 'essential';
+  return 'free';
 }
 
 export function getPlanConfig(planId: unknown): PlanConfig {
@@ -301,12 +307,14 @@ export function getAddonPrice(addonId: AddonId): number {
   return ADDONS[addonId].price;
 }
 
-/** Limite de criação de eventos B2C por plano — §7 */
+/** Limite de criação de eventos B2C por plano — §7.
+ *  Regra: 1 evento de casamento por plano (chás não contam); vários só Business.
+ *  'essential' mantém 2 para o legado (fora de venda, fichas antigas intactas). */
 export const EVENT_CREATION_LIMITS: Record<PlanId, number> = {
   free: 1,
   essential: 2,
-  premium: 5,
-  vip: 5,
+  premium: 1,
+  vip: 1,
   business: Infinity,
 };
 

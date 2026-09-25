@@ -13,6 +13,9 @@ import {
 } from 'lucide-react';
 import { LayoutMode } from '../../types';
 import { migrateCoverToStorage } from '../../lib/imageStorage';
+import { createEventViaApi } from '../../lib/eventApi';
+import { useCooldown } from '../../lib/useCooldown';
+import { IBAN_PREFIX, IBAN_BODY_LENGTH, canonicalIban, isValidAngolaIban, ibanError, splitIban, formatIbanGroups } from '../../lib/iban';
 import { LocationPinPicker } from '../../components/LocationPinPicker';
 import { MapsProvider } from '../../components/MapsProvider';
 
@@ -51,6 +54,8 @@ export const EventCreator: React.FC = () => {
 
   const [activeTab, setActiveTab] = useState<'content' | 'timeline' | 'gifts' | 'design'>('content');
   const [isLoading, setIsLoading] = useState(false);
+  // Cooldown para adds locais síncronos (sem loading async, duplo clique duplicava).
+  const allowLocalAdd = useCooldown();
 
   // Event State Variables
   const [selectedLayout, setSelectedLayout] = useState<LayoutMode>(
@@ -263,6 +268,7 @@ export const EventCreator: React.FC = () => {
   }, [eventIdParam]);
 
   const handleAddTimeline = () => {
+    if (!allowLocalAdd()) return;
     if (!newTime || !newTitle) {
       toast.error('Informe ao menos hora e o título da atividade.');
       return;
@@ -280,14 +286,24 @@ export const EventCreator: React.FC = () => {
   };
 
   const handleAddGift = () => {
-    if (!newGiftTitle || !newGiftValue) {
-      toast.error('Preencha o nome do presente/cota e os dados para pagamento.');
+    if (!allowLocalAdd()) return;
+    if (!newGiftTitle) {
+      toast.error('Preencha o nome do presente/cota.');
+      return;
+    }
+    if (newGiftType === 'IBAN') {
+      if (!isValidAngolaIban(newGiftValue)) {
+        toast.error(`IBAN inválido: ${ibanError(newGiftValue) || 'verifique os dígitos.'}`);
+        return;
+      }
+    } else if (!/^https?:\/\//i.test(newGiftValue.trim())) {
+      toast.error('Cole um link válido (https://…).');
       return;
     }
     setGifts([...gifts, {
       type: newGiftType,
       title: newGiftTitle,
-      value: newGiftValue,
+      value: newGiftType === 'IBAN' ? canonicalIban(newGiftValue) : newGiftValue.trim(),
       description: newGiftDesc,
       bankName: newGiftBank,
       accountName: newGiftAccount
@@ -344,15 +360,9 @@ export const EventCreator: React.FC = () => {
 
       const computedFormType = isBabyShower ? 'BABY_SHOWER' : isBridalShower ? 'BRIDAL_SHOWER' : 'WEDDING';
 
-      const normalizedPlan = normalizePlanId(userProfile?.plan || 'essential');
-      const expiresAtDate = (() => {
-        try {
-          const daysMap: Record<string, number> = { essential: 90, premium: 180, vip: 365, business: 365 };
-          const d = daysMap[normalizedPlan] ?? 90;
-          if (!isFinite(d)) return null;
-          const dt = new Date(); dt.setDate(dt.getDate() + d); return dt.toISOString();
-        } catch { return null; }
-      })();
+      const normalizedPlan = normalizePlanId(userProfile?.plan || 'free');
+      // expiresAt é carimbado pelo SERVIDOR (criação/ativação) — o cliente nunca
+      // envia, para o dono não conseguir estender a validade paga sozinho.
       const eventIsoDate = (() => {
         try {
           if (!date) return '';
@@ -374,7 +384,6 @@ export const EventCreator: React.FC = () => {
         status: 'active',
         billingStatus: 'pending',
         ...(isEditingExisting ? {} : { isPublished: false }),
-        expiresAt: expiresAtDate,
         publishedAt: new Date().toISOString(),
         addons: {},
         description: description,
@@ -434,7 +443,22 @@ export const EventCreator: React.FC = () => {
         initialHeroRef.current = cover.url;
       }
 
-      await setDoc(docRef, savePayload, { merge: true });
+      // Criação via servidor (impõe limite §7); edição segue direta (plano
+      // congelado nas regras). Erro de limite mostra e PARA (sem fallback).
+      if (!isEditingExisting) {
+        try {
+          await createEventViaApi(activeEventId, savePayload);
+        } catch (apiErr: any) {
+          if (apiErr?.code === 'EVENT_LIMIT_REACHED') {
+            toast.error(apiErr.message, { id: toastId });
+            setIsLoading(false);
+            return;
+          }
+          await setDoc(docRef, savePayload, { merge: true });
+        }
+      } else {
+        await setDoc(docRef, savePayload, { merge: true });
+      }
 
       toast.success(isEditingExisting ? 'Convite atualizado com perfeição!' : 'Perfeito! Seu convite foi criado com sucesso!', { id: toastId });
       
@@ -980,15 +1004,58 @@ export const EventCreator: React.FC = () => {
                             />
                           </div>
 
-                          <div>
-                            <label className="text-[10px] font-bold text-slate-500 block mb-1 uppercase tracking-wider">IBAN Angolano / Link</label>
-                            <input
-                              type="text"
-                              value={newGiftValue}
-                              onChange={(e) => setNewGiftValue(e.target.value)}
-                              placeholder="e.g. AO06 0000 0000..."
-                              className="w-full bg-white border border-slate-200 rounded-xl p-2.5 outline-none text-xs"
-                            />
+                          <div className="md:col-span-2">
+                            <label className="text-[10px] font-bold text-slate-500 block mb-1 uppercase tracking-wider">Tipo de Pagamento</label>
+                            <div className="flex gap-2">
+                              {(['IBAN', 'LINK'] as const).map((t) => (
+                                <button
+                                  key={t}
+                                  type="button"
+                                  onClick={() => setNewGiftType(t)}
+                                  className={`flex-1 py-2 rounded-xl text-xs font-bold transition-colors cursor-pointer ${newGiftType === t ? 'bg-[#1B365D] text-white' : 'bg-white border border-slate-200 text-slate-500 hover:bg-slate-50'}`}
+                                >
+                                  {t === 'IBAN' ? 'IBAN Angolano' : 'Link'}
+                                </button>
+                              ))}
+                            </div>
+                          </div>
+
+                          <div className="md:col-span-2">
+                            <label className="text-[10px] font-bold text-slate-500 block mb-1 uppercase tracking-wider">
+                              {newGiftType === 'IBAN' ? 'IBAN Angolano' : 'Link de Pagamento'}
+                            </label>
+                            {newGiftType === 'IBAN' ? (
+                              <div>
+                                <div className="flex items-stretch gap-0">
+                                  <span aria-hidden="true" className="inline-flex items-center px-3 rounded-l-xl border border-r-0 border-slate-200 bg-slate-100 text-slate-700 font-mono font-bold text-xs select-none">
+                                    {IBAN_PREFIX}
+                                  </span>
+                                  <input
+                                    type="text"
+                                    value={splitIban(newGiftValue).body}
+                                    onChange={(e) => setNewGiftValue(IBAN_PREFIX + e.target.value.replace(/\D/g, '').slice(0, IBAN_BODY_LENGTH))}
+                                    placeholder="19 dígitos da conta"
+                                    inputMode="numeric"
+                                    autoComplete="off"
+                                    maxLength={IBAN_BODY_LENGTH}
+                                    className="w-full bg-white border border-slate-200 rounded-r-xl p-2.5 outline-none text-xs font-mono"
+                                  />
+                                </div>
+                                {newGiftValue.trim() !== '' && ibanError(newGiftValue) && (
+                                  <p className="text-[11px] text-red-500 mt-1">{ibanError(newGiftValue)}</p>
+                                )}
+                              </div>
+                            ) : (
+                              <input
+                                type="url"
+                                value={newGiftValue}
+                                onChange={(e) => setNewGiftValue(e.target.value)}
+                                placeholder="https://…"
+                                inputMode="url"
+                                autoComplete="off"
+                                className="w-full bg-white border border-slate-200 rounded-xl p-2.5 outline-none text-xs"
+                              />
+                            )}
                           </div>
 
                           <div>
@@ -1046,7 +1113,14 @@ export const EventCreator: React.FC = () => {
                                   )}
                                 </div>
                                 <h4 className="text-xs font-bold text-slate-800 mt-1">{item.title}</h4>
-                                <p className="text-[11px] font-mono text-slate-600 mt-0.5 break-all leading-tight">IBAN: {item.value}</p>
+                                {item.type === 'IBAN' ? (
+                                  <p className="text-[11px] font-mono text-slate-600 mt-0.5 break-all leading-tight">IBAN: {formatIbanGroups(item.value)}</p>
+                                ) : (
+                                  <p className="text-[11px] text-slate-600 mt-0.5 break-all leading-tight">{item.value}</p>
+                                )}
+                                {item.description ? (
+                                  <p className="text-[11px] text-slate-500 italic mt-0.5 leading-snug">“{item.description}”</p>
+                                ) : null}
                                 {item.accountName && (
                                   <p className="text-[10px] text-slate-500 font-normal leading-tight mt-0.5">Titular: {item.accountName}</p>
                                 )}
@@ -1175,7 +1249,7 @@ export const EventCreator: React.FC = () => {
                       <div className="space-y-1.5">
                         {gifts.slice(0, 2).map((gft, idx) => (
                           <div key={idx} className="text-[10px] leading-tight flex justify-between gap-2 border-b border-slate-100 pb-1 last:border-none">
-                            <span className="font-semibold text-slate-800 line-clamp-1">{gft.title}</span>
+                            <span className="font-semibold text-slate-800 line-clamp-1">{gft.title}{gft.description ? ` — ${gft.description}` : ''}</span>
                             <span className="font-mono text-[9px] text-slate-400">[{gft.bankName || 'IBAN'}]</span>
                           </div>
                         ))}

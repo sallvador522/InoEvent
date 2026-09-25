@@ -1,7 +1,7 @@
 import React, { lazy, Suspense } from 'react';
 import { BrowserRouter as Router, Routes, Route, useLocation } from 'react-router-dom';
 import { Toaster } from 'react-hot-toast';
-import { motion, AnimatePresence, MotionConfig } from 'motion/react';
+import { AnimatePresence, MotionConfig } from 'motion/react';
 import { ProtectedRoute } from './components/ProtectedRoute';
 import { AdminRoute } from './components/AdminRoute';
 import { WhatsAppSupport } from './components/WhatsAppSupport';
@@ -43,17 +43,13 @@ const PageLoader: React.FC = () => (
 );
 
 const PageWrapper = ({ children }: { children: React.ReactNode }) => (
-  <motion.div
-    initial={{ opacity: 0 }}
-    animate={{ opacity: 1 }}
-    exit={{ opacity: 0 }}
-    transition={{ duration: 0.3, ease: 'easeOut' }}
-    className="w-full min-h-screen flex flex-col bg-slate-900"
-  >
+  // Sem fade global: a primeira tinta aparece de imediato; cada página mantém
+  // as suas micro-entradas (ex: hero da landing). Evita flash opacity 0 no LCP.
+  <div className="w-full min-h-screen flex flex-col bg-slate-900">
     <Suspense fallback={<PageLoader />}>
       {children}
     </Suspense>
-  </motion.div>
+  </div>
 );
 
 const AnimatedRoutes: React.FC = () => {

@@ -16,7 +16,7 @@ import { Router } from 'express';
 import { getDb } from '../lib/firebase-admin.js';
 import { apiRateLimiter } from '../middleware/index.js';
 import { createOrder, getOrder, getOrderByEvent, repurposePendingOrder, confirmPayment, failPayment, backfillAccountStamps } from '../lib/billing.js';
-import { normalizePlanId, PLANS } from '../../config/plans.js';
+import { normalizePlanId, PLANS, getGuestLimit, getPlanConfig } from '../../config/plans.js';
 import { logger } from '../../lib/logger.js';
 import { admin } from '../lib/firebase-admin.js';
 
@@ -49,8 +49,8 @@ router.post('/api/orders', apiRateLimiter, async (req, res) => {
   if (!effectiveUserId || !eventId || !plan) {
     return res.status(400).json({ error: 'userId, eventId e plan são obrigatórios' });
   }
-  const planId = normalizePlanId(plan);
-  if (!PLANS[planId as any]) return res.status(400).json({ error: 'Plano inválido' });
+    const planId = normalizePlanId(plan);
+    if (!PLANS[planId as any]) return res.status(400).json({ error: 'Plano inválido' });
 
   try {
     // verifica evento existe e pertence ao user (se autenticado)
@@ -62,6 +62,22 @@ router.post('/api/orders', apiRateLimiter, async (req, res) => {
       // admin pode criar para outros; verifica se é admin via token email
       const isAdmin = authUser.email === 'antoniosalvador522@gmail.com';
       if (!isAdmin) return res.status(403).json({ error: 'Sem permissão para este evento' });
+    }
+
+    // Travão de downgrade (§10/§11): não admite pedido para plano menor que a
+    // ocupação atual (recusados não contam — libertam o lugar, mesma semântica
+    // da quota de RSVP). Evita ativar Essential-100 num evento com 500 pessoas.
+    const guestsSnap = await db.collection('events').doc(eventId).collection('guests').get();
+    const occupying = guestsSnap.docs.filter((d) => (d.data() as any)?.status !== 'DECLINED').length;
+    const newLimit = getGuestLimit(planId);
+    if (occupying > newLimit) {
+      return res.status(400).json({
+        error: `O evento tem ${occupying} convidados e o plano ${getPlanConfig(planId).name} permite apenas ${newLimit}. Remova convidados ou escolha um plano superior.`,
+        code: 'PLAN_DOWNGRADE_BLOCKED',
+        plan: planId,
+        limit: newLimit,
+        current: occupying,
+      });
     }
 
     // Um pendente por evento: reaproveita (mesmo plano) ou converte (troca de plano)
@@ -91,22 +107,34 @@ router.post('/api/orders', apiRateLimiter, async (req, res) => {
 });
 
 // ---------------------------------------------------------------------------
-// GET /api/orders/:id
+// GET /api/orders/:id — só dono ou admin (antes: público, expunha valores e IDs)
 // ---------------------------------------------------------------------------
 router.get('/api/orders/:id', apiRateLimiter, async (req, res) => {
   const id = req.params.id as string;
+  const authUser = await getAuthUser(req);
+  if (!authUser) return res.status(401).json({ error: 'Autenticação obrigatória' });
   const order = await getOrder(id);
   if (!order) return res.status(404).json({ error: 'Pedido não encontrado' });
+  const isAdmin = authUser.email === 'antoniosalvador522@gmail.com';
+  if (order.userId !== authUser.uid && !isAdmin) {
+    return res.status(403).json({ error: 'Sem permissão para este pedido' });
+  }
   return res.json({ order });
 });
 
 // ---------------------------------------------------------------------------
-// GET /api/events/:id/order
+// GET /api/events/:id/order — só dono ou admin
 // ---------------------------------------------------------------------------
 router.get('/api/events/:id/order', apiRateLimiter, async (req, res) => {
   const eventId = req.params.id as string;
+  const authUser = await getAuthUser(req);
+  if (!authUser) return res.status(401).json({ error: 'Autenticação obrigatória' });
   const order = await getOrderByEvent(eventId);
   if (!order) return res.status(404).json({ error: 'Nenhum pedido para este evento' });
+  const isAdmin = authUser.email === 'antoniosalvador522@gmail.com';
+  if (order.userId !== authUser.uid && !isAdmin) {
+    return res.status(403).json({ error: 'Sem permissão para este pedido' });
+  }
   return res.json({ order });
 });
 

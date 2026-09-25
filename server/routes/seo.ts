@@ -38,7 +38,7 @@ router.get('/plans', async (req, res, next) => {
     }
     
     const plansTitle = "Planos e Preços de Convites Digitais Premium | InoEvents";
-    const plansDesc = `Conheça os preços do InoEvents. Essencial ${formatPrice(PLANS.essential.price)}, Premium ${formatPrice(PLANS.premium.price)}, VIP ${formatPrice(PLANS.vip.price)} e Business ${formatPrice(PLANS.business.price)}/mês. Concierge +${formatPrice(ADDONS.concierge.price)}. RSVP, QR, check-in e gestão de convidados em Angola.`;
+    const plansDesc = `Conheça os preços do InoEvents. Premium ${formatPrice(PLANS.premium.price)}, VIP ${formatPrice(PLANS.vip.price)} e Business ${formatPrice(PLANS.business.price)}/mês. Concierge +${formatPrice(ADDONS.concierge.price)}. RSVP, QR, check-in e gestão de convidados em Angola.`;
     
     html = html.replace(/<title>[^<]*<\/title>/g, `<title>${plansTitle}</title>`);
     html = html.replace(/<meta name="description" content="[^"]*"\s*\/?>/g, `<meta name="description" content="${plansDesc}" />`);
@@ -47,10 +47,8 @@ router.get('/plans', async (req, res, next) => {
     const hiddenAIText = `
       <div style="display:none;" id="ai-pricing-context">
         <h1>Preços e Planos do InoEvents Angola</h1>
-        <h2>Plano Essencial</h2>
-        <p>Preço: ${formatPrice(PLANS.essential.price)} (Pagamento único por evento). Validade ${PLANS.essential.validityDays} dias. Até ${PLANS.essential.guestLimit} convidados. Inclui: RSVP, Código QR Exclusivo, Galeria Básica, Mapa da zona com botão Como chegar, Localização, Countdown.</p>
         <h2>Plano Premium</h2>
-        <p>Preço: ${formatPrice(PLANS.premium.price)} (Pagamento único por evento). Validade ${PLANS.premium.validityDays} dias. Até ${PLANS.premium.guestLimit} convidados. Inclui: tudo do Essencial + convidados individualizados, galeria premium, música, livro de assinaturas, mapa das mesas, remoção da marca, analytics básicos.</p>
+        <p>Preço: ${formatPrice(PLANS.premium.price)} (Pagamento único por evento). Validade ${PLANS.premium.validityDays} dias. Até ${PLANS.premium.guestLimit} convidados. Inclui: convidados individualizados, galeria premium, música, livro de assinaturas, mapa das mesas, analytics básicos. (Sem marca InoEvents só no Business.)</p>
         <h2>Plano VIP</h2>
         <p>Preço: ${formatPrice(PLANS.vip.price)} (Pagamento único por evento). Validade ${PLANS.vip.validityDays} dias. Até ${PLANS.vip.guestLimit} convidados. Inclui: tudo do Premium + QR individual, check-in, gestão +1, mesas avançadas, analytics avançados, personalização avançada, suporte prioritário.</p>
         <h2>Concierge (Add-on)</h2>

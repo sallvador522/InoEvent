@@ -74,7 +74,6 @@ export const SEO: React.FC<SEOProps> = ({
       "url": domain,
       "featureList": "Convites digitais com mapa da zona e botão Como chegar, RSVP online, QR Code de check-in, lista de presentes por IBAN, galeria de fotos, contagem regressiva",
       "offers": [
-        { "@type": "Offer", "name": "Convite Essencial", "price": String(PLANS.essential.price), "priceCurrency": "AOA" },
         { "@type": "Offer", "name": "Convite Premium", "price": String(PLANS.premium.price), "priceCurrency": "AOA" },
         { "@type": "Offer", "name": "Convite VIP", "price": String(PLANS.vip.price), "priceCurrency": "AOA" },
         { "@type": "Offer", "name": "Business", "price": String(PLANS.business.price), "priceCurrency": "AOA" }

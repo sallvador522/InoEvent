@@ -10,9 +10,21 @@
 
       gtag('config', 'G-8P6CGLFLLJ');
     </script>
-    <!-- Meta Pixel: stub sem init/track (o init só corre após consentimento em lib/metaPixel.ts) -->
-    <link rel="preconnect" href="https://connect.facebook.net" crossorigin />
+    <!-- Meta Pixel: stub com queue apenas — o fbevents.js só é injetado após
+         consentimento via window.__inoLoadFbPixel() (lib/metaPixel.ts).
+         Sem preconnect aqui para não abrir conexão antes do aceite. -->
     <script>
+      window.__inoFbPixelLoaded = false;
+      window.__inoLoadFbPixel = function () {
+        if (window.__inoFbPixelLoaded) return;
+        window.__inoFbPixelLoaded = true;
+        var t = document.createElement('script');
+        t.async = true;
+        t.src = 'https://connect.facebook.net/en_US/fbevents.js';
+        var s = document.getElementsByTagName('script')[0];
+        if (s && s.parentNode) s.parentNode.insertBefore(t, s);
+        else document.head.appendChild(t);
+      };
       !(function (f, b, e, v, n, t, s) {
         if (f.fbq) return;
         n = f.fbq = function () {
@@ -23,15 +35,11 @@
         n.loaded = !0;
         n.version = '2.0';
         n.queue = [];
-        t = b.createElement(e);
-        t.async = !0;
-        t.src = v;
-        s = b.getElementsByTagName(e)[0];
-        s.parentNode.insertBefore(t, s);
+        // Injeção do script adiada: só via __inoLoadFbPixel() após consentimento.
       })(window, document, 'script', 'https://connect.facebook.net/en_US/fbevents.js');
     </script>
     <meta charset="UTF-8" />
-    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover" />
     <title>InoEvents Angola | Convites Digitais Premium, RSVP e Eventos</title>
     <meta name="description" content="Plataforma premium líder em Angola para gerir casamentos e eventos sociais. Crie convites digitais exclusivos com RSVP, mapa da zona com botão Como chegar, ofereça check-in via QR Code na recepção e receba presentes por IBAN." />
     <meta name="keywords" content="convites digitais em Angola, site de casamento Angola, convites premium Luanda, RSVP online Angola, check-in QR Code eventos Luanda, lista de casamento IBAN Angola, presentes multicaixa express, chá de panela Angola, InoEvents, gestão de casamentos Angola, confirmação de presença, convites interactivos, organizador de casamentos, recepção com QR Code, fotify alternativa angola, convite com mapa Angola, mapa do evento e como chegar Luanda" />
@@ -68,14 +76,15 @@
     <link rel="manifest" href="/manifest.json" />
     <meta name="theme-color" content="#1B365D" />
     <!-- LCP da landing: banner fotográfico -->
-    <link rel="preload" as="image" href="/bannerIno.webp" fetchpriority="high" />
+    <link rel="preload" as="image" href="/bannerIno.webp" type="image/webp" fetchpriority="high" />
     
-    <!-- Fonts -->
+    <!-- Fonts — todas as famílias mantidas (elegância dos convites).
+         Preload não-bloqueante: carrega async e aplica como stylesheet ao concluir. -->
     <link rel="preconnect" href="https://fonts.googleapis.com">
-    <link rel="preload" href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800;900&family=Montserrat:wght@400;700;900&family=Playfair+Display:ital,wght@0,400;0,500;0,600;0,700;1,400&family=Pinyon+Script&family=Cormorant+Garamond:wght@400;600;700&family=Great+Vibes&family=Josefin+Sans:wght@300;400;600&family=Dancing+Script:wght@400;600;700&display=swap" as="style">
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800;900&family=Montserrat:wght@400;700;900&family=Playfair+Display:ital,wght@0,400;0,500;0,600;0,700;1,400&family=Pinyon+Script&family=Cormorant+Garamond:wght@400;600;700&family=Great+Vibes&family=Josefin+Sans:wght@300;400;600&family=Dancing+Script:wght@400;600;700&display=swap" rel="stylesheet" crossorigin="anonymous">
-    <link href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:wght,FILL@100..700,0..1&display=swap" rel="stylesheet" crossorigin="anonymous"/>
+    <link rel="preload" href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800;900&family=Montserrat:wght@400;700;900&family=Playfair+Display:ital,wght@0,400;0,500;0,600;0,700;1,400&family=Pinyon+Script&family=Cormorant+Garamond:wght@400;600;700&family=Great+Vibes&family=Josefin+Sans:wght@300;400;600&family=Dancing+Script:wght@400;600;700&display=swap" as="style" onload="this.onload=null;this.rel='stylesheet'">
+    <noscript><link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800;900&family=Montserrat:wght@400;700;900&family=Playfair+Display:ital,wght@0,400;0,500;0,600;0,700;1,400&family=Pinyon+Script&family=Cormorant+Garamond:wght@400;600;700&family=Great+Vibes&family=Josefin+Sans:wght@300;400;600&family=Dancing+Script:wght@400;600;700&display=swap" rel="stylesheet"></noscript>
+    <link href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:wght,FILL@100..700,0..1&display=swap" rel="stylesheet" media="print" onload="this.media='all'" crossorigin="anonymous"/>
 
     <!-- Tailwind CSS with Plugins -->
     <style>
@@ -145,15 +154,36 @@
           });
         }
 
-        // Run immediately when interactive/DOMContentLoaded and watch for dynamic changes
+        // Run immediately when interactive/DOMContentLoaded and watch for dynamic changes.
+        // Throttled: React gera muitas mutações por frame — coalesce via rAF +
+        // trava de 300ms para não correr querySelectorAll a cada batch.
         if (document.readyState === 'loading') {
           document.addEventListener('DOMContentLoaded', replaceIcons);
         } else {
           replaceIcons();
         }
+
+        var inoIconsRaf = 0;
+        var inoIconsLast = 0;
+        function scheduleReplaceIcons() {
+          var now = Date.now();
+          if (now - inoIconsLast < 300) return;
+          if (inoIconsRaf) return;
+          inoIconsRaf = requestAnimationFrame(function () {
+            inoIconsRaf = 0;
+            inoIconsLast = Date.now();
+            replaceIcons();
+          });
+        }
         
         const observer = new MutationObserver((mutations) => {
-          replaceIcons();
+          for (var i = 0; i < mutations.length; i++) {
+            var m = mutations[i];
+            if (m.addedNodes && m.addedNodes.length) {
+              scheduleReplaceIcons();
+              break;
+            }
+          }
         });
         observer.observe(document.documentElement, { childList: true, subtree: true });
       })();

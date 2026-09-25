@@ -7,6 +7,7 @@ import { Navbar } from '../../components/Navbar';
 import { SEO } from '../../components/SEO';
 import { Skeleton } from '../../components/ui/Skeleton';
 import { getOptimizedImageUrl } from '../../lib/imageOptimizer';
+import { useFirebase } from '../../components/FirebaseProvider';
 
 const MotionLink = motion.create(Link as any) as any;
 
@@ -18,6 +19,7 @@ const CATEGORIES = [
 
 export const TemplateGalleryPage: React.FC = () => {
     const [searchParams, setSearchParams] = useSearchParams();
+    const { user } = useFirebase();
     const catParam = searchParams.get('category') || 'all';
     const [selectedCategory, setSelectedCategory] = useState(catParam);
     const [isLoading, setIsLoading] = useState(true);
@@ -78,6 +80,22 @@ export const TemplateGalleryPage: React.FC = () => {
                 <div className="mb-12">
                      <h1 className="text-4xl md:text-5xl font-serif font-bold text-slate-900 mb-4">Galeria de Modelos</h1>
                      <p className="text-slate-500 text-lg max-w-2xl">Encontre o design perfeito para o seu próximo evento. Escolha um dos nossos modelos e personalize como desejar.</p>
+                     {/* Visitantes: ninguém avisava que é preciso conta para personalizar */}
+                     {!user && (
+                       <div className="mt-6 flex flex-col sm:flex-row items-stretch sm:items-center gap-3 bg-[#1B365D] rounded-2xl p-4 sm:p-5 shadow-lg shadow-brand-blue/10">
+                         <span className="material-symbols-outlined text-[#C5A028] text-2xl shrink-0 hidden sm:block">lock</span>
+                         <p className="flex-1 text-sm text-blue-50/90 leading-relaxed">
+                           Encontrou o seu favorito? <strong className="text-white">Entre ou crie conta grátis</strong> para o personalizar com os seus dados.
+                         </p>
+                         <Link
+                           to="/auth"
+                           className="shrink-0 inline-flex items-center justify-center px-6 py-3 rounded-full bg-[#C5A028] text-[#1B365D] text-xs font-bold uppercase tracking-wider hover:bg-[#d4af37] active:scale-[0.97] cursor-pointer whitespace-nowrap"
+                           style={{ transition: 'transform 160ms ease-out, background-color 200ms ease' }}
+                         >
+                           Entrar / Criar conta
+                         </Link>
+                       </div>
+                     )}
                 </div>
 
                 {/* Categories */}
@@ -138,6 +156,12 @@ export const TemplateGalleryPage: React.FC = () => {
                                         />
                                         <div className="absolute inset-0 bg-gradient-to-t from-black/60 to-transparent opacity-60"></div>
                                         <div className="absolute top-2 right-2 md:top-4 md:right-4 z-20 flex flex-col md:flex-row gap-1 md:gap-2 items-end">
+                                            {!user && (
+                                                <span className="inline-flex items-center gap-1 px-2 py-1 md:px-3 md:py-1.5 bg-black/50 backdrop-blur-md rounded-full text-[8px] md:text-xs font-bold text-white/90 shadow-sm">
+                                                    <span className="material-symbols-outlined text-[10px] md:text-sm">lock</span>
+                                                    <span className="hidden md:inline">Requer conta</span>
+                                                </span>
+                                            )}
                                             <span className={`inline-block px-2 py-1 md:px-3 md:py-1.5 backdrop-blur-md rounded-full text-[8px] md:text-xs font-bold shadow-sm ${badge.className}`}>
                                                 {getLayoutLabel(event.layoutMode)}
                                             </span>

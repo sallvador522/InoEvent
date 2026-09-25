@@ -1,5 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { motion } from 'framer-motion';
+import { VirtuosoGrid } from 'react-virtuoso';
 import { MessageSquare, Trash2, Heart, ShieldCheck, ShieldAlert, Check, EyeOff, Eye } from 'lucide-react';
 import { collection, query, orderBy, onSnapshot, deleteDoc, doc, updateDoc } from 'firebase/firestore';
 import { db } from '../../components/FirebaseProvider';
@@ -118,10 +119,11 @@ export const GuestbookManager: React.FC<{ event: any }> = ({ event }) => {
                         type="button"
                         onClick={handleToggleModeration}
                         disabled={isToggling}
-                        className={`w-12 h-6 flex items-center rounded-full p-0.5 cursor-pointer transition-colors duration-300 outline-none disabled:opacity-60 ${
+                        className={`w-12 h-6 flex items-center rounded-full p-0.5 cursor-pointer transition-colors duration-300 outline-none disabled:opacity-60 disabled:cursor-wait ${isToggling ? 'animate-pulse' : ''} ${
                             moderationEnabled ? 'bg-emerald-500' : 'bg-slate-300'
                         }`}
                         aria-label="Ativar moderação de recados"
+                        aria-busy={isToggling}
                     >
                         <motion.div
                             layout
@@ -150,18 +152,25 @@ export const GuestbookManager: React.FC<{ event: any }> = ({ event }) => {
                     <p className="text-sm mt-1">As mensagens enviadas pelos convidados aparecerão aqui.</p>
                 </div>
             ) : (
-                <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
-                    {messages.map((msg, idx) => {
+                // Mural virtualizado (VirtuosoGrid): mantém o grid 1/2/3 colunas mas só
+                // monta os cartões visíveis. Antes cada cartão era um motion.div com
+                // stagger (delay idx*0.05) — N animações JS montadas de uma vez; agora
+                // são divs estáticas virtualizadas, sem mudar o visual final.
+                <VirtuosoGrid
+                    style={{ height: 640, maxHeight: '75dvh' }}
+                    totalCount={messages.length}
+                    overscan={400}
+                    listClassName="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6"
+                    itemContent={(index) => {
+                        const msg = messages[index];
+                        if (!msg) return null;
                         const isPending = msg.status === 'PENDING';
                         const isHidden = msg.status === 'HIDDEN';
                         const isApproved = msg.status === 'APPROVED' || !msg.status;
 
                         return (
-                            <motion.div 
+                            <div
                                 key={msg.id}
-                                initial={{ opacity: 0, scale: 0.95 }}
-                                animate={{ opacity: 1, scale: 1 }}
-                                transition={{ delay: idx * 0.05 }}
                                 className={`bg-slate-50 p-6 rounded-2xl border relative group flex flex-col justify-between transition-all ${
                                     isPending 
                                         ? 'border-amber-200 bg-amber-50/10' 
@@ -250,10 +259,10 @@ export const GuestbookManager: React.FC<{ event: any }> = ({ event }) => {
                                         )}
                                     </div>
                                 </div>
-                            </motion.div>
+                            </div>
                         );
-                    })}
-                </div>
+                    }}
+                />
             )}
         </div>
     );

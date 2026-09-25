@@ -44,8 +44,8 @@ export const LAYOUT_SECTIONS: Record<LayoutMode, SectionKey[]> = {
   CLASSIC: [...WEDDING_FULL],
   MODERN: [...WEDDING_FULL],
   GARDEN: [...WEDDING_FULL],
-  // Rústico não tem secção de galeria
-  RUSTIC: ['timeline', 'dressCode', 'gifts', 'reception', 'countdown', 'map'],
+  // Rústico e Ouro Imperial têm galeria (secção dourada/rústica no render)
+  RUSTIC: [...WEDDING_FULL],
   INDUSTRIAL: [...WEDDING_FULL],
   // Luxo não tem cronograma/programação
   LUXURY: ['dressCode', 'gifts', 'gallery', 'reception', 'countdown', 'map'],
@@ -58,8 +58,8 @@ export const LAYOUT_SECTIONS: Record<LayoutMode, SectionKey[]> = {
   BABY_BOY: ['gifts', 'gallery', 'map'],
   BABY_GIRL: ['gifts', 'gallery', 'map'],
   BABY_NEUTRAL: ['gifts', 'gallery', 'map'],
-  // Ouro Imperial não tem galeria
-  LIMINTSO_GOLD: ['timeline', 'dressCode', 'gifts', 'reception', 'countdown', 'map'],
+  // Ouro Imperial tem galeria (secção dourada no render)
+  LIMINTSO_GOLD: [...WEDDING_FULL],
   // Nobreza de Luanda tem contagem regressiva (secção "Falta Pouco" no render)
   LIMINTSO_ME: ['timeline', 'dressCode', 'gifts', 'gallery', 'reception', 'countdown', 'map'],
 };

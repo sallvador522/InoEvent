@@ -412,7 +412,7 @@ export const UserDashboard: React.FC = () => {
                 </p>
               </div>
             </div>
-            {(accountPlanId === 'essential' || accountPlanId === 'free') && (
+            {accountPlanId === 'free' && (
               <Button
                 onClick={() => navigate("/plans")}
                 className="bg-brand-blue hover:bg-brand-blue/90 text-white text-xs font-bold px-6 py-3 rounded-2xl shadow-lg shadow-brand-blue/15 hover:scale-[1.02] active:scale-95 transition-all outline-none cursor-pointer select-none whitespace-nowrap self-start md:self-center"
@@ -693,7 +693,9 @@ export const UserDashboard: React.FC = () => {
                         !notif.read && handleMarkAsRead(notif.id, e)
                       }
                       className={`group p-5 sm:p-6 rounded-3xl border transition-all duration-300 flex justify-between items-start gap-4 relative overflow-hidden ${
-                        notif.read
+                        pendingNotifId === notif.id
+                          ? "bg-white/60 border-brand-blue/30 shadow-[0_8px_30px_rgb(0,0,0,0.06)] cursor-wait animate-pulse"
+                          : notif.read
                           ? "bg-white/60 border-slate-100/50 opacity-75 backdrop-blur-md"
                           : "bg-white/80 border-brand-blue/20 shadow-[0_8px_30px_rgb(0,0,0,0.06)] hover:shadow-[0_8px_30px_rgb(0,0,0,0.12)] hover:border-brand-blue/40 cursor-pointer backdrop-blur-xl"
                       }`}

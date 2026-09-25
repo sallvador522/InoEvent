@@ -1,4 +1,5 @@
 import React, { useState, useEffect } from 'react';
+import { Virtuoso } from 'react-virtuoso';
 import { EventDetails } from '../../types';
 import { collection, query, onSnapshot, doc, updateDoc, setDoc, deleteDoc } from 'firebase/firestore';
 import { db } from '../../components/FirebaseProvider';
@@ -107,6 +108,11 @@ export const TableManager: React.FC<{ event: EventDetails; guests: any[] }> = ({
         e.preventDefault();
         const guestId = e.dataTransfer.getData('guestId');
         if (!guestId) return;
+        // Trava anti-corrida: drops rápidos valiam last-write-wins sem feedback.
+        if (movingGuestId) {
+            toast.error('Aguarde, a mover convidado…');
+            return;
+        }
 
         // Optionally check table capacity
         if (tableId) {
@@ -119,12 +125,15 @@ export const TableManager: React.FC<{ event: EventDetails; guests: any[] }> = ({
         }
 
         try {
+            setMovingGuestId(`drop:${guestId}`);
             const guestRef = doc(db, `events/${event.id}/guests`, guestId);
             await updateDoc(guestRef, { tableId: tableId });
             toast.success('Convidado movido com sucesso.');
         } catch (error) {
             console.error(error);
             toast.error('Erro ao mover convidado.');
+        } finally {
+            setMovingGuestId(null);
         }
     };
 
@@ -132,9 +141,28 @@ export const TableManager: React.FC<{ event: EventDetails; guests: any[] }> = ({
         e.dataTransfer.setData('guestId', guestId);
     };
 
-    // Filter only confirmed or pending guests who will actually attend
-    const attendingGuests = guests.filter(g => g.status === 'CONFIRMED' || g.status === 'PENDING');
-    const unassignedGuests = attendingGuests.filter(g => !(g as any).tableId);
+    // Listas derivadas memoizadas: antes cada render corria O(T×G) filters
+    // (um filter por mesa sobre todos os convidados). O mapa mesa→convidados
+    // é construído uma vez por mudança em `guests` — lookup O(1) por mesa.
+    const attendingGuests = React.useMemo(
+        () => guests.filter(g => g.status === 'CONFIRMED' || g.status === 'PENDING'),
+        [guests]
+    );
+    const unassignedGuests = React.useMemo(
+        () => attendingGuests.filter(g => !(g as any).tableId),
+        [attendingGuests]
+    );
+    const guestsByTable = React.useMemo(() => {
+        const m = new Map<string, any[]>();
+        for (const g of attendingGuests) {
+            const t = (g as any).tableId;
+            if (!t) continue;
+            const arr = m.get(t);
+            if (arr) arr.push(g);
+            else m.set(t, [g]);
+        }
+        return m;
+    }, [attendingGuests]);
 
     return (
         <div className="w-full min-w-0 overflow-hidden">
@@ -164,11 +192,22 @@ export const TableManager: React.FC<{ event: EventDetails; guests: any[] }> = ({
                                     Todos os convidados têm mesa!
                                 </div>
                             ) : (
-                                unassignedGuests.map(guest => (
-                                    <div 
-                                        key={guest.id}
-                                        draggable
-                                        onDragStart={(e) => handleDragStart(e, guest.id)}
+                                // Lista virtualizada (altura adaptativa: compacta com poucos
+                                // convidados, com scroll próprio quando cresce). Os handlers de
+                                // drop ficam no wrapper — os eventos borbulham do Virtuoso.
+                                <Virtuoso
+                                    style={{ height: Math.max(200, Math.min(480, unassignedGuests.length * 72)) }}
+                                    totalCount={unassignedGuests.length}
+                                    overscan={200}
+                                    itemContent={(index) => {
+                                        const guest = unassignedGuests[index];
+                                        if (!guest) return null;
+                                        return (
+                                        <div className="pb-2 pr-1">
+                                        <div
+                                            key={guest.id}
+                                            draggable
+                                            onDragStart={(e) => handleDragStart(e, guest.id)}
                                         className="bg-slate-50 border border-slate-200 p-3 rounded-xl cursor-grab active:cursor-grabbing hover:border-brand-blue/30 hover:bg-blue-50/50 transition-colors flex items-center gap-3"
                                     >
                                         <div className="w-8 h-8 rounded-full bg-slate-200 flex items-center justify-center text-slate-500 text-xs font-bold uppercase shrink-0">
@@ -180,8 +219,9 @@ export const TableManager: React.FC<{ event: EventDetails; guests: any[] }> = ({
                                         </div>
                                         <div className="relative flex items-center">
                                             <select 
-                                                className="absolute inset-0 w-full h-full opacity-0 cursor-pointer"
+                                                className="absolute inset-0 w-full h-full opacity-0 cursor-pointer disabled:cursor-wait"
                                                 value=""
+                                                disabled={movingGuestId !== null}
                                                 onChange={(e) => moveGuestToTable(guest.id, e.target.value)}
                                             >
                                                 <option value="" disabled>Atribuir mesa...</option>
@@ -194,7 +234,10 @@ export const TableManager: React.FC<{ event: EventDetails; guests: any[] }> = ({
                                             </button>
                                         </div>
                                     </div>
-                                ))
+                                        </div>
+                                        );
+                                    }}
+                                />
                             )}
                         </div>
                     </div>
@@ -230,9 +273,18 @@ export const TableManager: React.FC<{ event: EventDetails; guests: any[] }> = ({
                             <button 
                                 type="submit" 
                                 disabled={loading}
-                                className="px-6 py-3 bg-slate-900 hover:bg-slate-800 text-white text-sm font-bold rounded-xl transition-all shadow-md w-full sm:w-auto h-[46px] flex items-center justify-center gap-2"
+                                className="px-6 py-3 bg-slate-900 hover:bg-slate-800 text-white text-sm font-bold rounded-xl transition-all shadow-md w-full sm:w-auto h-[46px] flex items-center justify-center gap-2 disabled:opacity-70"
                             >
-                                <span className="material-symbols-outlined text-[18px]">add</span> Adicionar
+                                {loading ? (
+                                  <>
+                                    <span className="w-4 h-4 border-2 border-white/40 border-t-white rounded-full animate-spin" aria-hidden="true" />
+                                    A criar…
+                                  </>
+                                ) : (
+                                  <>
+                                    <span className="material-symbols-outlined text-[18px]">add</span> Adicionar
+                                  </>
+                                )}
                             </button>
                         </form>
                     </div>
@@ -249,7 +301,10 @@ export const TableManager: React.FC<{ event: EventDetails; guests: any[] }> = ({
                         )}
                         {!isFetching &&
                         tables.map(table => {
-                            const tableGuests = attendingGuests.filter(g => (g as any).tableId === table.id);
+                            // Lookup O(1) no mapa memoizado (antes: filter O(G) por mesa).
+                            // Os chips por mesa são poucos — ficam como estão (virtualizar
+                            // listas minúsculas só adicionaria custo, sem benefício).
+                            const tableGuests = guestsByTable.get(table.id) ?? [];
                             const isFull = tableGuests.length >= table.capacity;
                             
                             return (
@@ -296,8 +351,9 @@ export const TableManager: React.FC<{ event: EventDetails; guests: any[] }> = ({
                                                     <p className="text-xs font-medium text-slate-700 truncate flex-1">{guest.name}</p>
                                                     <div className="relative flex items-center ml-auto mr-2">
                                                         <select 
-                                                            className="absolute inset-0 w-full h-full opacity-0 cursor-pointer"
+                                                            className="absolute inset-0 w-full h-full opacity-0 cursor-pointer disabled:cursor-wait"
                                                             value={table.id}
+                                                            disabled={movingGuestId !== null}
                                                             onChange={(e) => moveGuestToTable(guest.id, e.target.value || null)}
                                                         >
                                                             <option value="">Remover da mesa</option>
@@ -311,7 +367,8 @@ export const TableManager: React.FC<{ event: EventDetails; guests: any[] }> = ({
                                                     </div>
                                                     <button
                                                         onClick={() => moveGuestToTable(guest.id, null)}
-                                                        className="text-slate-300 hover:text-red-500 transition-colors p-1 flex items-center justify-center rounded-md hover:bg-red-50"
+                                                        disabled={movingGuestId !== null}
+                                                        className="text-slate-300 hover:text-red-500 transition-colors p-1 flex items-center justify-center rounded-md hover:bg-red-50 disabled:opacity-40"
                                                     >
                                                         <span className="material-symbols-outlined text-[14px]">close</span>
                                                     </button>

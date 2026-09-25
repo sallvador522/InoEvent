@@ -34,8 +34,9 @@ Este documento apresenta uma auditoria brutalmente honesta, crítica e detalhada
 
 ### Como o InoEvents Gera Receita
 1.  **Modelo Freemium/SaaS de Evento Único:**
-    *   **Plano Essencial:** Recursos básicos para criação de convites, restrição a um baixo limite de convidados (ex: até 50).
-    *   **Plano Premium / Luxury:** Customização sem limite de convidados, galeria ilimitada, suporte ao TocaPlayer com upload direto de MP3, mural interativo e sem publicidade ("white-label").
+    *   **Plano Essencial (fora de venda, legado):** fichas antigas mantêm 100 convidados / 90 dias.
+    *   **Plano Premium / Luxury:** 1 evento de casamento por plano, até 50 convidados, galeria premium, suporte ao TocaPlayer com upload direto de MP3, mural interativo e sem publicidade ("white-label").
+    *   **Plano VIP:** 1 evento por plano, até 200 convidados, QR individual e domínio próprio.
 2.  **Taxas sobre Presentes Virtuais:** Cobrança de micro-taxas fixas ou percentuais na confirmação de saques de presentes virtuais (em Angola, otimizado via canais locais de pagamentos).
 
 ### Diferenciação Real & Product Market Fit
@@ -68,7 +69,7 @@ Este documento apresenta uma auditoria brutalmente honesta, crítica e detalhada
 *   **Custo de Gateway de Pagamento:** Estimado em 1.5% a 2% por transação de referência de pagamento.
 
 ### Simulação de Unit Economics (Angola)
-*   **Preço do Plano Premium:** ~15.000 AOA a 25.000 AOA por evento.
+*   **Preço do Plano Premium:** 15.000 AOA por evento (VIP: 25.000 AOA) — valores de `config/plans.ts`, que é a fonte oficial.
 *   **CAC (Custo de Aquisição):** Estimado em ~2.500 AOA através de marketing direcionado no Instagram.
 *   **LTV médio (Lifetime Value):** 1.2 eventos por utilizador (fidelização para chás de panela, chás de bebê e batizados subsequentes ao casamento).
 *   **Ponto de Equilíbrio (Break-Even):** Apenas 50 subscrições pagas mensalmente garantem a saúde e autosustentação operacional.

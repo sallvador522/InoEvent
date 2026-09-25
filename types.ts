@@ -133,7 +133,7 @@ export interface EventDetails {
   timeline: TimelineItem[];
   mapImage?: string;
   gallery?: Array<string | { id: string; url: string; likes: number }>;
-  /** @deprecated use plan as PlanId ('essential'|'premium'|'vip'|'business') via normalizePlanId */
+  /** @deprecated use plan as PlanId ('free'|'essential'|'premium'|'vip'|'business') via normalizePlanId */
   plan?: string;
   /** Novo campo canónico — preferir sobre plan legado */
   planId?: PlanId;

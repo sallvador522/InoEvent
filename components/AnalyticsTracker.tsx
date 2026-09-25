@@ -34,80 +34,108 @@ const getBrowserType = (): string => {
   return 'Outros';
 };
 
+/** Corre o callback quando o browser estiver idle — nunca compete com o first paint. */
+const runWhenIdle = (cb: () => void): void => {
+  try {
+    const w = window as any;
+    if (typeof w.requestIdleCallback === 'function') {
+      w.requestIdleCallback(cb, { timeout: 2500 });
+    } else {
+      setTimeout(cb, 1500);
+    }
+  } catch {
+    setTimeout(cb, 1500);
+  }
+};
+
 export const AnalyticsTracker: React.FC = () => {
   const location = useLocation();
 
   useEffect(() => {
-    const trackPageview = async () => {
+    const path = location.pathname;
+    const search = location.search;
+
+    // Skip tracking of editing mode or admin panel to avoid skewing real user traffic
+    if (search.includes('edit=true') || path.startsWith('/admin')) {
+      return;
+    }
+
+    // Check if we already tracked this page in the current session
+    const sessionKey = `ino_track_${path}`;
+    try {
+      if (sessionStorage.getItem(sessionKey)) {
+        return;
+      }
+      sessionStorage.setItem(sessionKey, 'true');
+    } catch {
+      /* storage indisponível — segue para o tracking leve */
+    }
+
+    // Sinais baratos e síncronos primeiro (não bloqueiam a renderização)
+    try {
+      if (typeof window !== 'undefined' && window.gtag) {
+        window.gtag('config', 'G-8P6CGLFLLJ', {
+          page_path: path + search,
+          page_title: document.title
+        });
+      }
+    } catch {
+      /* no-op */
+    }
+
+    // Meta Pixel PageView (SPA) — só dispara com consentimento (no-op sem aceite)
+    try {
+      initPixel();
+      trackPixelPageView(path + search);
+    } catch {
+      /* no-op */
+    }
+
+    // Extract event ID from the path if it exists
+    // Supported patterns: /invite/:id, /client-dashboard/:id, /checkin/:id
+    const inviteMatch = path.match(/^\/invite\/([^/]+)/);
+    const clientDashMatch = path.match(/^\/client-dashboard\/([^/]+)/);
+    const checkinMatch = path.match(/^\/checkin\/([^/]+)/);
+
+    let eventId = '';
+    if (inviteMatch) {
+      eventId = inviteMatch[1];
+    } else if (clientDashMatch) {
+      eventId = clientDashMatch[1];
+    } else if (checkinMatch) {
+      eventId = checkinMatch[1];
+    }
+
+    // Meta Pixel ViewContent na abertura de convite — 1x por sessão (mesma chave acima)
+    if (inviteMatch && eventId) {
       try {
-        const path = location.pathname;
-        const search = location.search;
-        
-        // Skip tracking of editing mode or admin panel to avoid skewing real user traffic
-        if (search.includes('edit=true') || path.startsWith('/admin')) {
-          return;
-        }
+        trackPixelViewContent(eventId);
+      } catch {
+        /* no-op */
+      }
+    }
 
-        // Check if we already tracked this page in the current session
-        const sessionKey = `ino_track_${path}`;
-        if (sessionStorage.getItem(sessionKey)) {
-          return;
-        }
-
-        // Extract event ID from the path if it exists
-        // Supported patterns: /invite/:id, /client-dashboard/:id, /checkin/:id
-        let eventId = '';
-        const inviteMatch = path.match(/^\/invite\/([^/]+)/);
-        const clientDashMatch = path.match(/^\/client-dashboard\/([^/]+)/);
-        const checkinMatch = path.match(/^\/checkin\/([^/]+)/);
-
-        if (inviteMatch) {
-          eventId = inviteMatch[1];
-        } else if (clientDashMatch) {
-          eventId = clientDashMatch[1];
-        } else if (checkinMatch) {
-          eventId = checkinMatch[1];
-        }
-
+    // Escrita no Firestore adiada para o idle — fire-and-forget, nunca await na rota.
+    // Antes: `await addDoc(...)` segurava o effect e competia com o LCP da landing.
+    runWhenIdle(() => {
+      try {
         const device = getDeviceType();
         const browser = getBrowserType();
         const referrer = document.referrer ? new URL(document.referrer).hostname : 'Direto';
-
-        // Add visit record to Firestore
-        await addDoc(collection(db, 'visits'), {
+        void addDoc(collection(db, 'visits'), {
           path,
           eventId: eventId || null,
           device,
           browser,
           referrer,
           timestamp: new Date().toISOString()
+        }).catch((err) => {
+          console.warn('[AnalyticsTracker Error] Falha ao registrar visita:', err);
         });
-
-        // Send page view to Google Analytics (gtag.js)
-        if (typeof window !== 'undefined' && window.gtag) {
-          window.gtag('config', 'G-8P6CGLFLLJ', {
-            page_path: path + search,
-            page_title: document.title
-          });
-        }
-
-        // Meta Pixel PageView (SPA) — só dispara com consentimento (no-op sem aceite)
-        initPixel();
-        trackPixelPageView(path + search);
-
-        // Meta Pixel ViewContent na abertura de convite — 1x por sessão (mesma chave acima)
-        if (inviteMatch && eventId) {
-          trackPixelViewContent(eventId);
-        }
-
-        // Set session storage to prevent double tracking during this session
-        sessionStorage.setItem(sessionKey, 'true');
       } catch (err) {
         console.warn('[AnalyticsTracker Error] Falha ao registrar visita:', err);
       }
-    };
-
-    trackPageview();
+    });
   }, [location.pathname, location.search]);
 
   return null;

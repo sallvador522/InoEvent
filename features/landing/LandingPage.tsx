@@ -1,14 +1,18 @@
-import React, { useState, useEffect, useRef } from 'react';
+import React, { useState, useEffect, useRef, lazy, Suspense } from 'react';
 import { Link, useNavigate, useLocation } from 'react-router-dom';
 import { motion, AnimatePresence } from 'framer-motion';
-import { useFirebase, signOut, auth, db, handleFirestoreError, OperationType } from '../../components/FirebaseProvider';
+import { useFirebase } from '../../components/FirebaseProvider';
 import { normalizePlanId } from '../../lib/entitlements';
-import { collection, query, where, getDocs, onSnapshot } from 'firebase/firestore';
 import { Navbar } from '../../components/Navbar';
 import { SEO } from '../../components/SEO';
-import { FAQSection } from './FAQSection';
-import { SupportModal } from '../../components/SupportModal';
-import { MapEmbed } from '../../components/MapEmbed';
+// Below-fold / sob demanda em chunks separados — fora do caminho crítico do LCP.
+const FAQSection = lazy(() => import('./FAQSection').then((m) => ({ default: m.FAQSection })));
+const SupportModal = lazy(() =>
+  import('../../components/SupportModal').then((m) => ({ default: m.SupportModal }))
+);
+const MapEmbed = lazy(() =>
+  import('../../components/MapEmbed').then((m) => ({ default: m.MapEmbed }))
+);
 import { buildEmbedSrc, buildDirectionsUrl, DEFAULT_CENTER } from '../../lib/maps';
 import { EVENTS } from '../../mockData';
 import { X, Copy, MessageSquare, ArrowRight, Award, CheckCircle2, Gem, Utensils, Briefcase, QrCode, Gift, Users, BookOpen, Globe, ChevronLeft, ChevronRight, MapPin, Navigation } from 'lucide-react';
@@ -37,7 +41,7 @@ const QuoteRotator: React.FC = () => {
       setIndex((i) => (i + 1) % QUOTES.length);
     }, 6000);
     return () => clearInterval(timer);
-  }, [paused, index]);
+  }, [paused]);
 
   const quote = QUOTES[index];
 
@@ -107,13 +111,12 @@ export const LandingPage: React.FC = () => {
   const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
   const [dashboardOpen, setDashboardOpen] = useState(false);
   const { user, userProfile } = useFirebase();
-  const [userEvents, setUserEvents] = useState<any[]>([]);
   const [supportOpen, setSupportOpen] = useState(false);
   const [showTypeModal, setShowTypeModal] = useState(false);
   const [whatsappModal, setWhatsappModal] = useState<{
     name: string;
     price: string;
-    billingCycle?: "monthly" | "annual";
+    billingCycle?: "monthly";
   } | null>(null);
   const typeModalPanelRef = useRef<HTMLDivElement>(null);
   const waModalPanelRef = useRef<HTMLDivElement>(null);
@@ -145,7 +148,7 @@ export const LandingPage: React.FC = () => {
     toast.success("Copiado!");
   };
 
-  const confirmPlanSelection = (planName: string, price: string, billingCycle?: "monthly" | "annual") => {
+  const confirmPlanSelection = (planName: string, price: string, billingCycle?: "monthly") => {
     if (!user) {
       toast.custom(
         (t) => (
@@ -221,35 +224,9 @@ export const LandingPage: React.FC = () => {
     }
   }, [location]);
 
-  useEffect(() => {
-    if (!user) {
-      setUserEvents([]);
-      return;
-    }
-    
-    try {
-      const eventsRef = collection(db, 'events');
-      const q = query(eventsRef, where("ownerId", "==", user.uid));
-      
-      const unsubscribeEvents = onSnapshot(q, (snapshot: any) => {
-        const eventsList = snapshot.docs.map((doc: any) => ({
-          ...doc.data(),
-          id: doc.id
-        }));
-        setUserEvents(eventsList);
-      }, (error: any) => {
-        // Suppress missing permissions error during development if rule not exist
-        if(error.message.includes("Missing or insufficient permissions")) {
-            console.warn("Firestore rules test or missing index error, ignore if dev", error);
-        } else {
-            handleFirestoreError(error, OperationType.LIST, 'events');
-        }
-      });
-      return unsubscribeEvents;
-    } catch(err) {
-      console.warn("Failed to set up events listener", err);
-    }
-  }, [user]);
+  // NOTA: sem listener de events aqui — a landing pública não precisa de realtime.
+  // O Navbar já escuta events/notifications do utilizador logado (com limit).
+  // Isto elimina 1 listener duplicado em cada visita de utilizador autenticado.
 
   const handleCreateEvent = () => {
     setShowTypeModal(true);
@@ -264,7 +241,7 @@ export const LandingPage: React.FC = () => {
     <div className="flex-1 min-h-screen flex flex-col justify-between relative font-display overflow-x-hidden bg-[#FDFBF7] text-slate-900">
       <SEO 
         title="InoEvents Angola | Convites Digitais de Casamento, Chá de Panela e Gestão de Eventos" 
-        description="A plataforma mais elegante de Angola para criar convites digitais de casamento e chás de panela a partir de 7.500 Kz, com RSVP online, QR Code de acesso, mapa da zona com botão Como chegar, check-in presencial no evento, lista de convidados e presentes por IBAN."
+        description={`A plataforma mais elegante de Angola para criar convites digitais de casamento e chás de panela a partir de ${PLANS.essential.price.toLocaleString('pt-AO')} Kz, com RSVP online, QR Code de acesso, mapa da zona com botão Como chegar, check-in presencial no evento, lista de convidados e presentes por IBAN.`}
       />
 
       <Navbar />
@@ -278,6 +255,7 @@ export const LandingPage: React.FC = () => {
               src="/bannerIno.webp"
               alt="Casal de noivos ao pôr-do-sol sobre o mar"
               fetchPriority="high"
+              decoding="async"
               className="absolute inset-0 h-full w-full object-cover object-[55%_20%] md:object-[50%_25%]"
             />
             <div className="absolute inset-0 bg-gradient-to-t from-[#0d1f38]/90 via-[#0d1f38]/35 to-[#0d1f38]/15 pointer-events-none" aria-hidden="true" />
@@ -287,7 +265,7 @@ export const LandingPage: React.FC = () => {
             <motion.div 
               initial={{ opacity: 0 }}
               animate={{ opacity: 1 }}
-              transition={{ duration: 0.8, ease: "easeOut", delay: 0.1 }}
+              transition={{ duration: 0.5, ease: "easeOut" }}
               className="relative z-20 flex justify-center w-full mb-8"
             >
                <div className="flex items-center gap-3 px-1 py-2">
@@ -299,28 +277,28 @@ export const LandingPage: React.FC = () => {
 
             <div className="relative z-20 max-w-5xl mx-auto px-6 pb-12 md:pb-16 text-center flex flex-col items-center">
               
-               <motion.h1 
+                <motion.h1 
                   initial={{ opacity: 0, y: 30 }}
                   animate={{ opacity: 1, y: 0 }}
-                  transition={{ duration: 0.9, ease: [0.22, 1, 0.36, 1], delay: 0.2 }}
+                  transition={{ duration: 0.55, ease: [0.22, 1, 0.36, 1], delay: 0.05 }}
                   className="text-[2.9rem] md:text-7xl lg:text-[5rem] font-serif font-bold text-white tracking-tight leading-[1.02] md:leading-[1.05] mb-6"
                >
                   O convite do seu<br />
                   <span className="italic font-medium text-[var(--color-gold-soft)] inline-block mt-2">grande dia.</span>
                </motion.h1>
                
-               <motion.p 
+                <motion.p 
                   initial={{ opacity: 0, y: 20 }}
                   animate={{ opacity: 1, y: 0 }}
-                  transition={{ duration: 0.8, ease: "easeOut", delay: 0.4 }}
+                  transition={{ duration: 0.5, ease: "easeOut", delay: 0.1 }}
                   className="text-lg md:text-xl text-white/85 max-w-xl mx-auto leading-relaxed mb-10 font-light text-center"
                >
                   Convites digitais de casamento e chá de panela, com confirmação de presença, lista de presentes e mapa com Como chegar — tudo num só link.
                </motion.p>
-               <motion.div 
-                 initial={{ opacity: 0, y: 20 }}
-                 animate={{ opacity: 1, y: 0 }}
-                 transition={{ duration: 0.8, ease: "easeOut", delay: 0.5 }}
+                <motion.div 
+                  initial={{ opacity: 0, y: 20 }}
+                  animate={{ opacity: 1, y: 0 }}
+                  transition={{ duration: 0.5, ease: "easeOut", delay: 0.15 }}
                  className="flex flex-col items-center gap-6 w-full max-w-2xl mx-auto px-4"
               >
                 {/* Primary CTA — hierarquia clara, lado a lado no desktop */}
@@ -355,11 +333,11 @@ export const LandingPage: React.FC = () => {
            </div>
 
             {/* Composição por cima do banner — painel de templates + telemóvel + confirmação */}
-            <motion.div
-              id="exemplo"
-              initial={{ opacity: 0, y: 40 }}
-              animate={{ opacity: 1, y: 0 }}
-              transition={{ duration: 1, ease: [0.22, 1, 0.36, 1], delay: 0.6 }}
+             <motion.div
+               id="exemplo"
+               initial={{ opacity: 0, y: 40 }}
+               animate={{ opacity: 1, y: 0 }}
+               transition={{ duration: 0.6, ease: [0.22, 1, 0.36, 1], delay: 0.2 }}
               className="relative z-10 w-full max-w-5xl mx-auto px-4 h-[420px] md:h-[500px] scroll-mt-28"
             >
                {/* Painel central de templates com desfile automático */}
@@ -367,47 +345,32 @@ export const LandingPage: React.FC = () => {
                   <div className="h-1.5 bg-[#C5A028]/70 shrink-0 z-10" />
                   <div className="flex-1 p-4 md:p-6 overflow-hidden relative">
                      <div className="absolute inset-0 bg-gradient-to-b from-[#FFFDF8] via-transparent to-[#FFFDF8] z-10 pointer-events-none" />
-                     <div className="grid grid-cols-2 gap-6 h-full relative z-0">
-                        <motion.div
-                           animate={{ y: ["0%", "-50%"] }}
-                           transition={{ repeat: Infinity, duration: 18, ease: "linear" }}
-                           className="flex flex-col gap-6 will-change-transform"
-                        >
-                           <img src="/casalModel.webp" className="rounded-2xl shadow-sm object-cover w-full aspect-[3/4]" alt="Convite de casamento" />
-                           <img src="/bridal-templates/templateCha3.webp" className="rounded-2xl shadow-sm object-cover w-full aspect-[3/4]" alt="Convite de chá de panela" />
-                           <img src="/bridal-templates/templateCha1.webp" className="rounded-2xl shadow-sm object-cover w-full aspect-[3/4]" alt="Convite de chá de panela" />
-                        </motion.div>
-                        <motion.div
-                           animate={{ y: ["-50%", "0%"] }}
-                           transition={{ repeat: Infinity, duration: 22, ease: "linear" }}
-                           className="flex flex-col gap-6 mt-[-50%] will-change-transform"
-                        >
-                           <img src="/bridal-templates/templateCha2.webp" className="rounded-2xl shadow-sm object-cover w-full aspect-[3/4]" alt="Convite de chá de panela" />
-                           <img src="/bridal-templates/templateCha4.webp" className="rounded-2xl shadow-sm object-cover w-full aspect-[3/4]" alt="Convite de chá de panela" />
-                           <img src="/bridal-templates/templateCha1.webp" className="rounded-2xl shadow-sm object-cover w-full aspect-[3/4]" alt="Convite de chá de panela" />
-                        </motion.div>
-                     </div>
+                      <div className="grid grid-cols-2 gap-6 h-full relative z-0">
+                        {/* Desfile automático em CSS (GPU) — mesmo visual, sem rAF em JS */}
+                        <div className="flex flex-col gap-6 ino-marquee-down">
+                           <img src="/casalModel.webp" loading="lazy" decoding="async" width="600" height="800" className="rounded-2xl shadow-sm object-cover w-full aspect-[3/4]" alt="Convite de casamento" />
+                           <img src="/bridal-templates/templateCha3.webp" loading="lazy" decoding="async" width="600" height="800" className="rounded-2xl shadow-sm object-cover w-full aspect-[3/4]" alt="Convite de chá de panela" />
+                           <img src="/bridal-templates/templateCha1.webp" loading="lazy" decoding="async" width="600" height="800" className="rounded-2xl shadow-sm object-cover w-full aspect-[3/4]" alt="Convite de chá de panela" />
+                        </div>
+                        <div className="flex flex-col gap-6 mt-[-50%] ino-marquee-up">
+                           <img src="/bridal-templates/templateCha2.webp" loading="lazy" decoding="async" width="600" height="800" className="rounded-2xl shadow-sm object-cover w-full aspect-[3/4]" alt="Convite de chá de panela" />
+                           <img src="/bridal-templates/templateCha4.webp" loading="lazy" decoding="async" width="600" height="800" className="rounded-2xl shadow-sm object-cover w-full aspect-[3/4]" alt="Convite de chá de panela" />
+                           <img src="/bridal-templates/templateCha1.webp" loading="lazy" decoding="async" width="600" height="800" className="rounded-2xl shadow-sm object-cover w-full aspect-[3/4]" alt="Convite de chá de panela" />
+                        </div>
+                      </div>
                   </div>
                </div>
 
-               {/* Telemóvel da noiva */}
-               <motion.div
-                  animate={{ y: [0, -10, 0] }}
-                  transition={{ repeat: Infinity, duration: 6, ease: "easeInOut" }}
-                  className="absolute left-2 md:left-24 top-12 w-[160px] md:w-[220px] h-[320px] md:h-[400px] bg-white rounded-3xl border-4 md:border-8 border-[#1B365D] shadow-2xl flex flex-col overflow-hidden z-20"
-               >
-                  <img src="/casalModel.webp" className="w-full h-full object-cover" alt="Convite visto no telemóvel" />
+               {/* Telemóvel da noiva — flutuação subtil em CSS (GPU) */}
+               <div className="absolute left-2 md:left-24 top-12 w-[160px] md:w-[220px] h-[320px] md:h-[400px] bg-white rounded-3xl border-4 md:border-8 border-[#1B365D] shadow-2xl flex flex-col overflow-hidden z-20 ino-float-soft">
+                  <img src="/casalModel.webp" loading="lazy" decoding="async" width="440" height="800" className="w-full h-full object-cover" alt="Convite visto no telemóvel" />
                   <div className="absolute bottom-4 left-1/2 -translate-x-1/2 w-[80%] bg-white/90 backdrop-blur text-center py-2 rounded-full text-[10px] sm:text-xs font-bold text-[#1B365D] shadow-lg">
                      Confirmar Presença
                   </div>
-               </motion.div>
+               </div>
 
-               {/* Cartão de confirmação */}
-               <motion.div
-                  animate={{ y: [0, 8, 0] }}
-                  transition={{ repeat: Infinity, duration: 5, ease: "easeInOut", delay: 1 }}
-                  className="absolute right-0 md:right-16 top-24 w-[180px] md:w-[260px] rounded-2xl bg-[#FFFDF8] border border-[#C5A028]/30 p-4 shadow-[0_20px_40px_rgba(27,54,93,0.12)] hidden sm:block"
-               >
+               {/* Cartão de confirmação — flutuação subtil em CSS (GPU) */}
+               <div className="absolute right-0 md:right-16 top-24 w-[180px] md:w-[260px] rounded-2xl bg-[#FFFDF8] border border-[#C5A028]/30 p-4 shadow-[0_20px_40px_rgba(27,54,93,0.12)] hidden sm:block ino-float-soft-alt">
                   <div className="w-12 h-12 rounded-full bg-emerald-100 flex items-center justify-center mb-4 text-emerald-600">
                      <CheckCircle2 size={24} />
                   </div>
@@ -416,7 +379,7 @@ export const LandingPage: React.FC = () => {
                   <div className="text-xs font-bold text-[#1B365D] bg-[#C5A028]/15 py-2 px-3 rounded-lg text-center">
                      Ver lista de presenças
                   </div>
-               </motion.div>
+               </div>
             </motion.div>
         </section>
 
@@ -539,10 +502,12 @@ export const LandingPage: React.FC = () => {
             <div className="mt-8 mx-auto max-w-xl text-left">
               <div className="rounded-[1.5rem] border border-slate-200/60 shadow-lg overflow-hidden bg-white">
                 <div className="relative w-full aspect-[16/10] min-h-[220px] bg-slate-100">
-                  <MapEmbed
-                    src={buildEmbedSrc({ latitude: DEFAULT_CENTER.lat, longitude: DEFAULT_CENTER.lng, locationName: 'Luanda' })}
-                    title="Exemplo de mapa do convite — Luanda"
-                  />
+                  <Suspense fallback={<div className="absolute inset-0 bg-slate-100 animate-pulse" aria-hidden="true" />}>
+                    <MapEmbed
+                      src={buildEmbedSrc({ latitude: DEFAULT_CENTER.lat, longitude: DEFAULT_CENTER.lng, locationName: 'Luanda' })}
+                      title="Exemplo de mapa do convite — Luanda"
+                    />
+                  </Suspense>
                   <div className="absolute bottom-3 right-3 pointer-events-none">
                     <span className="inline-flex items-center gap-1.5 rounded-full px-2.5 py-1 text-[10px] font-bold uppercase tracking-widest bg-white/90 backdrop-blur-md border border-slate-200 text-slate-600 shadow-sm">
                       <MapPin size={10} /> Só leitura
@@ -586,131 +551,123 @@ export const LandingPage: React.FC = () => {
               <p className="text-slate-600 font-light">Pagamento único por evento. Sem mensalidades para noivos.</p>
             </div>
             
-            <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-4 items-stretch justify-center gap-6">
-              {/* Plan 1: Essencial */}
+            <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 items-stretch justify-center gap-6">
+              {/* Plan 1: Premium */}
               <div className="w-full bg-[#FFFDF8] rounded-2xl p-8 border border-[#C5A028]/30 flex flex-col relative" style={{ transition: 'border-color 200ms ease, box-shadow 200ms ease' }}>
-                  <h4 className="font-serif text-2xl font-bold text-[#1B365D] mb-1">Essencial</h4>
-                  <p className="text-slate-500 text-[13px] font-light leading-relaxed mb-6">Para festas íntimas, sem complicações.</p>
+                  <h4 className="font-serif text-2xl font-bold text-[#1B365D] mb-1">Premium</h4>
+                  <p className="text-slate-500 text-[13px] font-light leading-relaxed mb-6">O grande dia, em grande e inesquecível.</p>
                   <div className="mb-2 flex items-baseline gap-1">
-                     <span className="text-4xl font-serif font-bold text-slate-900" style={{ fontVariantNumeric: 'tabular-nums' }}>{PLANS.essential.price.toLocaleString('pt-AO')}</span>
+                     <span className="text-4xl font-serif font-bold text-slate-900" style={{ fontVariantNumeric: 'tabular-nums' }}>{PLANS.premium.price.toLocaleString('pt-AO')}</span>
                      <span className="text-slate-500 text-sm font-medium">Kz / evento</span>
                   </div>
-                  <p className="text-xs text-slate-500 font-light mb-6">Válido por {PLANS.essential.validityDays} dias · Até {PLANS.essential.guestLimit} convidados</p>
-                 <ul className="flex flex-col gap-3 mb-8 flex-1">
-                     <li className="flex items-center gap-3 text-[13px] text-slate-600">
-                        <CheckCircle2 size={18} className="text-[#C5A028] shrink-0" />
-                        <span>Até {PLANS.essential.guestLimit} convidados</span>
-                     </li>
-                     <li className="flex items-center gap-3 text-[13px] text-slate-600">
-                        <CheckCircle2 size={18} className="text-[#C5A028] shrink-0" />
-                        <span>Temas clássicos</span>
-                     </li>
-                      <li className="flex items-center gap-3 text-[13px] text-slate-600">
-                         <CheckCircle2 size={18} className="text-[#C5A028] shrink-0" />
-                         <span>Galeria de fotos</span>
-                      </li>
-                      <li className="flex items-center gap-3 text-[13px] text-slate-600">
-                         <CheckCircle2 size={18} className="text-[#C5A028] shrink-0" />
-                         <span>QR do evento e contagem regressiva</span>
-                      </li>
-                  </ul>
-                  <button
-                     onClick={() => confirmPlanSelection("Essencial", `${PLANS.essential.price.toLocaleString('pt-AO')} Kz`)}
-                     className="w-full py-3.5 rounded-full border border-[#1B365D]/30 text-[#1B365D] font-bold text-xs uppercase tracking-wider hover:bg-[#1B365D] hover:text-white active:scale-[0.97] cursor-pointer"
-                     style={{ transition: 'transform 160ms ease-out, background-color 200ms ease, color 200ms ease' }}
-                  >
-                     Escolher Essencial
-                  </button>
-               </div>
-              
-              {/* Plan 2: Premium (Highlighted) */}
-              <div className="w-full bg-[#1B365D] rounded-2xl p-8 relative flex flex-col xl:-translate-y-3 border border-[#1B365D]">
-                  <div className="absolute top-0 left-1/2 -translate-x-1/2 -translate-y-1/2 bg-[#C5A028] text-white text-[10px] font-bold uppercase tracking-[0.14em] py-1 px-4 rounded-full whitespace-nowrap">
-                     O mais escolhido
-                  </div>
-                  <h4 className="font-serif text-2xl font-bold text-white mb-1">Premium</h4>
-                  <p className="text-blue-200/70 text-[13px] font-light leading-relaxed mb-6">O grande dia, sem limites nem marca.</p>
-                  <div className="mb-2 flex items-baseline gap-1">
-                     <span className="text-4xl font-serif font-bold text-white" style={{ fontVariantNumeric: 'tabular-nums' }}>{PLANS.premium.price.toLocaleString('pt-AO')}</span>
-                     <span className="text-blue-200/70 text-sm font-medium">Kz / evento</span>
-                  </div>
-                  <p className="text-xs text-blue-200/60 font-light mb-6">Válido por {PLANS.premium.validityDays} dias · Até {PLANS.premium.guestLimit} convidados</p>
+                  <p className="text-xs text-slate-500 font-light mb-6">Válido por {PLANS.premium.validityDays} dias · Até {PLANS.premium.guestLimit} convidados</p>
                   <ul className="flex flex-col gap-3 mb-8 flex-1">
-                     <li className="flex items-center gap-3 text-[13px] text-blue-50">
+                     <li className="flex items-center gap-3 text-[13px] text-slate-600">
                         <CheckCircle2 size={18} className="text-[#C5A028] shrink-0" />
-                        <span>Até {PLANS.premium.guestLimit} convidados</span>
+                        <span>Acesso por evento específico</span>
                      </li>
-                     <li className="flex items-center gap-3 text-[13px] text-blue-50">
+                     <li className="flex items-center gap-3 text-[13px] text-slate-600">
                         <CheckCircle2 size={18} className="text-[#C5A028] shrink-0" />
                         <span>Todos os 8 temas incluídos</span>
                      </li>
-                     <li className="flex items-center gap-3 text-[13px] text-blue-50">
+                     <li className="flex items-center gap-3 text-[13px] text-slate-600">
+                        <CheckCircle2 size={18} className="text-[#C5A028] shrink-0" />
+                        <span>Até {PLANS.premium.guestLimit} convidados</span>
+                     </li>
+                     <li className="flex items-center gap-3 text-[13px] text-slate-600">
+                        <CheckCircle2 size={18} className="text-[#C5A028] shrink-0" />
+                        <span>Convidados individualizados</span>
+                     </li>
+                     <li className="flex items-center gap-3 text-[13px] text-slate-600">
+                        <CheckCircle2 size={18} className="text-[#C5A028] shrink-0" />
+                        <span>Galeria Premium</span>
+                     </li>
+                     <li className="flex items-center gap-3 text-[13px] text-slate-600">
                         <CheckCircle2 size={18} className="text-[#C5A028] shrink-0" />
                         <span>Música de fundo no convite</span>
                      </li>
-                     <li className="flex items-center gap-3 text-[13px] text-blue-50">
+                     <li className="flex items-center gap-3 text-[13px] text-slate-600">
                         <CheckCircle2 size={18} className="text-[#C5A028] shrink-0" />
-                        <span>Sem marca InoEvents</span>
+                        <span>Livro de assinaturas digital</span>
                      </li>
-                     <li className="flex items-center gap-3 text-[13px] text-blue-50">
+                     <li className="flex items-center gap-3 text-[13px] text-slate-600">
                         <CheckCircle2 size={18} className="text-[#C5A028] shrink-0" />
-                        <span>Partilha por WhatsApp</span>
+                        <span>Mapa das mesas</span>
                      </li>
-                     <li className="flex items-center gap-3 text-[13px] text-blue-50">
+                     <li className="flex items-center gap-3 text-[13px] text-slate-600">
                         <CheckCircle2 size={18} className="text-[#C5A028] shrink-0" />
-                        <span>Mapa das mesas e livro de assinaturas</span>
+                        <span>Contagem regressiva</span>
+                     </li>
+                     <li className="flex items-center gap-3 text-[13px] text-slate-600">
+                        <CheckCircle2 size={18} className="text-[#C5A028] shrink-0" />
+                        <span>Analytics básicos</span>
                      </li>
                   </ul>
                  <button
                      onClick={() => confirmPlanSelection("Premium", `${PLANS.premium.price.toLocaleString('pt-AO')} Kz`)}
-                     className="w-full py-3.5 rounded-full bg-[#C5A028] text-[#1B365D] font-bold text-xs uppercase tracking-wider hover:bg-[#d4af37] active:scale-[0.97] cursor-pointer"
-                     style={{ transition: 'transform 160ms ease-out, background-color 200ms ease' }}
+                     className="w-full py-3.5 rounded-full border border-[#1B365D]/30 text-[#1B365D] font-bold text-xs uppercase tracking-wider hover:bg-[#1B365D] hover:text-white active:scale-[0.97] cursor-pointer"
+                     style={{ transition: 'transform 160ms ease-out, background-color 200ms ease, color 200ms ease' }}
                   >
                      Criar Convite Premium
                   </button>
                </div>
               
-              {/* Plan 3: VIP */}
-              <div className="w-full bg-[#FFFDF8] rounded-2xl p-8 border border-[#C5A028]/30 flex flex-col relative" style={{ transition: 'border-color 200ms ease, box-shadow 200ms ease' }}>
-                  <h4 className="font-serif text-2xl font-bold text-[#1B365D] mb-1">VIP</h4>
-                  <p className="text-slate-500 text-[13px] font-light leading-relaxed mb-6">Receção com check-in e endereço próprio.</p>
-                  <div className="mb-2 flex items-baseline gap-1">
-                     <span className="text-4xl font-serif font-bold text-slate-900" style={{ fontVariantNumeric: 'tabular-nums' }}>{PLANS.vip.price.toLocaleString('pt-AO')}</span>
-                     <span className="text-slate-500 text-sm font-medium">Kz / evento</span>
+              {/* Plan 2: VIP (Highlighted) */}
+              <div className="w-full bg-[#1B365D] rounded-2xl p-8 relative flex flex-col xl:-translate-y-3 border border-[#1B365D]">
+                  <div className="absolute top-0 left-1/2 -translate-x-1/2 -translate-y-1/2 bg-[#C5A028] text-white text-[10px] font-bold uppercase tracking-[0.14em] py-1 px-4 rounded-full whitespace-nowrap">
+                     O mais escolhido
                   </div>
-                  <p className="text-xs text-slate-500 font-light mb-6">Válido por {PLANS.vip.validityDays} dias · Até {PLANS.vip.guestLimit} convidados</p>
+                  <h4 className="font-serif text-2xl font-bold text-white mb-1">VIP</h4>
+                  <p className="text-blue-200/70 text-[13px] font-light leading-relaxed mb-6">Receção com check-in e endereço próprio.</p>
+                  <div className="mb-2 flex items-baseline gap-1">
+                     <span className="text-4xl font-serif font-bold text-white" style={{ fontVariantNumeric: 'tabular-nums' }}>{PLANS.vip.price.toLocaleString('pt-AO')}</span>
+                     <span className="text-blue-200/70 text-sm font-medium">Kz / evento</span>
+                  </div>
+                  <p className="text-xs text-blue-200/60 font-light mb-6">Válido por {PLANS.vip.validityDays} dias · Até {PLANS.vip.guestLimit} convidados</p>
                   <ul className="flex flex-col gap-3 mb-8 flex-1">
-                     <li className="flex items-center gap-3 text-[13px] text-slate-600">
+                     <li className="flex items-center gap-3 text-[13px] text-blue-50">
                         <CheckCircle2 size={18} className="text-[#C5A028] shrink-0" />
                         <span>Tudo do Premium</span>
                      </li>
-                     <li className="flex items-center gap-3 text-[13px] text-slate-600">
+                     <li className="flex items-center gap-3 text-[13px] text-blue-50">
                         <CheckCircle2 size={18} className="text-[#C5A028] shrink-0" />
-                        <span>QR individual e check-in à entrada</span>
+                        <span>Até {PLANS.vip.guestLimit} convidados</span>
                      </li>
-                     <li className="flex items-center gap-3 text-[13px] text-slate-600">
+                     <li className="flex items-center gap-3 text-[13px] text-blue-50">
                         <CheckCircle2 size={18} className="text-[#C5A028] shrink-0" />
-                        <span>Gestão de acompanhantes</span>
+                        <span>QR individual por convidado</span>
                      </li>
-                     <li className="flex items-center gap-3 text-[13px] text-slate-600">
+                     <li className="flex items-center gap-3 text-[13px] text-blue-50">
                         <CheckCircle2 size={18} className="text-[#C5A028] shrink-0" />
-                        <span>Estatísticas avançadas</span>
+                        <span>Check-in inteligente</span>
                      </li>
-                     <li className="flex items-center gap-3 text-[13px] text-slate-600">
+                     <li className="flex items-center gap-3 text-[13px] text-blue-50">
+                        <CheckCircle2 size={18} className="text-[#C5A028] shrink-0" />
+                        <span>Gestão +1</span>
+                     </li>
+                     <li className="flex items-center gap-3 text-[13px] text-blue-50">
+                        <CheckCircle2 size={18} className="text-[#C5A028] shrink-0" />
+                        <span>Mesas avançadas</span>
+                     </li>
+                     <li className="flex items-center gap-3 text-[13px] text-blue-50">
+                        <CheckCircle2 size={18} className="text-[#C5A028] shrink-0" />
+                        <span>Analytics avançados</span>
+                     </li>
+                     <li className="flex items-center gap-3 text-[13px] text-blue-50">
                         <CheckCircle2 size={18} className="text-[#C5A028] shrink-0" />
                         <span>Suporte prioritário</span>
                      </li>
                   </ul>
                   <button
                      onClick={() => confirmPlanSelection("VIP", `${PLANS.vip.price.toLocaleString('pt-AO')} Kz`)}
-                     className="w-full py-3.5 rounded-full border border-[#1B365D]/30 text-[#1B365D] font-bold text-xs uppercase tracking-wider hover:bg-[#1B365D] hover:text-white active:scale-[0.97] cursor-pointer"
-                     style={{ transition: 'transform 160ms ease-out, background-color 200ms ease, color 200ms ease' }}
+                     className="w-full py-3.5 rounded-full bg-[#C5A028] text-[#1B365D] font-bold text-xs uppercase tracking-wider hover:bg-[#d4af37] active:scale-[0.97] cursor-pointer"
+                     style={{ transition: 'transform 160ms ease-out, background-color 200ms ease' }}
                   >
                      Escolher VIP
                   </button>
                </div>
 
-                {/* Plan 4: Business */}
+                {/* Plan 3: Business */}
               <div className="w-full bg-[#FFFDF8] rounded-2xl p-8 border border-[#C5A028]/30 flex flex-col relative" style={{ transition: 'border-color 200ms ease, box-shadow 200ms ease' }}>
                   <h4 className="font-serif text-2xl font-bold text-[#1B365D] mb-1 flex items-center gap-2">
                     Business
@@ -733,7 +690,23 @@ export const LandingPage: React.FC = () => {
                      </li>
                      <li className="flex items-center gap-3 text-[13px] text-slate-600">
                         <CheckCircle2 size={18} className="text-[#C5A028] shrink-0" />
+                        <span>Sem marca InoEvents (só aqui)</span>
+                     </li>
+                     <li className="flex items-center gap-3 text-[13px] text-slate-600">
+                        <CheckCircle2 size={18} className="text-[#C5A028] shrink-0" />
                         <span>Painel para os seus clientes</span>
+                     </li>
+                     <li className="flex items-center gap-3 text-[13px] text-slate-600">
+                        <CheckCircle2 size={18} className="text-[#C5A028] shrink-0" />
+                        <span>Check-in inteligente</span>
+                     </li>
+                     <li className="flex items-center gap-3 text-[13px] text-slate-600">
+                        <CheckCircle2 size={18} className="text-[#C5A028] shrink-0" />
+                        <span>Equipa & gestão profissional</span>
+                     </li>
+                     <li className="flex items-center gap-3 text-[13px] text-slate-600">
+                        <CheckCircle2 size={18} className="text-[#C5A028] shrink-0" />
+                        <span>Concierge +{ADDONS.concierge.price.toLocaleString('pt-AO')} Kz (opcional)</span>
                      </li>
                      <li className="flex items-center gap-3 text-[13px] text-slate-600">
                         <CheckCircle2 size={18} className="text-[#C5A028] shrink-0" />
@@ -760,8 +733,21 @@ export const LandingPage: React.FC = () => {
           </div>
         </section>
 
-        {/* FAQ Section */}
-        <FAQSection preview />
+        {/* FAQ Section — chunk separado, carrega após o LCP */}
+        <Suspense
+          fallback={
+            <div className="px-6 py-16 md:py-24 w-full" aria-hidden="true">
+              <div className="max-w-3xl mx-auto space-y-3">
+                <div className="h-8 w-2/3 mx-auto rounded-lg bg-slate-200/70 animate-pulse" />
+                <div className="h-14 rounded-2xl bg-slate-100 animate-pulse" />
+                <div className="h-14 rounded-2xl bg-slate-100 animate-pulse" />
+                <div className="h-14 rounded-2xl bg-slate-100 animate-pulse" />
+              </div>
+            </div>
+          }
+        >
+          <FAQSection preview />
+        </Suspense>
 
       </main>
 
@@ -789,7 +775,12 @@ export const LandingPage: React.FC = () => {
         </footer>
 
 
-      <SupportModal isOpen={supportOpen} onClose={() => setSupportOpen(false)} />
+      {/* Modal de suporte — código só descarrega quando aberto */}
+      {supportOpen && (
+        <Suspense fallback={null}>
+          <SupportModal isOpen={supportOpen} onClose={() => setSupportOpen(false)} />
+        </Suspense>
+      )}
 
       {/* Event Type Selection Modal */}
       <AnimatePresence>
@@ -855,6 +846,20 @@ export const LandingPage: React.FC = () => {
                   </button>
                 ))}
               </div>
+
+              {/* Saída para visitantes: escolher tipo é público, personalizar pede conta */}
+              {!user && (
+                <p className="text-center text-xs text-slate-500 mt-5">
+                  Já tem conta?{' '}
+                  <Link
+                    to="/auth"
+                    onClick={() => setShowTypeModal(false)}
+                    className="font-bold text-[#1B365D] hover:text-[#8a6d1c] underline underline-offset-2"
+                  >
+                    Entre para personalizar
+                  </Link>
+                </p>
+              )}
             </motion.div>
           </motion.div>
         )}
@@ -921,9 +926,7 @@ export const LandingPage: React.FC = () => {
                       Faturação
                     </span>
                     <span className="text-xs font-bold text-slate-800">
-                      {whatsappModal.billingCycle === "annual"
-                        ? "Anual"
-                        : "Mensal"}
+                      Mensal
                     </span>
                   </div>
                 )}

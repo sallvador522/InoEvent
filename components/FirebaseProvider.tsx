@@ -1,9 +1,10 @@
 import React, { createContext, useContext, useEffect, useState } from 'react';
 import { initializeApp } from 'firebase/app';
 import { getAuth, GoogleAuthProvider, onAuthStateChanged, User, signOut } from 'firebase/auth';
-import { getFirestore, doc, onSnapshot, getDocFromServer, initializeFirestore, setLogLevel, updateDoc, persistentLocalCache, persistentMultipleTabManager } from 'firebase/firestore';
+import { getFirestore, doc, onSnapshot, getDocFromServer, initializeFirestore, setLogLevel, setDoc, updateDoc, persistentLocalCache, persistentMultipleTabManager } from 'firebase/firestore';
 import firebaseConfig from '../firebase-applet-config.json';
 import { logger } from '../lib/logger';
+import { normalizePlanId } from '../config/plans';
 
 const app = initializeApp(firebaseConfig);
 export const auth = getAuth(app);
@@ -176,11 +177,13 @@ export const FirebaseProvider: React.FC<{ children: React.ReactNode }> = ({ chil
       if (snapshot.exists()) {
         
         let uData = snapshot.data();
-        // Expirou e era pago → volta a free (trial); Essencial/Free com expiração não mexem.
-        // normalizePlanId cobre 'Essencial'/'Premium'/legados em qualquer capitalização.
+        // Plano pago com validade passada → mostra free (não grava: a ficha mantém
+        // os valores originais). Usa o normalizador central: cobre 'Essencial'/
+        // 'Corporate'/legados em qualquer capitalização (antes o lower() manual
+        // deixava 'Essencial' escapar da expiração).
         if (uData.planExpiresAt) {
           const paidPlans = ['essential', 'premium', 'vip', 'business'];
-          const pid = (uData.plan || '').toString().trim().toLowerCase();
+          const pid = normalizePlanId(uData.plan);
           if (paidPlans.includes(pid)) {
             const expiresAtDate = new Date(uData.planExpiresAt);
             if (expiresAtDate < new Date()) {
@@ -193,7 +196,19 @@ export const FirebaseProvider: React.FC<{ children: React.ReactNode }> = ({ chil
         setUserProfile(uData);
 
       } else {
-        setUserProfile(null);
+        // Ficha inexistente com login válido (conta antiga/migrada ou registo
+        // interrompido): cria a mínima com plano free em vez de deixar o perfil
+        // null para sempre (era isso que prendia selos em "…"). Merge: nunca apaga.
+        const seed: any = {
+          uid: user.uid,
+          email: user.email || 'no-email@example.com',
+          plan: 'free',
+        };
+        if (user.displayName) seed.name = user.displayName;
+        setDoc(doc(db, 'users', user.uid), seed, { merge: true }).catch((e) => {
+          logger.warn('Não foi possível criar a ficha do utilizador:', { category: 'AUTH', data: e });
+        });
+        setUserProfile((prev: any) => prev ?? { ...seed });
       }
     }, (error: any) => {
       handleFirestoreError(error, OperationType.GET, `users/${user.uid}`);

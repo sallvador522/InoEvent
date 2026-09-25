@@ -271,7 +271,14 @@ export const TeamManager: React.FC<TeamManagerProps> = ({ event }) => {
                             disabled={isSubmitting}
                             className="w-full bg-brand-blue hover:bg-brand-blue/90 text-white font-bold py-3 rounded-xl text-xs transition-colors shadow-lg shadow-brand-blue/15 flex items-center justify-center gap-2 disabled:opacity-50"
                         >
-                            {isSubmitting ? "Cadastrando..." : "Adicionar à Equipe"}
+                            {isSubmitting ? (
+                              <>
+                                <span className="w-4 h-4 border-2 border-white/40 border-t-white rounded-full animate-spin" aria-hidden="true" />
+                                Cadastrando...
+                              </>
+                            ) : (
+                              "Adicionar à Equipe"
+                            )}
                         </button>
                     </form>
                 </div>

@@ -5,6 +5,7 @@ import { useNavigate } from 'react-router-dom';
 import { useFirebase, db, handleFirestoreError, OperationType } from '../../components/FirebaseProvider';
 import { getGuestLimit, normalizePlanId, getPlanConfig, canUseFeature, getEventCreationLimit, isBusinessPlan } from '../../lib/entitlements';
 import { doc, setDoc, collection, updateDoc } from 'firebase/firestore';
+import { createEventViaApi } from '../../lib/eventApi';
 import toast from 'react-hot-toast';
 
 interface OnboardingWizardProps {
@@ -106,11 +107,9 @@ export const OnboardingWizard: React.FC<OnboardingWizardProps> = ({ onCancel, on
                 }
             }
 
-            // Create Event Document
+            // Create Event Document — via servidor (impõe limite §7) com fallback direto.
             const newEventId = "evt_" + Math.random().toString(36).substr(2, 9);
-            const docRef = doc(db, 'events', newEventId);
-            
-            await setDoc(docRef, {
+            const draftPayload: Record<string, any> = {
                 title: computedTitle,
                 date: eventDate,
                 time: eventTime || '17:00',
@@ -134,7 +133,19 @@ export const OnboardingWizard: React.FC<OnboardingWizardProps> = ({ onCancel, on
                     { time: '18:00', title: 'Coquetel de Recepção', description: 'Galeria exterior e música ambiente' },
                     { time: '20:00', title: 'Jantar & Baile', description: 'Corte do bolo e pista de dança' }
                 ]
-            });
+            };
+            let finalEventId = newEventId;
+            try {
+                finalEventId = await createEventViaApi(newEventId, draftPayload);
+            } catch (apiErr: any) {
+                if (apiErr?.code === 'EVENT_LIMIT_REACHED') {
+                    toast.error(apiErr.message, { id: toastId });
+                    setIsCreating(false);
+                    return;
+                }
+                const docRef = doc(db, 'events', newEventId);
+                await setDoc(docRef, draftPayload);
+            }
 
             toast.success('Seu convite foi gerado com êxito!', { id: toastId });
             
@@ -143,7 +154,7 @@ export const OnboardingWizard: React.FC<OnboardingWizardProps> = ({ onCancel, on
             }
             
             // Navigate straight to the live editor with search edit mode
-            navigate(`/invite/${newEventId}?edit=true`);
+            navigate(`/invite/${finalEventId}?edit=true`);
         } catch (error) {
             console.error(error);
             toast.error('Erro ao construir o espaço.', { id: toastId });

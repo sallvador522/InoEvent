@@ -1,12 +1,14 @@
 import React, { useEffect, useState } from 'react';
 import { useParams, useSearchParams, useNavigate } from 'react-router-dom';
 import { motion, AnimatePresence } from 'framer-motion';
+import { Virtuoso } from 'react-virtuoso';
 import { collection, doc, getDoc, updateDoc, onSnapshot } from 'firebase/firestore';
 import { db, useFirebase, OperationType, handleFirestoreError } from '../../components/FirebaseProvider';
 import { CheckCircle, XCircle, ArrowLeft, ScanLine, Clock, CheckCircle2, Users, Search } from 'lucide-react';
 import { Button } from '../../components/ui/Button';
 import { QRScanner } from '../../components/QRScanner';
 import { playScanSound } from '../../lib/sound';
+import { normalizePlanId, canUseFeature } from '../../lib/entitlements';
 import toast from 'react-hot-toast';
 
 
@@ -97,6 +99,8 @@ export const CheckinScanner: React.FC = () => {
     
     const [activeTab, setActiveTab] = useState<'scanner' | 'list'>('scanner');
     const [guests, setGuests] = useState<any[]>([]);
+    // Servidor pode recusar a lista (plano sem check-in) mesmo com token válido.
+    const [listBlocked, setListBlocked] = useState(false);
     const [searchQuery, setSearchQuery] = useState('');
     const [isGuestsLoading, setIsGuestsLoading] = useState(true);
     const [pendingCheckInId, setPendingCheckInId] = useState<string | null>(null);
@@ -119,6 +123,14 @@ export const CheckinScanner: React.FC = () => {
                 // If mode is reception and token is valid
                 if (mode === 'reception' && token) {
                     if (eventSnap.data().clientToken === token) {
+                        // Check-in é VIP/Business: token válido mas plano sem a
+                        // funcionalidade mostra aviso em vez da lista.
+                        const evPlan = normalizePlanId((eventSnap.data() as any)?.plan ?? (eventSnap.data() as any)?.planId);
+                        if (!canUseFeature(evPlan, 'checkin')) {
+                            setStatus('error');
+                            setMessage('Este evento não inclui check-in. Faça upgrade para VIP.');
+                            return;
+                        }
                         setStatus('reception_mode');
                         return; // stay in reception mode
                     } else {
@@ -198,18 +210,39 @@ export const CheckinScanner: React.FC = () => {
 
     useEffect(() => {
         if (status === 'reception_mode' && id) {
+            // Lista via API com o código do evento (a leitura direta da lista
+            // exige dono/equipa; a receção usa o token do link). Polling curto
+            // mantém a lista fresca sem escuta permanente.
+            let cancelled = false;
+            const loadGuests = async () => {
+                try {
+                    const res = await fetch(`/api/events/${id}/guests?token=${encodeURIComponent(token || '')}`);
+                    if (res.status === 403) {
+                        const data = await res.json().catch(() => ({}));
+                        if (data?.code === 'CHECKIN_NOT_INCLUDED' && !cancelled) {
+                            setListBlocked(true);
+                            setIsGuestsLoading(false);
+                            return;
+                        }
+                        throw new Error('forbidden');
+                    }
+                    if (!res.ok) throw new Error('forbidden');
+                    const data = await res.json();
+                    if (!cancelled && Array.isArray(data.guests)) {
+                        setGuests(data.guests);
+                    }
+                } catch (e) {
+                    console.warn('Falha ao atualizar lista da receção:', e);
+                } finally {
+                    if (!cancelled) setIsGuestsLoading(false);
+                }
+            };
             setIsGuestsLoading(true);
-            const unsubscribe = onSnapshot(collection(db, `events/${id}/guests`), (snapshot) => {
-                const guestsList = snapshot.docs.map(doc => ({
-                    id: doc.id,
-                    ...doc.data()
-                }));
-                setGuests(guestsList);
-                setIsGuestsLoading(false);
-            }, () => setIsGuestsLoading(false));
-            return () => unsubscribe();
+            loadGuests();
+            const timer = setInterval(loadGuests, 5000);
+            return () => { cancelled = true; clearInterval(timer); };
         }
-    }, [status, id]);
+    }, [status, id, token]);
 
     const handleScanResult = async (qrData: string) => {
         // Block all scans while showing any result (success, error, already_scanned, processing)
@@ -282,11 +315,14 @@ export const CheckinScanner: React.FC = () => {
         setPendingCheckInId(guest.id);
         try {
             const guestRef = doc(db, 'events', id, 'guests', guest.id);
+            // clientToken: é o que autoriza a receção (não-dona) nas regras.
+            // Antes faltava aqui e o botão falhava em modo receção puro.
             await updateDoc(guestRef, {
                 checkedIn: !guest.checkedIn,
                 status: !guest.checkedIn ? 'CHECKED_IN' : 'CONFIRMED',
                 name: guest.name,
-                checkedInAt: !guest.checkedIn ? new Date().toISOString() : null
+                checkedInAt: !guest.checkedIn ? new Date().toISOString() : null,
+                clientToken: token || null
             });
         } catch (e) {
             console.error("Error manually checking in guest", e);
@@ -296,10 +332,16 @@ export const CheckinScanner: React.FC = () => {
         }
     };
 
-    const filteredGuests = guests.filter(g => 
-        g.name?.toLowerCase().includes(searchQuery.toLowerCase()) || 
-        g.phone?.toLowerCase().includes(searchQuery.toLowerCase())
-    );
+    // Busca memoizada: antes o filter O(n) corria a cada render (cada tecla, cada
+    // snapshot de check-in). A query normalizada é calculada uma vez por mudança.
+    const filteredGuests = React.useMemo(() => {
+        const q = searchQuery.trim().toLowerCase();
+        if (!q) return guests;
+        return guests.filter(g =>
+            g.name?.toLowerCase().includes(q) ||
+            g.phone?.toLowerCase().includes(q)
+        );
+    }, [guests, searchQuery]);
 
     if (status === 'reception_mode') {
         return (
@@ -436,6 +478,14 @@ export const CheckinScanner: React.FC = () => {
 
                 {activeTab === 'list' && (
                     <div className="flex-1 flex flex-col p-4 max-w-xl mx-auto w-full">
+                        {listBlocked ? (
+                            <div className="text-center py-12 px-6 bg-slate-800/80 border border-slate-700 rounded-2xl">
+                                <ScanLine size={48} className="mx-auto text-slate-600 mb-4" />
+                                <p className="text-white font-bold text-lg mb-1">Check-in não incluído</p>
+                                <p className="text-slate-400 text-sm">Este evento não tem check-in no plano. Faça upgrade para VIP.</p>
+                            </div>
+                        ) : (
+                        <>
                         <div className="bg-slate-800 p-4 rounded-2xl flex items-center gap-3 mb-4">
                             <Search size={20} className="text-slate-400" />
                             <input 
@@ -447,8 +497,18 @@ export const CheckinScanner: React.FC = () => {
                             />
                         </div>
                         
-                        <div className="flex flex-col gap-3 pb-20">
-                            {filteredGuests.map((guest) => (
+                        {/* Lista virtualizada: só ~10 cartões no DOM mesmo com 1000+
+                            convidados — crítico em telemóveis fracos na recepção. */}
+                        <Virtuoso
+                            style={{ height: 'calc(100dvh - 240px)', minHeight: 320 }}
+                            totalCount={filteredGuests.length}
+                            overscan={300}
+                            components={{ Footer: () => <div style={{ height: 80 }} /> }}
+                            itemContent={(index) => {
+                                const guest = filteredGuests[index];
+                                if (!guest) return null;
+                                return (
+                                <div className="pb-3">
                                 <div key={guest.id} className="bg-slate-800/80 border border-slate-700 rounded-2xl p-4 flex items-center justify-between">
                                     <div className="flex-1 min-w-0 pr-4">
                                         <p className="font-bold text-white truncate text-lg">{guest.name}</p>
@@ -473,7 +533,10 @@ export const CheckinScanner: React.FC = () => {
                                         ) : guest.checkedIn ? <CheckCircle2 size={28} /> : <div className="w-7 h-7 rounded-full border-2 border-current opacity-50" />}
                                     </button>
                                 </div>
-                            ))}
+                                </div>
+                                );
+                            }}
+                        />
                             
                             {isGuestsLoading ? (
                                 <div className="flex flex-col gap-3 pb-20" aria-hidden="true">
@@ -493,7 +556,8 @@ export const CheckinScanner: React.FC = () => {
                                     <p className="text-slate-400 font-medium text-lg">{searchQuery ? 'Nada encontrado para esta busca.' : 'Nenhum convidado encontrado.'}</p>
                                 </div>
                             )}
-                        </div>
+                        </>
+                        )}
                     </div>
                 )}
             </div>

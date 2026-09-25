@@ -27,15 +27,28 @@ export const CreateBusiness: React.FC = () => {
     const handleImageUpload = (e: React.ChangeEvent<HTMLInputElement>) => {
         const file = e.target.files?.[0];
         if (file) {
-            if (file.size > 500 * 1024) {
-                toast.error('A imagem deve ter no máximo 500KB');
+            if (file.size > 5 * 1024 * 1024) {
+                toast.error('A imagem deve ter no máximo 5MB');
                 return;
             }
-            const reader = new FileReader();
-            reader.onloadend = () => {
-                setBusinessLogo(reader.result as string);
+            // Comprime para caber na ficha sem estourar o limite do documento.
+            const img = new Image();
+            const url = URL.createObjectURL(file);
+            img.onload = () => {
+                URL.revokeObjectURL(url);
+                const max = 256;
+                const scale = Math.min(1, max / Math.max(img.width, img.height));
+                const canvas = document.createElement('canvas');
+                canvas.width = Math.max(1, Math.round(img.width * scale));
+                canvas.height = Math.max(1, Math.round(img.height * scale));
+                canvas.getContext('2d')?.drawImage(img, 0, 0, canvas.width, canvas.height);
+                setBusinessLogo(canvas.toDataURL('image/jpeg', 0.8));
             };
-            reader.readAsDataURL(file);
+            img.onerror = () => {
+                URL.revokeObjectURL(url);
+                toast.error('Não foi possível ler a imagem.');
+            };
+            img.src = url;
         }
     };
 
@@ -55,7 +68,7 @@ export const CreateBusiness: React.FC = () => {
                     plan: normalizePlanId(userProfile?.plan),
                     whiteLabelName: businessName,
                     whiteLabelLogo: businessLogo
-                });
+                }, { merge: true });
             } else {
                 await updateDoc(userRef, { 
                     whiteLabelName: businessName,
@@ -63,7 +76,7 @@ export const CreateBusiness: React.FC = () => {
                 });
             }
             toast.success("Negócio criado com sucesso!");
-            navigate('/dashboard'); // Go to UserDashboard
+            navigate('/b2b'); // Voltar ao painel B2B (antes quebrava o loop para /dashboard)
         } catch (error) {
             console.error(error);
             toast.error("Erro ao criar negócio.");
@@ -108,7 +121,7 @@ export const CreateBusiness: React.FC = () => {
                     </div>
 
                     <div>
-                        <label className="text-xs font-bold uppercase tracking-wider text-slate-400 mb-2 block">Logo da Empresa (Até 500KB)</label>
+                                <label className="text-xs font-bold uppercase tracking-wider text-slate-400 mb-2 block">Logo da Empresa (comprimido auto.)</label>
                         <div className="flex gap-4 items-center">
                             <div className="w-16 h-16 bg-slate-50 border-2 border-dashed border-slate-200 rounded-xl flex items-center justify-center text-slate-400 overflow-hidden relative group">
                                 {businessLogo ? (

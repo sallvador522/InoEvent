@@ -23,6 +23,7 @@ import { getGuestLimit, normalizePlanId, getPlanConfig, canUseFeature, getEventC
 import {
   doc,
   getDoc,
+  getDocFromServer,
   setDoc,
   updateDoc,
   collection,
@@ -31,6 +32,9 @@ import {
   getDocs,
   onSnapshot, increment,
 } from "firebase/firestore";
+import { createEventViaApi } from "../../lib/eventApi";
+import { useCooldown } from "../../lib/useCooldown";
+import { IBAN_PREFIX, canonicalIban, isValidAngolaIban, ibanError, splitIban, formatIbanGroups } from "../../lib/iban";
 import {
   signInWithEmailAndPassword,
   createUserWithEmailAndPassword,
@@ -53,6 +57,7 @@ import { TravelMap } from "./TravelMap";
 import { ImageUploadField } from "./components/ImageUploadField";
 import { PremiumLoader } from "./components/PremiumLoader";
 import { CountdownTimer } from "./components/CountdownTimer";
+import { AgencyBrand } from "./components/AgencyBrand";
 import { EditableImageWrapper } from "./components/EditableImageWrapper";
 import { compressImage } from "./components/EditableImageWrapper";
 import { getRSVPText } from "./lib/rsvpText";
@@ -257,6 +262,8 @@ const InvitationView: React.FC = () => {
   };
   const [showLayersPanel, setShowLayersPanel] = useState(true);
   const [isSaving, setIsSaving] = useState(false);
+  // Cooldown para adds locais síncronos (sem loading async, duplo clique duplicava).
+  const allowLocalAdd = useCooldown();
   const [isAddingPhoto, setIsAddingPhoto] = useState(false);
   const [mobileView, setMobileView] = useState<"editor" | "preview">("preview");
   const [showGuideTip, setShowGuideTip] = useState(true);
@@ -608,7 +615,17 @@ const InvitationView: React.FC = () => {
     );
   }
 
-  const guestName = "Família Silva";
+  // Nome do convidado via link pessoal (?convidado=Ana); sem isso, neutro.
+  // Antes era fixo "Família Silva" para toda a gente, incluindo o dono.
+  const guestName = (() => {
+    try {
+      const v = new URLSearchParams(window.location.search).get("convidado");
+      const clean = (v || "").trim().slice(0, 60);
+      return clean || "Convidado Especial";
+    } catch {
+      return "Convidado Especial";
+    }
+  })();
 
   const handleUseTemplate = () => {
     if (!user) {
@@ -663,7 +680,7 @@ const InvitationView: React.FC = () => {
   };
 
   const addTimelineItem = () => {
-    if (!localEvent) return;
+    if (!localEvent || !allowLocalAdd()) return;
     const items = localEvent.timeline || [];
     const newItem: TimelineItem = {
       time: "18:00",
@@ -700,7 +717,7 @@ const InvitationView: React.FC = () => {
   };
 
   const addGiftItem = () => {
-    if (!localEvent) return;
+    if (!localEvent || !allowLocalAdd()) return;
     const list = localEvent.gifts || [];
     const item: GiftItem = {
       type: "IBAN",
@@ -739,9 +756,10 @@ const InvitationView: React.FC = () => {
       if (cover.migrated) setLocalEvent(eventToSave);
 
       if (isNewSave) {
-        // Just create the document directly, it's unpublished until they click 'Publicar' — §9 rascunho
-        const normPlanDraft = normalizePlanId((localEvent as any).plan || (localEvent as any).planId || userProfile?.plan || 'essential');
-        const savedPayload = {
+        // Just create the document directly, it's unpublished until they click 'Publicar' — §9 rascunho.
+        // Via servidor (impõe limite §7; rascunho não conta limite) com fallback direto offline.
+        const normPlanDraft = normalizePlanId((localEvent as any).plan || (localEvent as any).planId || userProfile?.plan || 'free');
+        const draftPayload = {
           ...eventToSave,
           plan: normPlanDraft,
           planId: normPlanDraft,
@@ -752,7 +770,16 @@ const InvitationView: React.FC = () => {
           draftData: eventToSave,
           isPublished: false
         };
-        await setDoc(eventRef, savedPayload);
+        try {
+          await createEventViaApi(localEvent.id, draftPayload, true);
+        } catch (apiErr: any) {
+          if (apiErr?.code === 'EVENT_LIMIT_REACHED') {
+            toast.error(apiErr.message, { id: toastId });
+            setIsSaving(false);
+            return;
+          }
+          await setDoc(eventRef, draftPayload);
+        }
       } else {
         await updateDoc(eventRef, {
           draftData: eventToSave,
@@ -830,28 +857,36 @@ const InvitationView: React.FC = () => {
         }
       }
 
-      // Save document values — §8/§9 validade e status centralizados
-      const normalizedPlanInv = normalizePlanId((localEvent as any).plan || (localEvent as any).planId || userProfile?.plan || 'essential');
-      const expiresAtInv = (() => {
-        if ((localEvent as any).expiresAt) return (localEvent as any).expiresAt;
-        const daysMap: Record<string, number> = { essential: 90, premium: 180, vip: 365, business: 365 };
-        const d = daysMap[normalizedPlanInv] ?? 90;
-        if (!isFinite(d)) return null;
-        const dt = new Date(); dt.setDate(dt.getDate() + d); return dt.toISOString();
-      })();
+      // Save document values — §8/§9 validade e status centralizados.
+      // expiresAt é carimbado pelo SERVIDOR — o cliente nunca envia.
+      const normalizedPlanInv = normalizePlanId((localEvent as any).plan || (localEvent as any).planId || userProfile?.plan || 'free');
       const savedPayload = {
         ...eventToSaveWs,
         plan: normalizedPlanInv,
         planId: normalizedPlanInv,
         status: (localEvent as any).status || 'active',
         billingStatus: (localEvent as any).billingStatus || 'pending',
-        expiresAt: expiresAtInv,
         publishedAt: (localEvent as any).publishedAt || new Date().toISOString(),
         ownerId: user.uid,
         updatedAt: new Date().toISOString(),
       };
 
-      await setDoc(eventRef, savedPayload);
+      // Publicação: via servidor (impõe limite §7) com fallback direto offline.
+      // Erro de limite mostra e PARA (nunca contorna pela escrita direta).
+      if (isNewSave) {
+        try {
+          await createEventViaApi(localEvent.id, savedPayload, false);
+        } catch (apiErr: any) {
+          if (apiErr?.code === 'EVENT_LIMIT_REACHED') {
+            toast.error(apiErr.message, { id: toastId });
+            setIsSaving(false);
+            return;
+          }
+          await setDoc(eventRef, savedPayload);
+        }
+      } else {
+        await setDoc(eventRef, savedPayload);
+      }
       toast.success("Seu convite foi publicado com total sucesso!", {
         id: toastId,
       });
@@ -878,14 +913,14 @@ const InvitationView: React.FC = () => {
           authEmail,
           authPassword,
         );
-        // Save profile
+        // Save profile — merge para nunca apagar a ficha (plano pago incluído).
         await setDoc(doc(db, "users", credential.user.uid), {
           uid: credential.user.uid,
           name: authName || "Noivo(a)",
           email: authEmail,
-          plan: "Essencial",
+          plan: "free",
           createdAt: new Date().toISOString(),
-        });
+        }, { merge: true });
         toast.success(`Conta criada!`);
       } else {
         await signInWithEmailAndPassword(auth, authEmail, authPassword);
@@ -906,17 +941,25 @@ const InvitationView: React.FC = () => {
     try {
       const provider = new GoogleAuthProvider();
       const res = await signInWithPopup(auth, provider);
-      // Create user doc if not found
+      // Create user doc if not found — confirmado NO SERVIDOR (cache vazia/offline
+      // fingiria inexistência e apagaria um plano pago) e com merge.
       const userRef = doc(db, "users", res.user.uid);
-      const snap = await getDoc(userRef);
-      if (!snap.exists()) {
+      let exists = false;
+      try {
+        exists = (await getDocFromServer(userRef)).exists();
+      } catch {
+        setIsAuthOpen(false);
+        toast.success("Login com Google efetuado!");
+        return;
+      }
+      if (!exists) {
         await setDoc(userRef, {
           uid: res.user.uid,
           name: res.user.displayName || "Parceiro(a)",
           email: res.user.email,
-          plan: "Essencial",
+          plan: "free",
           createdAt: new Date().toISOString(),
-        });
+        }, { merge: true });
       }
       toast.success("Login com Google efetuado!");
       setIsAuthOpen(false);
@@ -2071,11 +2114,25 @@ const InvitationView: React.FC = () => {
                                 onChange={(e) =>
                                   updateGiftItem(idx, "value", e.target.value)
                                 }
+                                onBlur={() => {
+                                  // Normaliza IBAN ao sair do campo (Pix/links ficam intactos).
+                                  const raw = (item as any).value || '';
+                                  const looksIban = /^AO/i.test(raw.trim()) || /^[\d\s.-]+$/.test(raw.trim());
+                                  if (looksIban && isValidAngolaIban(raw)) {
+                                    updateGiftItem(idx, "value", canonicalIban(raw));
+                                  }
+                                }}
                                 placeholder="AO06…"
                                 className="w-full bg-[#1A2026] border border-[#BF9B30]/20 rounded-lg px-3 py-1.5 text-xs text-white font-mono focus:outline-none focus:border-[#BF9B30] transition-colors"
                               />
+                              {(() => {
+                                const raw = (item as any).value || '';
+                                const looksIban = /^AO/i.test(raw.trim()) || (/^[\d\s.-]+$/.test(raw.trim()) && raw.trim() !== '');
+                                if (!looksIban || isValidAngolaIban(raw)) return null;
+                                return <p className="text-[10px] text-red-400 font-light mt-1">{ibanError(raw)}</p>;
+                              })()}
                               <p className="text-[10px] text-slate-500 font-light mt-1">
-                                IBAN, Pix ou link — é o que o botão Copiar usa. Vazio esconde a conta no convite.
+                                IBAN (AO06 + 19 dígitos), Pix ou link — é o que o botão Copiar usa. Vazio esconde a conta no convite.
                               </p>
                             </div>
 
@@ -2330,6 +2387,9 @@ const InvitationView: React.FC = () => {
         <BabyShowerLayout {...layoutProps} />
       )}
 
+      {/* Faixa da agência (white-label B2B) — um ponto para todos os temas */}
+      <AgencyBrand event={activeEvent} />
+
       {/* Floating Demo Template Banner (RETRACTABLE LUXURY BAR) */}
       {isTemplate && user && (
         <div
@@ -2390,6 +2450,31 @@ const InvitationView: React.FC = () => {
                 <span className="sm:hidden">Usar</span>
               </button>
             </div>
+          </div>
+        </div>
+      )}
+
+      {/* Faixa do template para VISITANTES: sem login não há botão — mostra o
+          caminho (abre o login no contexto) em vez de esconder tudo. */}
+      {isTemplate && !user && (
+        <div className="fixed top-4 left-1/2 -translate-x-1/2 z-[100] w-[95%] md:w-fit max-w-[95vw] md:max-w-4xl">
+          <div className="bg-[#0F1419]/95 backdrop-blur-xl border border-[#BF9B30]/30 rounded-full p-2 pr-2 flex items-center justify-between gap-2 sm:gap-3 shadow-[0_10px_40px_rgba(0,0,0,0.5)]">
+            <span className="flex items-center gap-2 pl-2 min-w-0">
+              <span className="w-8 h-8 rounded-full bg-[#BF9B30] flex items-center justify-center text-[#0F1419] font-black shrink-0">
+                <span className="material-symbols-outlined text-[18px]">
+                  lock
+                </span>
+              </span>
+              <span className="text-[9px] md:text-xs font-bold text-white whitespace-nowrap overflow-hidden text-ellipsis">
+                Entre para usar este modelo
+              </span>
+            </span>
+            <button
+              onClick={() => setIsAuthOpen(true)}
+              className="px-3 md:px-5 py-2 bg-[#BF9B30] hover:bg-white text-[#0F1419] text-[9px] md:text-xs font-bold uppercase tracking-widest rounded-full shadow-[0_0_20px_rgba(191,155,48,0.3)] transition-all cursor-pointer whitespace-nowrap active:scale-95 shrink-0"
+            >
+              Fazer login
+            </button>
           </div>
         </div>
       )}
@@ -3023,6 +3108,14 @@ guestName: string;
           </FadeInSection>
         ) : null}
 
+        {/* GUESTBOOK / MURAL DE RECADOS — só em planos com guestbook
+            (isPremium aqui equivale: premium/vip/business têm premium_themes e guestbook) */}
+        {isPremium && (
+          <div className="py-16">
+            <Guestbook eventId={event.id} layoutMode={event.layoutMode} />
+          </div>
+        )}
+
         {/* GIFTS */}
         {event.gifts && event.gifts.length > 0 && (
           <EditableSectionWrapper
@@ -3238,7 +3331,8 @@ guestName: string;
           {onCheckStatus && <button onClick={onCheckStatus} className="text-[11px] font-bold uppercase tracking-widest text-slate-500 bg-white/85 backdrop-blur rounded-full px-4 py-2.5 min-h-[44px] hover:text-slate-800 cursor-pointer" style={{ transition: 'color 200ms ease' }}>Meu convite</button>}
       </div>
 
-      {!isPremium && (
+      {/* Sem marca SÓ no Business ('white_label'): Premium/VIP exibem o crédito. */}
+      {!(isEditing || canUseFeature(normalizePlanId((event as any)?.plan ?? (event as any)?.planId), 'white_label')) && (
         <footer className="text-center pb-10 px-6">
           <p className="text-[11px] uppercase tracking-[0.2em] text-slate-400">Feito com InoEvents</p>
         </footer>
@@ -3601,6 +3695,13 @@ const ModernLayout: React.FC<{
               </div>
             )}
           </FadeInSection>
+
+          {/* GUESTBOOK / MURAL DE RECADOS — só em planos com guestbook */}
+          {isPremium && (
+            <div className="py-16">
+              <Guestbook eventId={event.id} layoutMode={event.layoutMode} />
+            </div>
+          )}
 
           <FadeInSection className="bg-white p-16 md:p-24 flex flex-col items-center justify-center text-center w-full">
             <span className="material-symbols-outlined text-4xl text-[#C2B280] mb-6">
@@ -4110,6 +4211,13 @@ const GardenLayout: React.FC<{
         </EditableSectionWrapper>
       )}
 
+      {/* GUESTBOOK / MURAL DE RECADOS — só em planos com guestbook */}
+      {isPremium && (
+        <div className="py-16">
+          <Guestbook eventId={event.id} layoutMode={event.layoutMode} />
+        </div>
+      )}
+
       {/* 7. GIFTS & DRESS CODE */}
       <EditableSectionWrapper
         isEditing={isEditing}
@@ -4228,13 +4336,14 @@ const GardenLayout: React.FC<{
         </EditableSectionWrapper>
 
       {/* FIXED BOTTOM BAR */}
-      <div className="fixed bottom-0 left-0 w-full bg-white/90 backdrop-blur-md border-t border-[#EAE5DF] p-4 z-50 flex items-center justify-center">
+      <div className="fixed bottom-0 left-0 w-full bg-white/90 backdrop-blur-md border-t border-[#EAE5DF] px-4 pt-4 z-50 flex flex-col items-center gap-2" style={{ paddingBottom: 'max(1rem, env(safe-area-inset-bottom))' }}>
         <Button
           onClick={onRSVP}
           className={`w-full max-w-md ${accentBg} text-white font-sans font-bold uppercase tracking-widest text-xs py-4 shadow-lg flex items-center justify-center gap-2 hover:opacity-90`}
         >
           <span>{getRSVPText(event.type)}</span>
         </Button>
+        {onCheckStatus && <button onClick={onCheckStatus} className="text-[11px] font-bold uppercase tracking-widest text-slate-400 hover:text-slate-700 cursor-pointer" style={{ transition: 'color 200ms ease' }}>Meu convite</button>}
       </div>
     </div>
   );
@@ -4410,8 +4519,10 @@ const RusticLayout: React.FC<{
           {onCheckStatus && <button onClick={onCheckStatus} className="mt-4 sm:mt-0 sm:ml-4 bg-white text-slate-900 border border-slate-200 shadow-lg hover:bg-slate-50 py-4 px-12 rounded-full font-bold uppercase tracking-widest text-sm transition-all w-full sm:w-auto">Meu Convite</button>}
           </div>
           <div className="w-full md:w-1/3 aspect-square rounded-2xl overflow-hidden">
+            {/* Foto do local real (Google) → hero → stock decorativo em último caso */}
             <img
-              src="https://images.unsplash.com/photo-1515934751635-c81c6bc9a2d8?q=80&w=2670&auto=format&fit=crop"
+              src={event.placePhotoUrl || event.heroImage || "https://images.unsplash.com/photo-1515934751635-c81c6bc9a2d8?q=80&w=2670&auto=format&fit=crop"}
+              alt={event.locationName || "Local do evento"}
               className="w-full h-full object-cover"
             />
           </div>
@@ -4516,6 +4627,59 @@ const RusticLayout: React.FC<{
           </div>
         </FadeInSection>
       </EditableSectionWrapper>
+
+      {/* GUESTBOOK / MURAL DE RECADOS — só em planos com guestbook */}
+      {isPremium && (
+        <div className="py-16">
+          <Guestbook eventId={event.id} layoutMode={event.layoutMode} />
+        </div>
+      )}
+
+      {/* GALERIA — fotos do casal (secção rústica) */}
+      {event.gallery && event.gallery.length > 0 && (
+        <div className="py-24 px-4">
+          <FadeInSection className="max-w-5xl mx-auto space-y-12">
+            <div className="text-center space-y-4">
+              <span className="material-symbols-outlined text-3xl text-[#8D6E63]">photo_library</span>
+              <h2 className="text-2xl md:text-3xl font-serif text-[#4E342E]">
+                Galeria
+              </h2>
+              <div className="w-12 h-[1px] bg-[#8D6E63]/30 mx-auto" />
+            </div>
+
+            <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-4">
+              {event.gallery.map((img, i) => {
+                const url = typeof img === "string" ? img : img?.url;
+                return (
+                  <div
+                    key={i}
+                    className="aspect-square relative rounded-2xl overflow-hidden shadow-sm group border border-[#8D6E63]/10 bg-[#FFF8E1]"
+                  >
+                    <EditableImageWrapper
+                      src={typeof url === 'string' ? url : (url as any).url}
+                      onChange={(newVal) =>
+                        updateField?.(
+                          "gallery",
+                          event.gallery?.map((g, gi) =>
+                            gi === i ? newVal : g,
+                          ),
+                        )
+                      }
+                      isEditing={isEditing}
+                      className="absolute inset-0"
+                    >
+                      <div
+                        className="absolute inset-0 bg-cover bg-center transition-transform duration-500 group-hover:scale-105"
+                        style={{ backgroundImage: `url('${getImageUrl(url, { width: 400, quality: 80 })}')` }}
+                      />
+                    </EditableImageWrapper>
+                  </div>
+                );
+              })}
+            </div>
+          </FadeInSection>
+        </div>
+      )}
 
       {/* GIFTS & DRESS CODE */}
       <EditableSectionWrapper
@@ -4936,16 +5100,23 @@ const IndustrialLayout: React.FC<{
         </div>
       ) : null}
 
-      {/* GIFTS */}
-      {event.gifts && event.gifts.length > 0 && (
-        <EditableSectionWrapper
-          isEditing={isEditing}
-          section="gifts"
+          {/* GUESTBOOK / MURAL DE RECADOS — só em planos com guestbook */}
+          {isPremium && (
+            <div className="py-16">
+              <Guestbook eventId={event.id} layoutMode={event.layoutMode} />
+            </div>
+          )}
+
+          {/* GIFTS */}
+          {event.gifts && event.gifts.length > 0 && (
+            <EditableSectionWrapper
+              isEditing={isEditing}
+              section="gifts"
           isHidden={(event.hiddenSections || []).includes("gifts")}
-          label="Lista de Presentes"
-          onEditSection={onEditSection}
-          className="block border-b border-white/20"
-        >
+              label="Lista de Presentes"
+              onEditSection={onEditSection}
+              className="block border-b border-white/20"
+            >
           <FadeInSection className="p-8 md:p-16 flex flex-col justify-center items-center text-center">
             <span className="text-xs font-bold uppercase tracking-widest mb-4 block border-b border-white/30 pb-2">
               Gifts
@@ -5096,13 +5267,14 @@ const IndustrialLayout: React.FC<{
         </EditableSectionWrapper>
 
       {/* RSVP BUTTON */}
-      <div className="fixed bottom-8 right-8 z-50">
+      <div className="fixed bottom-8 right-8 z-50 flex flex-col items-center gap-2">
         <button
           onClick={onRSVP}
           className="h-20 w-20 md:h-24 md:w-24 rounded-full bg-white text-black font-black text-xs md:text-sm uppercase tracking-widest flex items-center justify-center shadow-[0_0_30px_rgba(255,255,255,0.3)] hover:scale-110 transition-transform"
         >
           {getRSVPText(event.type, "RSVP")}
         </button>
+        {onCheckStatus && <button onClick={onCheckStatus} className="text-[10px] font-bold uppercase tracking-widest text-white/70 bg-white/10 backdrop-blur rounded-full px-3 py-2 hover:text-white cursor-pointer border border-white/10" style={{ transition: 'color 200ms ease' }}>Meu convite</button>}
       </div>
     </div>
   );
@@ -5427,6 +5599,13 @@ const LuxuryLayout: React.FC<{
           </FadeInSection>
         ) : null}
 
+      {/* GUESTBOOK / MURAL DE RECADOS — só em planos com guestbook */}
+      {isPremium && (
+        <div className="py-16">
+          <Guestbook eventId={event.id} layoutMode={event.layoutMode} />
+        </div>
+      )}
+
         {/* 8. GIFTS (Lista de Presentes) */}
         {event.gifts && event.gifts.length > 0 && (
           <EditableSectionWrapper
@@ -5610,7 +5789,7 @@ const LuxuryLayout: React.FC<{
         </EditableSectionWrapper>
 
         {/* Gold Action Button (Fixed Bottom Bar) */}
-        <div className="fixed bottom-0 left-0 w-full bg-[#0F1419]/95 backdrop-blur-md border-t border-[#BF9B30]/20 p-4 z-50 flex items-center justify-center">
+        <div className="fixed bottom-0 left-0 w-full bg-[#0F1419]/95 backdrop-blur-md border-t border-[#BF9B30]/20 px-4 pt-4 z-50 flex flex-col items-center gap-2" style={{ paddingBottom: 'max(1rem, env(safe-area-inset-bottom))' }}>
           <Button
             onClick={onRSVP}
             className="w-full max-w-md bg-[#BF9B30] text-[#0F1419] font-bold uppercase tracking-widest text-xs hover:bg-white transition-colors py-4 shadow-[0_0_20px_rgba(191,155,48,0.3)] flex items-center justify-center gap-2"
@@ -5618,6 +5797,7 @@ const LuxuryLayout: React.FC<{
             <span>{getRSVPText(event.type, "RESPONDER")}</span>
             <span className="material-symbols-outlined text-sm">mail</span>
           </Button>
+          {onCheckStatus && <button onClick={onCheckStatus} className="text-[11px] font-bold uppercase tracking-widest text-[#BF9B30]/80 hover:text-[#BF9B30] cursor-pointer" style={{ transition: 'color 200ms ease' }}>Meu convite</button>}
         </div>
       </div>
     </div>
@@ -5829,6 +6009,13 @@ const BridalShowerLayout: React.FC<{
               </button>
             </FadeInSection>
           </EditableSectionWrapper>
+
+          {/* GUESTBOOK / MURAL DE RECADOS — só em planos com guestbook */}
+          {isPremium && (
+            <div className="py-16">
+              <Guestbook eventId={event.id} layoutMode={event.layoutMode} />
+            </div>
+          )}
 
           {/* GIFTS */}
           {event.gifts && event.gifts.length > 0 && (
@@ -6292,15 +6479,15 @@ const BabyShowerLayout: React.FC<{
                     {gift.type === "IBAN" ? (
                       <div className="w-full">
                         <span className="text-[9px] uppercase font-bold opacity-30 block">
-                          {gift.bank || "BAI"}
+                          {(gift as any).bankName || (gift as any).bank || "BAI"}
                         </span>
                         <div className="flex items-center justify-between gap-2 mt-1">
                           <code className="text-[11px] font-mono break-all line-clamp-1 select-all bg-black/5 px-2 py-1 rounded">
-                            {gift.account}
+                            {formatIbanGroups((gift as any).value ?? (gift as any).account ?? '')}
                           </code>
                           <button
                             onClick={() => {
-                              navigator.clipboard.writeText(gift.account);
+                              navigator.clipboard.writeText(canonicalIban((gift as any).value ?? (gift as any).account ?? '') || '');
                               toast.success("IBAN copiado!");
                             }}
                             className="text-[10px] font-bold text-brand-blue uppercase hover:underline shrink-0"
@@ -7071,21 +7258,21 @@ const LimintsoGoldLayout: React.FC<{
                   <p className="text-xs text-slate-500 leading-relaxed mb-4">{gift.description}</p>
                   
                   {gift.type === "IBAN" && (
-                    <div className="bg-white border border-[#dcb349]/10 rounded-xl p-3 flex items-center justify-between gap-2 shadow-sm">
-                      <div className="truncate">
-                        <span className="text-[9px] uppercase font-bold text-slate-400 block">{gift.bankName || "BAI"}</span>
-                        <code className="text-[11px] font-mono font-bold text-slate-700 select-all">{gift.value}</code>
+                      <div className="bg-white border border-[#dcb349]/10 rounded-xl p-3 flex items-center justify-between gap-2 shadow-sm">
+                        <div className="truncate">
+                          <span className="text-[9px] uppercase font-bold text-slate-400 block">{gift.bankName || "BAI"}</span>
+                          <code className="text-[11px] font-mono font-bold text-slate-700 select-all">{formatIbanGroups(gift.value)}</code>
+                        </div>
+                        <button
+                          onClick={() => {
+                            navigator.clipboard.writeText(canonicalIban(gift.value) || gift.value || "");
+                            toast.success("IBAN copiado!");
+                          }}
+                          className="text-[10px] font-sans font-bold text-[#b49232] uppercase hover:underline shrink-0"
+                        >
+                          Copiar
+                        </button>
                       </div>
-                      <button
-                        onClick={() => {
-                          navigator.clipboard.writeText(gift.value);
-                          toast.success("IBAN copiado!");
-                        }}
-                        className="text-[10px] font-sans font-bold text-[#b49232] uppercase hover:underline shrink-0"
-                      >
-                        Copiar
-                      </button>
-                    </div>
                   )}
                 </FadeInSection>
               ))}
@@ -7107,28 +7294,74 @@ const LimintsoGoldLayout: React.FC<{
                 Transferência Bancária
               </span>
               <p className="text-xs text-slate-500 leading-relaxed mb-4">Sua presença é nosso maior presente.</p>
-              <div className="bg-white border border-[#dcb349]/10 rounded-xl p-3 flex items-center justify-between gap-2 shadow-sm">
-                <div className="truncate text-left">
-                  <span className="text-[9px] uppercase font-bold text-slate-400 block">{(event as any).bankName || "Banco"}</span>
-                  <code className="text-[11px] font-mono font-bold text-slate-700 select-all">{(event as any).iban}</code>
+                <div className="bg-white border border-[#dcb349]/10 rounded-xl p-3 flex items-center justify-between gap-2 shadow-sm">
+                  <div className="truncate text-left">
+                    <span className="text-[9px] uppercase font-bold text-slate-400 block">{(event as any).bankName || "Banco"}</span>
+                    <code className="text-[11px] font-mono font-bold text-slate-700 select-all">{formatIbanGroups((event as any).iban)}</code>
                   {(event as any).accountName && (
                     <span className="text-[10px] text-slate-500 block">{(event as any).accountName}</span>
                   )}
                 </div>
-                <button
-                  onClick={() => {
-                    navigator.clipboard.writeText((event as any).iban || "");
-                    toast.success("IBAN copiado!");
-                  }}
-                  className="text-[10px] font-sans font-bold text-[#b49232] uppercase hover:underline shrink-0"
-                >
-                  Copiar
-                </button>
+                  <button
+                    onClick={() => {
+                      navigator.clipboard.writeText(canonicalIban((event as any).iban) || (event as any).iban || "");
+                      toast.success("IBAN copiado!");
+                    }}
+                    className="text-[10px] font-sans font-bold text-[#b49232] uppercase hover:underline shrink-0"
+                  >
+                    Copiar
+                  </button>
               </div>
             </FadeInSection>
           </div>
         </div>
       ) : null}
+
+      {/* GALERIA — fotos do casal (secção dourada) */}
+      {event.gallery && event.gallery.length > 0 && (
+        <div className="py-24 bg-white border-t border-[#dcb349]/10">
+          <FadeInSection className="max-w-5xl mx-auto px-6 md:px-12 space-y-12">
+            <div className="text-center space-y-4">
+              <span className="material-symbols-outlined text-3xl text-[#b49232]">photo_library</span>
+              <h2 className="text-2xl md:text-3xl font-serif text-slate-800">
+                Galeria
+              </h2>
+              <div className="w-12 h-[1px] bg-[#dcb349]/30 mx-auto" />
+            </div>
+
+            <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-4">
+              {event.gallery.map((img, i) => {
+                const url = typeof img === "string" ? img : img?.url;
+                return (
+                  <div
+                    key={i}
+                    className="aspect-square relative rounded-2xl overflow-hidden shadow-sm group border border-[#dcb349]/10 bg-[#FCFAF6]"
+                  >
+                    <EditableImageWrapper
+                      src={typeof url === 'string' ? url : (url as any).url}
+                      onChange={(newVal) =>
+                        updateField?.(
+                          "gallery",
+                          event.gallery?.map((g, gi) =>
+                            gi === i ? newVal : g,
+                          ),
+                        )
+                      }
+                      isEditing={isEditing}
+                      className="absolute inset-0"
+                    >
+                      <div
+                        className="absolute inset-0 bg-cover bg-center transition-transform duration-500 group-hover:scale-105"
+                        style={{ backgroundImage: `url('${getImageUrl(url, { width: 400, quality: 80 })}')` }}
+                      />
+                    </EditableImageWrapper>
+                  </div>
+                );
+              })}
+            </div>
+          </FadeInSection>
+        </div>
+      )}
 
       {/* 8. RSVP FLOATING / FIXED ACTION CARD */}
       <div className="py-24 text-center max-w-xl mx-auto px-6">
@@ -7168,8 +7401,21 @@ const LimintsoGoldLayout: React.FC<{
 
       {/* FOOTER */}
       <footer className="text-center py-12 text-[10px] text-slate-400 tracking-wider font-sans uppercase">
-        {!isPremium ? <p>© 2025 {event.title} • Criado com InoEvents</p> : <p>© 2025 {event.title}</p>}
+        {/* Sem marca SÓ no Business ('white_label'): Premium/VIP exibem o crédito. */}
+        {!(isEditing || canUseFeature(normalizePlanId((event as any)?.plan ?? (event as any)?.planId), 'white_label')) ? <p>© 2025 {event.title} • Criado com InoEvents</p> : <p>© 2025 {event.title}</p>}
       </footer>
+
+      {/* Barra fixa dourada (padrão Clássico, no estilo Ouro Imperial) */}
+      <div className="fixed bottom-0 inset-x-0 z-50 flex flex-col items-center gap-2 px-6 pt-2" style={{ paddingBottom: 'max(1.25rem, env(safe-area-inset-bottom))' }}>
+        <button
+          onClick={onRSVP}
+          className="bg-[#1B365D] text-white px-8 py-4 rounded-full font-sans font-bold shadow-2xl shadow-[#1B365D]/40 uppercase tracking-widest text-xs whitespace-nowrap min-h-[52px] hover:scale-105 active:scale-95 cursor-pointer border border-[#C5A028]/50"
+          style={{ transition: 'transform 160ms ease-out' }}
+        >
+          {getRSVPText(event.type, "Confirmar Presença")}
+        </button>
+        {onCheckStatus && <button onClick={onCheckStatus} className="text-[11px] font-bold uppercase tracking-widest text-[#E9BE5D] bg-black/60 backdrop-blur rounded-full px-4 py-2.5 min-h-[44px] hover:text-white cursor-pointer border border-[#C5A028]/30" style={{ transition: 'color 200ms ease' }}>Meu convite</button>}
+      </div>
     </div>
   );
 };
@@ -7443,15 +7689,16 @@ const LimintsoMeLayout: React.FC<{
             className="min-h-screen flex flex-col items-center justify-center relative py-24 text-center px-6 overflow-hidden"
           >
             <div className="absolute inset-0 z-0">
+              {/* Hero = foto principal do utilizador; galeria[0] só como recurso */}
               <EditableImageWrapper
-                src={getGalleryImage(0, "https://in.limintso.com/wp-content/uploads/2025/08/mar.jpg")}
-                onChange={(newVal) => updateGalleryImage(0, newVal)}
+                src={event.heroImage || getGalleryImage(0, "/casalModel.webp")}
+                onChange={(newVal) => updateField?.("heroImage", newVal)}
                 isEditing={isEditing}
                 className="absolute inset-0"
               >
                 <div
                   className="absolute inset-0 bg-cover bg-center"
-                  style={{ backgroundImage: `url('${getImageUrl(getGalleryImage(0, "https://in.limintso.com/wp-content/uploads/2025/08/mar.jpg"), { width: 1200, quality: 80 })}')` }}
+                  style={{ backgroundImage: `url('${getImageUrl(event.heroImage || getGalleryImage(0, "/casalModel.webp"), { width: 1200, quality: 80 })}')` }}
                 />
               </EditableImageWrapper>
             </div>
@@ -7578,14 +7825,14 @@ const LimintsoMeLayout: React.FC<{
                 >
                   <div className="relative aspect-[3/4] rounded-[1.5rem] overflow-hidden group">
                     <EditableImageWrapper
-                      src={event.mapImage || "https://in.limintso.com/wp-content/uploads/2025/08/marrr11.jpg"}
-                      onChange={(newVal) => updateField?.("mapImage", newVal)}
+                      src={event.heroImage || getGalleryImage(0, "/casalModel.webp")}
+                      onChange={(newVal) => updateField?.("heroImage", newVal)}
                       isEditing={isEditing}
                       className="absolute inset-0"
                     >
                       <div
                         className="absolute inset-0 bg-cover bg-center transition-transform duration-500 group-hover:scale-105"
-                        style={{ backgroundImage: `url('${getImageUrl(event.mapImage || "https://in.limintso.com/wp-content/uploads/2025/08/marrr11.jpg", { width: 600, quality: 80 })}')` }}
+                        style={{ backgroundImage: `url('${getImageUrl(event.heroImage || getGalleryImage(0, "/casalModel.webp"), { width: 600, quality: 80 })}')` }}
                       />
                     </EditableImageWrapper>
                   </div>
@@ -7876,14 +8123,14 @@ const LimintsoMeLayout: React.FC<{
           >
             <div className="absolute inset-0 z-0">
               <EditableImageWrapper
-                src={getGalleryImage(1, "https://in.limintso.com/wp-content/uploads/2025/08/mar23.jpg")}
+                src={getGalleryImage(1, event.heroImage || "/casalModel.webp")}
                 onChange={(newVal) => updateGalleryImage(1, newVal)}
                 isEditing={isEditing}
                 className="absolute inset-0"
               >
                 <div
                   className="absolute inset-0 bg-cover bg-center"
-                  style={{ backgroundImage: `url('${getImageUrl(getGalleryImage(1, "https://in.limintso.com/wp-content/uploads/2025/08/mar23.jpg"), { width: 1200, quality: 80 })}')` }}
+                  style={{ backgroundImage: `url('${getImageUrl(getGalleryImage(1, event.heroImage || "/casalModel.webp"), { width: 1200, quality: 80 })}')` }}
                 />
               </EditableImageWrapper>
             </div>
@@ -8061,8 +8308,17 @@ const LimintsoMeLayout: React.FC<{
                       
                       <div className="p-4 bg-amber-50/50 rounded-2xl border border-amber-100 inline-block w-full">
                         <span className="montserrat-font text-sm font-semibold text-slate-800 tracking-wider select-all block break-all">
-                          {gift.value}
+                          {formatIbanGroups(gift.value)}
                         </span>
+                        <button
+                          onClick={() => {
+                            navigator.clipboard.writeText(canonicalIban(gift.value) || gift.value || '');
+                            toast.success("IBAN copiado!");
+                          }}
+                          className="montserrat-font text-[10px] font-bold text-[#b49232] uppercase hover:underline mt-2"
+                        >
+                          Copiar
+                        </button>
                       </div>
                     </FadeInSection>
                   ))}
@@ -8124,14 +8380,14 @@ const LimintsoMeLayout: React.FC<{
           >
             <div className="absolute inset-0 z-0">
               <EditableImageWrapper
-                src={getGalleryImage(2, "https://in.limintso.com/wp-content/uploads/2025/08/marb2222.jpg")}
+                src={getGalleryImage(2, event.heroImage || "/casalModel.webp")}
                 onChange={(newVal) => updateGalleryImage(2, newVal)}
                 isEditing={isEditing}
                 className="absolute inset-0"
               >
                 <div
                   className="absolute inset-0 bg-cover bg-center"
-                  style={{ backgroundImage: `url('${getImageUrl(getGalleryImage(2, "https://in.limintso.com/wp-content/uploads/2025/08/marb2222.jpg"), { width: 1200, quality: 80 })}')` }}
+                  style={{ backgroundImage: `url('${getImageUrl(getGalleryImage(2, event.heroImage || "/casalModel.webp"), { width: 1200, quality: 80 })}')` }}
                 />
               </EditableImageWrapper>
             </div>
@@ -8156,8 +8412,21 @@ const LimintsoMeLayout: React.FC<{
 
       {/* FOOTER */}
       <footer className="text-center py-12 text-[10px] text-slate-400 tracking-wider font-sans uppercase">
-        {!isPremium ? <p>© 2025 {event.title} • Criado com InoEvents</p> : <p>© 2025 {event.title}</p>}
+        {/* Sem marca SÓ no Business ('white_label'): Premium/VIP exibem o crédito. */}
+        {!(isEditing || canUseFeature(normalizePlanId((event as any)?.plan ?? (event as any)?.planId), 'white_label')) ? <p>© 2025 {event.title} • Criado com InoEvents</p> : <p>© 2025 {event.title}</p>}
       </footer>
+
+      {/* Barra fixa editorial (padrão Clássico, no estilo Nobreza de Luanda) */}
+      <div className="fixed bottom-0 inset-x-0 z-50 flex flex-col items-center gap-2 px-6 pt-2" style={{ paddingBottom: 'max(1.25rem, env(safe-area-inset-bottom))' }}>
+        <button
+          onClick={onRSVP}
+          className="bg-[#121212] text-white px-8 py-4 rounded-full font-sans font-bold shadow-2xl shadow-black/40 uppercase tracking-[0.2em] text-xs whitespace-nowrap min-h-[52px] hover:scale-105 active:scale-95 cursor-pointer border border-[#E9BE5D]/40"
+          style={{ transition: 'transform 160ms ease-out' }}
+        >
+          {getRSVPText(event.type, "Confirmar Presença")}
+        </button>
+        {onCheckStatus && <button onClick={onCheckStatus} className="text-[11px] font-bold uppercase tracking-[0.2em] text-[#E9BE5D] bg-black/60 backdrop-blur rounded-full px-4 py-2.5 min-h-[44px] hover:text-white cursor-pointer border border-white/10" style={{ transition: 'color 200ms ease' }}>Meu convite</button>}
+      </div>
     </div>
   );
 };
@@ -8305,31 +8574,10 @@ const RSVPForm: React.FC<{ event: EventDetails; onClose: () => void }> = ({
       };
 
       let guestId = "";
+      // Servidor primeiro: impõe limite de convidados, expiração, bloqueio e
+      // ativação do convite. A escrita direta abaixo é SÓ fallback (servidor
+      // inalcançável/offline) — nunca para contornar uma recusa do servidor.
       try {
-        const guestsCollection = collection(db, "events", event.id, "guests");
-        
-        // Verificar duplicado por telefone no client-side primeiro
-        if (normalizedPhone) {
-          const q = query(guestsCollection, where("phone", "==", normalizedPhone));
-          const querySnap = await getDocs(q);
-          if (!querySnap.empty) {
-            toast.error("Este número de WhatsApp já confirmou presença neste evento.", { id: toastId });
-            setLoading(false);
-            return;
-          }
-        }
-        
-        const newGuestDocRef = doc(guestsCollection);
-        await setDoc(newGuestDocRef, {
-          ...guestData,
-          createdAt: new Date().toISOString()
-        });
-        guestId = newGuestDocRef.id;
-        console.log("RSVP gravado com sucesso diretamente no Firestore via Client SDK:", guestId);
-      } catch (clientDbErr) {
-        console.warn("Falha ao salvar via Client SDK, tentando via backend API...", clientDbErr);
-        
-        // Fallback para a API de backend se falhar por regras ou outro motivo
         const res = await fetch(`/api/events/${event.id}/rsvp`, {
           method: "POST",
           headers: {
@@ -8344,9 +8592,40 @@ const RSVPForm: React.FC<{ event: EventDetails; onClose: () => void }> = ({
           setLoading(false);
           return;
         }
-        
+
         const data = await res.json();
         guestId = data.guestId;
+        console.log("RSVP gravado via backend API:", guestId);
+      } catch (fetchErr) {
+        console.warn("Servidor inalcançável, tentando escrita direta (fallback)...", fetchErr);
+
+        try {
+          const guestsCollection = collection(db, "events", event.id, "guests");
+          
+          // Verificar duplicado por telefone no client-side primeiro
+          if (normalizedPhone) {
+            const q = query(guestsCollection, where("phone", "==", normalizedPhone));
+            const querySnap = await getDocs(q);
+            if (!querySnap.empty) {
+              toast.error("Este número de WhatsApp já confirmou presença neste evento.", { id: toastId });
+              setLoading(false);
+              return;
+            }
+          }
+          
+          const newGuestDocRef = doc(guestsCollection);
+          await setDoc(newGuestDocRef, {
+            ...guestData,
+            createdAt: new Date().toISOString()
+          });
+          guestId = newGuestDocRef.id;
+          console.log("RSVP gravado em fallback diretamente no Firestore via Client SDK:", guestId);
+        } catch (clientDbErr) {
+          console.error("Falha ao salvar RSVP (servidor + fallback):", clientDbErr);
+          toast.error("Erro ao confirmar presença.", { id: toastId });
+          setLoading(false);
+          return;
+        }
       }
       toast.success(
         status === "yes"

@@ -1,10 +1,11 @@
 import React, { useState, useEffect } from 'react';
 import { useParams, useSearchParams, Link } from 'react-router-dom';
 import { Users, CheckCircle2, Clock, Search, ExternalLink, ShieldCheck, Printer } from 'lucide-react';
-import { motion, AnimatePresence } from 'framer-motion';
+import { Virtuoso } from 'react-virtuoso';
 import { doc, collection, onSnapshot, getDoc } from 'firebase/firestore';
 import { db } from '../../components/FirebaseProvider';
 import { GuestsProgressBar } from './GuestsProgressBar';
+import { normalizePlanId, canUseFeature } from '../../lib/entitlements';
 import { ResponsiveContainer, PieChart, Pie, Cell, LineChart, Line, XAxis, YAxis, Tooltip } from 'recharts';
 import { ExecutiveReportModal } from './ExecutiveReportModal';
 import { Skeleton } from '../../components/ui/Skeleton';
@@ -80,27 +81,26 @@ export const ClientDashboard = () => {
                     }
                 }
 
-                // Fetch guests in real-time via Client Web SDK (matching Admin Dashboard) with API fallback
-                const guestsRef = collection(db, 'events', id, 'guests');
-                const unsubscribeGuests = onSnapshot(
-                    guestsRef,
-                    (snapshot) => {
-                        const guestsList = snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() }));
-                        setGuests(guestsList);
+                // Lista via API com o código do evento (a leitura direta da lista
+                // exige dono/equipa; a visão do cliente usa o token do link).
+                // Polling curto em vez de escuta permanente.
+                const loadGuests = async () => {
+                    try {
+                        const res = await fetch(`/api/events/${id}/guests?token=${encodeURIComponent(tokenParam || '')}`);
+                        if (!res.ok) throw new Error('forbidden');
+                        const data = await res.json();
+                        if (Array.isArray(data?.guests)) setGuests(data.guests);
+                    } catch (e) {
+                        console.error("Guest API error", e);
+                    } finally {
                         setLoading(false);
-                    },
-                    (err) => {
-                        console.warn("Client SDK guest fetch warning, using API fallback:", err);
-                        fetch(`/api/events/${id}/guests?token=${tokenParam}`)
-                            .then(res => res.ok ? res.json() : null)
-                            .then(data => { if (data?.guests) setGuests(data.guests); })
-                            .catch(e => console.error("Guest API fallback error", e))
-                            .finally(() => setLoading(false));
                     }
-                );
+                };
+                loadGuests();
+                const guestsTimer = setInterval(loadGuests, 8000);
                 
                 return () => {
-                    unsubscribeGuests();
+                    clearInterval(guestsTimer);
                 };
             } catch (err) {
                 console.error("Error fetching event for client", err);
@@ -111,6 +111,32 @@ export const ClientDashboard = () => {
         
         verifyAndFetch();
     }, [id, tokenParam]);
+
+    // Contagens + lista filtrada memoizadas (mesmo padrão do Dashboard):
+    // evitam filters O(n) por render e preparam a lista virtualizada.
+    // Declarados junto aos states, ANTES de qualquer early return (regras dos hooks).
+    const { confirmedCount, pendingCount, declinedCount, checkedInCount, totalCount } = React.useMemo(() => ({
+        confirmedCount: guests.filter(g => g.status === 'CONFIRMED').length,
+        pendingCount: guests.filter(g => g.status === 'PENDING').length,
+        declinedCount: guests.filter(g => g.status === 'DECLINED').length,
+        checkedInCount: guests.filter(g => g.checkedIn).length,
+        totalCount: guests.length,
+    }), [guests]);
+
+    const filteredGuests = React.useMemo(() => {
+        const q = searchQuery.trim().toLowerCase();
+        return guests.filter(g => {
+            if (q && !(g.name?.toLowerCase().includes(q) || g.phone?.toLowerCase().includes(q))) return false;
+
+            switch (activeFilter) {
+                case 'checkedIn': return g.checkedIn === true;
+                case 'confirmed': return g.status === 'CONFIRMED';
+                case 'pending': return g.status === 'PENDING';
+                case 'declined': return g.status === 'DECLINED';
+                default: return true;
+            }
+        });
+    }, [guests, searchQuery, activeFilter]);
 
     if (loading) {
         return (
@@ -149,7 +175,7 @@ export const ClientDashboard = () => {
             </div>
         );
     }
-    
+
     if (authError || !event) {
         return (
             <div className="min-h-screen bg-slate-50 flex flex-col items-center justify-center p-6 text-center">
@@ -162,27 +188,6 @@ export const ClientDashboard = () => {
             </div>
         );
     }
-
-    const confirmedCount = guests.filter(g => g.status === 'CONFIRMED').length;
-    const pendingCount = guests.filter(g => g.status === 'PENDING').length;
-    const declinedCount = guests.filter(g => g.status === 'DECLINED').length;
-    const checkedInCount = guests.filter(g => g.checkedIn).length;
-    const totalCount = guests.length;
-
-    const filteredGuests = guests.filter(g => {
-        const matchesSearch = g.name?.toLowerCase().includes(searchQuery.toLowerCase()) || 
-                              g.phone?.toLowerCase().includes(searchQuery.toLowerCase());
-                              
-        if (!matchesSearch) return false;
-        
-        switch (activeFilter) {
-            case 'checkedIn': return g.checkedIn === true;
-            case 'confirmed': return g.status === 'CONFIRMED';
-            case 'pending': return g.status === 'PENDING';
-            case 'declined': return g.status === 'DECLINED';
-            default: return true;
-        }
-    });
 
     return (
         <div className="min-h-screen bg-slate-50 font-display pb-20 text-slate-800">
@@ -202,12 +207,15 @@ export const ClientDashboard = () => {
                         </span>
                     </div>
                     <div className="flex items-center gap-3">
+                        {/* Relatório executivo: avançado (VIP/Business do evento). */}
+                        {canUseFeature(normalizePlanId((event as any)?.plan ?? (event as any)?.planId), 'advanced_analytics') && (
                         <button 
                             onClick={() => setShowReportModal(true)}
                             className="text-xs font-bold bg-slate-900 border border-slate-900 text-white hover:bg-slate-800 px-3.5 py-1.5 rounded-full flex items-center gap-1.5 shadow-sm transition-all cursor-pointer"
                         >
                             <Printer size={13} /> Relatório Executivo
                         </button>
+                        )}
                         <div className="text-xs font-bold bg-slate-100 text-slate-500 px-3 py-1.5 rounded-full flex items-center gap-2">
                             <ShieldCheck size={14} className="text-brand-blue" />
                             Visão do Cliente
@@ -368,6 +376,9 @@ export const ClientDashboard = () => {
                         <span className="text-xs font-bold bg-white px-3 py-1 rounded-full border border-slate-200 text-slate-500">{filteredGuests.length} resultados</span>
                     </div>
                     
+                    {/* Lista virtualizada (Virtuoso): renderiza só as linhas visíveis.
+                        As linhas eram motion.div com fade por item — em listas grandes isso
+                        montava N animações JS; agora são divs estáticas virtualizadas. */}
                     {guests.length === 0 ? (
                         <div className="p-12 text-center flex flex-col items-center justify-center text-slate-500">
                             <span className="material-symbols-outlined text-4xl mb-4 opacity-50">group</span>
@@ -376,15 +387,18 @@ export const ClientDashboard = () => {
                     ) : filteredGuests.length === 0 ? (
                         <div className="p-12 text-center text-slate-500">Nenhum convidado corresponde aos filtros atuais.</div>
                     ) : (
-                        <div className="divide-y divide-slate-100 max-h-[600px] overflow-y-auto">
-                            <AnimatePresence>
-                                {filteredGuests.map((guest, idx) => (
-                                    <motion.div 
-                                        initial={{ opacity: 0 }}
-                                        animate={{ opacity: 1 }}
-                                        key={guest.id} 
+                        <Virtuoso
+                            style={{ height: 600, maxHeight: '70dvh' }}
+                            totalCount={filteredGuests.length}
+                            overscan={176}
+                            itemContent={(index) => {
+                                const guest = filteredGuests[index];
+                                if (!guest) return null;
+                                return (
+                                    <div
+                                        key={guest.id}
                                         onClick={() => setSelectedGuest(guest)}
-                                        className="flex flex-col md:flex-row md:items-center justify-between p-4 px-6 hover:bg-slate-50 transition-colors gap-4 cursor-pointer"
+                                        className="flex flex-col md:flex-row md:items-center justify-between p-4 px-6 hover:bg-slate-50 transition-colors gap-4 cursor-pointer border-b border-slate-100"
                                     >
                                         <div className="flex gap-4 items-center">
                                             <div className="w-10 h-10 rounded-full bg-slate-100 flex items-center justify-center text-slate-800 font-bold border border-slate-200">
@@ -410,10 +424,10 @@ export const ClientDashboard = () => {
                                                 "{guest.message}"
                                             </div>
                                         )}
-                                    </motion.div>
-                                ))}
-                            </AnimatePresence>
-                        </div>
+                                    </div>
+                                );
+                            }}
+                        />
                     )}
                 </div>
             </main>

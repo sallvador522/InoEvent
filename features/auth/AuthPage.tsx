@@ -28,16 +28,28 @@ export const AuthPage: React.FC = () => {
       const provider = new GoogleAuthProvider();
       const result = await signInWithPopup(auth, provider);
       
-      const { doc, getDoc, setDoc } = await import('firebase/firestore');
+      const { doc, setDoc, getDocFromServer } = await import('firebase/firestore');
       const userRef = doc(db, 'users', result.user.uid);
-      const userSnap = await getDoc(userRef);
-      if (!userSnap.exists()) {
+      // Verificar existência NO SERVIDOR: a cache local pode estar vazia/offline e
+      // fingir que a ficha não existe — criar por cima apagaria um plano pago
+      // (foi assim que contas premium "voltavam" a free em desenvolvimento).
+      let exists = false;
+      try {
+        exists = (await getDocFromServer(userRef)).exists();
+      } catch {
+        // Servidor inalcançável (offline): NÃO tocar na ficha. O snapshot do
+        // FirebaseProvider carrega o perfil real quando a rede voltar.
+        navigate(from, { replace: true });
+        return;
+      }
+      if (!exists) {
+          // merge:true por segurança: mesmo aqui, nunca apagar campos alheios.
           await setDoc(userRef, {
               uid: result.user.uid,
               name: result.user.displayName || '',
               email: result.user.email || 'no-email@example.com',
               plan: 'free'
-          });
+          }, { merge: true });
           trackPixelCompleteRegistration(
             { method: 'google' },
             { user_data: { email: result.user.email || undefined } },
@@ -77,12 +89,14 @@ export const AuthPage: React.FC = () => {
 
         const { doc, setDoc } = await import('firebase/firestore');
         const userRef = doc(db, 'users', userCredential.user.uid);
+        // merge:true — conta nova nasce free, mas nunca apagar campos se a ficha
+        // já existir por algum caminho (ex: pré-criada pelo admin).
         await setDoc(userRef, {
             uid: userCredential.user.uid,
             name: name,
             email: email,
             plan: 'free'
-        });
+        }, { merge: true });
         trackPixelCompleteRegistration(
           { method: 'email' },
           { user_data: { email } },

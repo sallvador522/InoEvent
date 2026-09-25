@@ -1,12 +1,12 @@
 import React, { useState, useEffect } from 'react';
 import { Navbar } from '../../components/Navbar';
 import { db, auth } from '../../components/FirebaseProvider';
-import { collection, getDocs, query, orderBy, doc, updateDoc, addDoc, limit, startAfter } from 'firebase/firestore';
+import { collection, getDocs, query, where, orderBy, doc, updateDoc, addDoc, limit, startAfter } from 'firebase/firestore';
 import { toast } from 'react-hot-toast';
 import { motion, AnimatePresence } from 'framer-motion';
 import { Skeleton } from '../../components/ui/Skeleton';
 import { ResponsiveContainer, AreaChart, Area, XAxis, YAxis, CartesianGrid, Tooltip } from 'recharts';
-import { getValidityDays, normalizePlanId } from '../../config/plans';
+import { getValidityDays, normalizePlanId, getPlanConfig, getGuestLimit } from '../../config/plans';
 
 export const AdminDashboard: React.FC = () => {
   const [users, setUsers] = useState<any[]>([]);
@@ -17,8 +17,11 @@ export const AdminDashboard: React.FC = () => {
   const [loading, setLoading] = useState(true);
   const [confirmingOrderId, setConfirmingOrderId] = useState<string | null>(null);
   const [isSendingNotif, setIsSendingNotif] = useState(false);
+  const [isRenewing, setIsRenewing] = useState(false);
   
-  const [activeTab, setActiveTab] = useState<'overview' | 'users' | 'events' | 'transactions' | 'orders' | 'analytics'>('overview');
+  const [activeTab, setActiveTab] = useState<'overview' | 'users' | 'events' | 'transactions' | 'orders' | 'subscriptions' | 'analytics'>('overview');
+  const [subscriptions, setSubscriptions] = useState<any[]>([]);
+  const [subActionId, setSubActionId] = useState<string | null>(null);
   const [selectedUser, setSelectedUser] = useState<any | null>(null);
   
   const [searchQuery, setSearchQuery] = useState('');
@@ -68,6 +71,16 @@ export const AdminDashboard: React.FC = () => {
         setTransactions(transactionsSnapshot.docs.map(doc => ({ id: doc.id, ...doc.data() })));
         setOrders(ordersData);
         setVisits(visitsData);
+        try {
+          const subsSnapshot = await getDocs(query(collection(db, 'subscriptions'), limit(100)));
+          setSubscriptions(
+            subsSnapshot.docs
+              .map(d => ({ id: d.id, ...d.data() }))
+              .sort((a: any, b: any) => String(b.createdAt || '').localeCompare(String(a.createdAt || '')))
+          );
+        } catch (subErr) {
+          console.warn('Falha ao buscar subscrições:', subErr);
+        }
       } catch (error) {
         console.error('Error fetching admin data:', error);
       } finally {
@@ -80,9 +93,12 @@ export const AdminDashboard: React.FC = () => {
 
   const handlePlanChangeSelect = (userId: string, currentPlan: string, nextPlan: string, e?: React.MouseEvent) => {
     if (e) e.stopPropagation();
-    setPendingPlanChange({ userId, currentPlan, nextPlan });
+    // Gravar sempre o id canónico (essential/free/premium/vip/business): o select
+    // antigo gravava 'Corporate'/Title Case e criava Business vitalício por acidente.
+    const canonNext = normalizePlanId(nextPlan);
+    setPendingPlanChange({ userId, currentPlan, nextPlan: canonNext });
     setNotificationTitle('Plano Atualizado 🎉');
-    setNotificationMessage(`Parabéns! O seu plano foi atualizado de ${currentPlan} para ${nextPlan} pela equipa de administração do InoEvents. Aproveite todos os novos recursos exclusivos!`);
+    setNotificationMessage(`Parabéns! O seu plano foi atualizado de ${getPlanConfig(currentPlan).name} para ${getPlanConfig(canonNext).name} pela equipa de administração do InoEvents. Aproveite todos os novos recursos exclusivos!`);
     setNotificationType('plan_upgrade');
     setNotificationTargetUserId(userId);
   };
@@ -92,7 +108,29 @@ export const AdminDashboard: React.FC = () => {
     setIsSendingNotif(true);
     try {
       if (pendingPlanChange) {
-        // Validade oficial do plano (config/plans) — Essencial/Free sem expiração
+        // Travão de downgrade (igual ao API de pedidos): não admite plano menor
+        // que a ocupação atual de nenhum evento do utilizador. Sem isto, pôr
+        // Essential-100 num evento com 500 pessoas bloqueava tudo sem explicação.
+        const planOrder = ['free', 'essential', 'premium', 'vip', 'business'];
+        const target = users.find((u) => u.id === pendingPlanChange.userId);
+        const fromIdx = planOrder.indexOf(normalizePlanId((target as any)?.plan ?? pendingPlanChange.currentPlan));
+        const toIdx = planOrder.indexOf(normalizePlanId(pendingPlanChange.nextPlan));
+        if (toIdx >= 0 && fromIdx >= 0 && toIdx < fromIdx) {
+          const newLimit = getGuestLimit(pendingPlanChange.nextPlan);
+          const ownerKey = (target as any)?.uid || pendingPlanChange.userId;
+          const owned = events.filter((e) => e.ownerId === ownerKey);
+          for (const ev of owned) {
+            const gsnap = await getDocs(collection(db, 'events', ev.id, 'guests'));
+            const occ = gsnap.docs.filter((d) => (d.data() as any)?.status !== 'DECLINED').length;
+            if (occ > newLimit) {
+              toast.error(`"${ev.title || ev.id}" tem ${occ} convidados e o plano ${getPlanConfig(pendingPlanChange.nextPlan).name} permite ${newLimit}. Remova convidados ou escolha um plano maior.`);
+              return;
+            }
+          }
+        }
+        // Validade oficial do plano (config/plans): essential 90d, premium 180d,
+        // vip 365d; null (business) = sem expiração. Sem validade nova, o vigia de
+        // expiração mostra Free no ecrã do utilizador.
         const validityDays = getValidityDays(pendingPlanChange.nextPlan);
         const expiresAt = validityDays === null ? null : new Date(Date.now() + validityDays * 86400000).toISOString();
         await updateDoc(doc(db, 'users', pendingPlanChange.userId), { 
@@ -116,9 +154,9 @@ export const AdminDashboard: React.FC = () => {
             /* best-effort — o backfill pode ser corrido manualmente */
           }
         }
-        setUsers(users.map(u => u.id === pendingPlanChange.userId ? { ...u, plan: pendingPlanChange.nextPlan, planExpiresAt: (() => { const d = getValidityDays(pendingPlanChange.nextPlan); return d === null ? null : new Date(Date.now() + d * 86400000).toISOString(); })() } : u));
+        setUsers(users.map(u => u.id === pendingPlanChange.userId ? { ...u, plan: pendingPlanChange.nextPlan, planExpiresAt: expiresAt } : u));
         if (selectedUser?.id === pendingPlanChange.userId) {
-          setSelectedUser({ ...selectedUser, plan: pendingPlanChange.nextPlan });
+          setSelectedUser({ ...selectedUser, plan: pendingPlanChange.nextPlan, planExpiresAt: expiresAt });
         }
       }
 
@@ -145,8 +183,37 @@ export const AdminDashboard: React.FC = () => {
     }
   };
 
+  // Renovar validade: repõe planExpiresAt = agora + dias oficiais do plano atual.
+  // Sem isto, um plano expirado mostra Free no ecrã do utilizador e o admin
+  // não tinha onde ver a validade nem como a corrigir sem trocar de plano.
+  const handleRenewPlan = async (user: any) => {
+    if (!user?.id || isRenewing) return;
+    const days = getValidityDays(user.plan);
+    if (days === null) {
+      toast.error('Este plano não tem expiração — nada a renovar.');
+      return;
+    }
+    setIsRenewing(true);
+    try {
+      const expiresAt = new Date(Date.now() + days * 86400000).toISOString();
+      await updateDoc(doc(db, 'users', user.id), { planExpiresAt: expiresAt });
+      setUsers((prev: any[]) => prev.map((u) => (u.id === user.id ? { ...u, planExpiresAt: expiresAt } : u)));
+      if (selectedUser?.id === user.id) {
+        setSelectedUser({ ...selectedUser, planExpiresAt: expiresAt });
+      }
+      toast.success(`Validade renovada até ${new Date(expiresAt).toLocaleDateString('pt-AO')}!`);
+    } catch (error) {
+      console.error('Erro ao renovar validade:', error);
+      toast.error('Não foi possível renovar. Tente de novo.');
+    } finally {
+      setIsRenewing(false);
+    }
+  };
+
   const handleConfirmOrder = async (order: any) => {
     if (!order || order.billingStatus !== 'pending') return;
+    // Trava anti-duplo-pedido (dinheiro): sem isto, 2 cliques ativam/cobram 2x.
+    if (confirmingOrderId) return;
     setConfirmingOrderId(order.id);
     try {
       const token = await auth.currentUser?.getIdToken();
@@ -184,6 +251,110 @@ export const AdminDashboard: React.FC = () => {
     }
   };
 
+  const callSubscriptionAction = async (sub: any, action: 'renew' | 'cancel') => {
+    if (!sub?.id || subActionId) return;
+    const label = action === 'renew' ? 'renovar +30 dias' : 'cancelar (corta em 7 dias)';
+    if (!window.confirm(`Confirmar: ${label} a subscrição de ${subEmail(sub)}?`)) return;
+    setSubActionId(`${action}:${sub.id}`);
+    try {
+      const token = await auth.currentUser?.getIdToken();
+      const res = await fetch(`/api/subscriptions/${sub.id}/${action}`, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          ...(token ? { Authorization: `Bearer ${token}` } : {}),
+        },
+      });
+      if (!res.ok) throw new Error('request failed');
+      const data = await res.json().catch(() => ({}));
+      if (action === 'renew' && data?.subscription) {
+        setSubscriptions((prev) => prev.map((s) => (s.id === sub.id ? { ...s, ...data.subscription } : s)));
+      } else {
+        // Cancelar: recarrega a linha (estado + graça vêm do servidor).
+        const snap = await getDocs(query(collection(db, 'subscriptions'), limit(100)));
+        setSubscriptions(
+          snap.docs.map((d) => ({ id: d.id, ...d.data() })).sort((a: any, b: any) => String(b.createdAt || '').localeCompare(String(a.createdAt || '')))
+        );
+      }
+      toast.success(action === 'renew' ? 'Mensalidade renovada e conta reativada!' : 'Subscrição cancelada. Corte suave em 7 dias.');
+    } catch (error) {
+      console.error('Erro na ação de subscrição:', error);
+      toast.error('Não foi possível concluir. Tente de novo.');
+    } finally {
+      setSubActionId(null);
+    }
+  };
+
+  const subEmail = (s: any) => {
+    const owner = users.find((u: any) => (u.id || u.uid) === s.userId);
+    return owner?.email || s.userId;
+  };
+
+  const renderSubscriptions = () => {
+    const daysLeft = (iso: any) => {
+      if (!iso) return null;
+      return Math.ceil((new Date(iso).getTime() - Date.now()) / 86400000);
+    };
+    return (
+      <div className="bg-white rounded-3xl border border-slate-100 shadow-sm overflow-hidden">
+        <div className="p-6 border-b border-slate-100">
+          <h3 className="font-bold text-slate-900">Subscrições Business</h3>
+          <p className="text-sm text-slate-500">Renovar reativa conta e eventos (+30 dias). Cancelar corta em 7 dias de graça.</p>
+        </div>
+        {subscriptions.length === 0 ? (
+          <p className="p-6 text-sm text-slate-500">Nenhuma subscrição ainda.</p>
+        ) : (
+          <ul className="divide-y divide-slate-100">
+            {subscriptions.map((s) => {
+              const left = daysLeft(s.currentPeriodEnd);
+              const busy = subActionId === `renew:${s.id}` || subActionId === `cancel:${s.id}`;
+              return (
+                <li key={s.id} className="p-4 sm:p-5 flex flex-col sm:flex-row sm:items-center gap-3">
+                  <div className="flex-1 min-w-0">
+                    <p className="font-bold text-sm text-slate-900 truncate">
+                      {subEmail(s)}
+                      <span className={`ml-2 text-[10px] font-black uppercase tracking-wider px-2 py-0.5 rounded-full ${s.status === 'active' ? 'bg-emerald-100 text-emerald-700' : 'bg-slate-200 text-slate-600'}`}>
+                        {s.status}
+                      </span>
+                    </p>
+                    <p className="text-xs text-slate-500 truncate">
+                      {s.id} · {s.currentPeriodEnd ? `até ${new Date(s.currentPeriodEnd).toLocaleDateString('pt-AO')} (${left ?? '?'}d)` : 'sem validade'}
+                    </p>
+                  </div>
+                  <div className="flex gap-2 shrink-0">
+                    <button
+                      onClick={() => callSubscriptionAction(s, 'renew')}
+                      disabled={!!subActionId}
+                      className="px-4 h-10 rounded-full bg-brand-blue text-white font-bold text-xs uppercase tracking-wider hover:bg-brand-blue/90 disabled:opacity-60 cursor-pointer whitespace-nowrap"
+                    >
+                      {busy ? 'Aguarde…' : 'Renovar +30d'}
+                    </button>
+                    {s.status === 'active' && (
+                      <button
+                        onClick={() => callSubscriptionAction(s, 'cancel')}
+                        disabled={!!subActionId}
+                        className="px-4 h-10 rounded-full border border-red-200 text-red-600 font-bold text-xs uppercase tracking-wider hover:bg-red-50 disabled:opacity-60 cursor-pointer whitespace-nowrap inline-flex items-center gap-2"
+                      >
+                        {subActionId === `cancel:${s.id}` ? (
+                          <>
+                            <span className="w-3.5 h-3.5 border-2 border-red-300 border-t-red-600 rounded-full animate-spin" aria-hidden="true" />
+                            A cancelar…
+                          </>
+                        ) : (
+                          'Cancelar'
+                        )}
+                      </button>
+                    )}
+                  </div>
+                </li>
+              );
+            })}
+          </ul>
+        )}
+      </div>
+    );
+  };
+
   const renderOrders = () => {
     const fmtKz = (v: any) => `${Number(v || 0).toLocaleString('pt-AO')} Kz`;
     return (
@@ -204,6 +375,11 @@ export const AdminDashboard: React.FC = () => {
                     <span className={`ml-2 text-[10px] font-black uppercase tracking-wider px-2 py-0.5 rounded-full ${o.billingStatus === 'paid' ? 'bg-emerald-100 text-emerald-700' : o.billingStatus === 'failed' ? 'bg-red-100 text-red-600' : 'bg-amber-100 text-amber-700'}`}>
                       {o.billingStatus}
                     </span>
+                    {(o.addons as any)?.concierge && (
+                      <span className="ml-2 text-[10px] font-black uppercase tracking-wider px-2 py-0.5 rounded-full bg-violet-100 text-violet-700">
+                        Concierge
+                      </span>
+                    )}
                   </p>
                   <p className="text-xs text-slate-500 truncate">
                     Pedido {o.id} · Evento {o.eventId}
@@ -290,7 +466,7 @@ export const AdminDashboard: React.FC = () => {
                         <div>
                           <p className="font-bold text-sm text-slate-700">{user.email || 'Sem e-mail'}</p>
                           <span className="inline-block mt-1 px-2 py-0.5 bg-brand-blue/10 text-brand-blue text-xs rounded-full font-bold">
-                              {user.plan || 'Essencial'}
+                              {getPlanConfig(user.plan).name}
                           </span>
                         </div>
                     </div>
@@ -350,16 +526,53 @@ export const AdminDashboard: React.FC = () => {
                 <li className="flex justify-between items-center text-sm">
                   <span className="text-slate-500">Plano Atual:</span>
                   <select 
-                    value={selectedUser.plan || 'Essencial'}
-                    onChange={(e) => handlePlanChangeSelect(selectedUser.id, selectedUser.plan || 'Essencial', e.target.value)}
+                    value={normalizePlanId(selectedUser.plan)}
+                    onChange={(e) => handlePlanChangeSelect(selectedUser.id, selectedUser.plan || 'free', e.target.value)}
                     className="bg-white border text-right border-slate-200 text-slate-700 text-sm rounded-lg focus:ring-brand-blue focus:border-brand-blue block p-1 font-bold outline-none cursor-pointer"
                   >
-                        <option value="Essencial">Essencial</option>
-                        <option value="Free">Free</option>
-                        <option value="Premium">Premium</option>
-                    <option value="Business">Business</option>
-                    <option value="Corporate">Corporate</option>
+                        <option value="essential" disabled>Essencial (legado)</option>
+                        <option value="free">Free</option>
+                        <option value="premium">Premium</option>
+                        <option value="vip">VIP</option>
+                    <option value="business">Business</option>
                   </select>
+                </li>
+                <li className="pt-1 text-xs text-slate-400">
+                  Essencial fora de venda — fichas antigas mantêm as regras originais.
+                </li>
+                <li className="flex justify-between items-center text-sm gap-3">
+                  <span className="text-slate-500 shrink-0">Validade:</span>
+                  {(() => {
+                    const exp = selectedUser.planExpiresAt;
+                    const isPaid = ['essential', 'premium', 'vip', 'business'].includes(normalizePlanId(selectedUser.plan));
+                    if (!exp) {
+                      return <span className="font-medium text-slate-400">sem validade</span>;
+                    }
+                    const d = new Date(exp);
+                    if (isNaN(d.getTime())) {
+                      return <span className="font-medium text-slate-400">data inválida</span>;
+                    }
+                    const expired = d < new Date();
+                    const daysLeft = Math.ceil((d.getTime() - Date.now()) / 86400000);
+                    return (
+                      <span className="flex items-center justify-end gap-2 flex-wrap">
+                        <span className={`font-bold ${expired ? 'text-red-600' : daysLeft <= 15 ? 'text-amber-600' : 'text-emerald-600'}`}>
+                          {expired
+                            ? `expirado em ${d.toLocaleDateString('pt-AO')}`
+                            : `válido até ${d.toLocaleDateString('pt-AO')} (${daysLeft}d)`}
+                        </span>
+                        {isPaid && (
+                          <button
+                            onClick={() => handleRenewPlan(selectedUser)}
+                            disabled={isRenewing}
+                            className="bg-brand-blue text-white text-xs font-bold px-3 py-1.5 rounded-lg shadow-sm hover:bg-brand-blue/90 active:scale-95 transition-all outline-none cursor-pointer disabled:opacity-60"
+                          >
+                            {isRenewing ? 'A renovar…' : 'Renovar'}
+                          </button>
+                        )}
+                      </span>
+                    );
+                  })()}
                 </li>
                 {selectedUser.name && (
                   <li className="flex justify-between items-center text-sm">
@@ -492,11 +705,11 @@ export const AdminDashboard: React.FC = () => {
                  className="bg-white border border-slate-200 text-slate-700 text-sm rounded-lg focus:ring-brand-blue focus:border-brand-blue block p-2 outline-none cursor-pointer"
               >
                  <option value="all">Todos os Planos</option>
-                  <option value="Essencial">Essencial</option>                                               
-                  <option value="Free">Free</option>
-                  <option value="Premium">Premium</option>
-                 <option value="Business">Business</option>
-                 <option value="Corporate">Corporate</option>
+                  <option value="essential">Essencial</option>                                               
+                  <option value="free">Free</option>
+                  <option value="premium">Premium</option>
+                  <option value="vip">VIP</option>
+                 <option value="business">Business</option>
               </select>
            </div>
         </div>
@@ -517,15 +730,15 @@ export const AdminDashboard: React.FC = () => {
                   </td>
                   <td className="px-6 py-4" onClick={e => e.stopPropagation()}>
                     <select 
-                        value={user.plan || 'Essencial'}
-                        onChange={(e) => handlePlanChangeSelect(user.id, user.plan || 'Essencial', e.target.value, e as any)}
+                        value={normalizePlanId(user.plan)}
+                        onChange={(e) => handlePlanChangeSelect(user.id, user.plan || 'free', e.target.value, e as any)}
                         className="bg-white border border-slate-200 text-slate-700 text-xs rounded-lg focus:ring-brand-blue focus:border-brand-blue block p-1.5 font-bold cursor-pointer outline-none"
                     >
-                        <option value="Essencial">Essencial</option>                                            
-                    <option value="Free">Free</option>
-                        <option value="Premium">Premium</option>
-                        <option value="Business">Business</option>
-                        <option value="Corporate">Corporate</option>
+                        <option value="essential" disabled>Essencial (legado)</option>                                            
+                    <option value="free">Free</option>
+                        <option value="premium">Premium</option>
+                        <option value="vip">VIP</option>
+                        <option value="business">Business</option>
                     </select>
                   </td>
                 </tr>
@@ -668,12 +881,18 @@ export const AdminDashboard: React.FC = () => {
             >
               Transações
             </button>
-            <button 
-              onClick={() => { setActiveTab('orders'); setSelectedUser(null); }}
-              className={`px-4 py-2 text-sm font-bold rounded-lg transition-all whitespace-nowrap ${activeTab === 'orders' ? 'bg-slate-900 text-white shadow-md' : 'text-slate-500 hover:text-slate-900 hover:bg-slate-100'}`}
-            >
-              Pedidos
-            </button>
+              <button
+                onClick={() => { setActiveTab('orders'); setSelectedUser(null); }}
+                className={`px-4 py-2 text-sm font-bold rounded-lg transition-all whitespace-nowrap ${activeTab === 'orders' ? 'bg-slate-900 text-white shadow-md' : 'text-slate-500 hover:text-slate-900 hover:bg-slate-100'}`}
+              >
+                Pedidos
+              </button>
+              <button
+                onClick={() => { setActiveTab('subscriptions'); setSelectedUser(null); }}
+                className={`px-4 py-2 text-sm font-bold rounded-lg transition-all whitespace-nowrap ${activeTab === 'subscriptions' ? 'bg-slate-900 text-white shadow-md' : 'text-slate-500 hover:text-slate-900 hover:bg-slate-100'}`}
+              >
+                Subscrições
+              </button>
             <button 
               onClick={() => { setActiveTab('analytics'); setSelectedUser(null); }}
               className={`px-4 py-2 text-sm font-bold rounded-lg transition-all whitespace-nowrap ${activeTab === 'analytics' ? 'bg-slate-900 text-white shadow-md' : 'text-slate-500 hover:text-slate-900 hover:bg-slate-100'}`}
@@ -696,6 +915,7 @@ export const AdminDashboard: React.FC = () => {
             {activeTab === 'events' && renderEvents()}
             {activeTab === 'transactions' && renderTransactions()}
             {activeTab === 'orders' && renderOrders()}
+            {activeTab === 'subscriptions' && renderSubscriptions()}
             {activeTab === 'analytics' && <AnalyticsView visits={visits} events={events} users={users} />}
           </motion.div>
         </AnimatePresence>

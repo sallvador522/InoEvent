@@ -24,35 +24,13 @@ import { trackPixelInitiateCheckout, trackPixelLead } from "../../lib/metaPixel"
 
 const plans = [
   {
-    id: "essential",
-    name: "Essencial",
-    subtitle: "Pagamento Único por Evento",
-    prices: {
-      monthly: `${PLANS.essential.price.toLocaleString('pt-AO')}`,
-      annual: "Válido por evento",
-    },
-    savings: `Activo durante ${PLANS.essential.validityDays} dias • Até ${PLANS.essential.guestLimit} convidados`,
-    description: PLANS.essential.description,
-    features: [
-      "Acesso por Evento Específico",
-      "Casamentos, Chás e Aniversários",
-      `RSVP Até ${PLANS.essential.guestLimit} convidados`,
-      "Galeria de Fotos Básica",
-      "Código QR Exclusivo",
-      "Localização & Mapa",
-      "Countdown",
-    ],
-  },
-  {
     id: "premium",
     name: "Premium",
     subtitle: "Pagamento Único por Evento",
     prices: {
-      monthly: `${PLANS.premium.price.toLocaleString('pt-AO')}`,
-      annual: "Válido por evento",
+      price: `${PLANS.premium.price.toLocaleString('pt-AO')}`,
     },
     savings: `Activo durante ${PLANS.premium.validityDays} dias • Até ${PLANS.premium.guestLimit} convidados`,
-    popular: true,
     description: PLANS.premium.description,
     features: [
       "Acesso por Evento Específico",
@@ -63,7 +41,7 @@ const plans = [
       "Música de Fundo (TocaPlayer)",
       "Livro de Assinaturas Digital",
       "Mapa das Mesas",
-      "Sem marca d'água (White-label)",
+      "Countdown",
       "Analytics Básicos",
     ],
   },
@@ -72,10 +50,10 @@ const plans = [
     name: "VIP",
     subtitle: "Pagamento Único por Evento",
     prices: {
-      monthly: `${PLANS.vip.price.toLocaleString('pt-AO')}`,
-      annual: "Válido por evento",
+      price: `${PLANS.vip.price.toLocaleString('pt-AO')}`,
     },
     savings: `Activo durante ${PLANS.vip.validityDays} dias • Até ${PLANS.vip.guestLimit} convidados`,
+    popular: true,
     description: PLANS.vip.description,
     features: [
       "Tudo do Premium",
@@ -84,9 +62,7 @@ const plans = [
       "Check-in Inteligente",
       "Gestão +1",
       "Mesas Avançadas",
-      "Lembretes Automáticos",
       "Analytics Avançados",
-      "Domínio Personalizado",
       "Suporte Prioritário",
     ],
   },
@@ -96,8 +72,7 @@ const plans = [
     displayName: "Business (B2B)",
     subtitle: "Assinatura Mensal",
     prices: {
-      monthly: `${PLANS.business.price.toLocaleString('pt-AO')}`,
-      annual: "Por mês",
+      price: `${PLANS.business.price.toLocaleString('pt-AO')}`,
     },
     savings: "Eventos ilimitados • Faturado como SaaS",
     description: PLANS.business.description,
@@ -143,18 +118,29 @@ export const PlansPage: React.FC = () => {
   const activatingEventId = searchParams.get("eventId");
   const fromShare = searchParams.get("from") === "share";
   const [activatingEventTitle, setActivatingEventTitle] = useState<string | null>(null);
+  const [activatingEventPlan, setActivatingEventPlan] = useState<string | null>(null);
   const [isFetchingTitle, setIsFetchingTitle] = useState(false);
   const [isOrdering, setIsOrdering] = useState(false);
   const [whatsappModal, setWhatsappModal] = useState<{
     name: string;
     price: string;
     planId: string;
-    billingCycle?: "monthly" | "annual";
+    billingCycle?: "monthly";
+    concierge: boolean;
   } | null>(null);
+
+  // Total com Concierge opcional (+10.000 Kz): o preço do cartão vem formatado.
+  const modalTotal = (m: { price: string; concierge: boolean } | null): string => {
+    if (!m) return '';
+    const base = Number(String(m.price).replace(/\D/g, '')) || 0;
+    const total = base + (m.concierge ? ADDONS.concierge.price : 0);
+    return total.toLocaleString('pt-AO');
+  };
 
   useEffect(() => {
     if (!activatingEventId) {
       setActivatingEventTitle(null);
+      setActivatingEventPlan(null);
       return;
     }
     setIsFetchingTitle(true);
@@ -162,11 +148,13 @@ export const PlansPage: React.FC = () => {
       .then((snap) => {
         if (snap.exists() && snap.data().ownerId === user?.uid) {
           setActivatingEventTitle(snap.data().title || "o seu evento");
+          setActivatingEventPlan(snap.data().plan ?? snap.data().planId ?? null);
         } else {
           setActivatingEventTitle(null);
+          setActivatingEventPlan(null);
         }
       })
-      .catch(() => setActivatingEventTitle(null))
+      .catch(() => { setActivatingEventTitle(null); setActivatingEventPlan(null); })
       .finally(() => setIsFetchingTitle(false));
   }, [activatingEventId, user]);
 
@@ -215,16 +203,17 @@ export const PlansPage: React.FC = () => {
       return;
     }
 
-    const priceVal = plan.prices.monthly;
+    const priceVal = plan.prices.price;
     setWhatsappModal({
       name: plan.name,
       price: priceVal,
       planId: plan.id,
       billingCycle: plan.id === "business" ? "monthly" : undefined,
+      concierge: false,
     });
   };
 
-  const createOrderForEvent = async (planId: string): Promise<string | null> => {
+  const createOrderForEvent = async (planId: string, addons?: { concierge?: boolean }): Promise<string | null> => {
     if (!activatingEventId || !user) return null;
     try {
       const token = await auth.currentUser?.getIdToken();
@@ -238,6 +227,7 @@ export const PlansPage: React.FC = () => {
           userId: user.uid,
           eventId: activatingEventId,
           plan: planId,
+          addons: addons && addons.concierge ? { concierge: true } : {},
         }),
       });
       if (!res.ok) return null;
@@ -253,7 +243,10 @@ export const PlansPage: React.FC = () => {
 
     setIsOrdering(true);
     const toastId = toast.loading("A registar pedido…");
-    const orderId: string | null = await createOrderForEvent(whatsappModal.planId).catch(() => null);
+    const orderId: string | null = await createOrderForEvent(
+      whatsappModal.planId,
+      whatsappModal.concierge ? { concierge: true } : undefined
+    ).catch(() => null);
     setIsOrdering(false);
     toast.dismiss(toastId);
     if (activatingEventId && !orderId) {
@@ -261,14 +254,17 @@ export const PlansPage: React.FC = () => {
       return;
     }
     const orderRef = orderId ? `\nPedido: ${orderId}` : "";
+    const conciergeLine = whatsappModal.concierge
+      ? `\n+ Concierge (equipa cria o convite): ${ADDONS.concierge.price.toLocaleString('pt-AO')} Kz`
+      : "";
 
     const messageText = whatsappModal.name === "Business"
-      ? `Olá! Gostaria de subscrever ao Plano ${whatsappModal.name.toUpperCase()} para a minha agência.\n\nID da Plataforma: ${user.uid}\nE-mail: ${user.email || "Não informado"}${orderRef ? `\nEvento: ${activatingEventId || "—"}${orderRef}` : ""}\n\nEstou em contacto para concluir o pagamento do meu plano. Obrigado!`
-      : `Olá! Gostaria de comprar o Plano ${whatsappModal.name.toUpperCase()} por ${whatsappModal.price} Kz.\n\nID da Plataforma: ${user.uid}\nE-mail: ${user.email || "Não informado"}${orderRef ? `\nEvento: ${activatingEventId || "—"}${orderRef}` : ""}\n\nEstou em contacto para concluir o pagamento do meu plano. Obrigado!`;
+      ? `Olá! Gostaria de subscrever ao Plano ${whatsappModal.name.toUpperCase()} para a minha agência.\n\nID da Plataforma: ${user.uid}\nE-mail: ${user.email || "Não informado"}${orderRef ? `\nEvento: ${activatingEventId || "—"}${orderRef}` : ""}${conciergeLine}\n\nEstou em contacto para concluir o pagamento do meu plano. Obrigado!`
+      : `Olá! Gostaria de comprar o Plano ${whatsappModal.name.toUpperCase()} por ${modalTotal(whatsappModal)} Kz.${conciergeLine}\n\nID da Plataforma: ${user.uid}\nE-mail: ${user.email || "Não informado"}${orderRef ? `\nEvento: ${activatingEventId || "—"}${orderRef}` : ""}\n\nEstou em contacto para concluir o pagamento do meu plano. Obrigado!`;
 
     const cleanNumber = whatsappNumber.replace(/\D/g, "");
     const url = `https://wa.me/${cleanNumber}?text=${encodeURIComponent(messageText)}`;
-    const planPrice = PLANS[whatsappModal.planId as keyof typeof PLANS]?.price ?? 0;
+    const planPrice = (PLANS[whatsappModal.planId as keyof typeof PLANS]?.price ?? 0) + (whatsappModal.concierge ? ADDONS.concierge.price : 0);
     const capiUser = user?.email ? { user_data: { email: user.email } } : {};
     trackPixelInitiateCheckout(
       {
@@ -308,14 +304,18 @@ export const PlansPage: React.FC = () => {
     }
   };
 
-  // Plano real da conta (sem máscara) — 'free' quando a carregar/ainda sem perfil
-  const currentPlanId = normalizePlanId(userProfile?.plan);
+  // Plano de referência: no fluxo de ativação (?eventId=) vale o plano DO EVENTO;
+  // fora dele, o plano da CONTA. Sem dados resolvidos = neutro (null), nunca um
+  // plano presumido — antes marcava "Plano atual: Essencial" ainda a carregar.
+  const currentPlanId = activatingEventId
+    ? (activatingEventPlan ? normalizePlanId(activatingEventPlan) : null)
+    : (userProfile ? normalizePlanId(userProfile.plan) : null);
 
   return (
     <div className="min-h-screen bg-[#FDFBF7] font-display text-slate-900 relative overflow-x-hidden flex flex-col">
       <SEO
         title="Planos e Preços de Convites Digitais | InoEvents"
-        description="Escolha o plano perfeito para o seu momento. Do Essencial ao Luxo Corporativo, encontre as ferramentas ideais para casamentos, chás de panela ou aniversários com RSVP."
+        description="Escolha o plano perfeito para o seu momento. Do Premium ao Luxo Corporativo, encontre as ferramentas ideais para casamentos, chás de panela ou aniversários com RSVP."
       />
       <Navbar />
 
@@ -380,20 +380,18 @@ export const PlansPage: React.FC = () => {
           variants={containerVariants}
           initial="hidden"
           animate="visible"
-          className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-4 items-stretch justify-center gap-6 max-w-6xl mx-auto"
+          className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 items-stretch justify-center gap-6 max-w-6xl mx-auto"
         >
           {plans.map((plan) => {
             const isCurrentPlan = currentPlanId === normalizePlanId(plan.name) || ((plan as any).id && currentPlanId === normalizePlanId((plan as any).id));
             const isHighlighted = !!plan.popular;
             const ctaLabel = isCurrentPlan
               ? "Plano atual"
-              : plan.id === "essential"
-                ? "Escolher Essencial"
-                : plan.id === "premium"
-                  ? "Criar Convite Premium"
-                  : plan.id === "vip"
-                    ? "Escolher VIP"
-                    : "Falar sobre o Business";
+              : plan.id === "premium"
+                ? "Criar Convite Premium"
+                : plan.id === "vip"
+                  ? "Escolher VIP"
+                  : "Falar sobre o Business";
 
             return (
               <motion.div
@@ -427,13 +425,11 @@ export const PlansPage: React.FC = () => {
                     )}
                   </h2>
                   <p className={`text-[13px] font-light leading-relaxed mb-6 ${isHighlighted ? "text-blue-200/70" : "text-slate-500"}`}>
-                    {plan.id === "essential"
-                      ? "Para festas íntimas, sem complicações."
-                      : plan.id === "premium"
-                        ? "O grande dia, sem limites nem marca."
-                        : plan.id === "vip"
-                          ? "Receção com check-in e endereço próprio."
-                          : "Para agências e cerimonialistas, todos os meses."}
+                    {plan.id === "premium"
+                      ? "O grande dia, em grande e inesquecível."
+                      : plan.id === "vip"
+                        ? "Receção com check-in e endereço próprio."
+                        : "Para agências e cerimonialistas, todos os meses."}
                   </p>
 
                   <div className="mb-2 flex items-baseline gap-1">
@@ -442,7 +438,7 @@ export const PlansPage: React.FC = () => {
                       style={{ fontVariantNumeric: 'tabular-nums' }}
                     >
                       <span className={isHighlighted ? "text-white" : "text-slate-900"}>
-                        {plan.prices.monthly}
+                        {plan.prices.price}
                       </span>
                     </span>
                     {plan.id === "business" && (
@@ -556,9 +552,7 @@ export const PlansPage: React.FC = () => {
                       Faturação
                     </span>
                     <span className="text-xs font-bold text-slate-800">
-                      {whatsappModal.billingCycle === "annual"
-                        ? "Anual"
-                        : "Mensal"}
+                      Mensal
                     </span>
                   </div>
                 )}
@@ -567,9 +561,21 @@ export const PlansPage: React.FC = () => {
                     Valor
                   </span>
                   <span className="text-xs font-bold text-slate-900">
-                    {whatsappModal.price} Kz
+                    {modalTotal(whatsappModal)} Kz
                   </span>
                 </div>
+                <label className="flex items-center justify-between gap-3 pt-1 cursor-pointer">
+                  <span className="text-xs text-slate-600">
+                    <span className="font-bold text-slate-800">Concierge</span>
+                    <span className="text-slate-400"> — a equipa cria o convite (+{ADDONS.concierge.price.toLocaleString('pt-AO')} Kz)</span>
+                  </span>
+                  <input
+                    type="checkbox"
+                    checked={!!whatsappModal.concierge}
+                    onChange={(e) => setWhatsappModal({ ...whatsappModal, concierge: e.target.checked })}
+                    className="w-5 h-5 accent-[#1B365D] cursor-pointer shrink-0"
+                  />
+                </label>
                 <div className="flex justify-between items-center gap-3 pt-0.5">
                   <div className="min-w-0 flex-1">
                     <span className="text-[9px] text-slate-400 uppercase tracking-wider block">

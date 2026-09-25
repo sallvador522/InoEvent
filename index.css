@@ -74,3 +74,36 @@ img {
     100% { opacity: 1; transform: translateY(0); }
   }
 }
+
+/* Landing hero — loops infinitos em CSS (GPU, sem custo de JS por frame).
+ * Espelham os antigos motion.div do framer-motion: mesmas direções e durações,
+ * mas compostos pelo compositor em vez de rAF em JS. Pausam fora da viewport
+ * via `animation-play-state` quando o browser economiza energia. */
+@keyframes ino-marquee-down {
+  from { transform: translate3d(0, 0, 0); }
+  to { transform: translate3d(0, -50%, 0); }
+}
+@keyframes ino-marquee-up {
+  from { transform: translate3d(0, -50%, 0); }
+  to { transform: translate3d(0, 0, 0); }
+}
+@keyframes ino-float-soft {
+  0%, 100% { transform: translate3d(0, 0, 0); }
+  50% { transform: translate3d(0, -10px, 0); }
+}
+@keyframes ino-float-soft-alt {
+  0%, 100% { transform: translate3d(0, 0, 0); }
+  50% { transform: translate3d(0, 8px, 0); }
+}
+.ino-marquee-down {
+  animation: ino-marquee-down 18s linear infinite;
+}
+.ino-marquee-up {
+  animation: ino-marquee-up 22s linear infinite;
+}
+.ino-float-soft {
+  animation: ino-float-soft 6s ease-in-out infinite;
+}
+.ino-float-soft-alt {
+  animation: ino-float-soft-alt 5s ease-in-out 1s infinite;
+}

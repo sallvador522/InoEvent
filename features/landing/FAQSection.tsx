@@ -14,7 +14,7 @@ interface FAQItem {
 const FAQ_ITEMS: FAQItem[] = [
   {
     q: "Como criar convites digitais online?",
-    a: "Criar convites digitais na InoEvents é simples e rápido. Basta criar a sua conta, escolher o plano ideal (Essencial, Premium, VIP ou Business) e selecionar um template do nosso catálogo. Depois, preencha os dados do evento (data, local, etc) e ative ferramentas como confirmação de presença (RSVP) e lista de presentes. Por fim, publique e partilhe o link exclusivo com os seus convidados via WhatsApp — eles abrem o link e confirmam na página.",
+    a: "Criar convites digitais na InoEvents é simples e rápido. Basta criar a sua conta, escolher o plano ideal (Premium, VIP ou Business) e selecionar um template do nosso catálogo. Depois, preencha os dados do evento (data, local, etc) e ative ferramentas como confirmação de presença (RSVP) e lista de presentes. Por fim, publique e partilhe o link exclusivo com os seus convidados via WhatsApp — eles abrem o link e confirmam na página.",
     category: "features",
     icon: Sparkles
   },
@@ -56,7 +56,7 @@ const FAQ_ITEMS: FAQItem[] = [
   },
   {
     q: "Dá para ocultar a marca d'água InoEvents e usar marca própria?",
-    a: "Sim. No plano Premium remove a marca d'água da InoEvents dos convites. No plano Business (para agências e cerimonialistas), vai além: coloca a sua própria marca no rodapé dos convites dos seus clientes (white-label).",
+    a: "A remoção da marca InoEvents e o uso de marca própria (white-label) é exclusiva do plano Business, para agências e cerimonialistas: coloca a sua própria marca no rodapé dos convites dos seus clientes.",
     category: "features",
     icon: Eye
   },
@@ -68,7 +68,7 @@ const FAQ_ITEMS: FAQItem[] = [
   },
   {
     q: "Quanto custa criar um convite digital em Angola?",
-    a: `Na InoEvents, o Essencial custa ${PLANS.essential.price.toLocaleString('pt-AO')} Kz, o Premium ${PLANS.premium.price.toLocaleString('pt-AO')} Kz e o VIP ${PLANS.vip.price.toLocaleString('pt-AO')} Kz — sempre pagamento único por evento, sem mensalidade. Para agências e cerimonialistas, o plano Business custa ${PLANS.business.price.toLocaleString('pt-AO')} Kz por mês com eventos ilimitados.`,
+    a: `Na InoEvents, o Premium custa ${PLANS.premium.price.toLocaleString('pt-AO')} Kz (até ${PLANS.premium.guestLimit} convidados) e o VIP ${PLANS.vip.price.toLocaleString('pt-AO')} Kz (até ${PLANS.vip.guestLimit} convidados) — sempre pagamento único por evento, sem mensalidade. Para agências e cerimonialistas, o plano Business custa ${PLANS.business.price.toLocaleString('pt-AO')} Kz por mês com eventos ilimitados.`,
     category: "features",
     icon: Heart
   },

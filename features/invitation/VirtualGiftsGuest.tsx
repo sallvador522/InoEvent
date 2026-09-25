@@ -3,6 +3,7 @@ import { motion, AnimatePresence } from 'framer-motion';
 import { Gift, X, Copy } from 'lucide-react';
 import { toast } from 'react-hot-toast';
 import { copyToClipboard } from '../../lib/clipboard';
+import { canonicalIban, formatIbanGroups } from '../../lib/iban';
 
 interface GiftItem {
   id: string;
@@ -10,6 +11,9 @@ interface GiftItem {
   price: number;
   emoji: string;
   description?: string;
+  value?: string;
+  bankName?: string;
+  accountName?: string;
 }
 
 export const VirtualGiftsGuest: React.FC<{ event: any; guestId?: string | null }> = ({ event }) => {
@@ -47,6 +51,9 @@ export const VirtualGiftsGuest: React.FC<{ event: any; guestId?: string | null }
                     >
                         <div className="text-4xl mb-3 transform group-hover:scale-110 transition-transform">{gift.emoji || "🎁"}</div>
                         <h3 className="font-bold text-slate-800 text-sm leading-tight mb-2 line-clamp-2">{gift.title}</h3>
+                        {gift.description ? (
+                          <p className="text-xs text-slate-500 italic leading-snug mb-2 line-clamp-2">“{gift.description}”</p>
+                        ) : null}
                         <div className="text-brand-blue font-black text-sm bg-blue-50 py-1.5 px-3 rounded-lg mt-auto">{Number(gift.price || 0).toLocaleString('pt-AO')} Kz</div>
                     </div>
                 ))}
@@ -71,6 +78,27 @@ export const VirtualGiftsGuest: React.FC<{ event: any; guestId?: string | null }
                                 <div className="bg-blue-50 text-blue-800 p-4 rounded-xl text-center font-bold text-lg border border-blue-100">
                                     {Number(selectedGift.price || 0).toLocaleString('pt-AO')} Kz
                                 </div>
+                                {selectedGift.description ? (
+                                  <p className="text-sm text-slate-600 italic leading-relaxed text-center">
+                                    “{selectedGift.description}”
+                                  </p>
+                                ) : null}
+                                {selectedGift.value ? (
+                                  <div className="bg-slate-50 border border-slate-200 rounded-xl p-4">
+                                    <p className="text-[10px] uppercase font-bold tracking-widest text-slate-400 mb-1 text-center">
+                                      {(selectedGift as any).bankName || 'Transferência'} {(selectedGift as any).accountName ? `· ${(selectedGift as any).accountName}` : ''}
+                                    </p>
+                                    <p className="font-mono text-sm font-bold text-slate-800 text-center break-all select-all">
+                                      {formatIbanGroups(selectedGift.value)}
+                                    </p>
+                                    <button
+                                      onClick={() => handleCopy(canonicalIban(selectedGift.value) || selectedGift.value || '')}
+                                      className="mx-auto mt-2 flex items-center gap-1.5 text-xs font-bold text-brand-blue hover:text-blue-700 cursor-pointer"
+                                    >
+                                      <Copy size={14} /> Copiar IBAN
+                                    </button>
+                                  </div>
+                                ) : null}
                                 <div className="bg-slate-50 border border-slate-200 rounded-xl p-4 mb-2">
                                   <p className="text-sm text-slate-600 font-medium leading-relaxed text-center">
                                     ℹ️ Para oferecer este presente, por favor, entre em contacto direto com os organizadores do evento.

@@ -5,7 +5,7 @@ import { doc, setDoc, collection, query, where, getDocs } from 'firebase/firesto
 import { useFirebase, db } from '../../components/FirebaseProvider';
 import { Navbar } from '../../components/Navbar';
 import { SEO } from '../../components/SEO';
-import { normalizePlanId, getEventCreationLimit, getValidityDays, isBusinessPlan } from '../../config/plans';
+import { normalizePlanId, getEventCreationLimit, isBusinessPlan } from '../../config/plans';
 import { uploadEventAudio, deleteEventAudio, isOwnStorageAudio, formatAudioSize, MAX_AUDIO_BYTES } from '../../lib/audioUpload';
 import { ArrowLeft, ArrowRight, Check, Plus, Trash2, Gift } from 'lucide-react';
 import toast from 'react-hot-toast';
@@ -15,6 +15,9 @@ import type { TimelineItem } from '../../types';
 import { layoutSupports, hiddenSectionsFor, SECTION_LABELS } from './lib/layoutSchemas';
 import { IMAGE_ACCEPT, validateImageFile } from '../../lib/imageValidation';
 import { migrateCoverToStorage } from '../../lib/imageStorage';
+import { createEventViaApi } from '../../lib/eventApi';
+import { IBAN_PREFIX, IBAN_BODY_LENGTH, canonicalIban, isValidAngolaIban, ibanError, splitIban } from '../../lib/iban';
+import { useCooldown } from '../../lib/useCooldown';
 
 // Todos os temas livres para escolher — o pagamento acontece na ativação (planos)
 const WEDDING_LAYOUTS = [
@@ -43,6 +46,7 @@ interface GiftItem {
   title: string;
   price: string;
   emoji: string;
+  description: string;
 }
 
 const STEP_DEFS = [
@@ -131,7 +135,7 @@ export const WeddingQuestionnaire: React.FC = () => {
   const musicRef = useRef<HTMLInputElement>(null);
   const [dressCode, setDressCode] = useState('');
   const [gifts, setGifts] = useState<GiftItem[]>([]);
-  const [newGift, setNewGift] = useState({ title: '', price: '', emoji: '🎁' });
+  const [newGift, setNewGift] = useState({ title: '', price: '', emoji: '🎁', description: '' });
   const [bankName, setBankName] = useState('BAI');
   const [iban, setIban] = useState('');
   const [accountName, setAccountName] = useState('');
@@ -172,7 +176,9 @@ export const WeddingQuestionnaire: React.FC = () => {
     }
   }, [brideName, groomName, titleTouched]);
 
-  const saveDraft = async (extra: Record<string, any> = {}) => {
+  // Guarda rascunho ou publica. Criação nova vai via servidor (impõe limite §7);
+  // `draft:false` (publicação) conta no limite, rascunho não. Edição segue direta.
+  const saveDraft = async (extra: Record<string, any> = {}, opts: { draft?: boolean } = {}) => {
     if (!user) {
       toast.error('Entre na sua conta para continuar.');
       navigate('/auth');
@@ -189,7 +195,7 @@ export const WeddingQuestionnaire: React.FC = () => {
     setSaving(true);
     try {
       const id = eventId || 'evt_' + Math.random().toString(36).substring(2, 11);
-      const plan = normalizePlanId(userProfile?.plan || 'essential');
+      const plan = normalizePlanId(userProfile?.plan || 'free');
       // isoDate canónico para countdown em todos os temas (date vem do input YYYY-MM-DD)
       let isoDate = '';
       if (date) {
@@ -234,22 +240,24 @@ export const WeddingQuestionnaire: React.FC = () => {
         dressCode: { title: 'Dress Code', description: dressCode },
         timeline: timeline.map((t) => ({ time: t.time, title: t.title, description: t.description || '' })),
         bankName,
-        iban,
+        iban: canonicalIban(iban),
         accountName,
         layoutMode: layout,
         updatedAt: new Date().toISOString(),
         ...extra,
       };
       if (gifts.length > 0) {
+        const cleanIban = canonicalIban(iban);
         payload.gifts = gifts.map((g) => ({
           id: g.id,
           title: g.title,
           price: Number(g.price) || 0,
           emoji: g.emoji,
+          description: g.description || '',
           type: 'IBAN',
           bankName,
           accountName,
-          value: iban,
+          value: cleanIban,
         }));
       }
       // Capa → Firebase Storage (URL pública p/ preview do link; base64 parte o OG e o doc 1MB)
@@ -264,6 +272,23 @@ export const WeddingQuestionnaire: React.FC = () => {
         setHeroImage(cover.url);
         lastCoverRef.current = cover.url;
       }
+      const isNewDoc = !eventId;
+      if (isNewDoc) {
+        try {
+          const createdId = await createEventViaApi(id, payload, opts.draft ?? true);
+          setEventId(createdId);
+          return createdId;
+        } catch (apiErr: any) {
+          if (apiErr?.code === 'EVENT_LIMIT_REACHED') {
+            toast.error(apiErr.message);
+            return null;
+          }
+          // Fallback offline: escrita direta original.
+          await setDoc(doc(db, 'events', id), payload, { merge: true });
+          setEventId(id);
+          return id;
+        }
+      }
       await setDoc(doc(db, 'events', id), payload, { merge: true });
       setEventId(id);
       return id;
@@ -276,7 +301,15 @@ export const WeddingQuestionnaire: React.FC = () => {
     }
   };
 
+  // Trava anti-duplo-pedido: enquanto grava/publica, cliques repetidos são
+  // ignorados (além do disabled visual). Nunca prende: finally sempre destrava.
+  const busyRef = useRef(false);
+  // Cooldown para adds locais síncronos (cota/momento): sem loading async,
+  // o duplo clique duplicava o item.
+  const allowLocalAdd = useCooldown();
+
   const next = async () => {
+    if (busyRef.current || saving) return;
     // Validação por passo (id, não índice — a lista muda com o tema escolhido)
     if (currentStepId === 'couple' && (!brideName.trim() || !groomName.trim())) {
       toast.error('Diga-nos o nome da noiva e do noivo.');
@@ -301,24 +334,40 @@ export const WeddingQuestionnaire: React.FC = () => {
       }
     }
     if (currentStepId === 'gifts') {
-      if (!bankName.trim() || !accountName.trim() || !iban.trim()) {
-        toast.error('Preencha o banco, o titular e o IBAN para os presentes. Pode editar depois no painel.');
+      if (!bankName.trim() || !accountName.trim()) {
+        toast.error('Preencha o banco e o titular da conta. Pode editar depois no painel.');
+        return;
+      }
+      const ibanErr = ibanError(iban);
+      if (ibanErr) {
+        toast.error(`IBAN inválido: ${ibanErr}`);
         return;
       }
     }
-    const id = await saveDraft();
-    if (id) setStep((s) => Math.min(s + 1, visibleSteps.length - 1));
+    busyRef.current = true;
+    const id = await saveDraft().finally(() => { busyRef.current = false; });
+    if (id) {
+      setStep((s) => Math.min(s + 1, visibleSteps.length - 1));
+    } else {
+      toast.error('Não foi possível guardar. Verifique a internet e tente de novo.');
+    }
   };
 
   const publish = async () => {
-    if (!user) return;
+    if (busyRef.current || saving) return;
+    if (!user) {
+      toast.error('Entre na sua conta para publicar.');
+      navigate('/auth');
+      return;
+    }
     if (!brideName.trim() || !groomName.trim() || !date || !locationName.trim()) {
       toast.error('Complete o casal, a data e o local antes de publicar.');
       return;
     }
+    busyRef.current = true;
     setSaving(true);
     try {
-      const plan = normalizePlanId(userProfile?.plan || 'essential');
+      const plan = normalizePlanId(userProfile?.plan || 'free');
       if (!eventId && !isBusinessPlan(plan)) {
         let paidCount = 0;
         try {
@@ -340,37 +389,40 @@ export const WeddingQuestionnaire: React.FC = () => {
           return;
         }
       }
-      const days = getValidityDays(plan);
-      const expiresAt =
-        days === null ? null : new Date(Date.now() + days * 86400000).toISOString();
+      // expiresAt é carimbado pelo SERVIDOR (criação/ativação) — o cliente nunca
+      // envia, para o dono não conseguir estender a validade paga sozinho.
       const id = await saveDraft({
         status: 'active',
         isPublished: false,
         billingStatus: 'pending',
         plan,
         planId: plan,
-        expiresAt,
         publishedAt: new Date().toISOString(),
         createdAt: new Date().toISOString(),
-      });
-      if (!id) return;
+      }, { draft: false });
+      if (!id) {
+        toast.error('Não foi possível publicar. Verifique a internet e tente de novo.');
+        return;
+      }
       toast.success('Convite pronto! Escolhe o plano para partilhar.');
       navigate(`/dashboard/${id}`);
     } finally {
+      busyRef.current = false;
       setSaving(false);
     }
   };
 
   const addGift = () => {
-    if (!newGift.title.trim() || !newGift.price) {
-      toast.error('Dê um nome e um valor ao presente.');
+    if (!allowLocalAdd()) return;
+    if (!newGift.title.trim() || !(Number(newGift.price) > 0)) {
+      toast.error('Dê um nome e um valor maior que zero ao presente.');
       return;
     }
     setGifts((g) => [
       ...g,
       { id: Math.random().toString(36).substring(2, 9), ...newGift },
     ]);
-    setNewGift({ title: '', price: '', emoji: '🎁' });
+    setNewGift({ title: '', price: '', emoji: '🎁', description: '' });
   };
 
   const pickLayout = (layoutId: string) => {
@@ -786,6 +838,7 @@ export const WeddingQuestionnaire: React.FC = () => {
                   <button
                     type="button"
                     onClick={() => {
+                      if (!allowLocalAdd()) return;
                       if (!newTime.trim() || !newTitle.trim()) {
                         toast.error('Diga a hora e o título do momento.');
                         return;
@@ -856,13 +909,32 @@ export const WeddingQuestionnaire: React.FC = () => {
                 </div>
                 <div className="mb-6">
                   <label className={labelCls} htmlFor="wq-iban">IBAN *</label>
-                  <input id="wq-iban" className={`${inputCls} font-mono`} value={iban} onChange={(e) => setIban(e.target.value)} placeholder="AO06…" inputMode="numeric" autoComplete="off" />
+                  <div className="flex items-stretch gap-0">
+                    <span aria-hidden="true" className="inline-flex items-center px-4 rounded-l-xl border border-r-0 border-slate-200 bg-slate-100 text-slate-700 font-mono font-bold text-sm select-none">
+                      {IBAN_PREFIX}
+                    </span>
+                    <input
+                      id="wq-iban"
+                      className={`${inputCls} !rounded-l-none font-mono`}
+                      value={splitIban(iban).body}
+                      onChange={(e) => setIban(IBAN_PREFIX + e.target.value.replace(/\D/g, '').slice(0, IBAN_BODY_LENGTH))}
+                      placeholder="19 dígitos da conta"
+                      inputMode="numeric"
+                      autoComplete="off"
+                      maxLength={IBAN_BODY_LENGTH}
+                    />
+                  </div>
+                  {ibanError(iban) && iban.trim() !== '' && (
+                    <p className="text-xs text-red-500 mt-1.5">{ibanError(iban)}</p>
+                  )}
+                  <p className="text-xs text-slate-400 mt-1.5">Padrão Angola: AO06 + 19 dígitos, sem espaços.</p>
                 </div>
                 <span className={labelCls}>Cotas de presente</span>
-                <div className="flex gap-2 mb-3">
+                <div className="flex flex-col sm:flex-row gap-2 mb-3">
+                  <div className="flex gap-2 flex-1 min-w-0">
                   <select
                     aria-label="Emoji do presente"
-                    className="bg-white border border-slate-200 rounded-xl px-2 text-xl"
+                    className="bg-white border border-slate-200 rounded-xl px-2 text-xl text-slate-900 shrink-0"
                     value={newGift.emoji}
                     onChange={(e) => setNewGift({ ...newGift, emoji: e.target.value })}
                   >
@@ -871,19 +943,26 @@ export const WeddingQuestionnaire: React.FC = () => {
                     ))}
                   </select>
                   <input
-                    className={`${inputCls} flex-1`}
+                    className={`${inputCls} flex-1 min-w-0`}
                     value={newGift.title}
                     onChange={(e) => setNewGift({ ...newGift, title: e.target.value })}
                     placeholder="Ex: Lua de mel"
                     aria-label="Nome do presente"
                   />
+                  </div>
+                  <div className="flex gap-2">
+                  {/* type=text + numeric: type=number esconde dígitos em alguns
+                      browsers/teclados e aperta a caixa no mobile */}
                   <input
-                    type="number"
-                    className={`${inputCls} w-28`}
+                    type="text"
+                    inputMode="numeric"
+                    pattern="[0-9]*"
+                    className={`${inputCls} flex-1 sm:w-28 sm:flex-none min-w-0 text-slate-900`}
                     value={newGift.price}
-                    onChange={(e) => setNewGift({ ...newGift, price: e.target.value })}
+                    onChange={(e) => setNewGift({ ...newGift, price: e.target.value.replace(/[^0-9]/g, '') })}
                     placeholder="Kz"
                     aria-label="Valor em Kwanzas"
+                    autoComplete="off"
                   />
                   <button
                     type="button"
@@ -894,23 +973,37 @@ export const WeddingQuestionnaire: React.FC = () => {
                   >
                     <Plus size={20} />
                   </button>
+                  </div>
                 </div>
+                <input
+                  className={`${inputCls} mb-3`}
+                  value={newGift.description}
+                  onChange={(e) => setNewGift({ ...newGift, description: e.target.value })}
+                  placeholder="Frase da cota (ex: Para a nossa lua de mel no Mussulo)"
+                  aria-label="Descrição do presente"
+                  maxLength={140}
+                />
                 {gifts.length > 0 && (
                   <ul className="flex flex-col gap-2">
                     {gifts.map((g) => (
-                      <li key={g.id} className="flex items-center gap-3 bg-white border border-slate-200 rounded-xl px-4 py-3">
-                        <span className="text-2xl">{g.emoji}</span>
-                        <span className="flex-1 font-bold text-sm text-slate-800">{g.title}</span>
-                        <span className="text-sm text-[#1B365D] font-bold">{Number(g.price).toLocaleString('pt-AO')} Kz</span>
-                        <button
-                          type="button"
-                          onClick={() => setGifts((list) => list.filter((x) => x.id !== g.id))}
-                          aria-label={`Remover ${g.title}`}
-                          className="text-slate-300 hover:text-red-500 cursor-pointer p-1"
-                          style={{ transition: 'color 200ms ease' }}
-                        >
-                          <Trash2 size={16} />
-                        </button>
+                      <li key={g.id} className="bg-white border border-slate-200 rounded-xl px-4 py-3">
+                        <div className="flex items-center gap-3">
+                          <span className="text-2xl">{g.emoji}</span>
+                          <span className="flex-1 font-bold text-sm text-slate-800">{g.title}</span>
+                          <span className="text-sm text-[#1B365D] font-bold">{Number(g.price).toLocaleString('pt-AO')} Kz</span>
+                          <button
+                            type="button"
+                            onClick={() => setGifts((list) => list.filter((x) => x.id !== g.id))}
+                            aria-label={`Remover ${g.title}`}
+                            className="text-slate-300 hover:text-red-500 cursor-pointer p-1"
+                            style={{ transition: 'color 200ms ease' }}
+                          >
+                            <Trash2 size={16} />
+                          </button>
+                        </div>
+                        {g.description ? (
+                          <p className="text-xs text-slate-500 italic mt-1 ml-11">“{g.description}”</p>
+                        ) : null}
                       </li>
                     ))}
                   </ul>
@@ -1033,7 +1126,7 @@ export const WeddingQuestionnaire: React.FC = () => {
               {saving ? (
                 <>
                   <span className="w-4 h-4 border-2 border-[#1B365D]/30 border-t-[#1B365D] rounded-full animate-spin" aria-hidden="true" />
-                  A publicar…
+                  Aguarde…
                 </>
               ) : (
                 <>Publicar convite <Check size={16} /></>

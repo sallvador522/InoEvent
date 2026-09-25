@@ -18,6 +18,9 @@ declare global {
   interface Window {
     fbq?: (...args: any[]) => void;
     _fbq?: any;
+    /** Injeta o fbevents.js — definido pelo stub em index.html, só corre após consentimento. */
+    __inoLoadFbPixel?: () => void;
+    __inoFbPixelLoaded?: boolean;
   }
 }
 
@@ -39,10 +42,33 @@ export function setPixelConsent(value: 'accepted' | 'declined'): void {
 
 let initialized = false;
 
+/** Injeta o fbevents.js uma única vez (via loader do index.html, com fallback inline). */
+function ensureFbScript(): void {
+  if (typeof window === 'undefined') return;
+  try {
+    if (typeof window.__inoLoadFbPixel === 'function') {
+      window.__inoLoadFbPixel();
+      return;
+    }
+    if (window.__inoFbPixelLoaded) return;
+    window.__inoFbPixelLoaded = true;
+    const t = document.createElement('script');
+    t.async = true;
+    t.src = 'https://connect.facebook.net/en_US/fbevents.js';
+    const s = document.getElementsByTagName('script')[0];
+    if (s?.parentNode) s.parentNode.insertBefore(t, s);
+    else document.head.appendChild(t);
+  } catch {
+    /* pixel bloqueado — tracking segue no-op */
+  }
+}
+
 export function initPixel(): void {
   if (initialized) return;
   if (!hasPixelConsent()) return;
   if (typeof window === 'undefined' || typeof window.fbq !== 'function') return;
+  // O stub enfileira o init até o fbevents.js carregar — nunca bloqueia a UX.
+  ensureFbScript();
   try {
     const initArgs: any[] = ['init', META_PIXEL_ID];
     // Test Event Code só em dev — nunca quebrar prod se ausente

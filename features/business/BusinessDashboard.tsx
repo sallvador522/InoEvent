@@ -19,8 +19,6 @@ export const BusinessDashboard: React.FC = () => {
     const [stats, setStats] = useState({ totalGuests: 0, checkedIn: 0, paperSaved: 0 });
     const [chartData, setChartData] = useState<any[]>([]);
     const [loading, setLoading] = useState(true);
-    const [isSimulateModalOpen, setIsSimulateModalOpen] = useState(false);
-    const [isSimulating, setIsSimulating] = useState(false);
     const navigate = useNavigate();
 
     useEffect(() => {
@@ -75,7 +73,7 @@ export const BusinessDashboard: React.FC = () => {
                 setStats({
                     totalGuests: totalGuestsCount,
                     checkedIn: checkedInCount,
-                    paperSaved: totalGuestsCount * 3.5 // Simulating R$ 3.50 saved per physical invite
+                    paperSaved: totalGuestsCount * 150 // Estimativa: 150 Kz poupados por convite físico evitado
                 });
 
 
@@ -169,8 +167,8 @@ export const BusinessDashboard: React.FC = () => {
                                 <Users className="w-6 h-6" />
                             </div>
                         </div>
-                        <h3 className="text-xl font-bold text-slate-800 mb-1">{events.length}</h3>
-                        <p className="text-slate-500 text-sm mb-6 line-clamp-2">Clientes Ativos</p>
+                        <h3 className="text-xl font-bold text-slate-800 mb-1">{stats.checkedIn}</h3>
+                        <p className="text-slate-500 text-sm mb-6 line-clamp-2">Check-ins Realizados</p>
                     </div>
                     
                     <div className="bg-white border border-slate-200 rounded-3xl p-8 shadow-sm relative group hover:border-brand-blue/30 transition-colors">
@@ -216,7 +214,7 @@ export const BusinessDashboard: React.FC = () => {
                      <div className="bg-white border border-slate-200 rounded-3xl p-6 shadow-sm relative overflow-hidden flex items-center justify-between group hover:border-emerald-500/30 transition-colors">
                         <div>
                             <p className="text-slate-500 text-xs font-bold uppercase tracking-widest mb-1">Economia Gerada</p>
-                            <h3 className="text-3xl font-black text-slate-800">R$ {(stats?.paperSaved || 0).toLocaleString('pt-BR', { minimumFractionDigits: 2 })}</h3>
+                            <h3 className="text-3xl font-black text-slate-800">{(stats?.paperSaved || 0).toLocaleString('pt-AO', { minimumFractionDigits: 2 })} Kz</h3>
                             <p className="text-sm text-emerald-600 mt-2 font-medium flex items-center gap-1">
                                 <Leaf size={14} /> Papel e logística evitados
                             </p>
@@ -268,7 +266,7 @@ export const BusinessDashboard: React.FC = () => {
                            <Calendar size={24} />
                         </div>
                         <h3 className="text-xl font-bold text-slate-800 mb-2">Nenhum evento criado para seus clientes</h3>
-                        <p className="text-slate-500 max-w-sm mb-6">Utilize seus créditos para criar os primeiros convites em nome da sua empresa (White-label).</p>
+                        <p className="text-slate-500 max-w-sm mb-6">Crie convites em nome da sua empresa (White-label).</p>
                         <Button onClick={() => navigate('/create-invitation')}>
                            Criar Primeiro Evento de Cliente
                         </Button>

@@ -3,7 +3,7 @@ import { Link, useNavigate, useLocation } from 'react-router-dom';
 import { motion, AnimatePresence } from 'framer-motion';
 import toast from 'react-hot-toast';
 import { useFirebase, signOut, auth, db, handleFirestoreError, OperationType } from './FirebaseProvider';
-import { collection, query, where, getDocs, onSnapshot, orderBy, doc, updateDoc, deleteDoc } from 'firebase/firestore';
+import { collection, query, where, onSnapshot, orderBy, limit, doc, updateDoc, deleteDoc } from 'firebase/firestore';
 import { normalizePlanId, getPlanConfig } from '../lib/entitlements';
 
 export const Navbar: React.FC = () => {
@@ -39,9 +39,11 @@ export const Navbar: React.FC = () => {
   }, [mobileMenuOpen]);
   
   const isAdmin = user?.email?.toLowerCase() === 'antoniosalvador522@gmail.com' || user?.email === (import.meta as any).env.VITE_ADMIN_EMAIL;
-  // Plano normalizado (Firestore grava minúsculas) — nome real para exibição
+  // Plano normalizado (Firestore grava minúsculas) — nome real para exibição.
+  // Sem perfil (ainda a carregar ou ficha em falta): null → selo mostra
+  // shimmer em vez de "…" (que parecia plano quebrado).
   const accountPlanId = normalizePlanId(userProfile?.plan);
-  const accountPlanName = userProfile ? getPlanConfig(accountPlanId).name : '…';
+  const accountPlanName = userProfile ? getPlanConfig(accountPlanId).name : null;
   const isBusinessAccount = accountPlanId === 'business';
 
   // Sair leva sempre ao início (sem piscar conteúdo protegido)
@@ -91,7 +93,9 @@ export const Navbar: React.FC = () => {
     }
     try {
       const notificationsRef = collection(db, 'users', user.uid, 'notifications');
-      const q = query(notificationsRef, orderBy('createdAt', 'desc'));
+      // Limitado às 30 mais recentes — o dropdown pagina por scroll e o sino só
+      // precisa da contagem de não-lidas; sem limit descarregava o histórico todo.
+      const q = query(notificationsRef, orderBy('createdAt', 'desc'), limit(30));
       
       const unsubscribeNotifications = onSnapshot(q, (snapshot) => {
         const notifsList = snapshot.docs.map(doc => ({
@@ -167,7 +171,9 @@ export const Navbar: React.FC = () => {
     setIsEventsLoading(true);
     try {
       const eventsRef = collection(db, 'events');
-      const q = query(eventsRef, where("ownerId", "==", user.uid));
+      // Limitado a 20 — o menu só exibe os 3 mais recentes; sem limit cada
+      // login descarregava todos os eventos do utilizador em realtime.
+      const q = query(eventsRef, where("ownerId", "==", user.uid), limit(20));
       
       const unsubscribeEvents = onSnapshot(q, (snapshot: any) => {
         const eventsList = snapshot.docs.map((doc: any) => ({
@@ -212,7 +218,11 @@ export const Navbar: React.FC = () => {
             <div className="flex items-center gap-1.5 ml-1 sm:ml-2">
               <span className="px-2 py-0.5 md:px-2.5 md:py-1 rounded-full text-[10px] md:text-xs font-bold leading-none bg-gradient-to-r from-amber-500/20 to-amber-600/30 text-amber-300 border border-amber-500/20 shadow-sm uppercase tracking-wider flex items-center gap-1 scale-95 md:scale-100">
                 <span className="material-symbols-outlined text-[10px] md:text-[12px] text-amber-400">verified</span>
-                <span>{accountPlanName}</span>
+                {accountPlanName ? (
+                  <span>{accountPlanName}</span>
+                ) : (
+                  <span className="inline-block w-10 h-3 rounded-full bg-amber-200/40 animate-pulse" aria-label="A carregar plano" />
+                )}
               </span>
             </div>
           )}
@@ -646,8 +656,10 @@ export const Navbar: React.FC = () => {
                            {userProfile?.name?.charAt(0).toUpperCase() || user.email?.charAt(0).toUpperCase() || 'U'}
                          </div>
                          <div className="flex flex-col overflow-hidden w-full">
-                           <span className="text-sm font-bold text-brand-blue truncate w-full">{userProfile?.name || user.email}</span>
-                            <span className="text-xs text-slate-500 font-medium whitespace-nowrap">Plano {accountPlanName}</span>
+                            <span className="text-sm font-bold text-brand-blue truncate w-full">{userProfile?.name || user.email}</span>
+                             <span className="text-xs text-slate-500 font-medium whitespace-nowrap">
+                               {accountPlanName ? `Plano ${accountPlanName}` : 'A carregar plano…'}
+                             </span>
                          </div>
                        </div>
                         <button onClick={handleSignOut} className="text-red-500 bg-red-50 w-10 h-10 flex-shrink-0 flex items-center justify-center rounded-xl hover:bg-red-100 transition-colors" title="Sair">

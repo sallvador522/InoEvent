@@ -9,6 +9,21 @@ service cloud.firestore {
     function isValidId(id) { return id is string && id.size() <= 128 && id.matches('^[a-zA-Z0-9_\\-]+$'); }
     function incoming() { return request.resource.data; }
     function existing() { return resource.data; }
+    // Plano carimbado no evento vs plano da conta (ambos em minúsculas).
+    // Tolera apelidos legados ('essencial', 'corporate', 'b2b', 'gratis'...):
+    // a criação nunca deve falhar por capitalização/alias histórico.
+    function planMatches(incomingPlan, storedPlan) {
+      return incomingPlan == 'free' ||
+        incomingPlan == storedPlan ||
+        (incomingPlan == 'essential' && storedPlan == 'essencial') ||
+        (incomingPlan == 'business' && (storedPlan == 'corporate' || storedPlan == 'b2b')) ||
+        (incomingPlan == 'free' && (storedPlan == 'gratis' || storedPlan == 'grátis' || storedPlan == 'gratuito'));
+    }
+    function userPlanLower() {
+      return exists(/databases/$(database)/documents/users/$(request.auth.uid))
+        ? get(/databases/$(database)/documents/users/$(request.auth.uid)).data.get('plan', 'free').lower()
+        : 'free';
+    }
 
     // --- Schema Validators ---
     function isValidUser(data) {
@@ -74,14 +89,21 @@ service cloud.firestore {
       // --- Create ---
       // §7 limites são validados no backend (server/lib/entitlements), não só nas rules.
       // Ativação nasce sempre pendente — publicar/pagar é via servidor (confirmPayment).
+      // Plano carimbado: só 'free' ou o plano da própria conta (planMatches tolera
+      // apelidos legados) — trava plan:business arbitrário (que liberava
+      // convidados ilimitados via leitura do servidor).
       allow create: if isSignedIn() && isValidId(eventId) && isValidEvent(incoming()) && incoming().ownerId == request.auth.uid &&
         incoming().get('billingStatus', 'pending') == 'pending' &&
         incoming().get('isPublished', false) == false &&
-        incoming().get('isBlocked', false) == false;
+        incoming().get('isBlocked', false) == false &&
+        planMatches(incoming().get('plan', 'free').lower(), userPlanLower()) &&
+        planMatches(incoming().get('planId', 'free').lower(), userPlanLower());
       
       // --- Update ---
       // Campos de ativação (isPublished/billingStatus/isBlocked/account*) só via servidor.
-      // expiresAt fica editável (fluxos legítimos de save recalculam) — o RSVP server-side lê do DB.
+      // expiresAt também SÓ via servidor (criação/ativação): o dono que estender a
+      // validade paga sozinho tem o update negado. scheduledBlockDate continua
+      // editável (controlo legítimo do organizador sobre o próprio bloqueio).
       allow update: if isValidId(eventId) && resource != null && (
           (
             isSignedIn() && 
@@ -89,11 +111,13 @@ service cloud.firestore {
             isValidEvent(incoming()) && 
             incoming().ownerId == resource.data.ownerId &&
             incoming().get('plan', 'essential').lower() == resource.data.get('plan', 'essential').lower() &&
+            incoming().get('planId', resource.data.get('planId', 'free')).lower() == resource.data.get('planId', 'free').lower() &&
             incoming().get('isPublished', resource.data.get('isPublished', false)) == resource.data.get('isPublished', false) &&
             incoming().get('billingStatus', resource.data.get('billingStatus', 'pending')) == resource.data.get('billingStatus', 'pending') &&
             incoming().get('isBlocked', resource.data.get('isBlocked', false)) == resource.data.get('isBlocked', false) &&
             incoming().get('accountActive', resource.data.get('accountActive', false)) == resource.data.get('accountActive', false) &&
-            incoming().get('accountExpiresAt', resource.data.get('accountExpiresAt', null)) == resource.data.get('accountExpiresAt', null)
+            incoming().get('accountExpiresAt', resource.data.get('accountExpiresAt', null)) == resource.data.get('accountExpiresAt', null) &&
+            incoming().get('expiresAt', resource.data.get('expiresAt', null)) == resource.data.get('expiresAt', null)
           ) ||
           (
             isSignedIn() && 
@@ -139,11 +163,26 @@ service cloud.firestore {
       }
 
       // --- Guests Subcollection ---
+      // Leitura da LISTA (nomes + telefones): só dono/equipa/admin. Leitura de UM
+      // convidado (pelo QR) continua pública — o convite não pede conta.
+      // Receção e visão do cliente leem via API com o código do evento.
       match /guests/{guestId} {
-        allow read: if true;
+        allow get: if true;
+        allow list: if isSignedIn() && (
+          get(/databases/$(database)/documents/events/$(eventId)).data.ownerId == request.auth.uid ||
+          exists(/databases/$(database)/documents/events/$(eventId)/team/$(request.auth.uid)) ||
+          isAdmin()
+        );
         
-        // Allow public to create guests (needed for direct RSVP from invitation), keeping list restricted to prevent data leak
-        allow create: if true;
+        // Allow public to create guests (needed for direct RSVP from invitation), keeping list restricted to prevent data leak.
+        // Validação de formato: nome obrigatório, status restrito e SEM campos de
+        // privilégio (checkedIn, contas, ativação). Limite de quota e expiração são
+        // impostos no servidor (POST /api/events/:id/rsvp) — caminho oficial.
+        allow create: if true
+          && incoming().get('name', '').size() > 0
+          && incoming().get('status', 'CONFIRMED') in ['CONFIRMED', 'DECLINED', 'PENDING']
+          && incoming().get('checkedIn', false) == false
+          && !(incoming().keys().hasAny(['checkedInAt', 'accountActive', 'accountExpiresAt', 'isBlocked', 'isPublished', 'billingStatus', 'plan', 'planId', 'orderId']));
         
         allow update: if isValidId(guestId) && (
             (isSignedIn() && (get(/databases/$(database)/documents/events/$(eventId)).data.ownerId == request.auth.uid || exists(/databases/$(database)/documents/events/$(eventId)/team/$(request.auth.uid)))) ||
@@ -169,8 +208,9 @@ service cloud.firestore {
     match /subscriptions/{subId} {
       allow get: if isSignedIn() && (resource.data.userId == request.auth.uid || isAdmin());
       allow list: if isSignedIn() && (resource.data.userId == request.auth.uid || isAdmin());
-      allow create: if isSignedIn() && isValidId(subId) && incoming().userId == request.auth.uid;
-      allow update: if isAdmin() || (isSignedIn() && resource.data.userId == request.auth.uid);
+      // Escrita SÓ via servidor (Admin SDK bypassa rules): antes o dono criava ou
+      // editava a própria subscrição (status/validade) e forjava Business ativo.
+      allow create, update, delete: if isAdmin();
     }
 
     match /visits/{visitId} {

@@ -2,9 +2,10 @@ import React, { useState, useEffect, useRef } from 'react';
 import { useParams, Link, useNavigate, useSearchParams } from 'react-router-dom';
 import { Users, CheckCircle2, QrCode, Share2, Download, Clock, Search, MessageSquare, ArrowLeft, MoreHorizontal, Settings, Copy, Check, Edit2, Trash2, Plus, MessageCircle, UploadCloud, Gem, Camera, Bell, BellOff, Volume2, Printer } from 'lucide-react';
 import { motion, AnimatePresence } from 'framer-motion';
+import { Virtuoso } from 'react-virtuoso';
 import { doc, collection, onSnapshot, deleteDoc, updateDoc, setDoc } from 'firebase/firestore';
 import { getStorage, ref, deleteObject } from 'firebase/storage';
-import { db, handleFirestoreError, OperationType, useFirebase } from '../../components/FirebaseProvider';
+import { db, auth, handleFirestoreError, OperationType, useFirebase } from '../../components/FirebaseProvider';
 import { QRScanner } from '../../components/QRScanner';
 import { LineChart, Line, XAxis, YAxis, CartesianGrid, Tooltip as RechartsTooltip, ResponsiveContainer, PieChart, Pie, Cell, BarChart, Bar, AreaChart, Area, Legend } from 'recharts';
 import { playScanSound } from '../../lib/sound';
@@ -64,7 +65,7 @@ export const Dashboard = () => {
     const [isImporting, setIsImporting] = useState(false);
     const [pendingInline, setPendingInline] = useState<string | null>(null);
 
-    const [activeTab, setActiveTab] = useState<'guests' | 'analytics' | 'gifts' | 'messages' | 'team' | 'premium' | 'tables'>('guests');
+    const [activeTab, setActiveTab] = useState<'guests' | 'analytics' | 'gifts' | 'messages' | 'team' | 'tables'>('guests');
 
     const [pushEnabled, setPushEnabled] = useState(() => {
         if (typeof window !== 'undefined') {
@@ -87,7 +88,13 @@ export const Dashboard = () => {
         let cancelled = false;
         const loadOrder = async () => {
             try {
-                const res = await fetch(`/api/events/${id}/order`);
+                // Bearer do dono: a leitura de pedidos exige dono ou admin.
+                const headers: Record<string, string> = {};
+                try {
+                    const t = await auth.currentUser?.getIdToken();
+                    if (t) headers.Authorization = `Bearer ${t}`;
+                } catch { /* segue sem token — mantém banner genérico */ }
+                const res = await fetch(`/api/events/${id}/order`, { headers });
                 if (!res.ok) return;
                 const data = await res.json();
                 if (!cancelled) setEventOrder(data.order || null);
@@ -217,7 +224,27 @@ export const Dashboard = () => {
         const unsubscribeEvent = onSnapshot(eventRef, 
             (docSnap) => {
                 if (docSnap.exists()) {
-                    setEvent({ id: docSnap.id, ...docSnap.data() });
+                    const data = { id: docSnap.id, ...docSnap.data() } as any;
+                    setEvent(data);
+                    // Eventos antigos podem não ter código de partilha: gerar uma
+                    // vez (a receção e a visão do cliente exigem-no desde a Fase 4).
+                    if (!data.clientToken) {
+                        updateDoc(eventRef, {
+                            clientToken: Math.random().toString(36).substring(2, 8).toUpperCase(),
+                        }).catch(() => { /* best-effort */ });
+                    }
+                    // Marca da agência: eventos business antigos podem não ter o
+                    // carimbo — sincroniza uma vez da ficha do dono (best-effort).
+                    if (
+                        normalizePlanId(data.plan ?? data.planId) === 'business' &&
+                        !data.whiteLabelName &&
+                        (userProfile as any)?.whiteLabelName
+                    ) {
+                        updateDoc(eventRef, {
+                            whiteLabelName: (userProfile as any).whiteLabelName,
+                            whiteLabelLogo: (userProfile as any).whiteLabelLogo || null,
+                        }).catch(() => { /* best-effort */ });
+                    }
                 } else {
                     setEvent(null);
                 }
@@ -272,6 +299,9 @@ export const Dashboard = () => {
     const eventPlanId = normalizePlanId((event as any)?.plan ?? (event as any)?.planId);
     const isPaidPlan = eventPlanId === 'premium' || eventPlanId === 'vip' || eventPlanId === 'business';
     const isBusinessPlan = eventPlanId === 'business';
+    // Analytics avançados (filtros de período, acompanhantes, PDF executivo):
+    // VIP/Business. O básico (pizza, curva, visitas) fica no Premium.
+    const hasAdvancedAnalytics = canUseFeature(eventPlanId, 'advanced_analytics');
 
     const isShareLocked =
         !!event &&
@@ -424,9 +454,11 @@ export const Dashboard = () => {
         
         const maxGuests = getGuestLimit(event?.planId || event?.plan);
         
-        const confirmedCount = guests.filter(g => g.status === 'CONFIRMED').length;
-        if (confirmedCount >= maxGuests) {
-            toast.error(`O plano ${event?.plan || 'Essencial'} permite no máximo ${maxGuests} convidados confirmados.`);
+        // Quota = registos exceto recusados (DECLINED liberta o lugar) — mesma
+        // semântica do servidor (POST /api/events/:id/rsvp).
+        const quotaUsed = guests.filter(g => g.status !== 'DECLINED').length;
+        if (quotaUsed >= maxGuests) {
+            toast.error(`O plano ${getPlanConfig(normalizePlanId(event?.plan)).name} permite no máximo ${maxGuests} convidados.`);
             return;
         }
 
@@ -607,26 +639,32 @@ export const Dashboard = () => {
         }
     };
 
-    const confirmedCount = guests.filter(g => g.status === 'CONFIRMED').length;
-    const pendingCount = guests.filter(g => g.status === 'PENDING').length;
-    const declinedCount = guests.filter(g => g.status === 'DECLINED').length;
-    const checkedInCount = guests.filter(g => g.checkedIn).length;
-    const totalCount = guests.length;
+    // Contagens + lista filtrada memoizadas: antes eram 5+ filters O(n) recalculados
+    // a cada render (digitação na busca, hover, qualquer snapshot). Agora só
+    // recalculam quando guests/busca/filtro mudam — e a lista renderiza via
+    // Virtuoso (só ~15 linhas no DOM em vez de N).
+    const { confirmedCount, pendingCount, declinedCount, checkedInCount, totalCount } = React.useMemo(() => ({
+        confirmedCount: guests.filter(g => g.status === 'CONFIRMED').length,
+        pendingCount: guests.filter(g => g.status === 'PENDING').length,
+        declinedCount: guests.filter(g => g.status === 'DECLINED').length,
+        checkedInCount: guests.filter(g => g.checkedIn).length,
+        totalCount: guests.length,
+    }), [guests]);
 
-    const filteredGuests = guests.filter(g => {
-        const matchesSearch = g.name?.toLowerCase().includes(searchQuery.toLowerCase()) || 
-                              g.phone?.toLowerCase().includes(searchQuery.toLowerCase());
-                              
-        if (!matchesSearch) return false;
-        
-        switch (activeFilter) {
-            case 'checkedIn': return g.checkedIn === true;
-            case 'confirmed': return g.status === 'CONFIRMED';
-            case 'pending': return g.status === 'PENDING';
-            case 'declined': return g.status === 'DECLINED';
-            default: return true;
-        }
-    });
+    const filteredGuests = React.useMemo(() => {
+        const q = searchQuery.trim().toLowerCase();
+        return guests.filter(g => {
+            if (q && !(g.name?.toLowerCase().includes(q) || g.phone?.toLowerCase().includes(q))) return false;
+
+            switch (activeFilter) {
+                case 'checkedIn': return g.checkedIn === true;
+                case 'confirmed': return g.status === 'CONFIRMED';
+                case 'pending': return g.status === 'PENDING';
+                case 'declined': return g.status === 'DECLINED';
+                default: return true;
+            }
+        });
+    }, [guests, searchQuery, activeFilter]);
 
     const pieData = [
         { name: 'Confirmados', value: confirmedCount, color: '#10B981' },
@@ -865,7 +903,9 @@ export const Dashboard = () => {
                     </div>
                 </div>
                 <div className="flex items-center gap-2 shrink-0">
-                    {isPaidPlan && (
+                    {/* Suporte VIP: 'priority_support' (VIP/Business). Antes: qualquer
+                        pago via isPaidPlan — o Premium via sem o ter no pacote. */}
+                    {canUseFeature(eventPlanId, 'priority_support') && (
                         <button 
                             onClick={() => setSupportOpen(true)}
                             className="hidden md:flex items-center gap-2 text-sm font-bold text-emerald-600 bg-emerald-50 px-4 py-2 rounded-full hover:bg-emerald-100 transition-colors cursor-pointer border-none"
@@ -1117,7 +1157,7 @@ export const Dashboard = () => {
                 {(() => {
                     const quotaLimit = getGuestLimit(eventPlanId);
                     const quotaLabel = quotaLimit === Infinity ? '∞' : String(quotaLimit);
-                    const planName = getPlanConfig(eventPlanId)?.name || 'Essencial';
+                    const planName = getPlanConfig(eventPlanId).name;
                     const daysLeft = event?.expiresAt
                         ? Math.max(0, Math.ceil((new Date(event.expiresAt).getTime() - Date.now()) / 86400000))
                         : null;
@@ -1155,12 +1195,16 @@ export const Dashboard = () => {
                     >
                         Gestão de Convidados
                     </button>
+                    {/* Analytics: funcionalidade 'basic_analytics' (Premium+).
+                        Antes: aba e PDF executivos abertos até ao Free. */}
+                    {canUseFeature(eventPlanId, 'basic_analytics') && (
                     <button 
                         onClick={() => setActiveTab('analytics')}
                         className={`flex-1 md:flex-none justify-center px-4 md:px-6 py-2.5 rounded-xl lg:rounded-full font-bold text-sm transition-all flex items-center gap-2 ${activeTab === 'analytics' ? 'bg-white shadow-sm text-brand-blue' : 'text-slate-500 hover:text-slate-700'}`}
                     >
                         Analytics
                     </button>
+                    )}
 
                     {isPaidPlan && (
                         <button 
@@ -1185,20 +1229,14 @@ export const Dashboard = () => {
                             <MessageSquare size={16} className={activeTab === 'messages' ? 'text-brand-blue' : 'text-slate-400'} /> Livro de Assinaturas
                         </button>
                     )}
-                    {isPaidPlan && (
+                    {/* Equipa: funcionalidade 'team_management', só Business (config/plans).
+                        Antes: qualquer plano pago via isPaidPlan. */}
+                    {canUseFeature(eventPlanId, 'team_management') && (
                         <button 
                             onClick={() => setActiveTab('team')}
                             className={`flex-1 md:flex-none justify-center px-4 md:px-6 py-2.5 rounded-xl lg:rounded-full font-bold text-sm transition-all flex items-center gap-2 ${activeTab === 'team' ? 'bg-white shadow-sm text-brand-blue' : 'text-slate-500 hover:text-slate-700'}`}
                         >
                             <Users size={16} className={activeTab === 'team' ? 'text-brand-blue' : 'text-slate-400'} /> Equipe
-                        </button>
-                    )}
-                    {isPaidPlan && (
-                        <button 
-                            onClick={() => setActiveTab('premium')}
-                            className={`flex-1 md:flex-none justify-center px-4 md:px-6 py-2.5 rounded-xl lg:rounded-full font-bold text-sm transition-all flex items-center gap-2 ${activeTab === 'premium' ? 'bg-amber-100 shadow-sm text-amber-700' : 'text-amber-500 hover:text-amber-600'}`}
-                        >
-                            <Gem size={16} className={activeTab === 'premium' ? 'text-amber-700' : 'text-amber-500'} /> VIP & Domínio
                         </button>
                     )}
                 </div>
@@ -1235,7 +1273,7 @@ export const Dashboard = () => {
                                                 const guestsCollection = collection(db, "events", id!, "guests");
                                                 const maxGuests = getGuestLimit(event?.planId || event?.plan);
                                                 let added = 0;
-                                                const currentCount = guests.filter(g => g.status === "CONFIRMED").length;
+                                                const currentCount = guests.filter(g => g.status !== "DECLINED").length;
                                                 const maxToAdd = maxGuests - currentCount;
                                                 for (let i = 1; i < rows.length; i++) {
                                                     if (added >= maxToAdd) {
@@ -1280,7 +1318,8 @@ export const Dashboard = () => {
                                 <button onClick={() => setShowExportModal(true)} className="justify-center text-sm font-bold text-brand-blue bg-brand-blue/5 px-4 py-2 rounded-xl hover:bg-brand-blue/10 transition-colors flex items-center gap-2 text-center">
                                     <Download size={16} /> Exportar
                                 </button>
-                                {isPaidPlan && (
+                                {/* Relatório executivo: avançado (VIP/Business). Exportar CSV/Excel acima continua livre. */}
+                                {hasAdvancedAnalytics && (
                                     <button onClick={() => setShowReportModal(true)} className="justify-center text-sm font-bold text-slate-800 bg-slate-100 border border-slate-200 px-4 py-2 rounded-xl hover:bg-slate-200 transition-colors flex items-center gap-2 text-center cursor-pointer">
                                         <Printer size={16} className="text-slate-600" /> Relatório PDF
                                     </button>
@@ -1328,9 +1367,16 @@ export const Dashboard = () => {
                             ) : filteredGuests.length === 0 ? (
                                 <div className="p-12 text-center text-slate-500">Nenhum resultado encontrado para "{searchQuery}"</div>
                             ) : (
-                                <div className="divide-y divide-slate-100 max-h-[600px] overflow-y-auto">
-                                    {filteredGuests.map((guest) => (
-                                        <div 
+                                <Virtuoso
+                                    style={{ height: 600, maxHeight: '70dvh' }}
+                                    totalCount={filteredGuests.length}
+                                    fixedItemHeight={88}
+                                    overscan={176}
+                                    itemContent={(index) => {
+                                        const guest = filteredGuests[index];
+                                        if (!guest) return null;
+                                        return (
+                                        <div
                                             key={guest.id}
                                             onClick={() => {
                                                 setSelectedGuest(guest);
@@ -1376,14 +1422,15 @@ export const Dashboard = () => {
                                                 </button>
                                             </div>
                                         </div>
-                                    ))}
-                                </div>
+                                        );
+                                    }}
+                                />
                             )}
                         </div>
                     </div>
                     )}
                     
-                    {activeTab === 'analytics' && (
+                    {activeTab === 'analytics' && canUseFeature(eventPlanId, 'basic_analytics') && (
                         <div className="lg:col-span-2 flex flex-col gap-6 min-w-0">
                             {/* Analytics Header & Description */}
                             <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
@@ -1391,16 +1438,27 @@ export const Dashboard = () => {
                                     <h3 className="text-2xl font-serif text-slate-800 mb-1">Estatísticas & Analytics</h3>
                                     <p className="text-slate-500 text-sm">Monitore gráficos de presença, check-ins e respostas com filtros interativos em tempo real.</p>
                                 </div>
+                                {hasAdvancedAnalytics ? (
                                 <button 
                                     onClick={() => setShowReportModal(true)}
                                     className="px-4 py-2.5 bg-slate-900 border border-slate-900 hover:bg-slate-800 text-white font-bold rounded-xl text-xs flex items-center justify-center gap-1.5 shadow-md shadow-slate-900/10 cursor-pointer self-start sm:self-auto"
                                 >
                                     <Printer size={14} /> Relatório Executivo PDF
                                 </button>
+                                ) : (
+                                <button
+                                    onClick={() => navigate(`/plans${id ? `?eventId=${id}` : ''}`)}
+                                    className="px-4 py-2.5 bg-amber-100 border border-amber-200 hover:bg-amber-200 text-amber-800 font-bold rounded-xl text-xs flex items-center justify-center gap-1.5 shadow-sm cursor-pointer self-start sm:self-auto"
+                                    title="Relatório executivo disponível no VIP"
+                                >
+                                    <Printer size={14} /> PDF Executivo no VIP
+                                </button>
+                                )}
                             </div>
 
                             {/* Reactive Filters Block */}
                             <div className="bg-slate-50 border border-slate-200/60 p-5 rounded-3xl flex flex-col md:flex-row gap-4 items-center justify-between">
+                                {hasAdvancedAnalytics ? (
                                 <div className="w-full md:w-auto">
                                     <span className="text-xs font-bold uppercase tracking-wider text-slate-400 block mb-2">Filtrar por Período de RSVP</span>
                                     <div className="flex gap-1 bg-slate-200/60 p-1 rounded-xl w-fit">
@@ -1430,6 +1488,18 @@ export const Dashboard = () => {
                                         </button>
                                     </div>
                                 </div>
+                                ) : (
+                                <div className="w-full md:w-auto">
+                                    <span className="text-xs font-bold uppercase tracking-wider text-slate-400 block mb-2">Período</span>
+                                    <button
+                                        onClick={() => navigate(`/plans${id ? `?eventId=${id}` : ''}`)}
+                                        className="px-4 py-2 rounded-xl text-xs font-bold bg-amber-100 border border-amber-200 text-amber-800 hover:bg-amber-200 transition-colors"
+                                        title="Filtros de período disponíveis no VIP"
+                                    >
+                                        Sempre · Filtros no VIP
+                                    </button>
+                                </div>
+                                )}
                                 <div className="w-full md:w-auto">
                                     <span className="text-xs font-bold uppercase tracking-wider text-slate-400 block mb-2">Filtrar Categoria</span>
                                     <div className="flex gap-1 bg-slate-200/60 p-1 rounded-xl w-fit">
@@ -1585,7 +1655,8 @@ export const Dashboard = () => {
                                     </div>
                                 </div>
 
-                                {/* Companions Distribution Bar Chart */}
+                                {/* Companions Distribution Bar Chart — avançado (VIP/Business) */}
+                                {hasAdvancedAnalytics ? (
                                 <div className="bg-white p-6 rounded-3xl border border-slate-100 shadow-sm flex flex-col justify-between">
                                     <div>
                                         <h4 className="font-bold text-slate-700 mb-2">Estrutura de Acompanhantes</h4>
@@ -1612,6 +1683,20 @@ export const Dashboard = () => {
                                         )}
                                     </div>
                                 </div>
+                                ) : (
+                                <div className="bg-amber-50 p-6 rounded-3xl border border-amber-200 shadow-sm flex flex-col justify-between">
+                                    <div>
+                                        <h4 className="font-bold text-amber-800 mb-2">Estrutura de Acompanhantes</h4>
+                                        <p className="text-xs text-amber-700 mb-6 font-medium">Análise de +1 e +2 disponível no plano VIP.</p>
+                                    </div>
+                                    <button
+                                        onClick={() => navigate(`/plans${id ? `?eventId=${id}` : ''}`)}
+                                        className="px-4 py-2.5 bg-amber-500 hover:bg-amber-600 text-white font-bold rounded-xl text-xs transition-colors cursor-pointer"
+                                    >
+                                        Desbloquear no VIP
+                                    </button>
+                                </div>
+                                )}
 
                                 {/* Access Tracking Area Chart */}
                                 <div className="bg-white p-6 rounded-3xl border border-slate-100 shadow-sm flex flex-col justify-between">
@@ -1674,48 +1759,6 @@ export const Dashboard = () => {
                         </div>
                     )}
 
-
-                    {activeTab === 'premium' && (
-                        <div className="lg:col-span-2 flex flex-col gap-6 min-w-0">
-                            <div>
-                                <h3 className="text-2xl font-serif text-slate-800 mb-1">Central VIP & Exclusividades</h3>
-                                <p className="text-slate-500 text-sm">Gerencie o seu domínio personalizado para ter um link exclusivo.</p>
-                            </div>
-                            
-                            {/* Custom Domain Feature */}
-                            <div className="bg-white border border-slate-100 p-6 md:p-8 rounded-3xl shadow-sm relative overflow-hidden">
-                                <div className="absolute top-0 right-0 w-32 h-32 bg-amber-50 rounded-full blur-3xl -mr-10 -mt-10 pointer-events-none"></div>
-                                <div className="flex items-start gap-4 mb-6">
-                                    <div className="w-12 h-12 rounded-2xl bg-amber-100 text-amber-600 flex items-center justify-center shrink-0">
-                                        <span className="material-symbols-outlined text-2xl">language</span>
-                                    </div>
-                                    <div>
-                                        <h4 className="text-lg font-bold text-slate-800">Domínio Personalizado (.com / .co.ao)</h4>
-                                        <p className="text-slate-500 text-sm mt-1">Gere um link exclusivo e requintado (ex: o-nosso-casamento.com) para o seu convite.</p>
-                                    </div>
-                                </div>
-                                
-                                <div className="flex flex-col sm:flex-row gap-4 items-end mb-4">
-                                    <div className="flex-1 w-full">
-                                        <label className="text-xs font-bold text-slate-400 uppercase tracking-wider mb-2 block">Seu domínio ideal</label>
-                                        <div className="relative">
-                                            <span className="absolute left-4 top-1/2 -translate-y-1/2 text-slate-400 font-medium text-sm">www.</span>
-                                            <input type="text" placeholder="mariana-e-joao.com" className="w-full bg-slate-50 border border-slate-200 text-slate-800 px-4 py-3 pl-14 rounded-xl focus:outline-none focus:border-amber-400 font-medium" />
-                                        </div>
-                                    </div>
-                                    <button onClick={() => toast.success('Pedido de domínio enviado! Nossa equipa vai verificar a disponibilidade e configurá-lo em até 24h.')} className="px-8 py-3 bg-slate-900 hover:bg-slate-800 text-white text-sm font-bold rounded-xl transition-all shadow-md w-full sm:w-auto h-[46px] whitespace-nowrap">
-                                        Solicitar Domínio
-                                    </button>
-                                </div>
-                                <p className="text-xs text-slate-400 leading-relaxed">
-                                    A configuração do domínio pode levar até 24h úteis. O domínio será válido por 1 ano. Está incluído no seu plano Premium, sem custos adicionais.
-                                </p>
-                            </div>
-                            
-                            
-                        </div>
-                    )}
-
                     {activeTab === 'team' && (
                         <div className="lg:col-span-2 flex flex-col gap-6 min-w-0">
                             <TeamManager event={event} />
@@ -1724,7 +1767,9 @@ export const Dashboard = () => {
 
                     {/* Sidebar Actions */}
                     <div className="flex flex-col gap-6 min-w-0">
-                        {event?.type !== 'BRIDAL_SHOWER' && isPaidPlan ? (
+                        {/* Check-in: funcionalidade 'checkin' (VIP/Business). Antes: qualquer
+                            pago via isPaidPlan — o Premium validava QR sem o ter no pacote. */}
+                        {event?.type !== 'BRIDAL_SHOWER' && canUseFeature(eventPlanId, 'checkin') ? (
                          <div className="bg-brand-blue text-white rounded-3xl p-8 relative overflow-hidden shadow-xl shadow-brand-blue/20">
                             <div className="absolute top-0 right-0 w-64 h-64 bg-white/5 rounded-full blur-3xl -mr-10 -mt-10 pointer-events-none"></div>
                             <h3 className="text-xl font-bold mb-2">Check-in Digital</h3>
@@ -1732,7 +1777,7 @@ export const Dashboard = () => {
                             <button onClick={() => setShowScanner(true)} className="w-full bg-white text-brand-blue py-3 rounded-xl font-bold flex items-center justify-center gap-2 hover:bg-blue-50 transition-colors shadow-lg mb-3">
                                 <QrCode size={18} /> Validar QRCode
                             </button>
-                            {isBusinessPlan && (
+                            {canUseFeature(eventPlanId, 'checkin') && (
                                 <button 
                                     onClick={async () => {
                                         if (isGenLink) return;
@@ -1766,9 +1811,9 @@ export const Dashboard = () => {
                          </div>
                         ) : (
                          <div className="bg-gradient-to-br from-slate-800 to-slate-900 text-white rounded-3xl p-8 relative overflow-hidden shadow-xl shadow-slate-900/20 text-center">
-                            <h3 className="text-xl font-bold mb-2 text-[#BF9B30]">Upgrade para Premium</h3>
+                            <h3 className="text-xl font-bold mb-2 text-[#BF9B30]">Upgrade para VIP</h3>
                             <p className="text-slate-300 text-sm mb-6">Desbloqueie o Check-in Digital na portaria e a validação rápida de QR Codes.</p>
-                            <Link to="/plans" className="w-full bg-[#BF9B30] text-slate-900 py-3 rounded-xl font-bold flex items-center justify-center gap-2 hover:brightness-110 transition-colors shadow-lg">
+                            <Link to={`/plans${id ? `?eventId=${id}` : ''}`} className="w-full bg-[#BF9B30] text-slate-900 py-3 rounded-xl font-bold flex items-center justify-center gap-2 hover:brightness-110 transition-colors shadow-lg">
                                 Mudar Plano
                             </Link>
                          </div>
@@ -1816,7 +1861,8 @@ export const Dashboard = () => {
                                                 }
                                             }}
                                             disabled={pendingInline === 'isBlocked'}
-                                            className={`relative inline-flex h-6 w-11 items-center rounded-full transition-colors disabled:opacity-60 ${event?.isBlocked ? 'bg-red-500' : 'bg-slate-200'}`}
+                                            aria-busy={pendingInline === 'isBlocked'}
+                                            className={`relative inline-flex h-6 w-11 items-center rounded-full transition-colors disabled:opacity-60 disabled:cursor-wait ${pendingInline === 'isBlocked' ? 'animate-pulse' : ''} ${event?.isBlocked ? 'bg-red-500' : 'bg-slate-200'}`}
                                         >
                                             <span className={`inline-block h-4 w-4 transform rounded-full bg-white transition-transform ${event?.isBlocked ? 'translate-x-6' : 'translate-x-1'}`} />
                                         </button>
@@ -1840,7 +1886,7 @@ export const Dashboard = () => {
                                                     setPendingInline(null);
                                                 }
                                             }}
-                                            className="w-full bg-slate-50 border border-slate-200 rounded-lg px-3 py-2 text-slate-700 text-xs focus:outline-none focus:border-brand-blue disabled:opacity-60"
+                                            className="w-full bg-slate-50 border border-slate-200 rounded-lg px-3 py-2 text-slate-700 text-xs focus:outline-none focus:border-brand-blue disabled:opacity-60 disabled:cursor-wait"
                                         />
                                     </div>
 
@@ -1861,7 +1907,7 @@ export const Dashboard = () => {
                                                     setPendingInline(null);
                                                 }
                                             }}
-                                            className="w-full bg-slate-50 border border-slate-200 rounded-lg px-3 py-2 text-slate-700 text-xs focus:outline-none focus:border-brand-blue disabled:opacity-60"
+                                            className="w-full bg-slate-50 border border-slate-200 rounded-lg px-3 py-2 text-slate-700 text-xs focus:outline-none focus:border-brand-blue disabled:opacity-60 disabled:cursor-wait"
                                             disabled={pendingInline === 'blockedTitle'}
                                         />
                                     </div>
@@ -1882,10 +1928,16 @@ export const Dashboard = () => {
                                                     setPendingInline(null);
                                                 }
                                             }}
-                                            className="w-full bg-slate-50 border border-slate-200 rounded-lg px-3 py-2 text-slate-700 text-xs focus:outline-none focus:border-brand-blue resize-none disabled:opacity-60"
+                                            className="w-full bg-slate-50 border border-slate-200 rounded-lg px-3 py-2 text-slate-700 text-xs focus:outline-none focus:border-brand-blue resize-none disabled:opacity-60 disabled:cursor-wait"
                                             disabled={pendingInline === 'blockedMessage'}
                                         />
                                     </div>
+                                    {pendingInline && (
+                                        <p className="text-[11px] text-slate-400 font-medium flex items-center gap-1.5" aria-live="polite">
+                                            <span className="w-3 h-3 border-2 border-slate-300 border-t-slate-500 rounded-full animate-spin" aria-hidden="true" />
+                                            A guardar…
+                                        </p>
+                                    )}
 
                                 </div>
                             </div>
@@ -2274,8 +2326,8 @@ export const Dashboard = () => {
                 onClose={() => setShowReportModal(false)} 
                 event={event} 
                 guests={guests} 
-                agencyName="InoEvents Enterprise" 
-                agencyLogo={null} 
+                agencyName={userProfile?.whiteLabelName || event?.whiteLabelName || "InoEvents Enterprise"} 
+                agencyLogo={userProfile?.whiteLabelLogo || event?.whiteLabelLogo || null} 
             />
 
             <GuestDetailsModal

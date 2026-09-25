@@ -10,6 +10,10 @@ service firebase.storage {
       return isSignedIn() && request.auth.uid == userId;
     }
 
+    function isAdmin() {
+      return isSignedIn() && request.auth.token.email == 'antoniosalvador522@gmail.com';
+    }
+
     function isImage() {
       return request.resource.contentType.matches('image/.*');
     }
@@ -34,12 +38,14 @@ service firebase.storage {
       allow write: if isOwner(userId) && isImage() && isValidImageSize();
     }
 
-    // Regras de segurança robustas para áudio de eventos
-    match /events/{allPaths=**} {
+    // Áudios em events/{uidDoDono}/music-*.mp3 — escrita e apagão SÓ do dono (ou
+    // admin). Antes QUALQUER logado criava/apagava áudio de qualquer evento
+    // (vandalismo + spam de armazenamento). Leitura pública (convite precisa).
+    match /events/{ownerUid}/{fileName} {
       allow read: if true;
-      allow create: if isSignedIn() && isAudio() && isValidAudioSize();
+      allow create: if (isOwner(ownerUid) || isAdmin()) && isAudio() && isValidAudioSize();
       allow update: if false; // Evita sobrescrever áudios existentes
-      allow delete: if isSignedIn();
+      allow delete: if isOwner(ownerUid) || isAdmin();
     }
   }
 }

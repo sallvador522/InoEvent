@@ -27,6 +27,7 @@ const AuthPage = lazy(() => import('./features/auth/AuthPage').then(m => ({ defa
 const ProfileSetup = lazy(() => import('./features/auth/ProfileSetup').then(m => ({ default: m.ProfileSetup })));
 const PlansPage = lazy(() => import('./features/plans/PlansPage').then(m => ({ default: m.PlansPage })));
 const EventCreator = lazy(() => import('./features/invitation/EventCreator').then(m => ({ default: m.EventCreator })));
+const TestePassePage = lazy(() => import('./features/passes/TestePassePage').then(m => ({ default: m.TestePassePage })));
 const WeddingQuestionnaire = lazy(() => import('./features/invitation/WeddingQuestionnaire').then(m => ({ default: m.WeddingQuestionnaire })));
 const AdminDashboard = lazy(() => import('./features/admin/AdminDashboard').then(m => ({ default: m.AdminDashboard })));
 
@@ -87,6 +88,8 @@ const AnimatedRoutes: React.FC = () => {
             </ProtectedRoute>
         } />
         <Route path="/client-dashboard/:id" element={<PageWrapper><ClientDashboard /></PageWrapper>} />
+        {/* Página interna de teste de passes (mock) — sem links, sem sitemap, noindex */}
+        <Route path="/teste-passe" element={<PageWrapper><TestePassePage /></PageWrapper>} />
         <Route path="/auth" element={<PageWrapper><AuthPage /></PageWrapper>} />
         <Route path="/bem-vindo" element={
             <ProtectedRoute>

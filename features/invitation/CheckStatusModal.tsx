@@ -1,10 +1,12 @@
-import React, { useState } from 'react';
+import React, { useRef, useState } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
 import { EventDetails } from '../../types';
 import { collection, query, where, getDocs, doc, getDoc } from 'firebase/firestore';
 import { db } from '../../components/FirebaseProvider';
 import toast from 'react-hot-toast';
 import { QRCodeSVG } from 'qrcode.react';
+import { toPng } from 'html-to-image';
+import { EventPass, supportsElegantPass } from '../../components/passes/EventPass';
 
 interface CheckStatusModalProps {
   isOpen: boolean;
@@ -17,6 +19,9 @@ export const CheckStatusModal: React.FC<CheckStatusModalProps> = ({ isOpen, onCl
   const [loading, setLoading] = useState(false);
   const [result, setResult] = useState<any>(null);
   const [tableName, setTableName] = useState<string | null>(null);
+  const passExportRef = useRef<HTMLDivElement>(null);
+  const [downloadingPass, setDownloadingPass] = useState(false);
+  const isGoldPass = supportsElegantPass(event?.layoutMode);
 
   const handleCheck = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -76,6 +81,31 @@ export const CheckStatusModal: React.FC<CheckStatusModalProps> = ({ isOpen, onCl
     img.src =
       "data:image/svg+xml;base64," +
       btoa(unescape(encodeURIComponent(svgData)));
+  };
+
+  // Passe elegante (Ouro Imperial): export PNG real; fallback QR simples.
+  const handleDownloadPass = async () => {
+    if (!result || downloadingPass) return;
+    setDownloadingPass(true);
+    const toastId = toast.loading("A gerar o teu passe…");
+    try {
+      try {
+        await (document as any).fonts?.ready;
+      } catch { /* segue sem fontes */ }
+      if (!passExportRef.current) throw new Error("no-node");
+      const dataUrl = await toPng(passExportRef.current, { pixelRatio: 2, cacheBust: true });
+      const clean = (s: string) => (s || '').replace(/[^a-zA-Z0-9À-ÿ ]/g, "").trim().replace(/\s+/g, "_") || "Convite";
+      const a = document.createElement("a");
+      a.download = `Passe_${clean(event.title)}_${clean(result.name)}.png`;
+      a.href = dataUrl;
+      a.click();
+      toast.success("Passe descarregado!", { id: toastId });
+    } catch {
+      toast.error("Falha no passe elegante — a descarregar QR simples.", { id: toastId });
+      handleDownloadQR();
+    } finally {
+      setDownloadingPass(false);
+    }
   };
 
   return (
@@ -146,15 +176,59 @@ export const CheckStatusModal: React.FC<CheckStatusModalProps> = ({ isOpen, onCl
                   </p>
                 </div>
 
-                <div className="p-4 bg-white border border-slate-200 rounded-2xl shadow-sm">
-                  <QRCodeSVG
-                    id="qr-code-svg-status"
-                    value={`guest=${result.id}`}
-                    size={160}
-                    level="H"
-                    includeMargin={true}
-                  />
-                </div>
+                {isGoldPass ? (
+                  <>
+                    <div style={{ width: 280, height: 350, overflow: 'hidden', borderRadius: 20, boxShadow: '0 8px 24px rgba(0,0,0,0.08)' }}>
+                      <div style={{ transform: 'scale(0.2593)', transformOrigin: 'top left', width: 1080 }}>
+                        <EventPass
+                          layoutMode={event.layoutMode}
+                          event={{
+                            title: event.title,
+                            brideName: event.brideName,
+                            groomName: event.groomName,
+                            isoDate: event.isoDate,
+                            date: event.date,
+                            time: event.time,
+                            locationName: event.locationName,
+                            address: event.address,
+                            heroImage: event.heroImage,
+                          }}
+                          guestName={result.name}
+                          guestId={result.id}
+                        />
+                      </div>
+                    </div>
+                    <div style={{ position: 'fixed', left: -20000, top: 0 }} aria-hidden="true">
+                      <EventPass
+                        ref={passExportRef}
+                        layoutMode={event.layoutMode}
+                        event={{
+                          title: event.title,
+                          brideName: event.brideName,
+                          groomName: event.groomName,
+                          isoDate: event.isoDate,
+                          date: event.date,
+                          time: event.time,
+                          locationName: event.locationName,
+                          address: event.address,
+                          heroImage: event.heroImage,
+                        }}
+                        guestName={result.name}
+                        guestId={result.id}
+                      />
+                    </div>
+                  </>
+                ) : (
+                  <div className="p-4 bg-white border border-slate-200 rounded-2xl shadow-sm">
+                    <QRCodeSVG
+                      id="qr-code-svg-status"
+                      value={`guest=${result.id}`}
+                      size={160}
+                      level="H"
+                      includeMargin={true}
+                    />
+                  </div>
+                )}
 
                 <div className="w-full bg-slate-50 border border-slate-100 rounded-2xl p-4 flex flex-col items-center gap-1">
                   <span className="text-xs uppercase tracking-widest text-slate-400 font-bold">A sua Mesa</span>
@@ -173,10 +247,11 @@ export const CheckStatusModal: React.FC<CheckStatusModalProps> = ({ isOpen, onCl
                     Voltar
                   </button>
                   <button
-                    onClick={handleDownloadQR}
-                    className="flex-1 py-3 bg-[#BF9B30] hover:bg-[#a68629] text-white rounded-xl font-bold text-sm transition-colors flex items-center justify-center gap-2"
+                    onClick={isGoldPass ? handleDownloadPass : handleDownloadQR}
+                    disabled={downloadingPass}
+                    className="flex-1 py-3 bg-[#BF9B30] hover:bg-[#a68629] disabled:opacity-60 text-white rounded-xl font-bold text-sm transition-colors flex items-center justify-center gap-2"
                   >
-                    <span className="material-symbols-outlined text-sm">download</span> Salvar QR
+                    <span className="material-symbols-outlined text-sm">download</span> {isGoldPass ? (downloadingPass ? "A gerar…" : "Salvar passe") : "Salvar QR"}
                   </button>
                 </div>
               </div>

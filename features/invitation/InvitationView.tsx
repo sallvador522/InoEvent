@@ -46,6 +46,8 @@ import toast from "react-hot-toast";
 import { copyToClipboard } from "../../lib/clipboard";
 import { uploadEventAudio, deleteEventAudio, isOwnStorageAudio } from "../../lib/audioUpload";
 import { QRCodeSVG } from "qrcode.react";
+import { toPng } from "html-to-image";
+import { EventPass, supportsElegantPass } from "../../components/passes/EventPass";
 import { SEO } from "../../components/SEO";
 import { getOptimizedImageUrl, OptimizeImageOptions } from "../../lib/imageOptimizer";
 import { Guestbook } from "./Guestbook";
@@ -8525,6 +8527,10 @@ const RSVPForm: React.FC<{ event: EventDetails; onClose: () => void }> = ({
     id: string;
     name: string;
   } | null>(null);
+  // Passe elegante (Ouro Imperial): export PNG em tamanho real via nó escondido.
+  const passExportRef = useRef<HTMLDivElement>(null);
+  const [downloadingPass, setDownloadingPass] = useState(false);
+  const isGoldPass = supportsElegantPass(event.layoutMode);
 
   const sanitizeInput = (val: string): string => {
     if (!val) return "";
@@ -8685,6 +8691,32 @@ const RSVPForm: React.FC<{ event: EventDetails; onClose: () => void }> = ({
       btoa(unescape(encodeURIComponent(svgData)));
   };
 
+  // Passe elegante: exporta o nó em tamanho real (1080×1350) em PNG.
+  // Fallback: QR simples (nunca sair sem passe).
+  const handleDownloadPass = async () => {
+    if (!successData || downloadingPass) return;
+    setDownloadingPass(true);
+    const toastId = toast.loading("A gerar o teu passe…");
+    try {
+      try {
+        await (document as any).fonts?.ready;
+      } catch { /* segue sem fontes */ }
+      if (!passExportRef.current) throw new Error("no-node");
+      const dataUrl = await toPng(passExportRef.current, { pixelRatio: 2, cacheBust: true });
+      const clean = (s: string) => s.replace(/[^a-zA-Z0-9À-ÿ ]/g, "").trim().replace(/\s+/g, "_") || "Convite";
+      const a = document.createElement("a");
+      a.download = `Passe_${clean(event.title)}_${clean(successData.name)}.png`;
+      a.href = dataUrl;
+      a.click();
+      toast.success("Passe descarregado!", { id: toastId });
+    } catch {
+      toast.error("Falha no passe elegante — a descarregar QR simples.", { id: toastId });
+      handleDownloadQR();
+    } finally {
+      setDownloadingPass(false);
+    }
+  };
+
   if (successData) {
     return (
       <motion.div
@@ -8746,30 +8778,89 @@ const RSVPForm: React.FC<{ event: EventDetails; onClose: () => void }> = ({
             isLuxury ? "text-gray-300" : "text-slate-500"
           }`}
         >
-          Muito obrigado, <span className="font-semibold">{successData.name}</span>! Guarde este QR Code, ele será seu passe de entrada no dia do evento.
+          Muito obrigado, <span className="font-semibold">{successData.name}</span>! {isGoldPass ? "Guarda o teu passe — ele é a tua entrada no dia do evento." : "Guarde este QR Code, ele será seu passe de entrada no dia do evento."}
         </motion.p>
 
-        <motion.div
-          variants={{
-            hidden: { opacity: 0, scale: 0.9, y: 20 },
-            visible: { 
-              opacity: 1, 
-              scale: 1, 
-              y: 0,
-              transition: { type: "spring", stiffness: 150, damping: 18 } 
-            }
-          }}
-          className="p-5 bg-white border border-slate-100 rounded-[28px] shadow-[0_12px_40px_rgba(0,0,0,0.06)] mb-8 flex flex-col items-center justify-center"
-        >
-          <QRCodeSVG
-            id="qr-code-svg"
-            value={`guest=${successData.id}`}
-            size={180}
-            level="H"
-            includeMargin={true}
-          />
-          <span className="text-[10px] text-slate-400 font-mono tracking-wider mt-3 uppercase">Passe de Entrada</span>
-        </motion.div>
+        {isGoldPass ? (
+          <>
+            <motion.div
+              variants={{
+                hidden: { opacity: 0, scale: 0.9, y: 20 },
+                visible: {
+                  opacity: 1,
+                  scale: 1,
+                  y: 0,
+                  transition: { type: "spring", stiffness: 150, damping: 18 }
+                }
+              }}
+              className="mb-8 flex flex-col items-center justify-center"
+            >
+              <div style={{ width: 300, height: 375, overflow: 'hidden', borderRadius: 24, boxShadow: '0 12px 40px rgba(0,0,0,0.12)' }}>
+                <div style={{ transform: 'scale(0.2778)', transformOrigin: 'top left', width: 1080 }}>
+                  <EventPass
+                    layoutMode={event.layoutMode}
+                    event={{
+                      title: event.title,
+                      brideName: event.brideName,
+                      groomName: event.groomName,
+                      isoDate: event.isoDate,
+                      date: event.date,
+                      time: event.time,
+                      locationName: event.locationName,
+                      address: event.address,
+                      heroImage: event.heroImage,
+                    }}
+                    guestName={successData.name}
+                    guestId={successData.id}
+                  />
+                </div>
+              </div>
+              <span className="text-[10px] text-slate-400 font-mono tracking-wider mt-3 uppercase">O teu passe de entrada</span>
+            </motion.div>
+            {/* Nó de export em tamanho real (fora da tela) */}
+            <div style={{ position: 'fixed', left: -20000, top: 0 }} aria-hidden="true">
+              <EventPass
+                ref={passExportRef}
+                layoutMode={event.layoutMode}
+                event={{
+                  title: event.title,
+                  brideName: event.brideName,
+                  groomName: event.groomName,
+                  isoDate: event.isoDate,
+                  date: event.date,
+                  time: event.time,
+                  locationName: event.locationName,
+                  address: event.address,
+                  heroImage: event.heroImage,
+                }}
+                guestName={successData.name}
+                guestId={successData.id}
+              />
+            </div>
+          </>
+        ) : (
+          <motion.div
+            variants={{
+              hidden: { opacity: 0, scale: 0.9, y: 20 },
+              visible: {
+                opacity: 1,
+                scale: 1,
+                y: 0,
+                transition: { type: "spring", stiffness: 150, damping: 18 }
+              }
+            }}
+            className="p-5 bg-white border border-slate-100 rounded-[28px] shadow-[0_12px_40px_rgba(0,0,0,0.06)] mb-8 flex flex-col items-center justify-center"
+          >
+            <QRCodeSVG
+              id="qr-code-svg"
+              value={`guest=${successData.id}`}
+              size={180}
+              level="H"
+              includeMargin={true}
+            />
+            <span className="text-[10px] text-slate-400 font-mono tracking-wider mt-3 uppercase">Passe de Entrada</span>
+          </motion.div>
+        )}
 
         <motion.div
           variants={{
@@ -8779,8 +8870,9 @@ const RSVPForm: React.FC<{ event: EventDetails; onClose: () => void }> = ({
           className="flex gap-3 w-full max-w-xs mt-2"
         >
           <button
-            onClick={handleDownloadQR}
-            className={`flex-1 py-3.5 rounded-2xl font-bold text-sm transition-all active:scale-[0.98] flex items-center justify-center gap-2 ${
+            onClick={isGoldPass ? handleDownloadPass : handleDownloadQR}
+            disabled={downloadingPass}
+            className={`flex-1 py-3.5 rounded-2xl font-bold text-sm transition-all active:scale-[0.98] flex items-center justify-center gap-2 disabled:opacity-60 ${
               isLuxury
                 ? "bg-transparent border-2 border-[#BF9B30] text-[#BF9B30] hover:bg-[#BF9B30]/10"
                 : isLimintso
@@ -8789,7 +8881,7 @@ const RSVPForm: React.FC<{ event: EventDetails; onClose: () => void }> = ({
             }`}
           >
             <span className="material-symbols-outlined text-sm">download</span>
-            Baixar QR
+            {isGoldPass ? (downloadingPass ? "A gerar…" : "Baixar passe") : "Baixar QR"}
           </button>
           <button
             onClick={onClose}

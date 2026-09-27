@@ -14,6 +14,7 @@
 import { Router } from 'express';
 import { getDb, admin } from '../lib/firebase-admin.js';
 import { apiRateLimiter } from '../middleware/index.js';
+import { logAudit } from '../lib/audit.js';
 import { logger } from '../../lib/logger.js';
 
 const router = Router();
@@ -67,6 +68,7 @@ router.post('/api/admin/events/:id/block', apiRateLimiter, async (req, res) => {
     }
     await ref.update(patch);
     logger.warn(`Evento desativado pelo admin ${id}`, { category: 'SYSTEM' });
+    await logAudit({ actorEmail: authUser?.email || 'admin', action: 'event.block', targetType: 'event', targetId: id, detail: (patch.blockedMessage as string) || undefined });
     return res.json({ success: true, eventId: id, ...patch });
   } catch (err: any) {
     logger.error('Erro ao desativar evento', { category: 'SYSTEM', data: err?.message || err });
@@ -102,10 +104,60 @@ router.post('/api/admin/events/:id/activate', apiRateLimiter, async (req, res) =
     if (!current?.publishedAt) patch.publishedAt = now;
     await ref.update(patch);
     logger.success(`Evento ativado+publicado pelo admin ${id}`, { category: 'SYSTEM' });
+    await logAudit({ actorEmail: authUser?.email || 'admin', action: 'event.activate', targetType: 'event', targetId: id });
     return res.json({ success: true, eventId: id, ...patch });
   } catch (err: any) {
     logger.error('Erro ao ativar evento', { category: 'SYSTEM', data: err?.message || err });
     return res.status(500).json({ error: 'Erro ao ativar' });
+  }
+});
+
+// ---------------------------------------------------------------------------
+// POST /api/admin/events/:id/delete — apaga evento + subcoleções (admin).
+// Exige { confirm: true } no body (dupla confirmação além do confirm() da UI).
+// ---------------------------------------------------------------------------
+const EVENT_SUBCOLLECTIONS = ['guests', 'contributions', 'photos', 'messages', 'team', 'tables'];
+
+router.post('/api/admin/events/:id/delete', apiRateLimiter, async (req, res) => {
+  const authUser = await getAuthUser(req);
+  if (!requireAdmin(authUser)) return res.status(403).json({ error: 'Apenas admin' });
+  const id = req.params.id as string;
+  if (!id || !/^[a-zA-Z0-9_-]{1,128}$/.test(id)) {
+    return res.status(400).json({ error: 'ID de evento inválido' });
+  }
+  if ((req.body || {}).confirm !== true) {
+    return res.status(400).json({ error: 'Confirmação obrigatória (confirm: true)' });
+  }
+  try {
+    const db = getDb();
+    const ref = db.collection('events').doc(id);
+    const snap = await ref.get();
+    if (!snap.exists) return res.status(404).json({ error: 'Evento não encontrado' });
+    const title = (snap.data() as any)?.title || id;
+    let deletedDocs = 0;
+    for (const sub of EVENT_SUBCOLLECTIONS) {
+      const qsnap = await ref.collection(sub).get();
+      // Batch em blocos de 400 (limite 500 por batch).
+      for (let i = 0; i < qsnap.docs.length; i += 400) {
+        const batch = db.batch();
+        qsnap.docs.slice(i, i + 400).forEach((d) => batch.delete(d.ref));
+        await batch.commit();
+      }
+      deletedDocs += qsnap.size;
+    }
+    await ref.delete();
+    logger.warn(`Evento apagado pelo admin ${id} (+${deletedDocs} docs)`, { category: 'SYSTEM' });
+    await logAudit({
+      actorEmail: authUser?.email || 'admin',
+      action: 'event.delete',
+      targetType: 'event',
+      targetId: id,
+      detail: `"${String(title).slice(0, 100)}" +${deletedDocs} docs`,
+    });
+    return res.json({ success: true, eventId: id, deletedDocs });
+  } catch (err: any) {
+    logger.error('Erro ao apagar evento', { category: 'SYSTEM', data: err?.message || err });
+    return res.status(500).json({ error: 'Erro ao apagar' });
   }
 });
 

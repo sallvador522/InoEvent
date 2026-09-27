@@ -24,6 +24,7 @@ const UserDashboard = lazy(() => import('./features/dashboard/UserDashboard').th
 const Dashboard = lazy(() => import('./features/dashboard/Dashboard').then(m => ({ default: m.Dashboard })));
 const ClientDashboard = lazy(() => import('./features/dashboard/ClientDashboard').then(m => ({ default: m.ClientDashboard })));
 const AuthPage = lazy(() => import('./features/auth/AuthPage').then(m => ({ default: m.AuthPage })));
+const ProfileSetup = lazy(() => import('./features/auth/ProfileSetup').then(m => ({ default: m.ProfileSetup })));
 const PlansPage = lazy(() => import('./features/plans/PlansPage').then(m => ({ default: m.PlansPage })));
 const EventCreator = lazy(() => import('./features/invitation/EventCreator').then(m => ({ default: m.EventCreator })));
 const WeddingQuestionnaire = lazy(() => import('./features/invitation/WeddingQuestionnaire').then(m => ({ default: m.WeddingQuestionnaire })));
@@ -87,6 +88,11 @@ const AnimatedRoutes: React.FC = () => {
         } />
         <Route path="/client-dashboard/:id" element={<PageWrapper><ClientDashboard /></PageWrapper>} />
         <Route path="/auth" element={<PageWrapper><AuthPage /></PageWrapper>} />
+        <Route path="/bem-vindo" element={
+            <ProtectedRoute>
+                <PageWrapper><ProfileSetup /></PageWrapper>
+            </ProtectedRoute>
+        } />
         <Route path="/plans" element={<PageWrapper><PlansPage /></PageWrapper>} />
         <Route path="/create-invitation" element={
             <ProtectedRoute>

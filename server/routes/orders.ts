@@ -16,6 +16,7 @@ import { Router } from 'express';
 import { getDb } from '../lib/firebase-admin.js';
 import { apiRateLimiter } from '../middleware/index.js';
 import { createOrder, getOrder, getOrderByEvent, repurposePendingOrder, confirmPayment, failPayment, backfillAccountStamps } from '../lib/billing.js';
+import { logAudit } from '../lib/audit.js';
 import { normalizePlanId, PLANS, getGuestLimit, getPlanConfig } from '../../config/plans.js';
 import { logger } from '../../lib/logger.js';
 import { admin } from '../lib/firebase-admin.js';
@@ -165,6 +166,13 @@ router.post('/api/orders/:id/confirm', apiRateLimiter, async (req, res) => {
   try {
     const order = await confirmPayment(id, providerTransactionId);
     if (!order) return res.status(404).json({ error: 'Pedido não encontrado' });
+    await logAudit({
+      actorEmail: authUser.email || 'admin',
+      action: 'order.confirm',
+      targetType: 'order',
+      targetId: id,
+      detail: `plan=${order.plan} total=${order.total}Kz event=${order.eventId}`,
+    });
     return res.json({ order, message: 'Pagamento confirmado, evento activado' });
   } catch (err: any) {
     logger.error('Erro ao confirmar pagamento', { category: 'SYSTEM', data: err?.message || err });
@@ -181,6 +189,7 @@ router.post('/api/orders/:id/fail', apiRateLimiter, async (req, res) => {
   }
   try {
     await failPayment(id, reason);
+    await logAudit({ actorEmail: authUser.email || 'admin', action: 'order.fail', targetType: 'order', targetId: id, detail: reason || undefined });
     return res.json({ success: true });
   } catch (err: any) {
     return res.status(500).json({ error: 'Erro' });
@@ -203,6 +212,7 @@ router.post('/api/admin/backfill-accounts', apiRateLimiter, async (req, res) => 
       return res.status(400).json({ error: 'userId inválido' });
     }
     const result = await backfillAccountStamps(userId);
+    await logAudit({ actorEmail: authUser.email || 'admin', action: 'accounts.backfill', targetType: 'system', targetId: userId || 'all', metadata: result as any });
     return res.json({ success: true, ...result });
   } catch (err: any) {
     logger.error('Backfill contas erro', { category: 'SYSTEM', data: err?.message || err });
@@ -269,6 +279,7 @@ router.post('/api/admin/backfill-order-titles', apiRateLimiter, async (req, res)
         skipped++;
       }
     }
+    await logAudit({ actorEmail: authUser.email || 'admin', action: 'order_titles.backfill', targetType: 'system', targetId: 'orders', metadata: { updated, skipped, total: snap.size } });
     return res.json({ success: true, updated, skipped, total: snap.size });
   } catch (err: any) {
     logger.error('Backfill order titles erro', { category: 'SYSTEM', data: err?.message || err });

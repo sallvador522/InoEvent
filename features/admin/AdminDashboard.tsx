@@ -1,12 +1,14 @@
 import React, { useState, useEffect, useRef } from 'react';
 import { Navbar } from '../../components/Navbar';
 import { db, auth } from '../../components/FirebaseProvider';
-import { collection, getDocs, query, where, orderBy, doc, updateDoc, addDoc, limit, startAfter } from 'firebase/firestore';
+import { collection, getDocs, query, orderBy, addDoc, limit } from 'firebase/firestore';
 import { toast } from 'react-hot-toast';
 import { motion, AnimatePresence } from 'framer-motion';
 import { Skeleton } from '../../components/ui/Skeleton';
 import { ResponsiveContainer, AreaChart, Area, XAxis, YAxis, CartesianGrid, Tooltip } from 'recharts';
-import { getValidityDays, normalizePlanId, getPlanConfig, getGuestLimit } from '../../config/plans';
+import { getValidityDays, normalizePlanId, getPlanConfig } from '../../config/plans';
+import { normalizeAccountType } from '../../types';
+import { downloadCSV } from '../../lib/csv';
 
 export const AdminDashboard: React.FC = () => {
   const [users, setUsers] = useState<any[]>([]);
@@ -17,16 +19,35 @@ export const AdminDashboard: React.FC = () => {
   const [loading, setLoading] = useState(true);
   const [confirmingOrderId, setConfirmingOrderId] = useState<string | null>(null);
   const [togglingEventId, setTogglingEventId] = useState<string | null>(null);
+  // Drill-down 360°: evento inspecionado + convidados + filtros das listas.
+  const [selectedEvent, setSelectedEvent] = useState<any | null>(null);
+  const [eventGuests, setEventGuests] = useState<any[]>([]);
+  const [guestsLoading, setGuestsLoading] = useState(false);
+  const [guestSearch, setGuestSearch] = useState('');
+  const [guestFilter, setGuestFilter] = useState<'all' | 'CONFIRMED' | 'PENDING' | 'DECLINED' | 'CHECKED_IN'>('all');
+  const [eventSearch, setEventSearch] = useState('');
+  const [eventStatusFilter, setEventStatusFilter] = useState<'all' | 'active' | 'pending' | 'blocked'>('all');
+  const [eventTypeFilter, setEventTypeFilter] = useState('all');
+  const [orderSearch, setOrderSearch] = useState('');
+  const [txSearch, setTxSearch] = useState('');
+  const [txPeriod, setTxPeriod] = useState<'all' | '7d' | '30d'>('all');
+  const [auditLogs, setAuditLogs] = useState<any[]>([]);
+  const [auditLoading, setAuditLoading] = useState(false);
+  const [auditFilter, setAuditFilter] = useState('all');
+  const [auditSearch, setAuditSearch] = useState('');
+  const [suspendingId, setSuspendingId] = useState<string | null>(null);
+  const [deletingEventId, setDeletingEventId] = useState<string | null>(null);
   const [isSendingNotif, setIsSendingNotif] = useState(false);
   const [isRenewing, setIsRenewing] = useState(false);
   
-  const [activeTab, setActiveTab] = useState<'overview' | 'users' | 'events' | 'transactions' | 'orders' | 'subscriptions' | 'analytics'>('overview');
+  const [activeTab, setActiveTab] = useState<'overview' | 'users' | 'events' | 'transactions' | 'orders' | 'subscriptions' | 'analytics' | 'audit'>('overview');
   const [subscriptions, setSubscriptions] = useState<any[]>([]);
   const [subActionId, setSubActionId] = useState<string | null>(null);
   const [selectedUser, setSelectedUser] = useState<any | null>(null);
   
   const [searchQuery, setSearchQuery] = useState('');
   const [planFilter, setPlanFilter] = useState('all');
+  const [accountFilter, setAccountFilter] = useState<'all' | 'client' | 'professional'>('all');
 
   // Notifications & Plan Upgrades State
   const [notificationTargetUserId, setNotificationTargetUserId] = useState<string | null>(null);
@@ -124,6 +145,14 @@ export const AdminDashboard: React.FC = () => {
     prevPendingRef.current = n;
   }, [orders]);
 
+  // Auditoria carrega ao abrir a aba (não no arranque — poupa leituras).
+  useEffect(() => {
+    if (activeTab === 'audit' && auditLogs.length === 0 && !auditLoading) {
+      fetchAuditLogs();
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [activeTab]);
+
   const handlePlanChangeSelect = (userId: string, currentPlan: string, nextPlan: string, e?: React.MouseEvent) => {
     if (e) e.stopPropagation();
     // Gravar sempre o id canónico (essential/free/premium/vip/business): o select
@@ -141,55 +170,27 @@ export const AdminDashboard: React.FC = () => {
     setIsSendingNotif(true);
     try {
       if (pendingPlanChange) {
-        // Travão de downgrade (igual ao API de pedidos): não admite plano menor
-        // que a ocupação atual de nenhum evento do utilizador. Sem isto, pôr
-        // Essential-100 num evento com 500 pessoas bloqueava tudo sem explicação.
-        const planOrder = ['free', 'essential', 'premium', 'vip', 'business'];
-        const target = users.find((u) => u.id === pendingPlanChange.userId);
-        const fromIdx = planOrder.indexOf(normalizePlanId((target as any)?.plan ?? pendingPlanChange.currentPlan));
-        const toIdx = planOrder.indexOf(normalizePlanId(pendingPlanChange.nextPlan));
-        if (toIdx >= 0 && fromIdx >= 0 && toIdx < fromIdx) {
-          const newLimit = getGuestLimit(pendingPlanChange.nextPlan);
-          const ownerKey = (target as any)?.uid || pendingPlanChange.userId;
-          const owned = events.filter((e) => e.ownerId === ownerKey);
-          for (const ev of owned) {
-            const gsnap = await getDocs(collection(db, 'events', ev.id, 'guests'));
-            const occ = gsnap.docs.filter((d) => (d.data() as any)?.status !== 'DECLINED').length;
-            if (occ > newLimit) {
-              toast.error(`"${ev.title || ev.id}" tem ${occ} convidados e o plano ${getPlanConfig(pendingPlanChange.nextPlan).name} permite ${newLimit}. Remova convidados ou escolha um plano maior.`);
-              return;
-            }
-          }
-        }
-        // Validade oficial do plano (config/plans): essential 90d, premium 180d,
-        // vip 365d; null (business) = sem expiração. Sem validade nova, o vigia de
-        // expiração mostra Free no ecrã do utilizador.
-        const validityDays = getValidityDays(pendingPlanChange.nextPlan);
-        const expiresAt = validityDays === null ? null : new Date(Date.now() + validityDays * 86400000).toISOString();
-        await updateDoc(doc(db, 'users', pendingPlanChange.userId), { 
-          plan: pendingPlanChange.nextPlan,
-          planExpiresAt: expiresAt
+        // Troca de plano via servidor (trava de downgrade + validade + backfill
+        // + auditoria). O cliente nunca grava plan diretamente.
+        const token = await auth.currentUser?.getIdToken();
+        const res = await fetch(`/api/admin/users/${pendingPlanChange.userId}/plan`, {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json',
+            ...(token ? { Authorization: `Bearer ${token}` } : {}),
+          },
+          body: JSON.stringify({ plan: pendingPlanChange.nextPlan }),
         });
-        // Conta paga → carimba eventos do dono para publicar de imediato
-        const next = (pendingPlanChange.nextPlan || '').toLowerCase();
-        if (next && next !== 'free') {
-          try {
-            const token = await auth.currentUser?.getIdToken();
-            await fetch('/api/admin/backfill-accounts', {
-              method: 'POST',
-              headers: {
-                'Content-Type': 'application/json',
-                ...(token ? { Authorization: `Bearer ${token}` } : {}),
-              },
-              body: JSON.stringify({ userId: pendingPlanChange.userId }),
-            });
-          } catch {
-            /* best-effort — o backfill pode ser corrido manualmente */
-          }
+        const data = await res.json().catch(() => ({}));
+        if (!res.ok) {
+          toast.error(data?.error || 'Não foi possível trocar o plano.');
+          setIsSendingNotif(false);
+          return;
         }
-        setUsers(users.map(u => u.id === pendingPlanChange.userId ? { ...u, plan: pendingPlanChange.nextPlan, planExpiresAt: expiresAt } : u));
+        const expiresAt = data.planExpiresAt || null;
+        setUsers(users.map(u => u.id === pendingPlanChange.userId ? { ...u, plan: pendingPlanChange.nextPlan, planId: pendingPlanChange.nextPlan, planExpiresAt: expiresAt } : u));
         if (selectedUser?.id === pendingPlanChange.userId) {
-          setSelectedUser({ ...selectedUser, plan: pendingPlanChange.nextPlan, planExpiresAt: expiresAt });
+          setSelectedUser({ ...selectedUser, plan: pendingPlanChange.nextPlan, planId: pendingPlanChange.nextPlan, planExpiresAt: expiresAt });
         }
       }
 
@@ -216,9 +217,7 @@ export const AdminDashboard: React.FC = () => {
     }
   };
 
-  // Renovar validade: repõe planExpiresAt = agora + dias oficiais do plano atual.
-  // Sem isto, um plano expirado mostra Free no ecrã do utilizador e o admin
-  // não tinha onde ver a validade nem como a corrigir sem trocar de plano.
+  // Renovar validade via servidor (com auditoria): repõe planExpiresAt.
   const handleRenewPlan = async (user: any) => {
     if (!user?.id || isRenewing) return;
     const days = getValidityDays(user.plan);
@@ -228,8 +227,18 @@ export const AdminDashboard: React.FC = () => {
     }
     setIsRenewing(true);
     try {
-      const expiresAt = new Date(Date.now() + days * 86400000).toISOString();
-      await updateDoc(doc(db, 'users', user.id), { planExpiresAt: expiresAt });
+      const token = await auth.currentUser?.getIdToken();
+      const res = await fetch(`/api/admin/users/${user.id}/renew`, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          ...(token ? { Authorization: `Bearer ${token}` } : {}),
+        },
+        body: JSON.stringify({}),
+      });
+      const data = await res.json().catch(() => ({}));
+      if (!res.ok) throw new Error(data?.error || 'renew failed');
+      const expiresAt = data.planExpiresAt;
       setUsers((prev: any[]) => prev.map((u) => (u.id === user.id ? { ...u, planExpiresAt: expiresAt } : u)));
       if (selectedUser?.id === user.id) {
         setSelectedUser({ ...selectedUser, planExpiresAt: expiresAt });
@@ -322,6 +331,90 @@ export const AdminDashboard: React.FC = () => {
       toast.error('Não foi possível alterar o evento. Tente de novo.');
     } finally {
       setTogglingEventId(null);
+    }
+  };
+
+  // Drill-down 360°: abre o evento e carrega convidados (rules permitem isAdmin).
+  const openEventInspector = async (event: any) => {
+    if (!event?.id) return;
+    setSelectedEvent(event);
+    setGuestSearch('');
+    setGuestFilter('all');
+    setGuestsLoading(true);
+    try {
+      const gsnap = await getDocs(query(collection(db, 'events', event.id, 'guests'), limit(500)));
+      setEventGuests(gsnap.docs.map(d => ({ id: d.id, ...d.data() })));
+    } catch {
+      setEventGuests([]);
+    } finally {
+      setGuestsLoading(false);
+    }
+  };
+
+  const handleDeleteEvent = async (event: any) => {
+    if (!event?.id || deletingEventId) return;
+    if (!window.confirm(`APAGAR o evento "${event.title || event.id}" e TODOS os convidados/mensagens? Esta ação não tem volta.`)) return;
+    setDeletingEventId(event.id);
+    try {
+      const token = await auth.currentUser?.getIdToken();
+      const res = await fetch(`/api/admin/events/${event.id}/delete`, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          ...(token ? { Authorization: `Bearer ${token}` } : {}),
+        },
+        body: JSON.stringify({ confirm: true }),
+      });
+      if (!res.ok) throw new Error('delete failed');
+      const data = await res.json().catch(() => ({}));
+      setEvents((list) => list.filter((e) => e.id !== event.id));
+      setSelectedEvent(null);
+      toast.success(`Evento apagado (+${data.deletedDocs || 0} registos).`);
+    } catch {
+      toast.error('Não foi possível apagar. Tente de novo.');
+    } finally {
+      setDeletingEventId(null);
+    }
+  };
+
+  const handleSuspendUser = async (user: any, suspend: boolean) => {
+    if (!user?.id || suspendingId) return;
+    const reason = suspend ? window.prompt(`Motivo da suspensão de ${user.email || user.id}:`, '') : '';
+    if (suspend && reason === null) return; // cancelou
+    if (!window.confirm(`${suspend ? 'SUSPENDER' : 'REATIVAR'} o login de ${user.email || user.id}?${suspend ? ' Eventos ficam intactos (visibilidade por isBlocked).' : ''}`)) return;
+    setSuspendingId(user.id);
+    try {
+      const token = await auth.currentUser?.getIdToken();
+      const res = await fetch(`/api/admin/users/${user.id}/${suspend ? 'disable' : 'enable'}`, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          ...(token ? { Authorization: `Bearer ${token}` } : {}),
+        },
+        body: JSON.stringify({ reason: reason || '' }),
+      });
+      if (!res.ok) throw new Error('suspend failed');
+      setUsers((list) => list.map((u) => u.id === user.id ? { ...u, suspendedAt: suspend ? new Date().toISOString() : null, suspendReason: suspend ? reason : null } : u));
+      if (selectedUser?.id === user.id) {
+        setSelectedUser({ ...selectedUser, suspendedAt: suspend ? new Date().toISOString() : null, suspendReason: suspend ? reason : null });
+      }
+      toast.success(suspend ? 'Conta suspensa.' : 'Conta reativada.');
+    } catch {
+      toast.error('Não foi possível processar. Tente de novo.');
+    } finally {
+      setSuspendingId(null);
+    }
+  };
+
+  const fetchAuditLogs = async () => {
+    setAuditLoading(true);
+    try {
+      const snap = await getDocs(query(collection(db, 'audit'), orderBy('at', 'desc'), limit(100)));
+      setAuditLogs(snap.docs.map(d => ({ id: d.id, ...d.data() })));
+    } catch {
+      setAuditLogs([]);
+    } finally {
+      setAuditLoading(false);
     }
   };
 
@@ -431,21 +524,43 @@ export const AdminDashboard: React.FC = () => {
 
   const renderOrders = () => {
     const fmtKz = (v: any) => `${Number(v || 0).toLocaleString('pt-AO')} Kz`;
+    const orderOwnerEmail = (o: any) => {
+      const owner = users.find((u: any) => (u.id || u.uid) === o.userId);
+      return owner?.email || '';
+    };
+    const orderTitle = (o: any) => o.eventTitle || events.find((e: any) => e.id === o.eventId)?.title || '';
+    const q = orderSearch.trim().toLowerCase();
+    const filteredOrders = orders.filter((o: any) =>
+      !q ||
+      (o.id || '').toLowerCase().includes(q) ||
+      (o.eventId || '').toLowerCase().includes(q) ||
+      orderTitle(o).toLowerCase().includes(q) ||
+      orderOwnerEmail(o).toLowerCase().includes(q)
+    );
     return (
       <div className="bg-white rounded-3xl border border-slate-100 shadow-sm overflow-hidden">
-        <div className="p-6 border-b border-slate-100">
-          <h3 className="font-bold text-slate-900">Pedidos de ativação</h3>
-          <p className="text-sm text-slate-500">Pendentes primeiro. Confirmar ativa o evento e notifica o dono.</p>
+        <div className="p-6 border-b border-slate-100 flex flex-col sm:flex-row sm:items-center gap-3">
+          <div className="flex-1">
+            <h3 className="font-bold text-slate-900">Pedidos de ativação</h3>
+            <p className="text-sm text-slate-500">Pendentes primeiro. Confirmar ativa o evento e notifica o dono.</p>
+          </div>
+          <input
+            type="text"
+            placeholder="Buscar pedido, evento ou e-mail…"
+            value={orderSearch}
+            onChange={(e) => setOrderSearch(e.target.value)}
+            className="px-3 py-2 w-full sm:w-72 text-sm border border-slate-200 rounded-lg outline-none focus:ring-brand-blue focus:border-brand-blue"
+          />
         </div>
-        {orders.length === 0 ? (
-          <p className="p-6 text-sm text-slate-500">Nenhum pedido ainda.</p>
+        {filteredOrders.length === 0 ? (
+          <p className="p-6 text-sm text-slate-500">{orders.length === 0 ? 'Nenhum pedido ainda.' : 'Nenhum pedido com esta busca.'}</p>
         ) : (
           <ul className="divide-y divide-slate-100">
-            {orders.map((o) => (
+            {filteredOrders.map((o) => (
               <li key={o.id} className="p-4 sm:p-5 flex flex-col sm:flex-row sm:items-center gap-3">
                 <div className="flex-1 min-w-0">
                   <p className="font-bold text-sm text-slate-900 truncate">
-                    {(o.eventTitle || (() => { const ev = events.find((e: any) => e.id === o.eventId); return ev?.title; })() || 'Evento sem título')} · {o.plan} · {fmtKz(o.amount)}
+                    {(orderTitle(o) || 'Evento sem título')} · {o.plan} · {fmtKz(o.amount)}
                     <span className={`ml-2 text-[10px] font-black uppercase tracking-wider px-2 py-0.5 rounded-full ${o.billingStatus === 'paid' ? 'bg-emerald-100 text-emerald-700' : o.billingStatus === 'failed' ? 'bg-red-100 text-red-600' : 'bg-amber-100 text-amber-700'}`}>
                       {o.billingStatus}
                     </span>
@@ -457,10 +572,20 @@ export const AdminDashboard: React.FC = () => {
                   </p>
                   <p className="text-xs text-slate-500 truncate">
                     Pedido {o.id} · Evento {o.eventId}
-                    {(() => { const owner = users.find((u: any) => (u.id || u.uid) === o.userId); return owner?.email ? ` · ${owner.email}` : ''; })()}
+                    {orderOwnerEmail(o) ? ` · ${orderOwnerEmail(o)}` : ''}
                     {o.createdAt ? ` · ${new Date(o.createdAt).toLocaleDateString('pt-AO')}` : ''}
                   </p>
                 </div>
+                <button
+                  onClick={() => {
+                    const ev = events.find((e: any) => e.id === o.eventId);
+                    if (ev) openEventInspector(ev);
+                    else toast.error('Evento não encontrado na lista.');
+                  }}
+                  className="shrink-0 px-4 h-11 rounded-full border border-slate-200 text-slate-700 font-bold text-xs uppercase tracking-wider hover:bg-slate-50 cursor-pointer whitespace-nowrap"
+                >
+                  Inspecionar
+                </button>
                 {o.billingStatus === 'pending' && (
                   <button
                     onClick={() => handleConfirmOrder(o)}
@@ -655,10 +780,49 @@ export const AdminDashboard: React.FC = () => {
                   </li>
                 )}
                 <li className="flex justify-between items-center text-sm">
+                  <span className="text-slate-500">Perfil (KYC):</span>
+                  <span className="font-bold text-slate-900">
+                    {normalizeAccountType((selectedUser as any)?.accountType) === 'professional'
+                      ? `💼 Cerimonialista${(selectedUser as any)?.agencyName ? ` — ${(selectedUser as any).agencyName}` : ''}`
+                      : '🤵 Noivo(a) / Família'}
+                  </span>
+                </li>
+                {((selectedUser as any)?.phone || (selectedUser as any)?.city) && (
+                  <li className="flex justify-between items-center text-sm">
+                    <span className="text-slate-500">Contacto:</span>
+                    <span className="font-medium text-slate-900">{[(selectedUser as any)?.phone, (selectedUser as any)?.city].filter(Boolean).join(' · ')}</span>
+                  </li>
+                )}
+                <li className="flex justify-between items-center text-sm">
                   <span className="text-slate-500">Criado em:</span>
                   <span className="font-medium text-slate-900">{selectedUser.createdAt ? new Date(selectedUser.createdAt).toLocaleDateString() : 'N/A'}</span>
                 </li>
-                <li className="pt-4 border-t border-slate-100 flex justify-end">
+                <li className="flex justify-between items-center text-sm">
+                  <span className="text-slate-500">Acesso:</span>
+                  {(selectedUser as any)?.suspendedAt ? (
+                    <span className="px-2 py-1 bg-red-100 text-red-700 rounded text-xs font-bold">Suspenso{(selectedUser as any)?.suspendReason ? ` — ${(selectedUser as any).suspendReason}` : ''}</span>
+                  ) : (
+                    <span className="px-2 py-1 bg-emerald-100 text-emerald-700 rounded text-xs font-bold">Ativo</span>
+                  )}
+                </li>
+                <li className="pt-4 border-t border-slate-100 flex justify-end gap-2 flex-wrap">
+                  {(selectedUser as any)?.suspendedAt ? (
+                    <button
+                      onClick={() => handleSuspendUser(selectedUser, false)}
+                      disabled={suspendingId === selectedUser.id}
+                      className="flex items-center gap-1.5 bg-emerald-600 text-white text-xs font-bold px-4 py-2 rounded-xl shadow-md hover:bg-emerald-700 transition-all outline-none cursor-pointer disabled:opacity-60"
+                    >
+                      {suspendingId === selectedUser.id ? 'A processar…' : 'Reativar conta'}
+                    </button>
+                  ) : (
+                    <button
+                      onClick={() => handleSuspendUser(selectedUser, true)}
+                      disabled={suspendingId === selectedUser.id}
+                      className="flex items-center gap-1.5 bg-white text-red-600 text-xs font-bold px-4 py-2 rounded-xl border border-red-200 shadow-sm hover:bg-red-50 transition-all outline-none cursor-pointer disabled:opacity-60"
+                    >
+                      {suspendingId === selectedUser.id ? 'A processar…' : 'Suspender conta'}
+                    </button>
+                  )}
                   <button 
                     onClick={() => {
                       setNotificationTargetUserId(selectedUser.id);
@@ -680,13 +844,18 @@ export const AdminDashboard: React.FC = () => {
               <h3 className="text-lg font-bold text-slate-900 mb-4 border-b border-slate-100 pb-2">Eventos do Usuário ({userEvents.length})</h3>
               <div className="space-y-3 max-h-60 overflow-y-auto">
                 {userEvents.map(event => (
-                  <div key={event.id} className="p-3 bg-slate-50 rounded-lg border border-slate-100">
+                  <button
+                    key={event.id}
+                    onClick={() => openEventInspector(event)}
+                    className="w-full text-left p-3 bg-slate-50 rounded-lg border border-slate-100 hover:border-brand-blue/40 hover:bg-brand-blue/5 transition-all cursor-pointer"
+                    title="Abrir visão 360° do evento"
+                  >
                     <p className="font-bold text-sm text-slate-800">{event.title || 'Evento sem título'}</p>
                     <div className="flex justify-between mt-1 text-xs text-slate-500">
                       <span>{event.type}</span>
-                      <span>{new Date(event.date).toLocaleDateString()}</span>
+                      <span>{event.date ? new Date(event.date).toLocaleDateString() : 'N/A'}</span>
                     </div>
-                  </div>
+                  </button>
                 ))}
                 {userEvents.length === 0 && <p className="text-sm text-slate-500">Nenhum evento criado.</p>}
               </div>
@@ -708,7 +877,9 @@ export const AdminDashboard: React.FC = () => {
                             (u.uid || '').toLowerCase().includes(searchQuery.toLowerCase());
       const matchesPlan = planFilter === 'all' || 
                           planOf(u) === normalizePlanId(planFilter);
-      return matchesSearch && matchesPlan;
+      const matchesAccount = accountFilter === 'all' ||
+                          normalizeAccountType((u as any)?.accountType) === accountFilter;
+      return matchesSearch && matchesPlan && matchesAccount;
     });
 
     return (
@@ -771,21 +942,45 @@ export const AdminDashboard: React.FC = () => {
                  className="pl-9 pr-4 py-2 w-full sm:w-80 text-sm border border-slate-200 rounded-lg focus:ring-brand-blue focus:border-brand-blue outline-none transition-shadow"
               />
            </div>
-           <div className="flex w-full sm:w-auto items-center gap-2">
-              <span className="text-sm font-bold text-slate-500">Filtrar:</span>
-              <select 
-                 value={planFilter}
-                 onChange={(e) => setPlanFilter(e.target.value)}
-                 className="bg-white border border-slate-200 text-slate-700 text-sm rounded-lg focus:ring-brand-blue focus:border-brand-blue block p-2 outline-none cursor-pointer"
-              >
-                 <option value="all">Todos os Planos</option>
-                  <option value="essential">Essencial</option>                                               
-                  <option value="free">Free</option>
-                  <option value="premium">Premium</option>
-                  <option value="vip">VIP</option>
-                 <option value="business">Business</option>
-              </select>
-           </div>
+            <div className="flex w-full sm:w-auto items-center gap-2">
+               <span className="text-sm font-bold text-slate-500">Filtrar:</span>
+               <select 
+                  value={planFilter}
+                  onChange={(e) => setPlanFilter(e.target.value)}
+                  className="bg-white border border-slate-200 text-slate-700 text-sm rounded-lg focus:ring-brand-blue focus:border-brand-blue block p-2 outline-none cursor-pointer"
+               >
+                  <option value="all">Todos os Planos</option>
+                   <option value="essential">Essencial</option>                                               
+                   <option value="free">Free</option>
+                   <option value="premium">Premium</option>
+                   <option value="vip">VIP</option>
+                  <option value="business">Business</option>
+               </select>
+               <select
+                  value={accountFilter}
+                  onChange={(e) => setAccountFilter(e.target.value as any)}
+                  className="bg-white border border-slate-200 text-slate-700 text-sm rounded-lg focus:ring-brand-blue focus:border-brand-blue block p-2 outline-none cursor-pointer"
+                  title="Filtrar por tipo de conta (KYC)"
+               >
+                  <option value="all">Todos os perfis</option>
+                  <option value="client">Noivos/Família</option>
+                  <option value="professional">Cerimonialistas</option>
+               </select>
+               <button
+                  onClick={() => {
+                    downloadCSV(`inoevents-usuarios-${new Date().toISOString().split('T')[0]}`, filteredUsers.map((u: any) => ({
+                      email: u.email || '', nome: u.name || '', uid: u.uid || u.id || '',
+                      plano: normalizePlanId(u.plan ?? u.planId), perfil: normalizeAccountType(u.accountType),
+                      agencia: u.agencyName || '', validade: u.planExpiresAt || '',
+                    })), ['email', 'nome', 'uid', 'plano', 'perfil', 'agencia', 'validade']);
+                    toast.success('CSV de usuários exportado!');
+                  }}
+                  className="bg-white border border-slate-200 text-slate-700 text-sm font-bold px-3 py-2 rounded-lg hover:bg-slate-50 cursor-pointer whitespace-nowrap"
+                  title="Exportar lista filtrada em CSV"
+               >
+                  Exportar CSV
+               </button>
+            </div>
         </div>
         <div className="overflow-x-auto">
           <table className="w-full text-left text-sm text-slate-600">
@@ -801,6 +996,18 @@ export const AdminDashboard: React.FC = () => {
                   <td className="px-6 py-4">
                     <p className="font-bold text-slate-900">{user.email || 'Sem email'}</p>
                     <p className="text-xs text-slate-400 font-mono mt-0.5">{user.uid}</p>
+                    <span className="mt-1 flex flex-wrap gap-1">
+                      {normalizeAccountType((user as any)?.accountType) === 'professional' && (
+                        <span className="inline-flex items-center gap-1 px-2 py-0.5 bg-blue-50 text-blue-700 text-[11px] font-bold rounded-full border border-blue-100">
+                          💼 {(user as any)?.agencyName || 'Cerimonialista'}
+                        </span>
+                      )}
+                      {(user as any)?.suspendedAt && (
+                        <span className="inline-flex items-center px-2 py-0.5 bg-red-100 text-red-700 text-[11px] font-bold rounded-full">
+                          Suspenso
+                        </span>
+                      )}
+                    </span>
                   </td>
                   <td className="px-6 py-4" onClick={e => e.stopPropagation()}>
                     <select 
@@ -829,13 +1036,68 @@ export const AdminDashboard: React.FC = () => {
     );
   };
 
-  const renderEvents = () => (
+  const renderEvents = () => {
+    const eventStatusOf = (e: any): 'active' | 'pending' | 'blocked' =>
+      e?.isBlocked ? 'blocked' : e?.isPublished === false ? 'pending' : 'active';
+    const ownerEmailOf = (e: any) => {
+      const owner = users.find((u: any) => (u.id || u.uid) === e.ownerId);
+      return owner?.email || '';
+    };
+    const filteredEvents = events.filter((e: any) => {
+      const q = eventSearch.trim().toLowerCase();
+      const matchesSearch = !q ||
+        (e.title || '').toLowerCase().includes(q) ||
+        (e.id || '').toLowerCase().includes(q) ||
+        ownerEmailOf(e).toLowerCase().includes(q);
+      const matchesStatus = eventStatusFilter === 'all' || eventStatusOf(e) === eventStatusFilter;
+      const matchesType = eventTypeFilter === 'all' || (e.type || 'WEDDING') === eventTypeFilter;
+      return matchesSearch && matchesStatus && matchesType;
+    });
+    return (
     <div className="bg-white rounded-2xl shadow-sm border border-slate-100 overflow-hidden">
+      <div className="p-4 border-b border-slate-100 flex flex-col lg:flex-row gap-3 lg:items-center bg-slate-50/50">
+        <div className="flex w-full lg:w-auto relative">
+          <span className="material-symbols-outlined absolute left-3 top-1/2 -translate-y-1/2 text-slate-400 text-sm">search</span>
+          <input
+            type="text"
+            placeholder="Buscar título, ID ou e-mail do dono…"
+            value={eventSearch}
+            onChange={(e) => setEventSearch(e.target.value)}
+            className="pl-9 pr-4 py-2 w-full lg:w-80 text-sm border border-slate-200 rounded-lg focus:ring-brand-blue focus:border-brand-blue outline-none transition-shadow"
+          />
+        </div>
+        <div className="flex flex-wrap items-center gap-2">
+          <select
+            value={eventStatusFilter}
+            onChange={(e) => setEventStatusFilter(e.target.value as any)}
+            className="bg-white border border-slate-200 text-slate-700 text-sm rounded-lg block p-2 outline-none cursor-pointer"
+          >
+            <option value="all">Todos os status</option>
+            <option value="active">Ativos</option>
+            <option value="pending">Pendentes</option>
+            <option value="blocked">Desativados</option>
+          </select>
+          <select
+            value={eventTypeFilter}
+            onChange={(e) => setEventTypeFilter(e.target.value)}
+            className="bg-white border border-slate-200 text-slate-700 text-sm rounded-lg block p-2 outline-none cursor-pointer"
+          >
+            <option value="all">Todos os tipos</option>
+            <option value="WEDDING">Casamento</option>
+            <option value="BRIDAL_SHOWER">Chá de Panela</option>
+            <option value="BABY_SHOWER">Chá de Bebé</option>
+            <option value="BIRTHDAY">Aniversário</option>
+            <option value="CORPORATE">Corporativo</option>
+          </select>
+          <span className="text-xs text-slate-400 font-bold">{filteredEvents.length} evento(s) — clica para inspecionar</span>
+        </div>
+      </div>
       <div className="overflow-x-auto">
         <table className="w-full text-left text-sm text-slate-600">
           <thead className="bg-slate-50 text-xs uppercase font-bold tracking-wider text-slate-500 border-b border-slate-200">
             <tr>
               <th className="px-6 py-4">Evento</th>
+              <th className="px-6 py-4">Dono</th>
               <th className="px-6 py-4">Tipo</th>
               <th className="px-6 py-4">Data</th>
               <th className="px-6 py-4">Status</th>
@@ -843,11 +1105,16 @@ export const AdminDashboard: React.FC = () => {
             </tr>
           </thead>
           <tbody className="divide-y divide-slate-100">
-            {events.map((event) => (
-              <tr key={event.id} className="hover:bg-slate-50 transition-colors">
+            {filteredEvents.map((event) => (
+              <tr key={event.id} onClick={() => openEventInspector(event)} className="hover:bg-brand-blue/5 transition-colors cursor-pointer" title="Abrir visão 360°">
+                <td className="px-6 py-4" onClick={(e) => e.stopPropagation()}>
+                  <button onClick={() => openEventInspector(event)} className="text-left cursor-pointer">
+                    <p className="font-bold text-slate-900 hover:text-brand-blue">{event.title || 'Sem título'}</p>
+                    <p className="text-xs text-slate-400 font-mono mt-0.5">{event.id}</p>
+                  </button>
+                </td>
                 <td className="px-6 py-4">
-                  <p className="font-bold text-slate-900">{event.title || 'Sem título'}</p>
-                  <p className="text-xs text-slate-400 font-mono mt-0.5">{event.id}</p>
+                  <p className="text-xs font-bold text-slate-700 truncate max-w-[180px]">{ownerEmailOf(event) || '—'}</p>
                 </td>
                 <td className="px-6 py-4">
                   <span className="px-2 py-1 bg-brand-beige/20 text-brand-beige rounded text-xs font-bold">{event.type || 'WEDDING'}</span>
@@ -864,7 +1131,7 @@ export const AdminDashboard: React.FC = () => {
                     <span className="px-2 py-1 bg-green-100 text-green-700 rounded text-xs font-bold">Ativo</span>
                   )}
                 </td>
-                <td className="px-6 py-4 text-right whitespace-nowrap">
+                <td className="px-6 py-4 text-right whitespace-nowrap" onClick={(e) => e.stopPropagation()}>
                   {event.isBlocked ? (
                     <button
                       onClick={() => handleToggleEventActive(event, true)}
@@ -885,18 +1152,233 @@ export const AdminDashboard: React.FC = () => {
                 </td>
               </tr>
             ))}
+            {filteredEvents.length === 0 && (
+              <tr>
+                <td colSpan={6} className="px-6 py-8 text-center text-slate-500">Nenhum evento com estes filtros.</td>
+              </tr>
+            )}
           </tbody>
         </table>
       </div>
     </div>
-  );
+    );
+  };
+
+  // Visão 360° do evento: dono, plano, KPIs, convidados, visitas e ações.
+  const renderEventInspector = () => {
+    const ev = selectedEvent;
+    if (!ev) return null;
+    const owner = users.find((u: any) => (u.id || u.uid) === ev.ownerId);
+    const evOrder = orders.find((o: any) => o.eventId === ev.id);
+    const evVisits = visits.filter((v: any) => v.eventId === ev.id).length;
+    const confirmed = eventGuests.filter((g: any) => g.status === 'CONFIRMED' && !g.checkedIn).length;
+    const checkedIn = eventGuests.filter((g: any) => g.checkedIn || g.status === 'CHECKED_IN').length;
+    const pending = eventGuests.filter((g: any) => g.status === 'PENDING' || (!g.status && !g.checkedIn)).length;
+    const declined = eventGuests.filter((g: any) => g.status === 'DECLINED').length;
+    const q = guestSearch.trim().toLowerCase();
+    const filteredGuests = eventGuests.filter((g: any) => {
+      const matchesQ = !q ||
+        (g.name || '').toLowerCase().includes(q) ||
+        (g.phone || '').toLowerCase().includes(q);
+      const st = g.checkedIn || g.status === 'CHECKED_IN' ? 'CHECKED_IN' : (g.status || 'PENDING');
+      return matchesQ && (guestFilter === 'all' || st === guestFilter);
+    });
+    const guestLabel = (g: any) => {
+      if (g.checkedIn || g.status === 'CHECKED_IN') return 'Entrou';
+      if (g.status === 'CONFIRMED') return 'Confirmado';
+      if (g.status === 'DECLINED') return 'Recusado';
+      return 'Pendente';
+    };
+    return (
+      <motion.div
+        initial={{ opacity: 0 }}
+        animate={{ opacity: 1 }}
+        exit={{ opacity: 0 }}
+        className="fixed inset-0 bg-slate-900/60 backdrop-blur-sm z-[150] flex items-center justify-center p-4"
+        onClick={() => setSelectedEvent(null)}
+      >
+        <motion.div
+          initial={{ scale: 0.97, y: 20, opacity: 0 }}
+          animate={{ scale: 1, y: 0, opacity: 1 }}
+          exit={{ scale: 0.97, y: 20, opacity: 0 }}
+          className="bg-white rounded-2xl border border-slate-100 shadow-2xl w-full max-w-3xl max-h-[90vh] overflow-y-auto"
+          onClick={(e) => e.stopPropagation()}
+        >
+          <div className="p-6 border-b border-slate-100 bg-slate-50/50 sticky top-0 bg-white/95 backdrop-blur z-10">
+            <div className="flex justify-between items-start gap-4">
+              <div className="min-w-0">
+                <p className="text-[11px] font-bold text-slate-400 uppercase tracking-wider">Visão 360° do evento</p>
+                <h2 className="text-xl font-bold text-slate-900 truncate">{ev.title || 'Sem título'}</h2>
+                <p className="text-xs text-slate-400 font-mono mt-0.5">{ev.id} · {ev.type || 'WEDDING'} · {ev.date ? new Date(ev.date).toLocaleDateString() : 'N/A'}</p>
+              </div>
+              <button onClick={() => setSelectedEvent(null)} className="text-slate-400 hover:text-slate-900 bg-slate-100 hover:bg-slate-200 p-2 rounded-full cursor-pointer shrink-0" aria-label="Fechar">✕</button>
+            </div>
+            <div className="mt-3 flex flex-wrap gap-2 text-xs">
+              <span className="px-2 py-1 bg-slate-100 rounded font-bold">👤 {owner?.email || ev.ownerId || '—'}</span>
+              <span className="px-2 py-1 bg-slate-100 rounded font-bold">📦 {getPlanConfig(ev.plan ?? ev.planId).name}</span>
+              <span className="px-2 py-1 bg-slate-100 rounded font-bold">💳 {ev.billingStatus || '—'}</span>
+              {ev.isBlocked
+                ? <span className="px-2 py-1 bg-red-100 text-red-700 rounded font-bold">Desativado</span>
+                : ev.isPublished === false
+                  ? <span className="px-2 py-1 bg-amber-100 text-amber-700 rounded font-bold">Pendente</span>
+                  : <span className="px-2 py-1 bg-green-100 text-green-700 rounded font-bold">Ativo</span>}
+              <a href={`/invite/${ev.id}`} target="_blank" rel="noreferrer" className="px-2 py-1 bg-brand-blue text-white rounded font-bold hover:bg-brand-blue/90">Abrir convite ↗</a>
+            </div>
+          </div>
+
+          <div className="p-6 grid grid-cols-2 sm:grid-cols-5 gap-3">
+            {[
+              { label: 'Convidados', value: eventGuests.length },
+              { label: 'Confirmados', value: confirmed },
+              { label: 'Entraram', value: checkedIn },
+              { label: 'Pendentes', value: pending },
+              { label: 'Visitas', value: evVisits },
+            ].map((k) => (
+              <div key={k.label} className="bg-slate-50 border border-slate-100 rounded-xl p-3 text-center">
+                <p className="text-2xl font-bold text-slate-900">{k.value}</p>
+                <p className="text-[11px] font-bold text-slate-500 uppercase tracking-wider">{k.label}</p>
+              </div>
+            ))}
+          </div>
+          {declined > 0 && <p className="px-6 -mt-2 text-xs text-slate-400">Recusados: {declined} (libertam quota)</p>}
+
+          <div className="px-6 pb-2 flex flex-col sm:flex-row gap-2 sm:items-center">
+            <input
+              type="text"
+              placeholder="Buscar convidado…"
+              value={guestSearch}
+              onChange={(e) => setGuestSearch(e.target.value)}
+              className="flex-1 px-3 py-2 text-sm border border-slate-200 rounded-lg outline-none focus:ring-brand-blue focus:border-brand-blue"
+            />
+            <select
+              value={guestFilter}
+              onChange={(e) => setGuestFilter(e.target.value as any)}
+              className="px-3 py-2 text-sm border border-slate-200 rounded-lg outline-none cursor-pointer"
+            >
+              <option value="all">Todos</option>
+              <option value="CONFIRMED">Confirmados</option>
+              <option value="CHECKED_IN">Entraram</option>
+              <option value="PENDING">Pendentes</option>
+              <option value="DECLINED">Recusados</option>
+            </select>
+            <button
+              onClick={() => {
+                downloadCSV(`inoevents-convidados-${ev.id}`, filteredGuests.map((g: any) => ({
+                  nome: g.name || '', telefone: g.phone || '', status: guestLabel(g),
+                  acompanhantes: g.adults ?? '', mesa: g.tableName || '',
+                })), ['nome', 'telefone', 'status', 'acompanhantes', 'mesa']);
+                toast.success('CSV de convidados exportado!');
+              }}
+              className="px-3 py-2 text-sm font-bold border border-slate-200 rounded-lg hover:bg-slate-50 cursor-pointer whitespace-nowrap"
+            >
+              Exportar CSV
+            </button>
+          </div>
+
+          <div className="px-6 pb-6">
+            {guestsLoading ? (
+              <p className="text-sm text-slate-500 py-6 text-center">A carregar convidados…</p>
+            ) : filteredGuests.length === 0 ? (
+              <p className="text-sm text-slate-500 py-6 text-center">Nenhum convidado.</p>
+            ) : (
+              <ul className="divide-y divide-slate-100 max-h-64 overflow-y-auto border border-slate-100 rounded-xl">
+                {filteredGuests.slice(0, 200).map((g: any) => (
+                  <li key={g.id} className="px-4 py-2.5 flex justify-between items-center text-sm">
+                    <div className="min-w-0">
+                      <p className="font-bold text-slate-800 truncate">{g.name || 'Sem nome'}</p>
+                      <p className="text-xs text-slate-400">{g.phone || ''}{g.tableName ? ` · 🪑 ${g.tableName}` : ''}</p>
+                    </div>
+                    <span className="text-[11px] font-bold uppercase tracking-wider px-2 py-0.5 rounded-full bg-slate-100 text-slate-600 shrink-0 ml-2">{guestLabel(g)}</span>
+                  </li>
+                ))}
+              </ul>
+            )}
+            {filteredGuests.length > 200 && <p className="text-xs text-slate-400 mt-1">A mostrar 200 de {filteredGuests.length} — usa a busca.</p>}
+          </div>
+
+          <div className="px-6 pb-6 flex flex-wrap gap-2 border-t border-slate-100 pt-4">
+            {evOrder && evOrder.billingStatus === 'pending' && (
+              <button
+                onClick={() => { setSelectedEvent(null); handleConfirmOrder(evOrder); }}
+                className="px-4 h-10 rounded-full bg-emerald-600 text-white font-bold text-xs uppercase tracking-wider hover:bg-emerald-700 cursor-pointer"
+              >
+                Confirmar pagamento
+              </button>
+            )}
+            {ev.isBlocked ? (
+              <button
+                onClick={async () => { await handleToggleEventActive(ev, true); setSelectedEvent((prev: any) => prev ? { ...prev, isBlocked: false, status: 'active', isPublished: true } : prev); }}
+                className="px-4 h-10 rounded-full bg-emerald-600 text-white font-bold text-xs uppercase tracking-wider hover:bg-emerald-700 cursor-pointer"
+              >
+                Ativar
+              </button>
+            ) : (
+              <button
+                onClick={async () => { await handleToggleEventActive(ev, false); setSelectedEvent((prev: any) => prev ? { ...prev, isBlocked: true, status: 'blocked' } : prev); }}
+                className="px-4 h-10 rounded-full border border-red-200 text-red-600 font-bold text-xs uppercase tracking-wider hover:bg-red-50 cursor-pointer"
+              >
+                Desativar
+              </button>
+            )}
+            <button
+              onClick={() => handleDeleteEvent(ev)}
+              disabled={deletingEventId === ev.id}
+              className="px-4 h-10 rounded-full border border-red-200 text-red-600 font-bold text-xs uppercase tracking-wider hover:bg-red-50 cursor-pointer disabled:opacity-60"
+            >
+              {deletingEventId === ev.id ? 'A apagar…' : 'Apagar evento'}
+            </button>
+          </div>
+        </motion.div>
+      </motion.div>
+    );
+  };
 
   const renderTransactions = () => {
      const totalRevenue = transactions.filter(t => t.type === 'CREDIT').reduce((acc, curr) => acc + (curr.amount || 0), 0);
+     const periodMs = txPeriod === '7d' ? 7 * 86400000 : txPeriod === '30d' ? 30 * 86400000 : Infinity;
+     const q = txSearch.trim().toLowerCase();
+     const filteredTx = transactions.filter((tx: any) => {
+       const inPeriod = periodMs === Infinity || (tx.date && (Date.now() - new Date(tx.date).getTime()) <= periodMs);
+       const matchesQ = !q ||
+         (tx.description || '').toLowerCase().includes(q) ||
+         (tx.userEmail || tx.userId || '').toLowerCase().includes(q) ||
+         (tx.id || '').toLowerCase().includes(q);
+       return inPeriod && matchesQ;
+     });
      return (
        <div className="bg-white rounded-2xl shadow-sm border border-slate-100 overflow-hidden">
-         <div className="p-6 border-b border-slate-100 bg-slate-50/50 flex justify-between items-center">
+         <div className="p-6 border-b border-slate-100 bg-slate-50/50 flex flex-col lg:flex-row lg:justify-between lg:items-center gap-3">
             <h2 className="text-lg font-bold text-slate-900">Histórico de Transações</h2>
+            <div className="flex flex-wrap items-center gap-2">
+              <input
+                type="text"
+                placeholder="Buscar descrição, usuário…"
+                value={txSearch}
+                onChange={(e) => setTxSearch(e.target.value)}
+                className="px-3 py-2 text-sm border border-slate-200 rounded-lg outline-none focus:ring-brand-blue focus:border-brand-blue"
+              />
+              <select
+                value={txPeriod}
+                onChange={(e) => setTxPeriod(e.target.value as any)}
+                className="px-3 py-2 text-sm border border-slate-200 rounded-lg outline-none cursor-pointer"
+              >
+                <option value="all">Todo o período</option>
+                <option value="7d">Últimos 7 dias</option>
+                <option value="30d">Últimos 30 dias</option>
+              </select>
+              <button
+                onClick={() => {
+                  downloadCSV(`inoevents-transacoes-${new Date().toISOString().split('T')[0]}`, filteredTx.map((tx: any) => ({
+                    data: tx.date || '', descricao: tx.description || '', usuario: tx.userEmail || tx.userId || '',
+                    tipo: tx.type || '', valor: tx.amount || 0,
+                  })), ['data', 'descricao', 'usuario', 'tipo', 'valor']);
+                  toast.success('CSV de transações exportado!');
+                }}
+                className="px-3 py-2 text-sm font-bold border border-slate-200 rounded-lg hover:bg-white cursor-pointer bg-white"
+              >
+                Exportar CSV
+              </button>
+            </div>
             <div className="bg-white border border-slate-200 px-4 py-2 rounded-lg shadow-sm">
                <span className="text-xs uppercase tracking-widest text-slate-500 font-bold mr-2">Faturamento Total (Aproximado):</span>
                <span className="text-lg text-green-500 font-bold">{totalRevenue.toLocaleString('pt-AO')} Kz</span>
@@ -913,10 +1395,10 @@ export const AdminDashboard: React.FC = () => {
                </tr>
              </thead>
              <tbody className="divide-y divide-slate-100">
-               {transactions.map((tx) => (
+               {filteredTx.map((tx) => (
                  <tr key={tx.id} className="hover:bg-slate-50 transition-colors">
                    <td className="px-6 py-4 whitespace-nowrap">
-                     {new Date(tx.date).toLocaleString()}
+                     {tx.date ? new Date(tx.date).toLocaleString() : 'N/A'}
                    </td>
                    <td className="px-6 py-4">
                      <p className="font-bold text-slate-900">{tx.description || 'Pagamento'}</p>
@@ -932,9 +1414,9 @@ export const AdminDashboard: React.FC = () => {
                    </td>
                  </tr>
                ))}
-               {transactions.length === 0 && (
+               {filteredTx.length === 0 && (
                    <tr>
-                       <td colSpan={4} className="px-6 py-8 text-center text-slate-500">Nenhuma transação encontrada.</td>
+                       <td colSpan={4} className="px-6 py-8 text-center text-slate-500">Nenhuma transação com estes filtros.</td>
                    </tr>
                )}
              </tbody>
@@ -942,6 +1424,86 @@ export const AdminDashboard: React.FC = () => {
          </div>
        </div>
      );
+  };
+
+  // Trilha de auditoria: quem fez o quê, quando (só admin lê — rules).
+  const renderAudit = () => {
+    const q = auditSearch.trim().toLowerCase();
+    const filtered = auditLogs.filter((a: any) =>
+      (auditFilter === 'all' || a.action === auditFilter) &&
+      (!q || (a.targetId || '').toLowerCase().includes(q) ||
+        (a.actorEmail || '').toLowerCase().includes(q) ||
+        (a.detail || '').toLowerCase().includes(q))
+    );
+    return (
+      <div className="bg-white rounded-2xl shadow-sm border border-slate-100 overflow-hidden">
+        <div className="p-6 border-b border-slate-100 bg-slate-50/50 flex flex-col lg:flex-row lg:items-center gap-3">
+          <div className="flex-1">
+            <h2 className="text-lg font-bold text-slate-900">Auditoria</h2>
+            <p className="text-sm text-slate-500">Ações administrativas registadas pelo servidor.</p>
+          </div>
+          <input
+            type="text"
+            placeholder="Buscar ator, alvo…"
+            value={auditSearch}
+            onChange={(e) => setAuditSearch(e.target.value)}
+            className="px-3 py-2 text-sm border border-slate-200 rounded-lg outline-none focus:ring-brand-blue focus:border-brand-blue"
+          />
+          <select
+            value={auditFilter}
+            onChange={(e) => setAuditFilter(e.target.value)}
+            className="px-3 py-2 text-sm border border-slate-200 rounded-lg outline-none cursor-pointer"
+          >
+            <option value="all">Todas as ações</option>
+            <option value="order.confirm">Pagamentos confirmados</option>
+            <option value="event.block">Eventos desativados</option>
+            <option value="event.activate">Eventos ativados</option>
+            <option value="event.delete">Eventos apagados</option>
+            <option value="user.disable">Contas suspensas</option>
+            <option value="user.enable">Contas reativadas</option>
+            <option value="user.plan_change">Trocas de plano</option>
+            <option value="subscription.renew">Subscrições renovadas</option>
+            <option value="subscription.cancel">Subscrições canceladas</option>
+          </select>
+          <button
+            onClick={fetchAuditLogs}
+            disabled={auditLoading}
+            className="px-3 py-2 text-sm font-bold border border-slate-200 rounded-lg hover:bg-white bg-white cursor-pointer disabled:opacity-60"
+          >
+            {auditLoading ? 'A carregar…' : 'Atualizar'}
+          </button>
+        </div>
+        <div className="overflow-x-auto">
+          <table className="w-full text-left text-sm text-slate-600">
+            <thead className="bg-slate-50 text-xs uppercase font-bold tracking-wider text-slate-500 border-b border-slate-200">
+              <tr>
+                <th className="px-6 py-4">Quando</th>
+                <th className="px-6 py-4">Ação</th>
+                <th className="px-6 py-4">Alvo</th>
+                <th className="px-6 py-4">Ator</th>
+                <th className="px-6 py-4">Detalhe</th>
+              </tr>
+            </thead>
+            <tbody className="divide-y divide-slate-100">
+              {filtered.map((a: any) => (
+                <tr key={a.id} className="hover:bg-slate-50 transition-colors">
+                  <td className="px-6 py-4 whitespace-nowrap text-xs">{a.at ? new Date(a.at).toLocaleString('pt-AO') : '—'}</td>
+                  <td className="px-6 py-4"><span className="px-2 py-1 bg-slate-100 rounded text-xs font-bold font-mono">{a.action}</span></td>
+                  <td className="px-6 py-4 text-xs font-mono truncate max-w-[220px]">{a.targetType}:{a.targetId}</td>
+                  <td className="px-6 py-4 text-xs truncate max-w-[200px]">{a.actorEmail}</td>
+                  <td className="px-6 py-4 text-xs text-slate-500">{a.detail || '—'}</td>
+                </tr>
+              ))}
+              {filtered.length === 0 && (
+                <tr>
+                  <td colSpan={5} className="px-6 py-8 text-center text-slate-500">{auditLogs.length === 0 ? 'Sem registos ainda — carrega para ver.' : 'Nada com estes filtros.'}</td>
+                </tr>
+              )}
+            </tbody>
+          </table>
+        </div>
+      </div>
+    );
   };
 
   // Badges das abas: pedidos pendentes (dinheiro a confirmar) + movimento de hoje.
@@ -1025,6 +1587,12 @@ export const AdminDashboard: React.FC = () => {
             >
               Tráfego & Visitas
             </button>
+            <button
+              onClick={() => { setActiveTab('audit'); setSelectedUser(null); }}
+              className={`px-4 py-2 text-sm font-bold rounded-lg transition-all whitespace-nowrap ${activeTab === 'audit' ? 'bg-slate-900 text-white shadow-md' : 'text-slate-500 hover:text-slate-900 hover:bg-slate-100'}`}
+            >
+              Auditoria
+            </button>
           </div>
         </div>
         
@@ -1043,7 +1611,12 @@ export const AdminDashboard: React.FC = () => {
             {activeTab === 'orders' && renderOrders()}
             {activeTab === 'subscriptions' && renderSubscriptions()}
             {activeTab === 'analytics' && <AnalyticsView visits={visits} events={events} users={users} />}
+            {activeTab === 'audit' && renderAudit()}
           </motion.div>
+        </AnimatePresence>
+
+        <AnimatePresence>
+          {selectedEvent && renderEventInspector()}
         </AnimatePresence>
 
         <AnimatePresence>

@@ -30,6 +30,7 @@ import ordersRoutes from './server/routes/orders.js';
 import metaRoutes from './server/routes/meta.js';
 import subscriptionsRoutes from './server/routes/subscriptions.js';
 import adminEventsRoutes from './server/routes/admin-events.js';
+import adminUsersRoutes from './server/routes/admin-users.js';
 
 // --- Express App ---
 const app = express();
@@ -130,6 +131,7 @@ app.use(ordersRoutes);    // /api/orders, /api/events/:id/order, /api/webhooks/p
 app.use(metaRoutes);      // POST /api/meta/events — relay da Conversions API (deduplicado via event_id)
 app.use(subscriptionsRoutes); // /api/subscriptions/*
 app.use(adminEventsRoutes); // /api/admin/events/:id/block|activate — Ativar/Desativar manual
+app.use(adminUsersRoutes); // /api/admin/users/:id — plano, validade, suspender/reativar
 
 // --- Global Error Handler ---
 app.use((err: any, req: express.Request, res: express.Response, _next: express.NextFunction) => {

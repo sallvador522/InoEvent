@@ -12,6 +12,7 @@ import { Router } from 'express';
 import { apiRateLimiter } from '../middleware/index.js';
 import { createSubscription, getActiveSubscription, cancelSubscription, renewSubscription } from '../lib/billing.js';
 import { admin } from '../lib/firebase-admin.js';
+import { logAudit } from '../lib/audit.js';
 import { logger } from '../../lib/logger.js';
 
 const router = Router();
@@ -65,6 +66,9 @@ router.post('/api/subscriptions/:id/cancel', apiRateLimiter, async (req, res) =>
       return res.status(403).json({ error: 'Forbidden' });
     }
     await cancelSubscription(req.params.id as string);
+    if (isAdmin) {
+      await logAudit({ actorEmail: auth.email || 'admin', action: 'subscription.cancel', targetType: 'subscription', targetId: req.params.id as string, detail: `owner=${owner}` });
+    }
     return res.json({ success: true });
   } catch (e: any) {
     return res.status(500).json({ error: 'Erro' });
@@ -82,6 +86,7 @@ router.post('/api/subscriptions/:id/renew', apiRateLimiter, async (req, res) => 
   try {
     const sub = await renewSubscription(req.params.id as string);
     if (!sub) return res.status(404).json({ error: 'Subscrição não encontrada' });
+    await logAudit({ actorEmail: auth.email || 'admin', action: 'subscription.renew', targetType: 'subscription', targetId: req.params.id as string, detail: `user=${(sub as any)?.userId || ''} +30d` });
     return res.json({ subscription: sub });
   } catch (e: any) {
     logger.error('Erro renovar subscription', { category: 'SYSTEM', data: e?.message || e });

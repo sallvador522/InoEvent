@@ -1,11 +1,12 @@
 import React, { useState } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
-import { ArrowLeft, Mail, Lock, User, Eye, EyeOff } from 'lucide-react';
+import { ArrowLeft, Mail, Lock, User, Eye, EyeOff, Heart, Briefcase } from 'lucide-react';
 import { Link, useNavigate, useLocation } from 'react-router-dom';
 import { GoogleAuthProvider, signInWithPopup, signInWithEmailAndPassword, createUserWithEmailAndPassword, updateProfile } from 'firebase/auth';
 import { auth, db } from '../../components/FirebaseProvider';
 import { SEO } from '../../components/SEO';
 import { trackPixelCompleteRegistration } from '../../lib/metaPixel';
+import type { AccountType } from '../../types';
 
 export const AuthPage: React.FC = () => {
   const [isLogin, setIsLogin] = useState(true);
@@ -16,6 +17,12 @@ export const AuthPage: React.FC = () => {
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
   const [error, setError] = useState('');
+  // KYC: tipo de conta escolhido no cadastro (obrigatório no signup).
+  const [accountType, setAccountType] = useState<AccountType>('client');
+  const [agencyName, setAgencyName] = useState('');
+  const [phone, setPhone] = useState('');
+  const [city, setCity] = useState('');
+  const [celebrantRole, setCelebrantRole] = useState('noiva');
 
   const navigate = useNavigate();
   const location = useLocation();
@@ -43,7 +50,7 @@ export const AuthPage: React.FC = () => {
         return;
       }
       if (!exists) {
-          // merge:true por segurança: mesmo aqui, nunca apagar campos alheios.
+          // Conta nova via Google: ficha mínima + KYC na tela /bem-vindo.
           await setDoc(userRef, {
               uid: result.user.uid,
               name: result.user.displayName || '',
@@ -54,6 +61,8 @@ export const AuthPage: React.FC = () => {
             { method: 'google' },
             { user_data: { email: result.user.email || undefined } },
           );
+          navigate('/bem-vindo', { state: { from }, replace: true });
+          return;
       }
       navigate(from, { replace: true });
     } catch (err: any) {
@@ -81,6 +90,11 @@ export const AuthPage: React.FC = () => {
            setLoading(false);
            return;
         }
+        if (accountType === 'professional' && !agencyName.trim()) {
+           setError('Informe o nome da sua agência ou marca profissional.');
+           setLoading(false);
+           return;
+        }
         const userCredential = await createUserWithEmailAndPassword(auth, email, password);
         
         await updateProfile(userCredential.user, {
@@ -91,11 +105,26 @@ export const AuthPage: React.FC = () => {
         const userRef = doc(db, 'users', userCredential.user.uid);
         // merge:true — conta nova nasce free, mas nunca apagar campos se a ficha
         // já existir por algum caminho (ex: pré-criada pelo admin).
+        // KYC gravado já no cadastro: accountType + perfil conforme o tipo.
+        const kycFields: Record<string, unknown> = {
+            accountType,
+            kycStatus: 'declared',
+            kycCompletedAt: new Date().toISOString(),
+        };
+        if (accountType === 'professional') {
+            kycFields.agencyName = agencyName.trim();
+            if (phone.trim()) kycFields.phone = phone.trim();
+            if (city.trim()) kycFields.city = city.trim();
+        } else {
+            kycFields.celebrantRole = celebrantRole;
+            if (phone.trim()) kycFields.phone = phone.trim();
+        }
         await setDoc(userRef, {
             uid: userCredential.user.uid,
             name: name,
             email: email,
-            plan: 'free'
+            plan: 'free',
+            ...kycFields,
         }, { merge: true });
         trackPixelCompleteRegistration(
           { method: 'email' },
@@ -218,6 +247,90 @@ export const AuthPage: React.FC = () => {
                <button type="button" className="text-xs font-semibold text-primary hover:text-brand-blue transition-colors">Esqueceu a senha?</button>
             </div>
           )}
+
+          <AnimatePresence mode="wait">
+            {!isLogin && (
+              <motion.div
+                key="kyc-field"
+                initial={{ opacity: 0, height: 0, marginBottom: 0 }}
+                animate={{ opacity: 1, height: 'auto', marginBottom: 16 }}
+                exit={{ opacity: 0, height: 0, marginBottom: 0 }}
+                transition={{ duration: 0.2 }}
+              >
+                <p className="text-xs font-bold text-slate-500 uppercase tracking-wider mb-2">Vou usar como</p>
+                <div className="grid grid-cols-2 gap-2 mb-3">
+                  <button
+                    type="button"
+                    onClick={() => setAccountType('client')}
+                    className={`flex flex-col items-center gap-1.5 rounded-xl border-2 px-3 py-4 text-center transition-all cursor-pointer ${accountType === 'client' ? 'border-brand-blue bg-brand-blue/5 text-brand-blue' : 'border-slate-200 text-slate-500 hover:border-slate-300'}`}
+                  >
+                    <Heart size={22} />
+                    <span className="text-xs font-bold">Noivo(a) / Família</span>
+                    <span className="text-[10px] leading-tight opacity-70">O meu próprio evento</span>
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => setAccountType('professional')}
+                    className={`flex flex-col items-center gap-1.5 rounded-xl border-2 px-3 py-4 text-center transition-all cursor-pointer ${accountType === 'professional' ? 'border-brand-blue bg-brand-blue/5 text-brand-blue' : 'border-slate-200 text-slate-500 hover:border-slate-300'}`}
+                  >
+                    <Briefcase size={22} />
+                    <span className="text-xs font-bold">Cerimonialista</span>
+                    <span className="text-[10px] leading-tight opacity-70">Eventos de clientes</span>
+                  </button>
+                </div>
+                {accountType === 'professional' ? (
+                  <div className="space-y-3">
+                    <input
+                      type="text"
+                      placeholder="Nome da agência / marca *"
+                      value={agencyName}
+                      onChange={(e) => setAgencyName(e.target.value)}
+                      className="w-full px-4 py-3.5 bg-slate-50 border border-slate-200 rounded-xl focus:ring-2 focus:ring-brand-blue/20 focus:border-brand-blue outline-none transition-all text-slate-700 text-sm"
+                      required={!isLogin}
+                    />
+                    <div className="grid grid-cols-2 gap-3">
+                      <input
+                        type="tel"
+                        placeholder="WhatsApp (opcional)"
+                        value={phone}
+                        onChange={(e) => setPhone(e.target.value)}
+                        className="w-full px-4 py-3.5 bg-slate-50 border border-slate-200 rounded-xl focus:ring-2 focus:ring-brand-blue/20 focus:border-brand-blue outline-none transition-all text-slate-700 text-sm"
+                      />
+                      <input
+                        type="text"
+                        placeholder="Cidade (opcional)"
+                        value={city}
+                        onChange={(e) => setCity(e.target.value)}
+                        className="w-full px-4 py-3.5 bg-slate-50 border border-slate-200 rounded-xl focus:ring-2 focus:ring-brand-blue/20 focus:border-brand-blue outline-none transition-all text-slate-700 text-sm"
+                      />
+                    </div>
+                    <p className="text-[11px] text-slate-400 leading-relaxed">O plano Business (eventos ilimitados + marca própria) é ativado pela equipa após o pagamento — declarar o perfil não libera nada sozinho.</p>
+                  </div>
+                ) : (
+                  <div className="grid grid-cols-2 gap-3">
+                    <select
+                      value={celebrantRole}
+                      onChange={(e) => setCelebrantRole(e.target.value)}
+                      className="w-full px-4 py-3.5 bg-slate-50 border border-slate-200 rounded-xl focus:ring-2 focus:ring-brand-blue/20 focus:border-brand-blue outline-none transition-all text-slate-700 text-sm cursor-pointer"
+                      aria-label="Eu sou"
+                    >
+                      <option value="noiva">Sou a Noiva</option>
+                      <option value="noivo">Sou o Noivo</option>
+                      <option value="familia">Sou Família</option>
+                      <option value="outro">Outro</option>
+                    </select>
+                    <input
+                      type="tel"
+                      placeholder="WhatsApp (opcional)"
+                      value={phone}
+                      onChange={(e) => setPhone(e.target.value)}
+                      className="w-full px-4 py-3.5 bg-slate-50 border border-slate-200 rounded-xl focus:ring-2 focus:ring-brand-blue/20 focus:border-brand-blue outline-none transition-all text-slate-700 text-sm"
+                    />
+                  </div>
+                )}
+              </motion.div>
+            )}
+          </AnimatePresence>
 
           {error && (
             <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }} className="p-3 bg-red-50 text-red-600 border border-red-100 rounded-lg text-sm text-center">

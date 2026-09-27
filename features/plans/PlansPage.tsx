@@ -19,6 +19,7 @@ import { Navbar } from "../../components/Navbar";
 import { SEO } from "../../components/SEO";
 import toast from "react-hot-toast";
 import { PLANS, ADDONS } from "../../config/plans";
+import { normalizeAccountType } from "../../types";
 import { normalizePlanId } from "../../lib/entitlements";
 import { trackPixelInitiateCheckout, trackPixelLead } from "../../lib/metaPixel";
 
@@ -265,11 +266,15 @@ export const PlansPage: React.FC = () => {
     const inviteLinkLine = activatingEventId
       ? `\nVer convite: ${typeof window !== 'undefined' ? window.location.origin : 'https://www.inoevent.online'}/invite/${activatingEventId}`
       : "";
+    // KYC: agência no texto ajuda a conciliação no WhatsApp.
+    const agencyLine = (userProfile as any)?.agencyName
+      ? `\nAgência: ${(userProfile as any).agencyName}`
+      : "";
     const totalLine = modalTotal(whatsappModal);
 
     const messageText = whatsappModal.name === "Business"
-      ? `Olá InoEvents! Quero subscrever o Plano ${whatsappModal.name.toUpperCase()} para a minha agência.${conciergeLine}\n\nID da Plataforma: ${user.uid}\nE-mail: ${user.email || "Não informado"}${eventTitleLine}${inviteLinkLine}\n\nAguardo o IBAN aqui e envio o comprovativo nesta conversa. Obrigado!`
-      : `Olá InoEvents! Quero ativar o Plano ${whatsappModal.name.toUpperCase()} — ${totalLine} Kz.${conciergeLine}\n\nID da Plataforma: ${user.uid}\nE-mail: ${user.email || "Não informado"}${eventTitleLine}${inviteLinkLine}\n\nAguardo o IBAN aqui e envio o comprovativo nesta conversa. Obrigado!`;
+      ? `Olá InoEvents! Quero subscrever o Plano ${whatsappModal.name.toUpperCase()} para a minha agência.${conciergeLine}\n\nID da Plataforma: ${user.uid}\nE-mail: ${user.email || "Não informado"}${agencyLine}${eventTitleLine}${inviteLinkLine}\n\nAguardo o IBAN aqui e envio o comprovativo nesta conversa. Obrigado!`
+      : `Olá InoEvents! Quero ativar o Plano ${whatsappModal.name.toUpperCase()} — ${totalLine} Kz.${conciergeLine}\n\nID da Plataforma: ${user.uid}\nE-mail: ${user.email || "Não informado"}${agencyLine}${eventTitleLine}${inviteLinkLine}\n\nAguardo o IBAN aqui e envio o comprovativo nesta conversa. Obrigado!`;
 
     const cleanNumber = whatsappNumber.replace(/\D/g, "");
     const url = `https://wa.me/${cleanNumber}?text=${encodeURIComponent(messageText)}`;
@@ -319,6 +324,12 @@ export const PlansPage: React.FC = () => {
   const currentPlanId = activatingEventId
     ? (activatingEventPlan ? normalizePlanId(activatingEventPlan) : null)
     : (userProfile ? normalizePlanId(userProfile.plan) : null);
+
+  // KYC: profissional vê o Business primeiro (sem esconder o B2C).
+  const isProfessionalViewer = normalizeAccountType((userProfile as any)?.accountType) === 'professional' && currentPlanId !== 'business';
+  const visiblePlans = isProfessionalViewer
+    ? [...plans].sort((a, b) => (a.id === 'business' ? -1 : b.id === 'business' ? 1 : 0))
+    : plans;
 
   return (
     <div className="min-h-screen bg-[#FDFBF7] font-display text-slate-900 relative overflow-x-hidden flex flex-col">
@@ -391,7 +402,7 @@ export const PlansPage: React.FC = () => {
           animate="visible"
           className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 items-stretch justify-center gap-6 max-w-6xl mx-auto"
         >
-          {plans.map((plan) => {
+          {visiblePlans.map((plan) => {
             const isCurrentPlan = currentPlanId === normalizePlanId(plan.name) || ((plan as any).id && currentPlanId === normalizePlanId((plan as any).id));
             const isHighlighted = !!plan.popular;
             const ctaLabel = isCurrentPlan

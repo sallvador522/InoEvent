@@ -176,6 +176,42 @@ export interface EventDetails {
   blockedMessage?: string;
 }
 
+// ---------------------------------------------------------------------------
+// KYC — tipo de conta (Cliente vs Profissional)
+// ---------------------------------------------------------------------------
+export type AccountType = 'client' | 'professional';
+export type KycStatus = 'declared' | 'verified';
+export type CelebrantRole = 'noiva' | 'noivo' | 'familia' | 'outro';
+
+export interface UserProfile {
+  uid: string;
+  email: string;
+  name?: string;
+  plan?: string;
+  planId?: PlanId;
+  planExpiresAt?: string | null;
+  accountType?: AccountType;
+  kycStatus?: KycStatus;
+  kycCompletedAt?: string | null;
+  // Cliente
+  celebrantRole?: CelebrantRole;
+  // Profissional (autodeclarado — B2B real exige subscrição paga)
+  agencyName?: string;
+  phone?: string;
+  city?: string;
+  // Conta
+  suspendedAt?: string | null;
+  suspendReason?: string | null;
+  whiteLabelName?: string;
+  whiteLabelLogo?: string;
+  createdAt?: string;
+  updatedAt?: string;
+}
+
+export function normalizeAccountType(raw: unknown): AccountType {
+  return raw === 'professional' ? 'professional' : 'client';
+}
+
 export interface ThemeConfig {
   bg: string;
   text: string;

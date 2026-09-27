@@ -20,6 +20,7 @@ import {
   useFirebase,
 } from "../../components/FirebaseProvider";
 import { getGuestLimit, normalizePlanId, getPlanConfig, canUseFeature, getEventCreationLimit } from "../../lib/entitlements";
+import { normalizeAccountType } from "../../types";
 import { Link, useNavigate } from "react-router-dom";
 import { Button } from "../../components/ui/Button";
 import {
@@ -260,6 +261,8 @@ export const UserDashboard: React.FC = () => {
   const accountPlanId = normalizePlanId(userProfile?.plan);
   const isBusinessAccount = accountPlanId === 'business';
   const isPremiumAccount = accountPlanId === 'premium' || accountPlanId === 'vip';
+  // KYC: profissional sem Business vê a oferta B2B em destaque.
+  const isProfessional = normalizeAccountType((userProfile as any)?.accountType) === 'professional';
 
   if (loading) {
     return (
@@ -437,6 +440,23 @@ export const UserDashboard: React.FC = () => {
               onClick={() => navigate("/b2b")}
             >
               Acessar Meu Negócio
+            </Button>
+          </div>
+        )}
+
+        {isProfessional && !isBusinessAccount && (
+          <div className="mb-10 bg-gradient-to-r from-[#1B365D] to-[#8a6d1c] rounded-3xl p-8 flex flex-col md:flex-row items-center justify-between shadow-lg">
+            <div className="text-white mb-6 md:mb-0">
+              <h2 className="text-2xl font-bold mb-2">Feito para o teu negócio{(userProfile as any)?.agencyName ? `, ${(userProfile as any).agencyName}` : ''}</h2>
+              <p className="text-blue-100 max-w-lg">
+                Eventos ilimitados, marca própria nos convites e painel de clientes — tudo por uma mensalidade.
+              </p>
+            </div>
+            <Button
+              className="bg-white text-brand-blue hover:bg-slate-50 whitespace-nowrap"
+              onClick={() => navigate("/plans")}
+            >
+              Ver plano Business
             </Button>
           </div>
         )}

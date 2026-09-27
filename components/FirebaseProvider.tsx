@@ -192,6 +192,17 @@ export const FirebaseProvider: React.FC<{ children: React.ReactNode }> = ({ chil
             }
           }
         }
+        // Migração lazy KYC: contas antigas sem accountType viram client/declared
+        // (merge: nunca apaga; upgrade client→professional é na tela de perfil).
+        if (!uData.accountType) {
+          setDoc(doc(db, 'users', user.uid), {
+            accountType: 'client',
+            kycStatus: uData.kycStatus || 'declared',
+            kycCompletedAt: uData.kycCompletedAt || new Date().toISOString(),
+            updatedAt: new Date().toISOString(),
+          } as any, { merge: true }).catch(() => {});
+          uData = { ...uData, accountType: 'client', kycStatus: uData.kycStatus || 'declared' };
+        }
         localStorage.setItem('ino_events_profile_cache', JSON.stringify(uData));
         setUserProfile(uData);
 
@@ -203,6 +214,9 @@ export const FirebaseProvider: React.FC<{ children: React.ReactNode }> = ({ chil
           uid: user.uid,
           email: user.email || 'no-email@example.com',
           plan: 'free',
+          accountType: 'client',
+          kycStatus: 'declared',
+          kycCompletedAt: new Date().toISOString(),
         };
         if (user.displayName) seed.name = user.displayName;
         setDoc(doc(db, 'users', user.uid), seed, { merge: true }).catch((e) => {

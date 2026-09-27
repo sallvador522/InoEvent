@@ -27,7 +27,16 @@ service cloud.firestore {
 
     // --- Schema Validators ---
     function isValidUser(data) {
-      return data.uid is string && data.email is string && data.email.matches('^[^@]+@[^@]+\\.[^@]+$') && (data.get('plan', null) is string || data.get('plan', null) == null);
+      return data.uid is string && data.email is string && data.email.matches('^[^@]+@[^@]+\\.[^@]+$') && (data.get('plan', null) is string || data.get('plan', null) == null) &&
+             (data.get('accountType', 'client') in ['client', 'professional']) &&
+             (data.get('kycStatus', 'declared') in ['declared', 'verified']);
+    }
+    // KYC: o dono só edita campos de perfil; accountType só sobe client→professional
+    // (downgrade via admin — evita auto-rebaixamento para fugir de trilha B2B).
+    // plan/kycStatus/suspendedAt continuam SÓ servidor/admin.
+    function accountTypeOk() {
+      return incoming().get('accountType', existing().get('accountType', 'client')) == existing().get('accountType', 'client') ||
+             (existing().get('accountType', 'client') == 'client' && incoming().get('accountType', 'client') == 'professional');
     }
 
     function isValidEvent(data) {
@@ -69,9 +78,10 @@ service cloud.firestore {
       allow list: if isAdmin();
       allow create: if isOwner(userId) && isValidUser(incoming()) && incoming().uid == request.auth.uid;
       allow update: if isAdmin() || (isOwner(userId) && 
-                       request.resource.data.diff(resource.data).affectedKeys().hasOnly(['whiteLabelName', 'whiteLabelLogo', 'updatedAt']) &&
+                       request.resource.data.diff(resource.data).affectedKeys().hasOnly(['whiteLabelName', 'whiteLabelLogo', 'updatedAt', 'accountType', 'agencyName', 'phone', 'city', 'celebrantRole', 'kycCompletedAt', 'name']) &&
                        request.resource.data.uid == resource.data.uid &&
-                       request.resource.data.email == resource.data.email);
+                       request.resource.data.email == resource.data.email &&
+                       accountTypeOk());
 
       match /notifications/{notificationId} {
         allow read: if isOwner(userId);
@@ -216,6 +226,12 @@ service cloud.firestore {
     match /visits/{visitId} {
       allow create: if true;
       allow read, write: if isAdmin();
+    }
+
+    match /audit/{auditId} {
+      // Trilha de auditoria: escrita SÓ via Admin SDK (servidor); leitura só admin.
+      allow get, list: if isAdmin();
+      allow create, update, delete: if false;
     }
   }
 }

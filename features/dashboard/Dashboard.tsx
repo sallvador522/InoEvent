@@ -291,9 +291,14 @@ export const Dashboard = () => {
     // Porteira de partilha: eventos novos só partilham pagos; contas Free nunca.
     // Eventos antigos (isPublished diferente de false) passam — regra de grandfather,
     // exceto contas Free, que provam mas não partilham.
+    //
+    // CONTA vs EVENTO (lógica separada — nunca misturar no rótulo):
+    // - isFreeAccount: plano DA CONTA. Só isto decide o texto "Conta Free".
+    // - eventNeedsOwnPlan: conta paga, mas ESTE evento está free/não-pago.
+    //   Cada evento de casamento precisa do seu próprio plano (1 evento por plano),
+    //   por isso o pagamento do evento 1 nunca ativa o evento 2.
     const isFreeAccount =
-        normalizePlanId(userProfile?.plan) === 'free' ||
-        normalizePlanId((event as any)?.plan || (event as any)?.planId) === 'free';
+        normalizePlanId(userProfile?.plan) === 'free';
 
     // Plano do evento normalizado (Firestore grava minúsculas) — usar SEMPRE isto em vez de comparar strings literais
     const eventPlanId = normalizePlanId((event as any)?.plan ?? (event as any)?.planId);
@@ -303,9 +308,24 @@ export const Dashboard = () => {
     // VIP/Business. O básico (pizza, curva, visitas) fica no Premium.
     const hasAdvancedAnalytics = canUseFeature(eventPlanId, 'advanced_analytics');
 
+    // Este evento precisa do SEU plano (conta paga, evento não): leva a
+    // /plans?eventId= para comprar → WhatsApp com referência → admin ativa.
+    // (Declarado antes da porteira — ela usa este estado.)
+    const eventNeedsOwnPlan =
+        !!event &&
+        !isFreeAccount &&
+        normalizePlanId(userProfile?.plan) !== 'business' &&
+        !hasPendingOrder &&
+        (normalizePlanId((event as any)?.plan || (event as any)?.planId) === 'free' ||
+            ((event as any)?.billingStatus !== 'paid' &&
+                (event as any)?.isPublished === false &&
+                !isAccountActive(event as any)));
+
     const isShareLocked =
         !!event &&
         (isFreeAccount ||
+            eventNeedsOwnPlan ||
+            hasPendingOrder ||
             (event.isPublished === false &&
                 event.billingStatus !== 'paid' &&
                 !isAccountActive(event) &&
@@ -316,7 +336,9 @@ export const Dashboard = () => {
             toast.error(
                 isFreeAccount
                     ? 'Na conta Free crias e provas à vontade. Para partilhar, ativa um plano.'
-                    : 'Este convite ativa com um plano. Escolhe abaixo para partilhar.'
+                    : eventNeedsOwnPlan
+                        ? 'Este evento ainda não tem plano. Cada evento precisa do seu — ativa para partilhar.'
+                        : 'Este convite ativa com um plano. Escolhe abaixo para partilhar.'
             );
             navigate(`/plans?eventId=${id}&from=share`);
             return false;
@@ -325,8 +347,12 @@ export const Dashboard = () => {
     };
 
     const requireGuestsAllowed = () => {
-        if (isFreeAccount) {
-            toast.error('A lista de convidados abre após ativares um plano.');
+        if (isFreeAccount || eventNeedsOwnPlan) {
+            toast.error(
+                isFreeAccount
+                    ? 'A lista de convidados abre após ativares um plano.'
+                    : 'Este evento ainda não tem plano. Ativa-o para gerir convidados.'
+            );
             navigate(`/plans?eventId=${id}&from=share`);
             return false;
         }
@@ -1052,27 +1078,19 @@ export const Dashboard = () => {
                     <div className="mb-8 bg-amber-50 border border-amber-200 rounded-3xl p-5 flex flex-col sm:flex-row sm:items-center gap-4">
                         <div className="flex-1">
                             <p className="font-bold text-slate-800">
-                                {isFreeAccount ? 'Conta Free — prova à vontade' : hasPendingOrder ? 'Pedido recebido!' : 'Aguarda pagamento'}
+                                {isFreeAccount ? 'Conta Free — prova à vontade' : hasPendingOrder ? 'Pedido recebido!' : eventNeedsOwnPlan ? 'Ativar evento' : 'Aguarda pagamento'}
                             </p>
                             <p className="text-sm text-slate-600">
                                 {isFreeAccount
                                     ? 'Cria e prova o teu convite. Para partilhar e gerir convidados, ativa um plano.'
                                     : hasPendingOrder
                                         ? `Pedido ${eventOrder?.id || ''} em confirmação — avisamos aqui assim que o pagamento for validado.`
-                                        : 'O teu convite está pronto, mas o link público só vive após a ativação. Conclui no WhatsApp e avisamos aqui.'}
+                                        : eventNeedsOwnPlan
+                                            ? 'Cada evento de casamento precisa do seu próprio plano. Escolhe um plano para este evento e a equipa ativa após o pagamento.'
+                                            : 'O teu convite está pronto, mas o link público só vive após a ativação. Conclui no WhatsApp e avisamos aqui.'}
                             </p>
                             {hasPendingOrder && (
                                 <div className="mt-3 flex flex-wrap gap-2">
-                                    <button
-                                        onClick={() => {
-                                            const ref = `Pedido ${eventOrder?.id || ''} · Evento ${id || ''}${event?.title ? ` · "${event.title}"` : ''}`;
-                                            copyToClipboard(ref);
-                                            toast.success('Referência copiada!');
-                                        }}
-                                        className="px-4 h-10 rounded-full bg-white border border-amber-300 text-amber-800 font-bold text-xs uppercase tracking-wider hover:bg-amber-100 cursor-pointer whitespace-nowrap inline-flex items-center gap-2"
-                                    >
-                                        <Copy size={14} /> Copiar referência
-                                    </button>
                                     <button
                                         onClick={() => {
                                             const msg = `Olá InoEvents! Fiz o pedido ${eventOrder?.id || ''} para o evento "${event?.title || id || ''}" (${id || ''}). Aguardo o IBAN aqui e envio o comprovativo nesta conversa. Obrigado!`;
@@ -1092,7 +1110,7 @@ export const Dashboard = () => {
                                 className="shrink-0 px-6 h-12 rounded-full bg-[#1B365D] text-white font-bold text-xs uppercase tracking-wider hover:bg-[#224373] cursor-pointer whitespace-nowrap"
                                 style={{ transition: 'background-color 200ms ease' }}
                             >
-                                Escolher plano
+                                {eventNeedsOwnPlan ? 'Ativar evento' : 'Escolher plano'}
                             </button>
                         )}
                     </div>

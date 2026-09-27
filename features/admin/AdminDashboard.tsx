@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 import { Navbar } from '../../components/Navbar';
 import { db, auth } from '../../components/FirebaseProvider';
 import { collection, getDocs, query, where, orderBy, doc, updateDoc, addDoc, limit, startAfter } from 'firebase/firestore';
@@ -91,6 +91,38 @@ export const AdminDashboard: React.FC = () => {
 
     fetchData();
   }, []);
+
+  // Alerta de pedidos: reconta pendentes a cada 30s sem recarregar a página,
+  // para o badge da aba "Pedidos" avisar de dinheiro a aguardar confirmação.
+  useEffect(() => {
+    const refreshOrders = async () => {
+      try {
+        const snap = await getDocs(query(collection(db, 'orders'), limit(100)));
+        const data = snap.docs
+          .map(d => ({ id: d.id, ...d.data() }))
+          .sort((a: any, b: any) => {
+            const rank = (o: any) => (o.billingStatus === 'pending' ? 0 : 1);
+            if (rank(a) !== rank(b)) return rank(a) - rank(b);
+            return String(b.createdAt || '').localeCompare(String(a.createdAt || ''));
+          });
+        setOrders(data);
+      } catch {
+        /* mantém lista atual — badge apenas não atualiza */
+      }
+    };
+    const timer = setInterval(refreshOrders, 30000);
+    return () => clearInterval(timer);
+  }, []);
+
+  // Toca o sino quando CHEGA pedido novo (não no carregamento inicial).
+  const prevPendingRef = useRef<number | null>(null);
+  useEffect(() => {
+    const n = orders.filter((o: any) => o.billingStatus === 'pending').length;
+    if (prevPendingRef.current !== null && n > prevPendingRef.current) {
+      toast.success(`Novo pedido de ativação! (${n} pendente${n > 1 ? 's' : ''}) — abre a aba Pedidos.`);
+    }
+    prevPendingRef.current = n;
+  }, [orders]);
 
   const handlePlanChangeSelect = (userId: string, currentPlan: string, nextPlan: string, e?: React.MouseEvent) => {
     if (e) e.stopPropagation();
@@ -912,6 +944,16 @@ export const AdminDashboard: React.FC = () => {
      );
   };
 
+  // Badges das abas: pedidos pendentes (dinheiro a confirmar) + movimento de hoje.
+  const pendingOrdersCount = orders.filter((o: any) => o.billingStatus === 'pending').length;
+  const todayTransactionsCount = transactions.filter((t: any) => {
+    try {
+      return new Date(t.date).toDateString() === new Date().toDateString();
+    } catch {
+      return false;
+    }
+  }).length;
+
   return (
     <div className="min-h-screen bg-slate-50 font-sans">
       <Navbar />
@@ -945,15 +987,31 @@ export const AdminDashboard: React.FC = () => {
             </button>
             <button 
               onClick={() => { setActiveTab('transactions'); setSelectedUser(null); }}
-              className={`px-4 py-2 text-sm font-bold rounded-lg transition-all whitespace-nowrap ${activeTab === 'transactions' ? 'bg-slate-900 text-white shadow-md' : 'text-slate-500 hover:text-slate-900 hover:bg-slate-100'}`}
+              className={`px-4 py-2 text-sm font-bold rounded-lg transition-all whitespace-nowrap inline-flex items-center ${activeTab === 'transactions' ? 'bg-slate-900 text-white shadow-md' : 'text-slate-500 hover:text-slate-900 hover:bg-slate-100'}`}
             >
               Transações
+              {todayTransactionsCount > 0 && (
+                <span
+                  title={`${todayTransactionsCount} transação(ões) hoje`}
+                  className="ml-1.5 inline-flex items-center justify-center min-w-[20px] h-5 px-1.5 rounded-full bg-emerald-500 text-white text-[11px] font-black"
+                >
+                  {todayTransactionsCount}
+                </span>
+              )}
             </button>
               <button
                 onClick={() => { setActiveTab('orders'); setSelectedUser(null); }}
-                className={`px-4 py-2 text-sm font-bold rounded-lg transition-all whitespace-nowrap ${activeTab === 'orders' ? 'bg-slate-900 text-white shadow-md' : 'text-slate-500 hover:text-slate-900 hover:bg-slate-100'}`}
+                className={`px-4 py-2 text-sm font-bold rounded-lg transition-all whitespace-nowrap inline-flex items-center ${activeTab === 'orders' ? 'bg-slate-900 text-white shadow-md' : 'text-slate-500 hover:text-slate-900 hover:bg-slate-100'}`}
               >
                 Pedidos
+                {pendingOrdersCount > 0 && (
+                  <span
+                    title={`${pendingOrdersCount} pedido(s) a aguardar confirmação`}
+                    className="ml-1.5 inline-flex items-center justify-center min-w-[20px] h-5 px-1.5 rounded-full bg-amber-500 text-white text-[11px] font-black animate-pulse"
+                  >
+                    {pendingOrdersCount}
+                  </span>
+                )}
               </button>
               <button
                 onClick={() => { setActiveTab('subscriptions'); setSelectedUser(null); }}

@@ -54,6 +54,15 @@ router.post('/api/orders', apiRateLimiter, async (req, res) => {
         upgradeTo: 'premium',
       });
     }
+    // Plano free nunca é comprável (quota 0) — o 1º evento grátis passa
+    // SÓ pela promo do assistente (/api/promo/first-event, com auditoria).
+    if (planId === 'free') {
+      return res.status(403).json({
+        error: 'Fala com um assistente no WhatsApp para ativar o teu primeiro evento grátis.',
+        code: 'PLAN_NOT_PURCHASABLE',
+        plan: planId,
+      });
+    }
 
   try {
     // verifica evento existe e pertence ao user (se autenticado)

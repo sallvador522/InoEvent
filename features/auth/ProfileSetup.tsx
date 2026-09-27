@@ -82,7 +82,7 @@ export const ProfileSetup: React.FC = () => {
             className={`flex flex-col items-center gap-1.5 rounded-xl border-2 px-3 py-5 text-center transition-all cursor-pointer ${accountType === 'client' ? 'border-brand-blue bg-brand-blue/5 text-brand-blue' : 'border-slate-200 text-slate-500 hover:border-slate-300'}`}
           >
             <Heart size={26} />
-            <span className="text-sm font-bold">Noivo(a) / Família</span>
+            <span className="text-sm font-bold">Meu evento</span>
             <span className="text-[11px] leading-tight opacity-70">O meu próprio evento</span>
           </button>
           <button

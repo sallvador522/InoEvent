@@ -193,6 +193,10 @@ export interface UserProfile {
   accountType?: AccountType;
   kycStatus?: KycStatus;
   kycCompletedAt?: string | null;
+  // Promo primeiro evento grátis (escrita SÓ servidor — rules).
+  firstEventFreeUsed?: boolean;
+  firstEventFreeEventId?: string | null;
+  firstEventFreeAt?: string | null;
   // RBAC: espelho do custom claim (autoridade real é o claim no Auth).
   role?: 'admin' | null;
   roleGrantedAt?: string | null;

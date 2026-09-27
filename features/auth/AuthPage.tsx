@@ -267,7 +267,7 @@ export const AuthPage: React.FC = () => {
                     className={`flex flex-col items-center gap-1.5 rounded-xl border-2 px-3 py-4 text-center transition-all cursor-pointer ${accountType === 'client' ? 'border-brand-blue bg-brand-blue/5 text-brand-blue' : 'border-slate-200 text-slate-500 hover:border-slate-300'}`}
                   >
                     <Heart size={22} />
-                    <span className="text-xs font-bold">Noivo(a) / Família</span>
+                    <span className="text-xs font-bold">Meu evento</span>
                     <span className="text-[10px] leading-tight opacity-70">O meu próprio evento</span>
                   </button>
                   <button

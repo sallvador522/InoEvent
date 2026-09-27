@@ -47,6 +47,7 @@ import { Skeleton } from "../../components/ui/Skeleton";
 import { OnboardingWizard } from "./OnboardingWizard";
 
 import { getEventByLayoutMode } from "../../mockData";
+import { FirstEventFreeModal } from "./FirstEventFreeModal";
 
 export const UserDashboard: React.FC = () => {
   const { user, userProfile } = useFirebase();
@@ -62,6 +63,9 @@ export const UserDashboard: React.FC = () => {
   const [isClearingNotifs, setIsClearingNotifs] = useState(false);
   const [subTab, setSubTab] = useState<"events" | "notifications">("events");
   const [supportOpen, setSupportOpen] = useState(false);
+  // Promo 1º evento grátis: 1x por sessão, só se há rascunho free elegível.
+  const [promoEvent, setPromoEvent] = useState<any | null>(null);
+  const [promoDismissed, setPromoDismissed] = useState(false);
   const navigate = useNavigate();
 
   // Subscrição em Tempo Real para as Notificações do Usuário
@@ -161,6 +165,20 @@ export const UserDashboard: React.FC = () => {
     };
     fetchEvents();
   }, [user]);
+
+  // Promo 1º evento grátis: abre 1x por sessão quando há rascunho free elegível
+  // (não-chá, não-pago), conta free e promo nunca usada.
+  useEffect(() => {
+    if (promoDismissed || promoEvent || loading) return;
+    if (!userProfile || normalizePlanId((userProfile as any)?.plan) !== 'free') return;
+    if ((userProfile as any)?.firstEventFreeUsed === true) return;
+    const eligible = events.find((e: any) =>
+      !['BRIDAL_SHOWER', 'BABY_SHOWER'].includes(e?.type) &&
+      e?.billingStatus !== 'paid' &&
+      e?.isPublished === false
+    );
+    if (eligible) setPromoEvent(eligible);
+  }, [events, userProfile, loading, promoDismissed, promoEvent]);
 
   const handleDeleteEvent = async () => {
     if (!eventToDelete) return;
@@ -839,6 +857,19 @@ export const UserDashboard: React.FC = () => {
         isOpen={supportOpen}
         onClose={() => setSupportOpen(false)}
       />
+
+      <AnimatePresence>
+        {promoEvent && user && (
+          <FirstEventFreeModal
+            eventTitle={promoEvent.title || 'o teu evento'}
+            eventId={promoEvent.id}
+            userUid={user.uid}
+            userEmail={user.email || (userProfile as any)?.email || ''}
+            onClose={() => { setPromoEvent(null); setPromoDismissed(true); }}
+            onDismiss={() => { setPromoEvent(null); setPromoDismissed(true); }}
+          />
+        )}
+      </AnimatePresence>
     </div>
   );
 };

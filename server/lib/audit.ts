@@ -28,7 +28,8 @@ export type AuditAction =
   | 'admin.resync'
   | 'admin.mirror_view'
   | 'ticket.reply'
-  | 'ticket.status';
+  | 'ticket.status'
+  | 'promo.first_event';
 
 export async function logAudit(input: {
   actorEmail: string;

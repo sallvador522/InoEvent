@@ -331,6 +331,26 @@ export const Dashboard = () => {
                 !isAccountActive(event) &&
                 normalizePlanId(userProfile?.plan) !== 'business'));
 
+    // Promo 1º evento grátis: conta free + rascunho elegível + nunca usou.
+    // Banner persistente (o modal do UserDashboard abre 1x por sessão).
+    const promoEligible =
+        !!event &&
+        isFreeAccount &&
+        !hasPendingOrder &&
+        !(userProfile as any)?.firstEventFreeUsed &&
+        !['BRIDAL_SHOWER', 'BABY_SHOWER'].includes((event as any)?.type) &&
+        (event as any)?.billingStatus !== 'paid';
+
+    const openPromoWhatsApp = () => {
+        const origin = typeof window !== 'undefined' ? window.location.origin : 'https://www.inoevent.online';
+        const msg =
+          `Olá InoEvents! Quero a promo do PRIMEIRO EVENTO GRÁTIS 🎉\n\n` +
+          `Evento: "${(event as any)?.title || id || ''}" (${id || ''})\n` +
+          `Ver convite: ${origin}/invite/${id || ''}\n\n` +
+          `Aguardo a ativação aqui. Obrigado!`;
+        window.open(`https://wa.me/244952815430?text=${encodeURIComponent(msg)}`, '_blank', 'noopener,noreferrer');
+    };
+
     const requirePaidForShare = () => {
         if (isShareLocked) {
             toast.error(
@@ -1074,6 +1094,20 @@ export const Dashboard = () => {
                     </div>
                 </div>
 
+                {promoEligible && (
+                    <div className="mb-8 bg-gradient-to-r from-[#C5A028]/15 via-[#FFFDF8] to-[#C5A028]/15 border border-[#C5A028]/50 rounded-3xl p-5 flex flex-col sm:flex-row sm:items-center gap-4">
+                        <div className="flex-1">
+                            <p className="font-bold text-slate-800">🎉 O teu primeiro evento é GRÁTIS</p>
+                            <p className="text-sm text-slate-600">Ativamos este evento em Premium (50 convidados, 180 dias) sem pagares nada. Fala com um assistente no WhatsApp.</p>
+                        </div>
+                        <button
+                            onClick={openPromoWhatsApp}
+                            className="shrink-0 px-6 h-12 rounded-full bg-emerald-600 text-white font-bold text-xs uppercase tracking-wider hover:bg-emerald-700 cursor-pointer whitespace-nowrap"
+                        >
+                            Ativar grátis
+                        </button>
+                    </div>
+                )}
                 {isShareLocked && (
                     <div className="mb-8 bg-amber-50 border border-amber-200 rounded-3xl p-5 flex flex-col sm:flex-row sm:items-center gap-4">
                         <div className="flex-1">

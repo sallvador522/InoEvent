@@ -640,6 +640,41 @@ export const AdminDashboard: React.FC = () => {
     } catch { /* best-effort — o espelho abre na mesma */ }
   };
 
+  // Promo 1º evento grátis: assistente ativa após o WhatsApp (com travas no servidor).
+  const [promoBusyId, setPromoBusyId] = useState<string | null>(null);
+
+  const handlePromoFirstEvent = async (event: any) => {
+    if (!event?.id || promoBusyId) return;
+    const owner = users.find((u: any) => (u.id || u.uid) === event.ownerId);
+    if ((owner as any)?.firstEventFreeUsed === true) {
+      toast.error('Esta conta já usou o primeiro evento grátis.');
+      return;
+    }
+    if (!window.confirm(`Ativar GRÁTIS (Premium) o evento "${event.title || event.id}"? Uso único por conta.`)) return;
+    setPromoBusyId(event.id);
+    try {
+      const token = await auth.currentUser?.getIdToken();
+      const res = await fetch('/api/promo/first-event', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          ...(token ? { Authorization: `Bearer ${token}` } : {}),
+        },
+        body: JSON.stringify({ eventId: event.id }),
+      });
+      const data = await res.json().catch(() => ({}));
+      if (!res.ok) throw new Error(data?.error || 'promo failed');
+      setEvents((list) => list.map((e) => e.id === event.id ? { ...e, plan: 'premium', planId: 'premium', billingStatus: 'paid', status: 'active', isPublished: true, isBlocked: false } : e));
+      setUsers((list) => list.map((u) => ((u.id || u.uid) === event.ownerId ? { ...u, plan: 'premium', planId: 'premium', firstEventFreeUsed: true, firstEventFreeEventId: event.id } : u)));
+      setSelectedEvent((prev: any) => prev ? { ...prev, plan: 'premium', planId: 'premium', billingStatus: 'paid', isPublished: true, isBlocked: false } : prev);
+      toast.success('Promo ativada — evento em Premium!');
+    } catch (e: any) {
+      toast.error(e?.message || 'Não foi possível ativar a promo.');
+    } finally {
+      setPromoBusyId(null);
+    }
+  };
+
   const fetchTeam = async () => {
     setTeamLoading(true);
     try {
@@ -1014,10 +1049,12 @@ export const AdminDashboard: React.FC = () => {
   }
 
   const activePlansCount = users.filter(u => !['free', 'essential'].includes(normalizePlanId(u.plan ?? u.planId))).length;
+  // Promo 1º evento grátis: quantas contas já usaram (mede o CAC da campanha).
+  const promoUsedCount = users.filter((u: any) => u?.firstEventFreeUsed === true).length;
 
   const renderOverview = () => (
     <>
-      <div className="grid grid-cols-1 md:grid-cols-4 gap-6 mb-8">
+      <div className="grid grid-cols-1 md:grid-cols-5 gap-6 mb-8">
         <div className="bg-white p-6 rounded-2xl shadow-sm border border-slate-100 flex flex-col justify-center items-center">
             <span className="text-sm uppercase tracking-widest text-slate-500 font-bold mb-2">Total Usuários</span>
             <span className="text-4xl text-brand-blue font-bold">{users.length}</span>
@@ -1033,6 +1070,10 @@ export const AdminDashboard: React.FC = () => {
         <div className="bg-white p-6 rounded-2xl shadow-sm border border-slate-100 flex flex-col justify-center items-center">
             <span className="text-sm uppercase tracking-widest text-slate-500 font-bold mb-2">Transações</span>
             <span className="text-4xl text-brand-beige font-bold">{transactions.length}</span>
+        </div>
+        <div className="bg-white p-6 rounded-2xl shadow-sm border border-slate-100 flex flex-col justify-center items-center" title="Contas que ativaram a promo do 1º evento grátis">
+            <span className="text-sm uppercase tracking-widest text-slate-500 font-bold mb-2">🎉 Promos 1º evento</span>
+            <span className="text-4xl text-[#8a6d1c] font-bold">{promoUsedCount}</span>
         </div>
       </div>
       
@@ -1561,6 +1602,10 @@ export const AdminDashboard: React.FC = () => {
     if (!ev) return null;
     const owner = users.find((u: any) => (u.id || u.uid) === ev.ownerId);
     const evOrder = orders.find((o: any) => o.eventId === ev.id);
+    // Elegível à promo: não-chá, não-pago e dono nunca usou.
+    const promoEligible = !['BRIDAL_SHOWER', 'BABY_SHOWER'].includes(ev?.type) &&
+      ev?.billingStatus !== 'paid' &&
+      (owner as any)?.firstEventFreeUsed !== true;
     const evVisits = visits.filter((v: any) => v.eventId === ev.id).length;
     const confirmed = eventGuests.filter((g: any) => g.status === 'CONFIRMED' && !g.checkedIn).length;
     const checkedIn = eventGuests.filter((g: any) => g.checkedIn || g.status === 'CHECKED_IN').length;
@@ -1694,6 +1739,16 @@ export const AdminDashboard: React.FC = () => {
                 className="px-4 h-10 rounded-full bg-emerald-600 text-white font-bold text-xs uppercase tracking-wider hover:bg-emerald-700 cursor-pointer"
               >
                 Confirmar pagamento
+              </button>
+            )}
+            {promoEligible && (
+              <button
+                onClick={() => handlePromoFirstEvent(ev)}
+                disabled={promoBusyId === ev.id}
+                className="px-4 h-10 rounded-full bg-[#C5A028] text-[#1B365D] font-bold text-xs uppercase tracking-wider hover:bg-[#d4af37] cursor-pointer disabled:opacity-60"
+                title="Ativar GRÁTIS em Premium (uso único por conta)"
+              >
+                {promoBusyId === ev.id ? 'A ativar…' : '🎉 Ativar promo 1º evento'}
               </button>
             )}
             {ev.isBlocked ? (
@@ -1857,6 +1912,7 @@ export const AdminDashboard: React.FC = () => {
             <option value="subscription.cancel">Subscrições canceladas</option>
             <option value="admin.grant">Admins promovidos</option>
             <option value="admin.revoke">Admins removidos</option>
+            <option value="promo.first_event">Promos 1º evento</option>
           </select>
           <button
             onClick={fetchAuditLogs}

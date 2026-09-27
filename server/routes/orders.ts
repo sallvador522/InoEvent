@@ -51,6 +51,16 @@ router.post('/api/orders', apiRateLimiter, async (req, res) => {
   }
     const planId = normalizePlanId(plan);
     if (!PLANS[planId as any]) return res.status(400).json({ error: 'Plano inválido' });
+    // Essencial aposentado (retired): fora de venda — novos pedidos recusados.
+    // Pedidos pendentes antigos continuam confirmáveis via /:id/confirm (legado).
+    if (planId === 'essential') {
+      return res.status(403).json({
+        error: 'O plano Essencial está fora de venda. Escolha o Premium para ativar o seu evento.',
+        code: 'PLAN_RETIRED',
+        plan: planId,
+        upgradeTo: 'premium',
+      });
+    }
 
   try {
     // verifica evento existe e pertence ao user (se autenticado)
@@ -58,6 +68,8 @@ router.post('/api/orders', apiRateLimiter, async (req, res) => {
     const evSnap = await db.collection('events').doc(eventId).get();
     if (!evSnap.exists) return res.status(404).json({ error: 'Evento não encontrado' });
     const ev = evSnap.data() as any;
+    // Título denormalizado no pedido (fonte da verdade: banco, nunca o cliente)
+    const eventTitle = typeof ev?.title === 'string' ? ev.title.slice(0, 100) : null;
     if (authUser && ev.ownerId !== authUser.uid) {
       // admin pode criar para outros; verifica se é admin via token email
       const isAdmin = authUser.email === 'antoniosalvador522@gmail.com';
@@ -95,6 +107,7 @@ router.post('/api/orders', apiRateLimiter, async (req, res) => {
     const order = await createOrder({
       userId: effectiveUserId,
       eventId,
+      eventTitle,
       plan: planId as any,
       addons: addons || {},
       organizationId: organizationId || null,
@@ -223,6 +236,43 @@ router.post('/api/webhooks/payment', async (req, res) => {
   } catch (err: any) {
     logger.error('Webhook erro', { category: 'SYSTEM', data: err?.message || err });
     return res.status(500).json({ error: 'Webhook error' });
+  }
+});
+
+// ---------------------------------------------------------------------------
+// POST /api/admin/backfill-order-titles — preenche eventTitle denormalizado
+// em pedidos antigos (criados antes da denormalização). Admin estrito.
+// ---------------------------------------------------------------------------
+router.post('/api/admin/backfill-order-titles', apiRateLimiter, async (req, res) => {
+  const authUser = await getAuthUser(req);
+  if (!authUser || authUser.email !== 'antoniosalvador522@gmail.com') {
+    return res.status(403).json({ error: 'Apenas admin' });
+  }
+  try {
+    const db = getDb();
+    const snap = await db.collection('orders').get();
+    let updated = 0;
+    let skipped = 0;
+    for (const d of snap.docs) {
+      const data = d.data() as any;
+      if (data?.eventTitle) { skipped++; continue; }
+      if (!data?.eventId) { skipped++; continue; }
+      try {
+        const evSnap = await db.collection('events').doc(data.eventId).get();
+        const title = evSnap.exists && typeof (evSnap.data() as any)?.title === 'string'
+          ? (evSnap.data() as any).title.slice(0, 100)
+          : null;
+        if (!title) { skipped++; continue; }
+        await d.ref.update({ eventTitle: title } as any);
+        updated++;
+      } catch {
+        skipped++;
+      }
+    }
+    return res.json({ success: true, updated, skipped, total: snap.size });
+  } catch (err: any) {
+    logger.error('Backfill order titles erro', { category: 'SYSTEM', data: err?.message || err });
+    return res.status(500).json({ error: 'Erro no backfill' });
   }
 });
 

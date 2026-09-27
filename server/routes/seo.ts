@@ -50,7 +50,7 @@ router.get('/plans', async (req, res, next) => {
         <h2>Plano Premium</h2>
         <p>Preço: ${formatPrice(PLANS.premium.price)} (Pagamento único por evento). Validade ${PLANS.premium.validityDays} dias. Até ${PLANS.premium.guestLimit} convidados. Inclui: convidados individualizados, galeria premium, música, livro de assinaturas, mapa das mesas, analytics básicos. (Sem marca InoEvents só no Business.)</p>
         <h2>Plano VIP</h2>
-        <p>Preço: ${formatPrice(PLANS.vip.price)} (Pagamento único por evento). Validade ${PLANS.vip.validityDays} dias. Até ${PLANS.vip.guestLimit} convidados. Inclui: tudo do Premium + QR individual, check-in, gestão +1, mesas avançadas, analytics avançados, personalização avançada, suporte prioritário.</p>
+        <p>Preço: ${formatPrice(PLANS.vip.price)} (Pagamento único por evento). Validade ${PLANS.vip.validityDays} dias. Até ${PLANS.vip.guestLimit} convidados. Inclui: tudo do Premium + QR individual, check-in, gestão +1, mesas avançadas, analytics avançados, suporte prioritário.</p>
         <h2>Concierge (Add-on)</h2>
         <p>Preço: +${formatPrice(ADDONS.concierge.price)} por evento. A equipa InoEvent configura o evento por si.</p>
         <h2>Plano Business (B2B)</h2>

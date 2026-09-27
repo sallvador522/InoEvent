@@ -12,6 +12,7 @@ import type { Order, Subscription, PlanId, BillingStatus } from '../../types.js'
 export type CreateOrderInput = {
   userId: string;
   eventId: string;
+  eventTitle?: string | null;
   plan: PlanId;
   addons?: { concierge?: boolean };
   paymentProvider?: Order['paymentProvider'];
@@ -34,6 +35,7 @@ export async function createOrder(input: CreateOrderInput): Promise<Order> {
     userId: input.userId,
     organizationId: input.organizationId || null,
     eventId: input.eventId,
+    eventTitle: typeof input.eventTitle === 'string' ? input.eventTitle.slice(0, 100) : null,
     plan,
     amount: total,
     currency: 'AOA',

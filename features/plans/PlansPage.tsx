@@ -257,10 +257,19 @@ export const PlansPage: React.FC = () => {
     const conciergeLine = whatsappModal.concierge
       ? `\n+ Concierge (equipa cria o convite): ${ADDONS.concierge.price.toLocaleString('pt-AO')} Kz`
       : "";
+    // Referência pronta do evento: título denormalizado + link público.
+    // A equipa envia o IBAN depois neste mesmo chat; o usuário responde com o comprovativo.
+    const eventTitleLine = activatingEventTitle
+      ? `\nEvento: "${activatingEventTitle}" (${activatingEventId})${orderRef}`
+      : (orderRef ? `\nEvento: ${activatingEventId || "—"}${orderRef}` : "");
+    const inviteLinkLine = activatingEventId
+      ? `\nVer convite: ${typeof window !== 'undefined' ? window.location.origin : 'https://www.inoevent.online'}/invite/${activatingEventId}`
+      : "";
+    const totalLine = modalTotal(whatsappModal);
 
     const messageText = whatsappModal.name === "Business"
-      ? `Olá! Gostaria de subscrever ao Plano ${whatsappModal.name.toUpperCase()} para a minha agência.\n\nID da Plataforma: ${user.uid}\nE-mail: ${user.email || "Não informado"}${orderRef ? `\nEvento: ${activatingEventId || "—"}${orderRef}` : ""}${conciergeLine}\n\nEstou em contacto para concluir o pagamento do meu plano. Obrigado!`
-      : `Olá! Gostaria de comprar o Plano ${whatsappModal.name.toUpperCase()} por ${modalTotal(whatsappModal)} Kz.${conciergeLine}\n\nID da Plataforma: ${user.uid}\nE-mail: ${user.email || "Não informado"}${orderRef ? `\nEvento: ${activatingEventId || "—"}${orderRef}` : ""}\n\nEstou em contacto para concluir o pagamento do meu plano. Obrigado!`;
+      ? `Olá InoEvents! Quero subscrever o Plano ${whatsappModal.name.toUpperCase()} para a minha agência.${conciergeLine}\n\nID da Plataforma: ${user.uid}\nE-mail: ${user.email || "Não informado"}${eventTitleLine}${inviteLinkLine}\n\nAguardo o IBAN aqui e envio o comprovativo nesta conversa. Obrigado!`
+      : `Olá InoEvents! Quero ativar o Plano ${whatsappModal.name.toUpperCase()} — ${totalLine} Kz.${conciergeLine}\n\nID da Plataforma: ${user.uid}\nE-mail: ${user.email || "Não informado"}${eventTitleLine}${inviteLinkLine}\n\nAguardo o IBAN aqui e envio o comprovativo nesta conversa. Obrigado!`;
 
     const cleanNumber = whatsappNumber.replace(/\D/g, "");
     const url = `https://wa.me/${cleanNumber}?text=${encodeURIComponent(messageText)}`;
@@ -428,7 +437,7 @@ export const PlansPage: React.FC = () => {
                     {plan.id === "premium"
                       ? "O grande dia, em grande e inesquecível."
                       : plan.id === "vip"
-                        ? "Receção com check-in e endereço próprio."
+                        ? "Receção com check-in inteligente."
                         : "Para agências e cerimonialistas, todos os meses."}
                   </p>
 

@@ -1061,6 +1061,30 @@ export const Dashboard = () => {
                                         ? `Pedido ${eventOrder?.id || ''} em confirmação — avisamos aqui assim que o pagamento for validado.`
                                         : 'O teu convite está pronto, mas o link público só vive após a ativação. Conclui no WhatsApp e avisamos aqui.'}
                             </p>
+                            {hasPendingOrder && (
+                                <div className="mt-3 flex flex-wrap gap-2">
+                                    <button
+                                        onClick={() => {
+                                            const ref = `Pedido ${eventOrder?.id || ''} · Evento ${id || ''}${event?.title ? ` · "${event.title}"` : ''}`;
+                                            copyToClipboard(ref);
+                                            toast.success('Referência copiada!');
+                                        }}
+                                        className="px-4 h-10 rounded-full bg-white border border-amber-300 text-amber-800 font-bold text-xs uppercase tracking-wider hover:bg-amber-100 cursor-pointer whitespace-nowrap inline-flex items-center gap-2"
+                                    >
+                                        <Copy size={14} /> Copiar referência
+                                    </button>
+                                    <button
+                                        onClick={() => {
+                                            const msg = `Olá InoEvents! Fiz o pedido ${eventOrder?.id || ''} para o evento "${event?.title || id || ''}" (${id || ''}). Aguardo o IBAN aqui e envio o comprovativo nesta conversa. Obrigado!`;
+                                            const url = `https://wa.me/244952815430?text=${encodeURIComponent(msg)}`;
+                                            window.open(url, '_blank', 'noopener,noreferrer');
+                                        }}
+                                        className="px-4 h-10 rounded-full bg-emerald-600 text-white font-bold text-xs uppercase tracking-wider hover:bg-emerald-700 cursor-pointer whitespace-nowrap inline-flex items-center gap-2"
+                                    >
+                                        <MessageSquare size={14} /> Reabrir WhatsApp
+                                    </button>
+                                </div>
+                            )}
                         </div>
                         {!hasPendingOrder && (
                             <button

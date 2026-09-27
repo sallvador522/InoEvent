@@ -24,7 +24,7 @@ Para quem procura requinte e exclusividade no grande dia. **1 evento de casament
   - Nota: sem marca InoEvents SÓ no Business (white-label exclusivo B2B).
 
 ### Convite VIP (Pagamento Único)
-Para grandes festas que precisam de controlo total e endereço próprio. **1 evento de casamento por plano.**
+Para grandes festas que precisam de controlo total na receção. **1 evento de casamento por plano.**
 - **Preço**: 25.000 Kz / por evento.
 - **Duração**: Ativo durante 365 dias após a ativação.
 - **Recursos**:

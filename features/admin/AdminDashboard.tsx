@@ -16,6 +16,7 @@ export const AdminDashboard: React.FC = () => {
   const [visits, setVisits] = useState<any[]>([]);
   const [loading, setLoading] = useState(true);
   const [confirmingOrderId, setConfirmingOrderId] = useState<string | null>(null);
+  const [togglingEventId, setTogglingEventId] = useState<string | null>(null);
   const [isSendingNotif, setIsSendingNotif] = useState(false);
   const [isRenewing, setIsRenewing] = useState(false);
   
@@ -251,6 +252,47 @@ export const AdminDashboard: React.FC = () => {
     }
   };
 
+  const handleToggleEventActive = async (event: any, activate: boolean) => {
+    if (!event?.id || togglingEventId) return;
+    const label = activate ? 'ATIVAR e PUBLICAR' : 'DESATIVAR';
+    if (!window.confirm(`${label} o evento "${event.title || event.id}"?${activate ? '' : ' O convite público fica indisponível.'}`)) return;
+    setTogglingEventId(event.id);
+    try {
+      const token = await auth.currentUser?.getIdToken();
+      const res = await fetch(`/api/admin/events/${event.id}/${activate ? 'activate' : 'block'}`, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          ...(token ? { Authorization: `Bearer ${token}` } : {}),
+        },
+        body: JSON.stringify({}),
+      });
+      if (!res.ok) throw new Error('toggle failed');
+      const data = await res.json();
+      setEvents((list) =>
+        list.map((e) =>
+          e.id === event.id
+            ? {
+                ...e,
+                isBlocked: activate ? false : true,
+                status: activate ? 'active' : 'blocked',
+                scheduledBlockDate: activate ? null : e.scheduledBlockDate,
+                isPublished: activate ? true : e.isPublished,
+                publishedAt: activate && !e.publishedAt ? new Date().toISOString() : e.publishedAt,
+              }
+            : e
+        )
+      );
+      toast.success(activate ? `Evento "${event.title || event.id}" ativado e publicado!` : `Evento "${event.title || event.id}" desativado.`);
+      void data;
+    } catch (error) {
+      console.error('Error toggling event:', error);
+      toast.error('Não foi possível alterar o evento. Tente de novo.');
+    } finally {
+      setTogglingEventId(null);
+    }
+  };
+
   const callSubscriptionAction = async (sub: any, action: 'renew' | 'cancel') => {
     if (!sub?.id || subActionId) return;
     const label = action === 'renew' ? 'renovar +30 dias' : 'cancelar (corta em 7 dias)';
@@ -371,7 +413,7 @@ export const AdminDashboard: React.FC = () => {
               <li key={o.id} className="p-4 sm:p-5 flex flex-col sm:flex-row sm:items-center gap-3">
                 <div className="flex-1 min-w-0">
                   <p className="font-bold text-sm text-slate-900 truncate">
-                    {o.plan} · {fmtKz(o.amount)}
+                    {(o.eventTitle || (() => { const ev = events.find((e: any) => e.id === o.eventId); return ev?.title; })() || 'Evento sem título')} · {o.plan} · {fmtKz(o.amount)}
                     <span className={`ml-2 text-[10px] font-black uppercase tracking-wider px-2 py-0.5 rounded-full ${o.billingStatus === 'paid' ? 'bg-emerald-100 text-emerald-700' : o.billingStatus === 'failed' ? 'bg-red-100 text-red-600' : 'bg-amber-100 text-amber-700'}`}>
                       {o.billingStatus}
                     </span>
@@ -765,6 +807,7 @@ export const AdminDashboard: React.FC = () => {
               <th className="px-6 py-4">Tipo</th>
               <th className="px-6 py-4">Data</th>
               <th className="px-6 py-4">Status</th>
+              <th className="px-6 py-4 text-right">Ação</th>
             </tr>
           </thead>
           <tbody className="divide-y divide-slate-100">
@@ -781,7 +824,32 @@ export const AdminDashboard: React.FC = () => {
                   {event.date ? new Date(event.date).toLocaleDateString() : 'N/A'}
                 </td>
                 <td className="px-6 py-4">
-                  <span className="px-2 py-1 bg-green-100 text-green-700 rounded text-xs font-bold">Ativo</span>
+                  {event.isBlocked ? (
+                    <span className="px-2 py-1 bg-red-100 text-red-700 rounded text-xs font-bold">Desativado</span>
+                  ) : event.isPublished === false ? (
+                    <span className="px-2 py-1 bg-amber-100 text-amber-700 rounded text-xs font-bold">Pendente</span>
+                  ) : (
+                    <span className="px-2 py-1 bg-green-100 text-green-700 rounded text-xs font-bold">Ativo</span>
+                  )}
+                </td>
+                <td className="px-6 py-4 text-right whitespace-nowrap">
+                  {event.isBlocked ? (
+                    <button
+                      onClick={() => handleToggleEventActive(event, true)}
+                      disabled={togglingEventId === event.id}
+                      className="px-4 h-9 rounded-full bg-emerald-600 text-white font-bold text-xs uppercase tracking-wider hover:bg-emerald-700 disabled:opacity-60 cursor-pointer"
+                    >
+                      {togglingEventId === event.id ? 'A ativar…' : 'Ativar'}
+                    </button>
+                  ) : (
+                    <button
+                      onClick={() => handleToggleEventActive(event, false)}
+                      disabled={togglingEventId === event.id}
+                      className="px-4 h-9 rounded-full border border-red-200 text-red-600 font-bold text-xs uppercase tracking-wider hover:bg-red-50 disabled:opacity-60 cursor-pointer"
+                    >
+                      {togglingEventId === event.id ? 'A desativar…' : 'Desativar'}
+                    </button>
+                  )}
                 </td>
               </tr>
             ))}

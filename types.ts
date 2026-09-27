@@ -61,6 +61,8 @@ export interface Order {
   userId: string;
   organizationId?: string | null;
   eventId: string;
+  /** Título do evento denormalizado (matching rápido no admin/WhatsApp) */
+  eventTitle?: string | null;
   plan: PlanId;
   amount: number;
   currency: 'AOA';

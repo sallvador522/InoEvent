@@ -23,8 +23,9 @@ import { getActiveSubscription } from '../lib/billing.js';
 const router = Router();
 
 const SHOWER_TYPES = ['BRIDAL_SHOWER', 'BABY_SHOWER'];
+// Essencial aposentado (retired): nunca sugerir como upgrade — free sobe direto a premium.
 const UPGRADE_AFTER: Record<string, string | null> = {
-  free: 'essential',
+  free: 'premium',
   essential: 'premium',
   premium: 'vip',
   vip: 'business',

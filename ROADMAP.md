@@ -36,7 +36,7 @@ Este documento apresenta uma auditoria brutalmente honesta, crítica e detalhada
 1.  **Modelo Freemium/SaaS de Evento Único:**
     *   **Plano Essencial (fora de venda, legado):** fichas antigas mantêm 100 convidados / 90 dias.
     *   **Plano Premium / Luxury:** 1 evento de casamento por plano, até 50 convidados, galeria premium, suporte ao TocaPlayer com upload direto de MP3, mural interativo e sem publicidade ("white-label").
-    *   **Plano VIP:** 1 evento por plano, até 200 convidados, QR individual e domínio próprio.
+    *   **Plano VIP:** 1 evento por plano, até 200 convidados, QR individual e check-in inteligente.
 2.  **Taxas sobre Presentes Virtuais:** Cobrança de micro-taxas fixas ou percentuais na confirmação de saques de presentes virtuais (em Angola, otimizado via canais locais de pagamentos).
 
 ### Diferenciação Real & Product Market Fit

@@ -29,6 +29,7 @@ import seoRoutes from './server/routes/seo.js';
 import ordersRoutes from './server/routes/orders.js';
 import metaRoutes from './server/routes/meta.js';
 import subscriptionsRoutes from './server/routes/subscriptions.js';
+import adminEventsRoutes from './server/routes/admin-events.js';
 
 // --- Express App ---
 const app = express();
@@ -128,6 +129,7 @@ app.use(eventsRoutes);    // POST /api/events — criação com limite por plano
 app.use(ordersRoutes);    // /api/orders, /api/events/:id/order, /api/webhooks/payment
 app.use(metaRoutes);      // POST /api/meta/events — relay da Conversions API (deduplicado via event_id)
 app.use(subscriptionsRoutes); // /api/subscriptions/*
+app.use(adminEventsRoutes); // /api/admin/events/:id/block|activate — Ativar/Desativar manual
 
 // --- Global Error Handler ---
 app.use((err: any, req: express.Request, res: express.Response, _next: express.NextFunction) => {

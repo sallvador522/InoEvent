@@ -241,7 +241,7 @@ export const LandingPage: React.FC = () => {
     <div className="flex-1 min-h-screen flex flex-col justify-between relative font-display overflow-x-hidden bg-[#FDFBF7] text-slate-900">
       <SEO 
         title="InoEvents Angola | Convites Digitais de Casamento, Chá de Panela e Gestão de Eventos" 
-        description={`A plataforma mais elegante de Angola para criar convites digitais de casamento e chás de panela a partir de ${PLANS.essential.price.toLocaleString('pt-AO')} Kz, com RSVP online, QR Code de acesso, mapa da zona com botão Como chegar, check-in presencial no evento, lista de convidados e presentes por IBAN.`}
+        description={`A plataforma mais elegante de Angola para criar convites digitais de casamento e chás de panela a partir de ${PLANS.premium.price.toLocaleString('pt-AO')} Kz, com RSVP online, QR Code de acesso, mapa da zona com botão Como chegar, check-in presencial no evento, lista de convidados e presentes por IBAN.`}
       />
 
       <Navbar />
@@ -618,7 +618,7 @@ export const LandingPage: React.FC = () => {
                      O mais escolhido
                   </div>
                   <h4 className="font-serif text-2xl font-bold text-white mb-1">VIP</h4>
-                  <p className="text-blue-200/70 text-[13px] font-light leading-relaxed mb-6">Receção com check-in e endereço próprio.</p>
+                  <p className="text-blue-200/70 text-[13px] font-light leading-relaxed mb-6">Receção com check-in inteligente.</p>
                   <div className="mb-2 flex items-baseline gap-1">
                      <span className="text-4xl font-serif font-bold text-white" style={{ fontVariantNumeric: 'tabular-nums' }}>{PLANS.vip.price.toLocaleString('pt-AO')}</span>
                      <span className="text-blue-200/70 text-sm font-medium">Kz / evento</span>

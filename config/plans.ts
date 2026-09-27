@@ -40,11 +40,8 @@ export type FeatureId =
   | 'checkin'
   | 'plus_one'
   | 'advanced_tables'
-  | 'reminders'
   | 'advanced_analytics'
-  | 'advanced_customization'
   | 'priority_support'
-  | 'custom_domain'
   // Business (+)
   | 'multiple_events'
   | 'client_management'
@@ -179,13 +176,8 @@ export const PLANS: Record<PlanId, PlanConfig> = {
       'checkin',
       'plus_one',
       'advanced_tables',
-      // 'reminders' e 'custom_domain' removidos do catálogo (sem implementação);
-      // mantidos aqui como reserva técnica, sem efeito em gates.
-      'reminders',
       'advanced_analytics',
-      'advanced_customization',
       'priority_support',
-      'custom_domain',
     ],
   },
   business: {
@@ -220,11 +212,8 @@ export const PLANS: Record<PlanId, PlanConfig> = {
       'checkin',
       'plus_one',
       'advanced_tables',
-      'reminders',
       'advanced_analytics',
-      'advanced_customization',
       'priority_support',
-      'custom_domain',
       // + b2b
       'multiple_events',
       'client_management',

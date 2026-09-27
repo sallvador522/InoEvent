@@ -23,6 +23,20 @@ if ('serviceWorker' in navigator) {
   });
 }
 
+// Marca quando a fonte de ícones Material Symbols carregou (ver guarda em index.css).
+try {
+  const done = () => document.documentElement.classList.add('ms-ready');
+  const p = (document as any).fonts?.load?.('24px "Material Symbols Outlined"');
+  if (p?.then) {
+    p.then(done).catch(done);
+    setTimeout(done, 3500);
+  } else {
+    done();
+  }
+} catch {
+  document.documentElement.classList.add('ms-ready');
+}
+
 const rootElement = document.getElementById('root');
 if (!rootElement) {
   throw new Error("Could not find root element to mount to");

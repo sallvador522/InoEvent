@@ -5,6 +5,11 @@ import toast from 'react-hot-toast';
 import { useFirebase, signOut, auth, db, handleFirestoreError, OperationType } from './FirebaseProvider';
 import { collection, query, where, onSnapshot, orderBy, limit, doc, updateDoc, deleteDoc } from 'firebase/firestore';
 import { normalizePlanId, getPlanConfig } from '../lib/entitlements';
+import {
+  BadgeCheck, Bell, BellRing, Briefcase, Check, ChevronDown, ChevronRight,
+  Heart, Home, Info, LayoutDashboard, LogOut, MessageCircle, Phone,
+  Plus, ShieldCheck, Trash2, X, ArrowRight, Menu,
+} from 'lucide-react';
 
 export const Navbar: React.FC = () => {
   const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
@@ -213,11 +218,11 @@ export const Navbar: React.FC = () => {
             </span>
           </Link>
 
-          {/* User Plan Badge and Credits directly in header */}
+          {/* User Plan Badge — escondido em telas estreitas para não lotar */}
           {user && (
-            <div className="flex items-center gap-1.5 ml-1 sm:ml-2">
+            <div className="hidden min-[480px]:flex items-center gap-1.5 ml-1 sm:ml-2">
               <span className="px-2 py-0.5 md:px-2.5 md:py-1 rounded-full text-[10px] md:text-xs font-bold leading-none bg-gradient-to-r from-amber-500/20 to-amber-600/30 text-amber-300 border border-amber-500/20 shadow-sm uppercase tracking-wider flex items-center gap-1 scale-95 md:scale-100">
-                <span className="material-symbols-outlined text-[10px] md:text-[12px] text-amber-400">verified</span>
+                <BadgeCheck size={12} className="text-amber-400" aria-hidden="true" />
                 {accountPlanName ? (
                   <span>{accountPlanName}</span>
                 ) : (
@@ -238,8 +243,8 @@ export const Navbar: React.FC = () => {
           )}
         </div>
 
-        {/* Desktop Navigation */}
-        <div className="hidden md:flex items-center gap-8 text-sm font-medium text-blue-100">
+        {/* Desktop Navigation (lg+: hambúrguer abaixo disso para nunca lotar) */}
+        <div className="hidden lg:flex items-center gap-5 xl:gap-8 text-sm font-medium text-blue-100">
            <button onClick={() => goToSection('features')} className="hover:text-white transition-colors cursor-pointer">Funcionalidades</button>
            <Link to="/plans" className="hover:text-white transition-colors">Preços</Link>
            <a href="https://wa.me/244952815430" target="_blank" rel="noopener noreferrer" className="hover:text-white transition-colors">Contactos</a>
@@ -256,7 +261,7 @@ export const Navbar: React.FC = () => {
                     aria-haspopup="true"
                     title="Ir para Meus Eventos"
                   >
-                    Meus Eventos <span className="material-symbols-outlined text-sm transition-transform group-hover:rotate-180">expand_more</span>
+                    Meus Eventos <ChevronDown size={14} className="transition-transform group-hover:rotate-180" aria-hidden="true" />
                   </button>
                   
                   {/* Dropdown Desktop */}
@@ -305,7 +310,7 @@ export const Navbar: React.FC = () => {
                       onClick={() => setNotificationsOpen(!notificationsOpen)}
                       className="relative w-8 h-8 rounded-full bg-white/10 hover:bg-white/20 active:bg-white/15 border border-white/10 flex items-center justify-center transition-all cursor-pointer select-none outline-none focus:outline-none"
                     >
-                      <span className="material-symbols-outlined text-[18px] text-white">notifications</span>
+                      <Bell size={18} className="text-white" aria-hidden="true" />
                       {notifications.filter(n => !n.read).length > 0 && (
                         <span className="absolute -top-1 -right-1 w-4.5 h-4.5 bg-red-500 text-white font-bold text-[9px] rounded-full flex items-center justify-center animate-pulse border border-brand-blue shadow-lg">
                           {notifications.filter(n => !n.read).length}
@@ -327,7 +332,7 @@ export const Navbar: React.FC = () => {
                           >
                             <div className="p-4 border-b border-slate-50 bg-slate-50/50 flex justify-between items-center">
                               <span className="font-bold text-xs tracking-wide text-slate-800 flex items-center gap-1.5 uppercase">
-                                <span className="material-symbols-outlined text-sm text-brand-blue">circle_notifications</span>
+                                <BellRing size={14} className="text-brand-blue" aria-hidden="true" />
                                 Notificações
                               </span>
                               {notifications.filter(n => !n.read).length > 0 && (
@@ -372,7 +377,7 @@ export const Navbar: React.FC = () => {
                                           {pendingNotifId === n.id ? (
                                             <span className="w-3 h-3 border-2 border-blue-200 border-t-brand-blue rounded-full animate-spin block" aria-hidden="true" />
                                           ) : (
-                                            <span className="material-symbols-outlined text-[13px]">done</span>
+                                            <Check size={13} aria-hidden="true" />
                                           )}
                                         </button>
                                       )}
@@ -385,7 +390,7 @@ export const Navbar: React.FC = () => {
                                         {pendingNotifId === n.id ? (
                                           <span className="w-3 h-3 border-2 border-slate-200 border-t-red-400 rounded-full animate-spin block" aria-hidden="true" />
                                         ) : (
-                                          <span className="material-symbols-outlined text-[13px]">delete</span>
+                                          <Trash2 size={13} aria-hidden="true" />
                                         )}
                                       </button>
                                     </div>
@@ -393,7 +398,7 @@ export const Navbar: React.FC = () => {
                                 ))
                               ) : (
                                 <div className="py-10 text-center text-slate-400 text-xs font-semibold flex flex-col items-center justify-center gap-1 bg-white">
-                                  <span className="material-symbols-outlined text-2xl text-slate-300">chat_bubble_outline</span>
+                                  <MessageCircle size={28} className="text-slate-300" aria-hidden="true" />
                                   Nenhuma notificação
                                 </div>
                               )}
@@ -412,7 +417,7 @@ export const Navbar: React.FC = () => {
                   
                   {isAdmin && (
                     <Link to="/admin" className="ml-4 hover:text-primary transition-colors font-semibold text-white flex items-center gap-1">
-                      <span className="material-symbols-outlined text-sm">admin_panel_settings</span>
+                      <ShieldCheck size={14} aria-hidden="true" />
                       Admin
                     </Link>
                   )}
@@ -434,7 +439,7 @@ export const Navbar: React.FC = () => {
         </div>
 
         {/* Mobile Actions */}
-        <div className="flex items-center gap-2 sm:gap-4 md:hidden">
+        <div className="flex items-center gap-2 sm:gap-4 lg:hidden">
           <Link to="/plans" className="text-sm font-semibold text-blue-100 hover:text-white transition-colors">Preços</Link>
           {!user && (
             <>
@@ -450,7 +455,7 @@ export const Navbar: React.FC = () => {
                 onClick={() => setNotificationsOpen(!notificationsOpen)}
                 className="relative w-8 h-8 rounded-full bg-white/10 hover:bg-white/20 active:bg-white/15 flex items-center justify-center transition-all cursor-pointer outline-none"
               >
-                <span className="material-symbols-outlined text-[18px] text-white">notifications</span>
+                <Bell size={18} className="text-white" aria-hidden="true" />
                 {notifications.filter(n => !n.read).length > 0 && (
                   <span className="absolute -top-0.5 -right-0.5 w-4 h-4 bg-red-500 text-white font-bold text-[8px] rounded-full flex items-center justify-center animate-pulse">
                     {notifications.filter(n => !n.read).length}
@@ -521,8 +526,8 @@ export const Navbar: React.FC = () => {
           <button 
            onClick={() => setMobileMenuOpen(!mobileMenuOpen)}
            className="bg-white/10 hover:bg-white/20 text-white p-2 rounded-full flex items-center justify-center transition-colors">
-            <span className="material-symbols-outlined text-[20px]">
-              {mobileMenuOpen ? 'close' : 'menu'}
+            <span className="text-[20px] inline-flex">
+              {mobileMenuOpen ? <X size={20} aria-hidden="true" /> : <Menu size={20} aria-hidden="true" />}
             </span>
           </button>
         </div>
@@ -535,7 +540,7 @@ export const Navbar: React.FC = () => {
             initial={{ opacity: 0 }}
             animate={{ opacity: 1 }}
             exit={{ opacity: 0 }}
-            className="fixed inset-0 bg-brand-blue/80 backdrop-blur-sm z-40 md:hidden"
+            className="fixed inset-0 bg-brand-blue/80 backdrop-blur-sm z-40 lg:hidden"
             onClick={() => setMobileMenuOpen(false)}
           />
         )}
@@ -550,7 +555,7 @@ export const Navbar: React.FC = () => {
             animate={{ x: 0 }}
             exit={{ x: '100%' }}
             transition={{ type: 'spring', damping: 25, stiffness: 200 }}
-            className="fixed top-0 right-0 bottom-0 w-[85%] max-w-sm bg-white z-50 p-6 shadow-2xl md:hidden overflow-y-auto flex flex-col font-display"
+            className="fixed top-0 right-0 bottom-0 w-[85%] max-w-sm bg-white z-50 p-6 shadow-2xl lg:hidden overflow-y-auto flex flex-col font-display"
           >
             <div className="flex justify-between items-center mb-8">
               <Link to="/" onClick={() => setMobileMenuOpen(false)} className="w-10 h-10 rounded-xl overflow-hidden border border-slate-100 shadow-sm flex items-center justify-center bg-white">
@@ -560,14 +565,14 @@ export const Navbar: React.FC = () => {
                 onClick={() => setMobileMenuOpen(false)}
                 className="bg-slate-100 hover:bg-slate-200 text-slate-500 p-2 rounded-full transition-colors flex items-center justify-center w-10 h-10"
               >
-                <span className="material-symbols-outlined text-xl">close</span>
+                <X size={20} aria-hidden="true" />
               </button>
             </div>
 
             <div className="flex flex-col gap-6 font-semibold text-lg text-slate-700">
               <Link to="/" onClick={() => setMobileMenuOpen(false)} className="hover:text-primary transition-colors flex items-center justify-between">
-                <span className="flex items-center gap-3"><span className="material-symbols-outlined text-slate-400">home</span> Início</span>
-                <span className="material-symbols-outlined text-slate-300">chevron_right</span>
+                <span className="flex items-center gap-3"><Home size={18} className="text-slate-400" aria-hidden="true" /> Início</span>
+                <ChevronRight size={18} className="text-slate-300" aria-hidden="true" />
               </Link>
               
               {user && (
@@ -576,10 +581,8 @@ export const Navbar: React.FC = () => {
                     onClick={() => setDashboardOpen(!dashboardOpen)} 
                     className="hover:text-primary transition-colors flex items-center justify-between w-full truncate"
                   >
-                    <span className="flex items-center gap-3 truncate"><span className="material-symbols-outlined text-slate-400">dashboard</span> Meus Eventos</span>
-                    <span className="material-symbols-outlined text-slate-300 text-xl transition-transform duration-300 flex-shrink-0" style={{ transform: dashboardOpen ? 'rotate(180deg)' : 'rotate(0deg)' }}>
-                      expand_more
-                    </span>
+<span className="flex items-center gap-3 truncate"><LayoutDashboard size={18} className="text-slate-400" aria-hidden="true" /> Meus Eventos</span>
+                <ChevronRight size={20} className="text-slate-300 flex-shrink-0 transition-transform duration-300" style={{ transform: dashboardOpen ? 'rotate(180deg)' : 'rotate(0deg)' }} aria-hidden="true" />
                   </button>
                   
                   <AnimatePresence>
@@ -616,7 +619,7 @@ export const Navbar: React.FC = () => {
                               })}
                               {sortedEvents.length > 3 && (
                                 <Link to="/dashboard" onClick={() => setMobileMenuOpen(false)} className="text-primary mt-2 flex items-center gap-1 font-bold truncate">
-                                  Ver todos <span className="material-symbols-outlined text-sm">arrow_forward</span>
+                                  Ver todos <ArrowRight size={14} aria-hidden="true" />
                                 </Link>
                               )}
                             </>
@@ -632,29 +635,29 @@ export const Navbar: React.FC = () => {
               
               {(isBusinessAccount) && (
                   <Link to="/b2b" onClick={() => setMobileMenuOpen(false)} className="hover:text-primary transition-colors flex items-center justify-between">
-                    <span className="flex items-center gap-3"><span className="material-symbols-outlined text-brand-blue">business_center</span> <span className="font-bold text-brand-blue">Meu Negócio</span></span>
-                    <span className="material-symbols-outlined text-slate-300">chevron_right</span>
+<span className="flex items-center gap-3"><Briefcase size={18} className="text-brand-blue" aria-hidden="true" /> <span className="font-bold text-brand-blue">Meu Negócio</span></span>
+                <ChevronRight size={18} className="text-slate-300" aria-hidden="true" />
                   </Link>
               )}
 
               {isAdmin && (
                   <Link to="/admin" onClick={() => setMobileMenuOpen(false)} className="hover:text-primary transition-colors flex items-center justify-between">
-                    <span className="flex items-center gap-3"><span className="material-symbols-outlined text-purple-600">admin_panel_settings</span> <span className="font-bold text-purple-600">Admin</span></span>
-                    <span className="material-symbols-outlined text-slate-300">chevron_right</span>
+                    <span className="flex items-center gap-3"><ShieldCheck size={18} className="text-purple-600" aria-hidden="true" /> <span className="font-bold text-purple-600">Admin</span></span>
+                    <ChevronRight size={18} className="text-slate-300" aria-hidden="true" />
                   </Link>
               )}
               
               <button onClick={() => goToSection('features')} className="hover:text-primary transition-colors flex items-center justify-between w-full text-left cursor-pointer">
-                <span className="flex items-center gap-3"><span className="material-symbols-outlined text-slate-400">favorite</span> Funcionalidades</span>
-                <span className="material-symbols-outlined text-slate-300">chevron_right</span>
+                <span className="flex items-center gap-3"><Heart size={18} className="text-slate-400" aria-hidden="true" /> Funcionalidades</span>
+                <ChevronRight size={18} className="text-slate-300" aria-hidden="true" />
               </button>
               <Link to="/about" onClick={() => setMobileMenuOpen(false)} className="hover:text-primary transition-colors flex items-center justify-between">
-                <span className="flex items-center gap-3"><span className="material-symbols-outlined text-slate-400">info</span> Sobre Nós</span>
-                <span className="material-symbols-outlined text-slate-300">chevron_right</span>
+                <span className="flex items-center gap-3"><Info size={18} className="text-slate-400" aria-hidden="true" /> Sobre Nós</span>
+                <ChevronRight size={18} className="text-slate-300" aria-hidden="true" />
               </Link>
               <a href="https://wa.me/244952815430" target="_blank" rel="noopener noreferrer" onClick={() => setMobileMenuOpen(false)} className="hover:text-primary transition-colors flex items-center justify-between">
-                <span className="flex items-center gap-3"><span className="material-symbols-outlined text-slate-400">call</span> Contactos</span>
-                <span className="material-symbols-outlined text-slate-300">chevron_right</span>
+                <span className="flex items-center gap-3"><Phone size={18} className="text-slate-400" aria-hidden="true" /> Contactos</span>
+                <ChevronRight size={18} className="text-slate-300" aria-hidden="true" />
               </a>
             </div>
             
@@ -674,15 +677,15 @@ export const Navbar: React.FC = () => {
                          </div>
                        </div>
                         <button onClick={handleSignOut} className="text-red-500 bg-red-50 w-10 h-10 flex-shrink-0 flex items-center justify-center rounded-xl hover:bg-red-100 transition-colors" title="Sair">
-                          <span className="material-symbols-outlined text-xl">logout</span>
+                          <LogOut size={20} aria-hidden="true" />
                         </button>
                      </div>
                      <button 
                        onClick={() => { setMobileMenuOpen(false); handleCreateEvent(); }} 
                        className="w-full py-3 bg-brand-blue text-white rounded-xl font-bold hover:bg-brand-blue/90 transition-colors flex items-center justify-center gap-2"
                      >
-                       <span className="material-symbols-outlined text-xl">add</span>
-                       Criar Evento
+<Plus size={20} aria-hidden="true" />
+                        Criar Evento
                      </button>
                    </div>
               ) : (

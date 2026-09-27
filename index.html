@@ -1,12 +1,22 @@
 <!DOCTYPE html>
 <html lang="pt-AO">
   <head>
-    <!-- Google tag (gtag.js) -->
+    <!-- Google tag (gtag.js) — consent mode: negado por omissão (LGPD).
+         O AnalyticsTracker só configura/envia após aceite (ino_consent). -->
     <script async src="https://www.googletagmanager.com/gtag/js?id=G-8P6CGLFLLJ"></script>
     <script>
       window.dataLayer = window.dataLayer || [];
       function gtag(){dataLayer.push(arguments);}
       gtag('js', new Date());
+      gtag('consent', 'default', {
+        'ad_storage': 'denied',
+        'analytics_storage': 'denied'
+      });
+      try {
+        if (localStorage.getItem('ino_consent') === 'accepted') {
+          gtag('consent', 'update', { 'ad_storage': 'granted', 'analytics_storage': 'granted' });
+        }
+      } catch (e) { /* sem storage — mantém negado */ }
 
       gtag('config', 'G-8P6CGLFLLJ');
     </script>
@@ -191,7 +201,8 @@
   
 </head>
   <body class="bg-[#0f172a] text-slate-900 selection:bg-brand-blue selection:text-white">
-    <noscript><img height="1" width="1" style="display:none" src="https://www.facebook.com/tr?id=2309059223221498&ev=PageView&noscript=1" alt="" /></noscript>
+    <!-- noscript do Pixel removido (LGPD): disparava PageView mesmo com recusa.
+         Sem JS não há consentimento possível — logo, sem tracking. -->
     <div id="root"></div>
   <script type="module" src="/index.tsx"></script>
 </body>

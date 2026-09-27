@@ -6,6 +6,7 @@ import { GoogleAuthProvider, signInWithPopup, signInWithEmailAndPassword, create
 import { auth, db } from '../../components/FirebaseProvider';
 import { SEO } from '../../components/SEO';
 import { trackPixelCompleteRegistration } from '../../lib/metaPixel';
+import { TERMS_VERSION } from '../../lib/legal';
 import type { AccountType } from '../../types';
 
 export const AuthPage: React.FC = () => {
@@ -57,7 +58,9 @@ export const AuthPage: React.FC = () => {
               uid: result.user.uid,
               name: result.user.displayName || '',
               email: result.user.email || 'no-email@example.com',
-              plan: 'free'
+              plan: 'free',
+              termsVersion: TERMS_VERSION,
+              acceptedTermsAt: new Date().toISOString(),
           }, { merge: true });
           trackPixelCompleteRegistration(
             { method: 'google' },
@@ -126,6 +129,8 @@ export const AuthPage: React.FC = () => {
             name: name,
             email: email,
             plan: 'free',
+            termsVersion: TERMS_VERSION,
+            acceptedTermsAt: new Date().toISOString(),
             ...kycFields,
         }, { merge: true });
         trackPixelCompleteRegistration(

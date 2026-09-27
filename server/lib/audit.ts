@@ -29,7 +29,9 @@ export type AuditAction =
   | 'admin.mirror_view'
   | 'ticket.reply'
   | 'ticket.status'
-  | 'promo.first_event';
+  | 'promo.first_event'
+  | 'privacy.export'
+  | 'privacy.delete';
 
 export async function logAudit(input: {
   actorEmail: string;

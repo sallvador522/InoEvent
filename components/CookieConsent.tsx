@@ -25,12 +25,26 @@ export const CookieConsent: React.FC = () => {
     } catch {
       setVisible(false);
     }
+    // Reabrir a escolha (ex: botão "Gerir cookies" na página de privacidade).
+    const reopen = () => setVisible(true);
+    window.addEventListener('ino:open-consent', reopen);
+    return () => window.removeEventListener('ino:open-consent', reopen);
   }, []);
 
   if (!visible) return null;
 
+  const updateGtagConsent = (granted: boolean) => {
+    try {
+      (window as any).gtag?.('consent', 'update', {
+        ad_storage: granted ? 'granted' : 'denied',
+        analytics_storage: granted ? 'granted' : 'denied',
+      });
+    } catch { /* no-op */ }
+  };
+
   const accept = () => {
     setPixelConsent('accepted');
+    updateGtagConsent(true);
     initPixel();
     try {
       window.fbq?.('track', 'PageView');
@@ -42,6 +56,7 @@ export const CookieConsent: React.FC = () => {
 
   const decline = () => {
     setPixelConsent('declined');
+    updateGtagConsent(false);
     setVisible(false);
   };
 

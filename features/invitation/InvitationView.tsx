@@ -182,6 +182,8 @@ const InvitationView: React.FC = () => {
   const editParam = new URLSearchParams(window.location.search).get("edit") === "true";
   const isNew = new URLSearchParams(window.location.search).get("new") === "true";
   const isTemplate = EVENTS.some((e) => e.id === id);
+  // Simulação de convidado: ?simular=1 — dono testa RSVP/consulta sem gravar nada.
+  const simParam = new URLSearchParams(window.location.search).get("simular") === "1";
 
    // Load event either from Firestore custom URL or template static mockup
   const [event, setEvent] = useState<EventDetails | null>(() => {
@@ -203,6 +205,8 @@ const InvitationView: React.FC = () => {
   const isOwner = !!(user && event && event.ownerId === user.uid);
   const canEdit = !firebaseLoading && !!user && (isTemplate || !!isNew || isOwner);
   const isEditing = editParam && canEdit;
+  // Sim só para o dono (ou templates): convidado real nunca vê a faixa.
+  const isGuestSim = simParam && !isEditing && (isTemplate || isOwner || !!isNew);
 
   // Tour State (Clean & Single Declaration)
   const [runTour, setRunTour] = useState(() => {
@@ -2292,6 +2296,7 @@ const InvitationView: React.FC = () => {
           <RSVPForm
             event={localEvent || event}
             onClose={() => setRSVPOpen(false)}
+            simMode={isGuestSim}
           />
         </BottomSheet>
       </div>
@@ -2301,6 +2306,12 @@ const InvitationView: React.FC = () => {
 
   return (
     <>
+      {/* Faixa de simulação — dono a testar como convidado, nada é gravado */}
+      {isGuestSim && (
+        <div className="fixed top-0 left-0 right-0 z-[9998] bg-amber-500 text-black text-center text-xs font-bold uppercase tracking-widest px-3 py-2">
+          🎭 Simulação — nada será gravado
+        </div>
+      )}
       {/* WELCOME ENVELOPE OVERLAY (os Limintso têm capa própria — sem envelope duplo) */}
       <AnimatePresence>
         {!hasOpened && !isEditing && activeEvent.layoutMode !== "LIMINTSO_GOLD" && activeEvent.layoutMode !== "LIMINTSO_ME" && (
@@ -2487,6 +2498,7 @@ const InvitationView: React.FC = () => {
           isOpen={isCheckStatusOpen}
           onClose={() => setCheckStatusOpen(false)}
           event={activeEvent}
+          simMode={isGuestSim}
         />
 
       {/* Shared RSVP Modal */}
@@ -2507,6 +2519,7 @@ const InvitationView: React.FC = () => {
         <RSVPForm
           event={activeEvent}
           onClose={() => setRSVPOpen(false)}
+          simMode={isGuestSim}
         />
       </BottomSheet>
     </>
@@ -8502,9 +8515,10 @@ const AnimatedCheckmark: React.FC<{ className?: string }> = ({ className = "w-10
   </svg>
 );
 
-const RSVPForm: React.FC<{ event: EventDetails; onClose: () => void }> = ({
+const RSVPForm: React.FC<{ event: EventDetails; onClose: () => void; simMode?: boolean }> = ({
   event,
   onClose,
+  simMode = false,
 }) => {
   // Ramo escuro (sheet preta): só LUXURY/INDUSTRIAL. LIMINTSO usa sheet clara
   // (ver BottomSheet themeClasses) e tem tema ouro-sobre-marfim próprio abaixo.
@@ -8567,6 +8581,18 @@ const RSVPForm: React.FC<{ event: EventDetails; onClose: () => void }> = ({
     setLoading(true);
     const toastId = toast.loading("Verificando...");
     try {
+      // SIMULAÇÃO (?simular=1, dono): valida tudo, mostra sucesso + passe com
+      // QR SIMULACAO, mas NÃO grava (sem fetch, sem setDoc) nem dispara Pixel.
+      if (simMode) {
+        await new Promise((r) => setTimeout(r, 600));
+        toast.success("Simulação concluída — nada foi gravado!", { id: toastId });
+        if (status === "yes") {
+          setSuccessData({ id: `SIMULACAO-${Date.now().toString(36).toUpperCase()}`, name: name.trim() });
+        } else {
+          onClose();
+        }
+        return;
+      }
             const normalizedPhone = phone.trim().replace(/[\s\-()]/g, "");
       const guestData = {
         name: cleanName,
@@ -8768,6 +8794,11 @@ const RSVPForm: React.FC<{ event: EventDetails; onClose: () => void }> = ({
         >
           Presença Confirmada!
         </motion.h3>
+        {successData.id.startsWith("SIMULACAO-") && (
+          <span className="mb-3 inline-block bg-amber-400 text-black text-[11px] font-black uppercase tracking-widest px-3 py-1 rounded-full">
+            🎭 Simulação — QR sem validade
+          </span>
+        )}
 
         <motion.p
           variants={{

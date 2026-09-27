@@ -35,10 +35,14 @@ service cloud.firestore {
     }
     // KYC: o dono só edita campos de perfil; accountType só sobe client→professional
     // (downgrade via admin — evita auto-rebaixamento para fugir de trilha B2B).
-    // plan/kycStatus/suspendedAt continuam SÓ servidor/admin.
+    // kycStatus: dono só pode declarar (verified é SÓ servidor/admin).
+    // plan/suspendedAt continuam SÓ servidor/admin.
     function accountTypeOk() {
       return incoming().get('accountType', existing().get('accountType', 'client')) == existing().get('accountType', 'client') ||
              (existing().get('accountType', 'client') == 'client' && incoming().get('accountType', 'client') == 'professional');
+    }
+    function kycStatusOk() {
+      return incoming().get('kycStatus', existing().get('kycStatus', 'declared')) in ['declared', existing().get('kycStatus', 'declared')];
     }
 
     function isValidEvent(data) {
@@ -80,10 +84,10 @@ service cloud.firestore {
       allow list: if isAdmin();
       allow create: if isOwner(userId) && isValidUser(incoming()) && incoming().uid == request.auth.uid;
       allow update: if isAdmin() || (isOwner(userId) && 
-                       request.resource.data.diff(resource.data).affectedKeys().hasOnly(['whiteLabelName', 'whiteLabelLogo', 'updatedAt', 'accountType', 'agencyName', 'phone', 'city', 'celebrantRole', 'kycCompletedAt', 'name']) &&
+                       request.resource.data.diff(resource.data).affectedKeys().hasOnly(['whiteLabelName', 'whiteLabelLogo', 'updatedAt', 'accountType', 'agencyName', 'phone', 'city', 'celebrantRole', 'kycStatus', 'kycCompletedAt', 'name']) &&
                        request.resource.data.uid == resource.data.uid &&
                        request.resource.data.email == resource.data.email &&
-                       accountTypeOk());
+                       accountTypeOk() && kycStatusOk());
 
       match /notifications/{notificationId} {
         allow read: if isOwner(userId);

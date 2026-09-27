@@ -193,6 +193,9 @@ export interface UserProfile {
   accountType?: AccountType;
   kycStatus?: KycStatus;
   kycCompletedAt?: string | null;
+  // LGPD: versão dos Termos aceite + quando (banner se mudar de versão).
+  termsVersion?: string | null;
+  acceptedTermsAt?: string | null;
   // Promo primeiro evento grátis (escrita SÓ servidor — rules).
   firstEventFreeUsed?: boolean;
   firstEventFreeEventId?: string | null;

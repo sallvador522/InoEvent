@@ -4,6 +4,7 @@ import { ArrowLeft } from 'lucide-react';
 import { Link } from 'react-router-dom';
 import { Navbar } from '../../components/Navbar';
 import { SEO } from '../../components/SEO';
+import { TERMS_VERSION, TERMS_VERSION_LABEL } from '../../lib/legal';
 
 export const TermsPage = () => {
     return (
@@ -22,7 +23,7 @@ export const TermsPage = () => {
                     className="prose prose-slate prose-lg max-w-none"
                 >
                     <h1 className="text-4xl md:text-5xl font-extrabold tracking-tight text-slate-900 mb-8">Termos de Serviço</h1>
-                    <p className="text-slate-500 text-sm mb-12">Última atualização: 08 de Maio de 2026</p>
+                    <p className="text-slate-500 text-sm mb-12">Última atualização: {TERMS_VERSION_LABEL} (v{TERMS_VERSION})</p>
 
                     <section className="mb-12">
                         <h2 className="text-2xl font-bold text-slate-800 mb-4">1. Aceitação dos Termos</h2>

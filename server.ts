@@ -34,6 +34,7 @@ import adminUsersRoutes from './server/routes/admin-users.js';
 import adminTeamRoutes from './server/routes/admin-team.js';
 import ticketsRoutes from './server/routes/tickets.js';
 import promoRoutes from './server/routes/promo.js';
+import privacyRoutes from './server/routes/privacy.js';
 
 // --- Express App ---
 const app = express();
@@ -138,6 +139,7 @@ app.use(adminUsersRoutes); // /api/admin/users/:id — plano, validade, suspende
 app.use(adminTeamRoutes); // /api/admin/admins — gerir equipa (super-admin)
 app.use(ticketsRoutes); // /api/tickets + /api/admin/tickets — suporte com SLA
 app.use(promoRoutes); // /api/promo/first-event — 1º evento grátis via assistente
+app.use(privacyRoutes); // /api/privacy — LGPD export/apagar conta
 
 // --- Global Error Handler ---
 app.use((err: any, req: express.Request, res: express.Response, _next: express.NextFunction) => {

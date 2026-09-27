@@ -12,9 +12,10 @@ interface CheckStatusModalProps {
   isOpen: boolean;
   onClose: () => void;
   event: EventDetails;
+  simMode?: boolean;
 }
 
-export const CheckStatusModal: React.FC<CheckStatusModalProps> = ({ isOpen, onClose, event }) => {
+export const CheckStatusModal: React.FC<CheckStatusModalProps> = ({ isOpen, onClose, event, simMode = false }) => {
   const [phone, setPhone] = useState('');
   const [loading, setLoading] = useState(false);
   const [result, setResult] = useState<any>(null);
@@ -30,6 +31,15 @@ export const CheckStatusModal: React.FC<CheckStatusModalProps> = ({ isOpen, onCl
     setLoading(true);
     setResult(null);
     setTableName(null);
+
+    // SIMULAÇÃO: resposta fictícia, sem leitura nem gravação.
+    if (simMode) {
+      await new Promise((r) => setTimeout(r, 500));
+      setResult({ id: 'SIMULACAO-TESTE', name: phone.trim() || 'Convidado Teste', status: 'confirmed', tableName: null });
+      setTableName(null);
+      setLoading(false);
+      return;
+    }
 
     try {
       const normalizedPhone = phone.trim().replace(/[\s\-()]/g, "");

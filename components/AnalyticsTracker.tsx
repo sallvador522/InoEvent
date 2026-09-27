@@ -2,7 +2,7 @@ import React, { useEffect } from 'react';
 import { useLocation } from 'react-router-dom';
 import { db } from './FirebaseProvider';
 import { collection, addDoc } from 'firebase/firestore';
-import { initPixel, trackPixelPageView, trackPixelViewContent } from '../lib/metaPixel';
+import { initPixel, trackPixelPageView, trackPixelViewContent, hasPixelConsent } from '../lib/metaPixel';
 
 declare global {
   interface Window {
@@ -56,7 +56,14 @@ export const AnalyticsTracker: React.FC = () => {
     const search = location.search;
 
     // Skip tracking of editing mode or admin panel to avoid skewing real user traffic
-    if (search.includes('edit=true') || path.startsWith('/admin')) {
+    if (search.includes('edit=true') || path.startsWith('/admin') || search.includes('simular=1')) {
+      return;
+    }
+
+    // LGPD: sem consentimento, nada de tracking (gtag, visits, simulação).
+    // Mesma chave do Pixel (ino_consent) — recusar desliga tudo.
+    const consented = hasPixelConsent();
+    if (!consented) {
       return;
     }
 

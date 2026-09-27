@@ -4,6 +4,7 @@ import { ArrowLeft } from 'lucide-react';
 import { Link } from 'react-router-dom';
 import { Navbar } from '../../components/Navbar';
 import { SEO } from '../../components/SEO';
+import { TERMS_VERSION, TERMS_VERSION_LABEL } from '../../lib/legal';
 
 export const PrivacyPage = () => {
     return (
@@ -22,7 +23,7 @@ export const PrivacyPage = () => {
                     className="prose prose-slate prose-lg max-w-none"
                 >
                     <h1 className="text-4xl md:text-5xl font-extrabold tracking-tight text-slate-900 mb-8">Políticas de Privacidade</h1>
-                    <p className="text-slate-500 text-sm mb-12">Última atualização: 08 de Maio de 2026</p>
+                    <p className="text-slate-500 text-sm mb-12">Última atualização: {TERMS_VERSION_LABEL} (v{TERMS_VERSION})</p>
 
                     <section className="mb-12">
                         <h2 className="text-2xl font-bold text-slate-800 mb-4">1. Informações que Coletamos</h2>
@@ -66,7 +67,7 @@ export const PrivacyPage = () => {
                     <section>
                         <h2 className="text-2xl font-bold text-slate-800 mb-4">5. Seus Direitos</h2>
                         <p className="text-slate-600 leading-relaxed">
-                            Você tem o direito de acessar, atualizar ou excluir suas informações pessoais a qualquer momento através do seu painel. Se precisar de assistência adicional relacionada aos seus dados, entre em contato em <a href="mailto:privacy@inoevents.com" className="text-brand-blue hover:underline">privacy@inoevents.com</a>.
+                            Você tem o direito de acessar, atualizar ou excluir suas informações pessoais a qualquer momento na página <a href="/privacidade" className="text-brand-blue hover:underline">Privacidade e meus dados</a> (exportar JSON ou apagar a conta). Se precisar de assistência adicional relacionada aos seus dados, entre em contato em <a href="mailto:privacy@inoevents.com" className="text-brand-blue hover:underline">privacy@inoevents.com</a>.
                         </p>
                     </section>
                 </motion.div>

@@ -997,6 +997,15 @@ export const Dashboard = () => {
                     >
                         {isShareLocked ? 'Pré-visualizar' : 'Ver Convite'}
                     </button>
+                    <button
+                        onClick={() => {
+                            window.open(`/invite/${event.id}?simular=1`, '_blank', 'noopener,noreferrer');
+                        }}
+                        title="Testar como convidado: RSVP, consulta e check-in sem gravar nada"
+                        className="px-4 py-2 bg-white border border-amber-300 text-amber-700 rounded-full font-bold text-sm hover:bg-amber-50 shadow-sm transition-all cursor-pointer whitespace-nowrap"
+                    >
+                        🎭 Ver como convidado
+                    </button>
                 </div>
             </nav>
 

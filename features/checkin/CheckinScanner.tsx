@@ -86,6 +86,8 @@ export const CheckinScanner: React.FC = () => {
     const guestId = searchParams.get('guest');
     const token = searchParams.get('token');
     const mode = searchParams.get('mode');
+    // Simulação (?simular=1, dono a testar): mostra sucesso visual sem gravar.
+    const simMode = searchParams.get('simular') === '1';
     
     const { user } = useFirebase();
     const navigate = useNavigate();
@@ -185,6 +187,13 @@ export const CheckinScanner: React.FC = () => {
                     return;
                 }
 
+                // SIMULAÇÃO (?simular=1): sucesso visual sem gravar.
+                if (simMode) {
+                    setStatus('success');
+                    setMessage(`🎭 Simulação — entrada liberada para ${guestData.name} (nada gravado)!`);
+                    return;
+                }
+
                 // Fire the checkin update
                 await updateDoc(guestRef, {
                     checkedIn: true,
@@ -266,6 +275,21 @@ export const CheckinScanner: React.FC = () => {
             }
             
             if (scannedGuestId && id) {
+                // SIMULAÇÃO: nunca grava — sucesso visual (com nome real se existir).
+                if (simMode) {
+                    let simName: string | undefined;
+                    try {
+                        const simSnap = await getDoc(doc(db, 'events', id, 'guests', scannedGuestId));
+                        if (simSnap.exists()) simName = (simSnap.data() as any)?.name;
+                    } catch { /* leitura best-effort */ }
+                    setScanState({
+                        status: 'success',
+                        message: '🎭 Simulação — entrada liberada (nada gravado)!',
+                        guestName: simName || 'Convidado Simulação',
+                    });
+                    playScanSound('success');
+                    return;
+                }
                 const guestRef = doc(db, 'events', id, 'guests', scannedGuestId);
                 const guestSnap = await getDoc(guestRef);
                 
@@ -312,6 +336,11 @@ export const CheckinScanner: React.FC = () => {
 
     const handleManualCheckIn = async (guest: any) => {
         if (!id || pendingCheckInId) return;
+        // SIMULAÇÃO: sem gravação.
+        if (simMode) {
+            toast.success('🎭 Simulação — nada foi gravado.');
+            return;
+        }
         setPendingCheckInId(guest.id);
         try {
             const guestRef = doc(db, 'events', id, 'guests', guest.id);
@@ -346,6 +375,11 @@ export const CheckinScanner: React.FC = () => {
     if (status === 'reception_mode') {
         return (
             <div className="min-h-screen bg-slate-900 flex flex-col font-display">
+                {simMode && (
+                    <div className="bg-amber-500 text-black text-center text-xs font-bold uppercase tracking-widest px-3 py-2">
+                        🎭 Simulação — nada será gravado
+                    </div>
+                )}
                 {/* Tabs */}
                 <div className="sticky top-0 z-20 bg-slate-900/80 backdrop-blur-md border-b border-slate-800 p-4 pb-0">
                     <div className="flex gap-2 mb-4">

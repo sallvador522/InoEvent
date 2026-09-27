@@ -38,7 +38,7 @@ export const Navbar: React.FC = () => {
     }
   }, [mobileMenuOpen]);
   
-  const isAdmin = user?.email?.toLowerCase() === 'antoniosalvador522@gmail.com' || user?.email === (import.meta as any).env.VITE_ADMIN_EMAIL;
+  const isAdmin = (userProfile as any)?.role === 'admin' || user?.email?.toLowerCase() === 'antoniosalvador522@gmail.com' || user?.email === (import.meta as any).env.VITE_ADMIN_EMAIL;
   // Plano normalizado (Firestore grava minúsculas) — nome real para exibição.
   // Sem perfil (ainda a carregar ou ficha em falta): null → selo mostra
   // shimmer em vez de "…" (que parecia plano quebrado).
@@ -419,9 +419,17 @@ export const Navbar: React.FC = () => {
 
                   <button onClick={handleSignOut} className="hover:text-red-400 transition-colors font-semibold text-white ml-4 cursor-pointer">Sair</button>
                </div>
-             ) : (
-               <Link to="/auth" className="hover:text-primary transition-colors font-semibold text-white">Entrar</Link>
-             )}
+              ) : (
+                <div className="flex items-center gap-3">
+                  <Link to="/auth" className="hover:text-primary transition-colors font-semibold text-white">Entrar</Link>
+                  <Link
+                    to="/auth?mode=signup"
+                    className="bg-[#C5A028] hover:bg-[#d4af37] text-[#1B365D] font-bold text-sm px-5 py-2 rounded-full transition-colors whitespace-nowrap"
+                  >
+                    Cadastrar
+                  </Link>
+                </div>
+              )}
            </div>
         </div>
 
@@ -429,7 +437,10 @@ export const Navbar: React.FC = () => {
         <div className="flex items-center gap-2 sm:gap-4 md:hidden">
           <Link to="/plans" className="text-sm font-semibold text-blue-100 hover:text-white transition-colors">Preços</Link>
           {!user && (
-            <Link to="/auth" className="text-sm font-semibold text-blue-100 hover:text-white transition-colors">Entrar</Link>
+            <>
+              <Link to="/auth" className="text-sm font-semibold text-blue-100 hover:text-white transition-colors">Entrar</Link>
+              <Link to="/auth?mode=signup" className="text-sm font-bold text-[#1B365D] bg-[#C5A028] hover:bg-[#d4af37] px-4 py-1.5 rounded-full transition-colors">Cadastrar</Link>
+            </>
           )}
           
           {/* Mobile Notifications Bell when logged in */}

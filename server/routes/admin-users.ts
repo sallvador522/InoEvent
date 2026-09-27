@@ -17,22 +17,15 @@ import { apiRateLimiter } from '../middleware/index.js';
 import { logAudit } from '../lib/audit.js';
 import { normalizePlanId, getGuestLimit, getPlanConfig, getValidityDays, PLANS } from '../../config/plans.js';
 import { backfillAccountStamps } from '../lib/billing.js';
+import { getAdminAuthUser, isAdmin } from '../lib/admin-auth.js';
 import { logger } from '../../lib/logger.js';
 
 const router = Router();
-const ADMIN_EMAIL = 'antoniosalvador522@gmail.com';
 const PLAN_ORDER = ['free', 'essential', 'premium', 'vip', 'business'];
 
-async function getAuthUser(req: any): Promise<{ uid: string; email?: string } | null> {
-  const hdr = req.headers.authorization as string | undefined;
-  if (!hdr || !hdr.startsWith('Bearer ')) return null;
-  const token = hdr.slice(7);
-  try {
-    const decoded = await admin.auth().verifyIdToken(token);
-    return { uid: decoded.uid, email: decoded.email };
-  } catch {
-    return null;
-  }
+// Auth centralizada (claim admin + bootstrap) — ver server/lib/admin-auth.ts.
+async function getAuthUser(req: any) {
+  return getAdminAuthUser(req);
 }
 
 // ---------------------------------------------------------------------------
@@ -40,7 +33,7 @@ async function getAuthUser(req: any): Promise<{ uid: string; email?: string } | 
 // ---------------------------------------------------------------------------
 router.post('/api/admin/users/:id/plan', apiRateLimiter, async (req, res) => {
   const authUser = await getAuthUser(req);
-  if (!authUser || authUser.email !== ADMIN_EMAIL) {
+  if (!isAdmin(authUser)) {
     return res.status(403).json({ error: 'Apenas admin' });
   }
   const id = req.params.id as string;
@@ -97,7 +90,7 @@ router.post('/api/admin/users/:id/plan', apiRateLimiter, async (req, res) => {
 // ---------------------------------------------------------------------------
 router.post('/api/admin/users/:id/renew', apiRateLimiter, async (req, res) => {
   const authUser = await getAuthUser(req);
-  if (!authUser || authUser.email !== ADMIN_EMAIL) {
+  if (!isAdmin(authUser)) {
     return res.status(403).json({ error: 'Apenas admin' });
   }
   const id = req.params.id as string;
@@ -124,7 +117,7 @@ router.post('/api/admin/users/:id/renew', apiRateLimiter, async (req, res) => {
 // ---------------------------------------------------------------------------
 async function setDisabled(req: any, res: any, disabled: boolean) {
   const authUser = await getAuthUser(req);
-  if (!authUser || authUser.email !== ADMIN_EMAIL) {
+  if (!isAdmin(authUser)) {
     return res.status(403).json({ error: 'Apenas admin' });
   }
   const id = req.params.id as string;
@@ -157,5 +150,22 @@ async function setDisabled(req: any, res: any, disabled: boolean) {
 
 router.post('/api/admin/users/:id/disable', apiRateLimiter, (req, res) => setDisabled(req, res, true));
 router.post('/api/admin/users/:id/enable', apiRateLimiter, (req, res) => setDisabled(req, res, false));
+
+// ---------------------------------------------------------------------------
+// POST /api/admin/mirror-view — regista "ver como usuário" (readonly)
+// ---------------------------------------------------------------------------
+router.post('/api/admin/mirror-view', apiRateLimiter, async (req, res) => {
+  const authUser = await getAuthUser(req);
+  if (!isAdmin(authUser)) return res.status(403).json({ error: 'Apenas admin' });
+  const { userId } = (req.body || {}) as any;
+  if (!userId || typeof userId !== 'string') return res.status(400).json({ error: 'userId obrigatório' });
+  await logAudit({
+    actorEmail: authUser!.email || 'admin',
+    action: 'admin.mirror_view',
+    targetType: 'user',
+    targetId: userId,
+  });
+  return res.json({ success: true });
+});
 
 export default router;

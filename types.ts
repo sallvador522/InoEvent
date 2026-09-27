@@ -193,6 +193,10 @@ export interface UserProfile {
   accountType?: AccountType;
   kycStatus?: KycStatus;
   kycCompletedAt?: string | null;
+  // RBAC: espelho do custom claim (autoridade real é o claim no Auth).
+  role?: 'admin' | null;
+  roleGrantedAt?: string | null;
+  roleGrantedBy?: string | null;
   // Cliente
   celebrantRole?: CelebrantRole;
   // Profissional (autodeclarado — B2B real exige subscrição paga)

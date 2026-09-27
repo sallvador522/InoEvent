@@ -16,26 +16,18 @@ import { Router } from 'express';
 import { getDb } from '../lib/firebase-admin.js';
 import { apiRateLimiter } from '../middleware/index.js';
 import { createOrder, getOrder, getOrderByEvent, repurposePendingOrder, confirmPayment, failPayment, backfillAccountStamps } from '../lib/billing.js';
+import { getAdminAuthUser, isAdmin as checkIsAdmin } from '../lib/admin-auth.js';
 import { logAudit } from '../lib/audit.js';
 import { normalizePlanId, PLANS, getGuestLimit, getPlanConfig } from '../../config/plans.js';
 import { logger } from '../../lib/logger.js';
-import { admin } from '../lib/firebase-admin.js';
 
 const router = Router();
 
 // ---------------------------------------------------------------------------
-// Helper — verifica Firebase ID token quando disponível
+// Helper — verifica Firebase ID token quando disponível (com claim admin)
 // ---------------------------------------------------------------------------
-async function getAuthUser(req: any): Promise<{ uid: string; email?: string } | null> {
-  const hdr = req.headers.authorization as string | undefined;
-  if (!hdr || !hdr.startsWith('Bearer ')) return null;
-  const token = hdr.slice(7);
-  try {
-    const decoded = await admin.auth().verifyIdToken(token);
-    return { uid: decoded.uid, email: decoded.email };
-  } catch {
-    return null;
-  }
+async function getAuthUser(req: any) {
+  return getAdminAuthUser(req);
 }
 
 // ---------------------------------------------------------------------------
@@ -73,7 +65,7 @@ router.post('/api/orders', apiRateLimiter, async (req, res) => {
     const eventTitle = typeof ev?.title === 'string' ? ev.title.slice(0, 100) : null;
     if (authUser && ev.ownerId !== authUser.uid) {
       // admin pode criar para outros; verifica se é admin via token email
-      const isAdmin = authUser.email === 'antoniosalvador522@gmail.com';
+      const isAdmin = authUser && checkIsAdmin(authUser);
       if (!isAdmin) return res.status(403).json({ error: 'Sem permissão para este evento' });
     }
 
@@ -129,7 +121,7 @@ router.get('/api/orders/:id', apiRateLimiter, async (req, res) => {
   if (!authUser) return res.status(401).json({ error: 'Autenticação obrigatória' });
   const order = await getOrder(id);
   if (!order) return res.status(404).json({ error: 'Pedido não encontrado' });
-  const isAdmin = authUser.email === 'antoniosalvador522@gmail.com';
+  const isAdmin = authUser && checkIsAdmin(authUser);
   if (order.userId !== authUser.uid && !isAdmin) {
     return res.status(403).json({ error: 'Sem permissão para este pedido' });
   }
@@ -145,7 +137,7 @@ router.get('/api/events/:id/order', apiRateLimiter, async (req, res) => {
   if (!authUser) return res.status(401).json({ error: 'Autenticação obrigatória' });
   const order = await getOrderByEvent(eventId);
   if (!order) return res.status(404).json({ error: 'Nenhum pedido para este evento' });
-  const isAdmin = authUser.email === 'antoniosalvador522@gmail.com';
+  const isAdmin = authUser && checkIsAdmin(authUser);
   if (order.userId !== authUser.uid && !isAdmin) {
     return res.status(403).json({ error: 'Sem permissão para este pedido' });
   }
@@ -160,7 +152,7 @@ router.post('/api/orders/:id/confirm', apiRateLimiter, async (req, res) => {
   const { providerTransactionId } = req.body as any;
   const authUser = await getAuthUser(req);
   // Admin estrito: sem Bearer válido de admin, recusa (sem modo dev permissivo — ativa dinheiro)
-  if (!authUser || authUser.email !== 'antoniosalvador522@gmail.com') {
+  if (!checkIsAdmin(authUser)) {
     return res.status(403).json({ error: 'Apenas admin pode confirmar pagamentos' });
   }
   try {
@@ -184,7 +176,7 @@ router.post('/api/orders/:id/fail', apiRateLimiter, async (req, res) => {
   const id = req.params.id as string;
   const { reason } = req.body as any;
   const authUser = await getAuthUser(req);
-  if (!authUser || authUser.email !== 'antoniosalvador522@gmail.com') {
+  if (!checkIsAdmin(authUser)) {
     return res.status(403).json({ error: 'Apenas admin' });
   }
   try {
@@ -203,7 +195,7 @@ router.post('/api/orders/:id/fail', apiRateLimiter, async (req, res) => {
 // ---------------------------------------------------------------------------
 router.post('/api/admin/backfill-accounts', apiRateLimiter, async (req, res) => {
   const authUser = await getAuthUser(req);
-  if (!authUser || authUser.email !== 'antoniosalvador522@gmail.com') {
+  if (!checkIsAdmin(authUser)) {
     return res.status(403).json({ error: 'Apenas admin' });
   }
   try {
@@ -255,7 +247,7 @@ router.post('/api/webhooks/payment', async (req, res) => {
 // ---------------------------------------------------------------------------
 router.post('/api/admin/backfill-order-titles', apiRateLimiter, async (req, res) => {
   const authUser = await getAuthUser(req);
-  if (!authUser || authUser.email !== 'antoniosalvador522@gmail.com') {
+  if (!checkIsAdmin(authUser)) {
     return res.status(403).json({ error: 'Apenas admin' });
   }
   try {

@@ -11,19 +11,14 @@
 import { Router } from 'express';
 import { apiRateLimiter } from '../middleware/index.js';
 import { createSubscription, getActiveSubscription, cancelSubscription, renewSubscription } from '../lib/billing.js';
-import { admin } from '../lib/firebase-admin.js';
+import { getAdminAuthUser, isAdmin as checkIsAdmin } from '../lib/admin-auth.js';
 import { logAudit } from '../lib/audit.js';
 import { logger } from '../../lib/logger.js';
 
 const router = Router();
 
 async function getAuthUser(req: any) {
-  const hdr = req.headers.authorization as string | undefined;
-  if (!hdr || !hdr.startsWith('Bearer ')) return null;
-  try {
-    const decoded = await admin.auth().verifyIdToken(hdr.slice(7));
-    return { uid: decoded.uid, email: decoded.email };
-  } catch { return null; }
+  return getAdminAuthUser(req);
 }
 
 router.get('/api/subscriptions/me', apiRateLimiter, async (req, res) => {
@@ -38,7 +33,7 @@ router.post('/api/subscriptions', apiRateLimiter, async (req, res) => {
   if (!auth) return res.status(401).json({ error: 'Auth required' });
   // Criação SÓ pelo admin (após pagamento confirmado fora da API).
   // Self-service aqui equivalia a Business grátis sem pedido.
-  if (auth.email !== 'antoniosalvador522@gmail.com') {
+  if (!checkIsAdmin(auth)) {
     return res.status(403).json({ error: 'Subscrições Business são ativadas pela equipa após pagamento. Fale connosco no WhatsApp.' });
   }
   const { userId } = req.body as any;
@@ -61,7 +56,7 @@ router.post('/api/subscriptions/:id/cancel', apiRateLimiter, async (req, res) =>
     const snap = await getDb().collection('subscriptions').doc(req.params.id as string).get();
     if (!snap.exists) return res.status(404).json({ error: 'Subscrição não encontrada' });
     const owner = (snap.data() as any)?.userId;
-    const isAdmin = auth.email === 'antoniosalvador522@gmail.com';
+    const isAdmin = auth && checkIsAdmin(auth);
     if (owner !== auth.uid && !isAdmin) {
       return res.status(403).json({ error: 'Forbidden' });
     }
@@ -80,7 +75,7 @@ router.post('/api/subscriptions/:id/cancel', apiRateLimiter, async (req, res) =>
 // ---------------------------------------------------------------------------
 router.post('/api/subscriptions/:id/renew', apiRateLimiter, async (req, res) => {
   const auth = await getAuthUser(req);
-  if (!auth || auth.email !== 'antoniosalvador522@gmail.com') {
+  if (!checkIsAdmin(auth)) {
     return res.status(403).json({ error: 'Apenas admin' });
   }
   try {

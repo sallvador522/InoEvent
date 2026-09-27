@@ -3,10 +3,12 @@ import { useFirebase } from './FirebaseProvider';
 import { NotFound } from './NotFound';
 
 export const AdminRoute: React.FC<{ children: React.ReactNode }> = ({ children }) => {
-  const { user, loading } = useFirebase();
+  const { user, userProfile, loading } = useFirebase();
 
+  // RBAC: espelho users/{uid}.role (autoridade real = claim no servidor/rules).
   const adminEmail = (import.meta as any).env.VITE_ADMIN_EMAIL || 'antoniosalvador522@gmail.com';
-  const isAdmin = user?.email?.toLowerCase() === 'antoniosalvador522@gmail.com' || user?.email === adminEmail;
+  const mirrorAdmin = (userProfile as any)?.role === 'admin';
+  const isAdmin = mirrorAdmin || user?.email?.toLowerCase() === 'antoniosalvador522@gmail.com' || user?.email === adminEmail;
 
   if (loading) {
     return (

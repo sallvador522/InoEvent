@@ -12,35 +12,19 @@
  * no confirmPayment). Apenas libera visibilidade: desbloqueia + publica.
  */
 import { Router } from 'express';
-import { getDb, admin } from '../lib/firebase-admin.js';
+import { getDb } from '../lib/firebase-admin.js';
 import { apiRateLimiter } from '../middleware/index.js';
 import { logAudit } from '../lib/audit.js';
+import { getAdminAuthUser, isAdmin as requireAdmin } from '../lib/admin-auth.js';
 import { logger } from '../../lib/logger.js';
 
 const router = Router();
-const ADMIN_EMAIL = 'antoniosalvador522@gmail.com';
-
-async function getAuthUser(req: any): Promise<{ uid: string; email?: string } | null> {
-  const hdr = req.headers.authorization as string | undefined;
-  if (!hdr || !hdr.startsWith('Bearer ')) return null;
-  const token = hdr.slice(7);
-  try {
-    const decoded = await admin.auth().verifyIdToken(token);
-    return { uid: decoded.uid, email: decoded.email };
-  } catch {
-    return null;
-  }
-}
-
-function requireAdmin(authUser: { email?: string } | null): boolean {
-  return !!authUser && authUser.email === ADMIN_EMAIL;
-}
 
 // ---------------------------------------------------------------------------
 // POST /api/admin/events/:id/block
 // ---------------------------------------------------------------------------
 router.post('/api/admin/events/:id/block', apiRateLimiter, async (req, res) => {
-  const authUser = await getAuthUser(req);
+  const authUser = await getAdminAuthUser(req);
   if (!requireAdmin(authUser)) return res.status(403).json({ error: 'Apenas admin' });
   const id = req.params.id as string;
   if (!id || !/^[a-zA-Z0-9_-]{1,128}$/.test(id)) {
@@ -80,7 +64,7 @@ router.post('/api/admin/events/:id/block', apiRateLimiter, async (req, res) => {
 // POST /api/admin/events/:id/activate — ativa E publica
 // ---------------------------------------------------------------------------
 router.post('/api/admin/events/:id/activate', apiRateLimiter, async (req, res) => {
-  const authUser = await getAuthUser(req);
+  const authUser = await getAdminAuthUser(req);
   if (!requireAdmin(authUser)) return res.status(403).json({ error: 'Apenas admin' });
   const id = req.params.id as string;
   if (!id || !/^[a-zA-Z0-9_-]{1,128}$/.test(id)) {
@@ -119,7 +103,7 @@ router.post('/api/admin/events/:id/activate', apiRateLimiter, async (req, res) =
 const EVENT_SUBCOLLECTIONS = ['guests', 'contributions', 'photos', 'messages', 'team', 'tables'];
 
 router.post('/api/admin/events/:id/delete', apiRateLimiter, async (req, res) => {
-  const authUser = await getAuthUser(req);
+  const authUser = await getAdminAuthUser(req);
   if (!requireAdmin(authUser)) return res.status(403).json({ error: 'Apenas admin' });
   const id = req.params.id as string;
   if (!id || !/^[a-zA-Z0-9_-]{1,128}$/.test(id)) {

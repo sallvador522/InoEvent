@@ -22,7 +22,13 @@ export type AuditAction =
   | 'subscription.renew'
   | 'subscription.cancel'
   | 'accounts.backfill'
-  | 'order_titles.backfill';
+  | 'order_titles.backfill'
+  | 'admin.grant'
+  | 'admin.revoke'
+  | 'admin.resync'
+  | 'admin.mirror_view'
+  | 'ticket.reply'
+  | 'ticket.status';
 
 export async function logAudit(input: {
   actorEmail: string;

@@ -7,24 +7,18 @@
  *   GET  /api/events/:id/rsvp-status — Check RSVP status by phone
  */
 import { Router } from 'express';
-import { getDb, admin, getEventDetails, readLocalGuests, writeLocalGuest, fetchFirestoreGuestsWebSDK } from '../lib/firebase-admin.js';
+import { getDb, getEventDetails, readLocalGuests, writeLocalGuest, fetchFirestoreGuestsWebSDK } from '../lib/firebase-admin.js';
 import { apiRateLimiter, rsvpRateLimiter } from '../middleware/index.js';
 import { logger } from '../../lib/logger.js';
 import { normalizePlanId, getGuestLimit, getPlanConfig } from '../../config/plans.js';
 import { isEventExpired, canUseFeature } from '../lib/entitlements.js';
 import { getActiveSubscription } from '../lib/billing.js';
+import { getAdminAuthUser, isAdmin as checkIsAdmin } from '../lib/admin-auth.js';
 
 const router = Router();
 
-async function getAuthUser(req: any): Promise<{ uid: string; email?: string } | null> {
-  const hdr = req.headers.authorization as string | undefined;
-  if (!hdr || !hdr.startsWith('Bearer ')) return null;
-  try {
-    const decoded = await admin.auth().verifyIdToken(hdr.slice(7));
-    return { uid: decoded.uid, email: decoded.email };
-  } catch {
-    return null;
-  }
+async function getAuthUser(req: any) {
+  return getAdminAuthUser(req);
 }
 
 // --- List Guests ---
@@ -50,7 +44,7 @@ router.get('/api/events/:id/guests', apiRateLimiter, async (req, res) => {
             const authUser = await getAuthUser(req);
             if (authUser) {
                 const db = getDb();
-                const isAdmin = authUser.email === 'antoniosalvador522@gmail.com';
+                const isAdmin = authUser && checkIsAdmin(authUser);
                 const isOwner = (event as any).ownerId === authUser.uid;
                 let isTeam = false;
                 if (!isOwner && !isAdmin) {

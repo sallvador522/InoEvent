@@ -9,8 +9,9 @@
  * servidor e NUNCA aceites do cliente.
  */
 import { Router } from 'express';
-import { getDb, admin } from '../lib/firebase-admin.js';
+import { getDb } from '../lib/firebase-admin.js';
 import { apiRateLimiter } from '../middleware/index.js';
+import { getAdminAuthUser, isAdmin as checkIsAdmin } from '../lib/admin-auth.js';
 import {
   normalizePlanId,
   getEventCreationLimit,
@@ -32,16 +33,8 @@ const UPGRADE_AFTER: Record<string, string | null> = {
   business: null,
 };
 
-async function getAuthUser(req: any): Promise<{ uid: string; email?: string } | null> {
-  const hdr = req.headers.authorization as string | undefined;
-  if (!hdr || !hdr.startsWith('Bearer ')) return null;
-  const token = hdr.slice(7);
-  try {
-    const decoded = await admin.auth().verifyIdToken(token);
-    return { uid: decoded.uid, email: decoded.email };
-  } catch {
-    return null;
-  }
+async function getAuthUser(req: any) {
+  return getAdminAuthUser(req);
 }
 
 function randomId(prefix: string): string {
@@ -63,7 +56,7 @@ router.post('/api/events', apiRateLimiter, async (req, res) => {
 
   try {
     const db = getDb();
-    const isAdmin = authUser.email === 'antoniosalvador522@gmail.com';
+    const isAdmin = authUser && checkIsAdmin(authUser);
     const ownerId =
       isAdmin && typeof data.ownerId === 'string' && data.ownerId ? data.ownerId : authUser.uid;
 

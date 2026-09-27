@@ -9,6 +9,7 @@ import { ResponsiveContainer, AreaChart, Area, XAxis, YAxis, CartesianGrid, Tool
 import { getValidityDays, normalizePlanId, getPlanConfig } from '../../config/plans';
 import { normalizeAccountType } from '../../types';
 import { downloadCSV } from '../../lib/csv';
+import { UserMirror } from '../../components/admin/UserMirror';
 
 export const AdminDashboard: React.FC = () => {
   const [users, setUsers] = useState<any[]>([]);
@@ -37,10 +38,16 @@ export const AdminDashboard: React.FC = () => {
   const [auditSearch, setAuditSearch] = useState('');
   const [suspendingId, setSuspendingId] = useState<string | null>(null);
   const [deletingEventId, setDeletingEventId] = useState<string | null>(null);
+  // Equipa (RBAC): lista de admins + gestão (só super-admin gere).
+  const [team, setTeam] = useState<any[]>([]);
+  const [teamLoading, setTeamLoading] = useState(false);
+  const [grantEmail, setGrantEmail] = useState('');
+  const [teamBusyId, setTeamBusyId] = useState<string | null>(null);
+  const isSuperAdminUI = (auth.currentUser?.email || '').toLowerCase() === 'antoniosalvador522@gmail.com';
   const [isSendingNotif, setIsSendingNotif] = useState(false);
   const [isRenewing, setIsRenewing] = useState(false);
   
-  const [activeTab, setActiveTab] = useState<'overview' | 'users' | 'events' | 'transactions' | 'orders' | 'subscriptions' | 'analytics' | 'audit'>('overview');
+  const [activeTab, setActiveTab] = useState<'overview' | 'users' | 'events' | 'transactions' | 'orders' | 'subscriptions' | 'analytics' | 'audit' | 'team' | 'support'>('overview');
   const [subscriptions, setSubscriptions] = useState<any[]>([]);
   const [subActionId, setSubActionId] = useState<string | null>(null);
   const [selectedUser, setSelectedUser] = useState<any | null>(null);
@@ -145,10 +152,13 @@ export const AdminDashboard: React.FC = () => {
     prevPendingRef.current = n;
   }, [orders]);
 
-  // Auditoria carrega ao abrir a aba (não no arranque — poupa leituras).
+  // Auditoria e suporte carregam ao abrir a aba (não no arranque).
   useEffect(() => {
     if (activeTab === 'audit' && auditLogs.length === 0 && !auditLoading) {
       fetchAuditLogs();
+    }
+    if (activeTab === 'support' && supportTickets.length === 0 && !supportLoading) {
+      fetchSupportTickets();
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [activeTab]);
@@ -417,6 +427,379 @@ export const AdminDashboard: React.FC = () => {
       setAuditLoading(false);
     }
   };
+
+  // Equipa: carrega ao abrir a aba.
+  useEffect(() => {
+    if (activeTab === 'team') fetchTeam();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [activeTab]);
+
+  // Suporte com SLA: fila de tickets (vencidos primeiro no servidor).
+  const [supportTickets, setSupportTickets] = useState<any[]>([]);
+  const [supportLoading, setSupportLoading] = useState(false);
+  const [supportFilter, setSupportFilter] = useState<'all' | 'aberto' | 'em_atendimento' | 'resolvido'>('all');
+  const [openTicketId, setOpenTicketId] = useState<string | null>(null);
+  const [ticketMessages, setTicketMessages] = useState<any[]>([]);
+  const [replyDraft, setReplyDraft] = useState('');
+  const [replyingId, setReplyingId] = useState<string | null>(null);
+  const openTicketsCount = supportTickets.filter((t: any) => t.status !== 'resolvido').length;
+  const overdueTicketsCount = supportTickets.filter((t: any) => t.overdue).length;
+
+  const fetchSupportTickets = async () => {
+    setSupportLoading(true);
+    try {
+      const token = await auth.currentUser?.getIdToken();
+      const res = await fetch('/api/admin/tickets', {
+        headers: { ...(token ? { Authorization: `Bearer ${token}` } : {}) },
+      });
+      const data = await res.json().catch(() => ({}));
+      if (res.ok) setSupportTickets(data.tickets || []);
+      else toast.error('Sem permissão para ver tickets.');
+    } catch {
+      toast.error('Falha ao carregar tickets.');
+    } finally {
+      setSupportLoading(false);
+    }
+  };
+
+  // Poll leve da fila (badge de vencidos) a cada 60s.
+  useEffect(() => {
+    const timer = setInterval(() => {
+      if (document.visibilityState === 'visible') fetchSupportTickets();
+    }, 60000);
+    return () => clearInterval(timer);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
+
+  const openTicketThread = async (t: any) => {
+    if (openTicketId === t.id) {
+      setOpenTicketId(null);
+      return;
+    }
+    setOpenTicketId(t.id);
+    setReplyDraft('');
+    try {
+      const snap = await getDocs(query(collection(db, 'tickets', t.id, 'messages'), orderBy('at', 'asc'), limit(100)));
+      setTicketMessages(snap.docs.map(d => ({ id: d.id, ...d.data() })));
+    } catch {
+      setTicketMessages([]);
+    }
+  };
+
+  const handleTicketReply = async (t: any) => {
+    if (!replyDraft.trim() || replyingId) return;
+    setReplyingId(t.id);
+    try {
+      const token = await auth.currentUser?.getIdToken();
+      const res = await fetch(`/api/admin/tickets/${t.id}/reply`, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          ...(token ? { Authorization: `Bearer ${token}` } : {}),
+        },
+        body: JSON.stringify({ text: replyDraft.trim() }),
+      });
+      if (!res.ok) throw new Error('reply failed');
+      setReplyDraft('');
+      toast.success('Resposta enviada — dono notificado.');
+      openTicketThread({ ...t, id: t.id });
+      fetchSupportTickets();
+    } catch {
+      toast.error('Falha ao responder.');
+    } finally {
+      setReplyingId(null);
+    }
+  };
+
+  const handleTicketStatus = async (t: any, status: string) => {
+    try {
+      const token = await auth.currentUser?.getIdToken();
+      const res = await fetch(`/api/admin/tickets/${t.id}/status`, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          ...(token ? { Authorization: `Bearer ${token}` } : {}),
+        },
+        body: JSON.stringify({ status }),
+      });
+      if (!res.ok) throw new Error('status failed');
+      setSupportTickets((list) => list.map((x) => x.id === t.id ? { ...x, status } : x));
+      toast.success(`Ticket ${status}.`);
+    } catch {
+      toast.error('Falha ao mudar status.');
+    }
+  };
+
+  const renderSupport = () => {
+    const filtered = supportTickets.filter((t: any) => supportFilter === 'all' || t.status === supportFilter);
+    return (
+      <div className="bg-white rounded-2xl shadow-sm border border-slate-100 overflow-hidden">
+        <div className="p-6 border-b border-slate-100 bg-slate-50/50 flex flex-col sm:flex-row sm:items-center gap-3">
+          <div className="flex-1">
+            <h2 className="text-lg font-bold text-slate-900">Suporte — fila com SLA</h2>
+            <p className="text-sm text-slate-500">Pagamento 4h · Técnico 8h · Dúvida 24h. Vencidos primeiro.</p>
+          </div>
+          <select
+            value={supportFilter}
+            onChange={(e) => setSupportFilter(e.target.value as any)}
+            className="px-3 py-2 text-sm border border-slate-200 rounded-lg outline-none cursor-pointer"
+          >
+            <option value="all">Todos</option>
+            <option value="aberto">Abertos</option>
+            <option value="em_atendimento">Em atendimento</option>
+            <option value="resolvido">Resolvidos</option>
+          </select>
+          <button
+            onClick={fetchSupportTickets}
+            disabled={supportLoading}
+            className="px-3 py-2 text-sm font-bold border border-slate-200 rounded-lg hover:bg-white bg-white cursor-pointer disabled:opacity-60"
+          >
+            {supportLoading ? 'A carregar…' : 'Atualizar'}
+          </button>
+        </div>
+        {supportLoading && supportTickets.length === 0 ? (
+          <p className="p-6 text-sm text-slate-500">A carregar tickets…</p>
+        ) : filtered.length === 0 ? (
+          <p className="p-6 text-sm text-slate-500">Fila limpa. Nada aqui.</p>
+        ) : (
+          <ul className="divide-y divide-slate-100">
+            {filtered.map((t: any) => (
+              <li key={t.id} className={`p-4 sm:p-5 ${t.overdue ? 'bg-red-50/50' : ''}`}>
+                <button onClick={() => openTicketThread(t)} className="w-full text-left cursor-pointer">
+                  <p className="font-bold text-sm text-slate-900 flex flex-wrap items-center gap-2">
+                    {t.overdue && <span className="text-[10px] font-black uppercase px-2 py-0.5 rounded-full bg-red-600 text-white animate-pulse">Vencido</span>}
+                    <span className={`text-[10px] font-black uppercase px-2 py-0.5 rounded-full ${t.status === 'resolvido' ? 'bg-emerald-100 text-emerald-700' : t.status === 'em_atendimento' ? 'bg-blue-100 text-blue-700' : 'bg-amber-100 text-amber-700'}`}>
+                      {t.status}
+                    </span>
+                    <span className="text-[10px] px-2 py-0.5 rounded-full bg-slate-100 text-slate-600 font-bold">{t.category} · SLA {t.slaDue ? new Date(t.slaDue).toLocaleString('pt-AO') : '—'}</span>
+                    <span className="truncate">{t.subject}</span>
+                  </p>
+                  <p className="text-xs text-slate-400 mt-1 font-mono">{t.id}{t.eventId ? ` · evento ${t.eventId}` : ''}</p>
+                </button>
+                {openTicketId === t.id && (
+                  <div className="mt-3 space-y-2" onClick={(e) => e.stopPropagation()}>
+                    <div className="space-y-1.5 max-h-48 overflow-y-auto bg-slate-50/50 rounded-xl p-3">
+                      {ticketMessages.map((m: any) => (
+                        <div key={m.id} className={`text-xs rounded-xl px-3 py-2 ${m.from === 'admin' ? 'bg-brand-blue/10 text-slate-700' : 'bg-white border border-slate-100 text-slate-600'}`}>
+                          <span className="font-bold">{m.from === 'admin' ? `Equipa${m.by ? ` (${m.by})` : ''}: ` : 'Cliente: '}</span>{m.text}
+                        </div>
+                      ))}
+                      {ticketMessages.length === 0 && <p className="text-xs text-slate-400">Sem mensagens carregadas.</p>}
+                    </div>
+                    {t.status !== 'resolvido' && (
+                      <div className="flex flex-col sm:flex-row gap-2">
+                        <input
+                          type="text"
+                          placeholder="Responder ao cliente…"
+                          value={replyDraft}
+                          onChange={(e) => setReplyDraft(e.target.value)}
+                          maxLength={2000}
+                          className="flex-1 px-3 py-2.5 text-sm border border-slate-200 rounded-xl outline-none focus:ring-brand-blue focus:border-brand-blue"
+                        />
+                        <button
+                          onClick={() => handleTicketReply(t)}
+                          disabled={replyingId === t.id || !replyDraft.trim()}
+                          className="px-5 h-11 rounded-xl bg-brand-blue text-white font-bold text-xs uppercase tracking-wider hover:bg-brand-blue/90 disabled:opacity-60 cursor-pointer whitespace-nowrap"
+                        >
+                          {replyingId === t.id ? 'A enviar…' : 'Responder'}
+                        </button>
+                        <button
+                          onClick={() => handleTicketStatus(t, 'resolvido')}
+                          className="px-4 h-11 rounded-xl border border-emerald-200 text-emerald-700 font-bold text-xs uppercase tracking-wider hover:bg-emerald-50 cursor-pointer whitespace-nowrap"
+                        >
+                          Resolver
+                        </button>
+                      </div>
+                    )}
+                  </div>
+                )}
+              </li>
+            ))}
+          </ul>
+        )}
+      </div>
+    );
+  };
+
+  // Espelho readonly ("ver como usuário"): sem writes, com auditoria de acesso.
+  const [mirrorUser, setMirrorUser] = useState<any | null>(null);
+
+  const openMirror = async (user: any) => {
+    if (!user?.id) return;
+    setMirrorUser(user);
+    try {
+      const token = await auth.currentUser?.getIdToken();
+      await fetch('/api/admin/mirror-view', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          ...(token ? { Authorization: `Bearer ${token}` } : {}),
+        },
+        body: JSON.stringify({ userId: user.id }),
+      });
+    } catch { /* best-effort — o espelho abre na mesma */ }
+  };
+
+  const fetchTeam = async () => {
+    setTeamLoading(true);
+    try {
+      const token = await auth.currentUser?.getIdToken();
+      const res = await fetch('/api/admin/admins', {
+        headers: { ...(token ? { Authorization: `Bearer ${token}` } : {}) },
+      });
+      const data = await res.json().catch(() => ({}));
+      if (res.ok) setTeam(data.admins || []);
+      else toast.error('Sem permissão para ver a equipa.');
+    } catch {
+      toast.error('Falha ao carregar equipa.');
+    } finally {
+      setTeamLoading(false);
+    }
+  };
+
+  const handleGrantAdmin = async () => {
+    const email = grantEmail.trim();
+    if (!email || teamBusyId) return;
+    if (!window.confirm(`Conceder acesso ADMIN a ${email}? Terá todos os poderes operacionais.`)) return;
+    setTeamBusyId('grant');
+    try {
+      const token = await auth.currentUser?.getIdToken();
+      const res = await fetch('/api/admin/admins/grant', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          ...(token ? { Authorization: `Bearer ${token}` } : {}),
+        },
+        body: JSON.stringify({ email }),
+      });
+      const data = await res.json().catch(() => ({}));
+      if (!res.ok) throw new Error(data?.error || 'grant failed');
+      setGrantEmail('');
+      toast.success(`Admin concedido a ${data.email || email}!`);
+      fetchTeam();
+    } catch (e: any) {
+      toast.error(e?.message || 'Não foi possível conceder.');
+    } finally {
+      setTeamBusyId(null);
+    }
+  };
+
+  const handleRevokeAdmin = async (member: any) => {
+    if (!member?.uid || teamBusyId) return;
+    const reason = window.prompt(`Motivo da remoção de ${member.email || member.uid}:`, '');
+    if (reason === null) return;
+    if (!window.confirm(`REMOVER acesso admin de ${member.email || member.uid}? Perde o /admin de imediato.`)) return;
+    setTeamBusyId(member.uid);
+    try {
+      const token = await auth.currentUser?.getIdToken();
+      const res = await fetch('/api/admin/admins/revoke', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          ...(token ? { Authorization: `Bearer ${token}` } : {}),
+        },
+        body: JSON.stringify({ uid: member.uid, reason: reason || '' }),
+      });
+      const data = await res.json().catch(() => ({}));
+      if (!res.ok) throw new Error(data?.error || 'revoke failed');
+      toast.success('Acesso removido.');
+      fetchTeam();
+    } catch (e: any) {
+      toast.error(e?.message || 'Não foi possível remover.');
+    } finally {
+      setTeamBusyId(null);
+    }
+  };
+
+  const handleResyncAdmin = async (member: any) => {
+    if (!member?.uid || teamBusyId) return;
+    setTeamBusyId(`resync:${member.uid}`);
+    try {
+      const token = await auth.currentUser?.getIdToken();
+      const res = await fetch('/api/admin/admins/resync', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          ...(token ? { Authorization: `Bearer ${token}` } : {}),
+        },
+        body: JSON.stringify({ uid: member.uid }),
+      });
+      if (!res.ok) throw new Error('resync failed');
+      toast.success('Ressincronizado.');
+      fetchTeam();
+    } catch {
+      toast.error('Falha ao ressincronizar.');
+    } finally {
+      setTeamBusyId(null);
+    }
+  };
+
+  const renderTeam = () => (
+    <div className="bg-white rounded-2xl shadow-sm border border-slate-100 overflow-hidden">
+      <div className="p-6 border-b border-slate-100 bg-slate-50/50">
+        <h2 className="text-lg font-bold text-slate-900">Equipa administrativa</h2>
+        <p className="text-sm text-slate-500">Quem tem acesso ao /admin. {isSuperAdminUI ? 'Como super-admin, podes promover e remover.' : 'Só o super-admin gere a equipa.'}</p>
+        {isSuperAdminUI && (
+          <div className="mt-4 flex flex-col sm:flex-row gap-2">
+            <input
+              type="email"
+              placeholder="e-mail do novo admin…"
+              value={grantEmail}
+              onChange={(e) => setGrantEmail(e.target.value)}
+              className="flex-1 px-3 py-2.5 text-sm border border-slate-200 rounded-xl outline-none focus:ring-brand-blue focus:border-brand-blue"
+            />
+            <button
+              onClick={handleGrantAdmin}
+              disabled={teamBusyId === 'grant' || !grantEmail.trim()}
+              className="px-5 h-11 rounded-xl bg-slate-900 text-white font-bold text-xs uppercase tracking-wider hover:bg-slate-700 disabled:opacity-60 cursor-pointer whitespace-nowrap"
+            >
+              {teamBusyId === 'grant' ? 'A conceder…' : 'Promover a admin'}
+            </button>
+          </div>
+        )}
+      </div>
+      {teamLoading ? (
+        <p className="p-6 text-sm text-slate-500">A carregar equipa…</p>
+      ) : team.length === 0 ? (
+        <p className="p-6 text-sm text-slate-500">Nenhum admin com espelho — usa "Promover" para ativar o teu acesso.</p>
+      ) : (
+        <ul className="divide-y divide-slate-100">
+          {team.map((m: any) => (
+            <li key={m.uid} className="p-4 sm:p-5 flex flex-col sm:flex-row sm:items-center gap-3">
+              <div className="flex-1 min-w-0">
+                <p className="font-bold text-sm text-slate-900 truncate">{m.email || m.uid}</p>
+                <p className="text-xs text-slate-500">
+                  desde {m.roleGrantedAt ? new Date(m.roleGrantedAt).toLocaleDateString('pt-AO') : '—'}
+                  {m.roleGrantedBy ? ` · por ${m.roleGrantedBy}` : ''}
+                  {!m.inSync && <span className="ml-2 text-amber-600 font-bold">⚠ claim divergente</span>}
+                </p>
+              </div>
+              {isSuperAdminUI && (
+                <div className="flex gap-2 shrink-0">
+                  {!m.inSync && (
+                    <button
+                      onClick={() => handleResyncAdmin(m)}
+                      disabled={teamBusyId === `resync:${m.uid}`}
+                      className="px-4 h-10 rounded-full border border-slate-200 text-slate-700 font-bold text-xs uppercase tracking-wider hover:bg-slate-50 cursor-pointer disabled:opacity-60"
+                    >
+                      Ressincronizar
+                    </button>
+                  )}
+                  <button
+                    onClick={() => handleRevokeAdmin(m)}
+                    disabled={teamBusyId === m.uid}
+                    className="px-4 h-10 rounded-full border border-red-200 text-red-600 font-bold text-xs uppercase tracking-wider hover:bg-red-50 cursor-pointer disabled:opacity-60"
+                  >
+                    {teamBusyId === m.uid ? 'A remover…' : 'Remover'}
+                  </button>
+                </div>
+              )}
+            </li>
+          ))}
+        </ul>
+      )}
+    </div>
+  );
 
   const callSubscriptionAction = async (sub: any, action: 'renew' | 'cancel') => {
     if (!sub?.id || subActionId) return;
@@ -806,6 +1189,14 @@ export const AdminDashboard: React.FC = () => {
                   )}
                 </li>
                 <li className="pt-4 border-t border-slate-100 flex justify-end gap-2 flex-wrap">
+                  <button
+                    onClick={() => openMirror(selectedUser)}
+                    className="flex items-center gap-1.5 bg-white text-brand-blue text-xs font-bold px-4 py-2 rounded-xl border border-brand-blue/30 shadow-sm hover:bg-brand-blue/5 transition-all outline-none cursor-pointer"
+                    title="Ver o painel exatamente como este usuário vê (somente leitura)"
+                  >
+                    <span className="material-symbols-outlined text-sm">visibility</span>
+                    Ver como usuário
+                  </button>
                   {(selectedUser as any)?.suspendedAt ? (
                     <button
                       onClick={() => handleSuspendUser(selectedUser, false)}
@@ -1464,6 +1855,8 @@ export const AdminDashboard: React.FC = () => {
             <option value="user.plan_change">Trocas de plano</option>
             <option value="subscription.renew">Subscrições renovadas</option>
             <option value="subscription.cancel">Subscrições canceladas</option>
+            <option value="admin.grant">Admins promovidos</option>
+            <option value="admin.revoke">Admins removidos</option>
           </select>
           <button
             onClick={fetchAuditLogs}
@@ -1593,6 +1986,26 @@ export const AdminDashboard: React.FC = () => {
             >
               Auditoria
             </button>
+            <button
+              onClick={() => { setActiveTab('team'); setSelectedUser(null); }}
+              className={`px-4 py-2 text-sm font-bold rounded-lg transition-all whitespace-nowrap ${activeTab === 'team' ? 'bg-slate-900 text-white shadow-md' : 'text-slate-500 hover:text-slate-900 hover:bg-slate-100'}`}
+            >
+              Equipa
+            </button>
+            <button
+              onClick={() => { setActiveTab('support'); setSelectedUser(null); }}
+              className={`px-4 py-2 text-sm font-bold rounded-lg transition-all whitespace-nowrap inline-flex items-center ${activeTab === 'support' ? 'bg-slate-900 text-white shadow-md' : 'text-slate-500 hover:text-slate-900 hover:bg-slate-100'}`}
+            >
+              Suporte
+              {openTicketsCount > 0 && (
+                <span
+                  title={`${openTicketsCount} ticket(s) em aberto${overdueTicketsCount > 0 ? `, ${overdueTicketsCount} vencido(s)` : ''}`}
+                  className={`ml-1.5 inline-flex items-center justify-center min-w-[20px] h-5 px-1.5 rounded-full text-white text-[11px] font-black ${overdueTicketsCount > 0 ? 'bg-red-600 animate-pulse' : 'bg-blue-500'}`}
+                >
+                  {openTicketsCount}
+                </span>
+              )}
+            </button>
           </div>
         </div>
         
@@ -1612,11 +2025,28 @@ export const AdminDashboard: React.FC = () => {
             {activeTab === 'subscriptions' && renderSubscriptions()}
             {activeTab === 'analytics' && <AnalyticsView visits={visits} events={events} users={users} />}
             {activeTab === 'audit' && renderAudit()}
+            {activeTab === 'team' && renderTeam()}
+            {activeTab === 'support' && renderSupport()}
           </motion.div>
         </AnimatePresence>
 
         <AnimatePresence>
           {selectedEvent && renderEventInspector()}
+        </AnimatePresence>
+
+        <AnimatePresence>
+          {mirrorUser && (
+            <UserMirror
+              targetUser={mirrorUser}
+              targetEvents={events.filter((e: any) => e.ownerId === (mirrorUser.uid || mirrorUser.id))}
+              targetOrders={orders.filter((o: any) => o.userId === (mirrorUser.uid || mirrorUser.id))}
+              onClose={() => setMirrorUser(null)}
+              onInspectEvent={(ev) => {
+                setMirrorUser(null);
+                openEventInspector(ev);
+              }}
+            />
+          )}
         </AnimatePresence>
 
         <AnimatePresence>

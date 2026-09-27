@@ -31,6 +31,8 @@ import metaRoutes from './server/routes/meta.js';
 import subscriptionsRoutes from './server/routes/subscriptions.js';
 import adminEventsRoutes from './server/routes/admin-events.js';
 import adminUsersRoutes from './server/routes/admin-users.js';
+import adminTeamRoutes from './server/routes/admin-team.js';
+import ticketsRoutes from './server/routes/tickets.js';
 
 // --- Express App ---
 const app = express();
@@ -132,6 +134,8 @@ app.use(metaRoutes);      // POST /api/meta/events — relay da Conversions API 
 app.use(subscriptionsRoutes); // /api/subscriptions/*
 app.use(adminEventsRoutes); // /api/admin/events/:id/block|activate — Ativar/Desativar manual
 app.use(adminUsersRoutes); // /api/admin/users/:id — plano, validade, suspender/reativar
+app.use(adminTeamRoutes); // /api/admin/admins — gerir equipa (super-admin)
+app.use(ticketsRoutes); // /api/tickets + /api/admin/tickets — suporte com SLA
 
 // --- Global Error Handler ---
 app.use((err: any, req: express.Request, res: express.Response, _next: express.NextFunction) => {

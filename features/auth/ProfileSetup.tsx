@@ -17,7 +17,15 @@ export const ProfileSetup: React.FC = () => {
   const navigate = useNavigate();
   const location = useLocation();
   const { user } = useFirebase();
-  const from = (location.state as any)?.from || '/dashboard';
+  // `from` pode ser string ou objeto Location (via ProtectedRoute).
+  const rawFrom = (location.state as any)?.from;
+  const fromPath: string =
+    typeof rawFrom === 'string'
+      ? rawFrom
+      : typeof rawFrom?.pathname === 'string'
+        ? `${rawFrom.pathname}${rawFrom.search || ''}${rawFrom.hash || ''}`
+        : '/dashboard';
+  const justRegistered = (location.state as any)?.justRegistered === true;
 
   const [accountType, setAccountType] = useState<AccountType>('client');
   const [agencyName, setAgencyName] = useState('');
@@ -53,7 +61,11 @@ export const ProfileSetup: React.FC = () => {
       }
       await setDoc(doc(db, 'users', user.uid), fields, { merge: true });
       toast.success(accountType === 'professional' ? 'Perfil profissional pronto!' : 'Perfil pronto!');
-      navigate(from, { replace: true });
+      if (justRegistered) {
+        navigate('/dashboard', { state: { justRegistered: true }, replace: true });
+      } else {
+        navigate(fromPath, { replace: true });
+      }
     } catch {
       toast.error('Não foi possível guardar. Tente de novo.');
     } finally {

@@ -26,14 +26,27 @@ export const AuthPage: React.FC = () => {
   const [phone, setPhone] = useState('');
   const [city, setCity] = useState('');
   const [celebrantRole, setCelebrantRole] = useState('noiva');
+  const [suggestLogin, setSuggestLogin] = useState(false);
 
   const navigate = useNavigate();
   const location = useLocation();
-  const from = (location.state as any)?.from || '/dashboard';
+  // `from` pode ser string ('/dashboard') ou objeto Location (ProtectedRoute passa
+  // `state={{ from: location }}`). Normalizar para string antes de navegar.
+  const rawFrom = (location.state as any)?.from;
+  const fromPath: string =
+    typeof rawFrom === 'string'
+      ? rawFrom
+      : typeof rawFrom?.pathname === 'string'
+        ? `${rawFrom.pathname}${rawFrom.search || ''}${rawFrom.hash || ''}`
+        : '/dashboard';
+
+  const goDashboardFresh = () =>
+    navigate('/dashboard', { state: { justRegistered: true }, replace: true });
 
   const handleGoogleSignIn = async () => {
     setLoading(true);
     setError('');
+    setSuggestLogin(false);
     try {
       const provider = new GoogleAuthProvider();
       const result = await signInWithPopup(auth, provider);
@@ -49,11 +62,12 @@ export const AuthPage: React.FC = () => {
       } catch {
         // Servidor inalcançável (offline): NÃO tocar na ficha. O snapshot do
         // FirebaseProvider carrega o perfil real quando a rede voltar.
-        navigate(from, { replace: true });
+        navigate(fromPath, { replace: true });
         return;
       }
       if (!exists) {
           // Conta nova via Google: ficha mínima + KYC na tela /bem-vindo.
+          // Só campos de CREATE: o update posterior é restrito pelas rules.
           await setDoc(userRef, {
               uid: result.user.uid,
               name: result.user.displayName || '',
@@ -62,14 +76,18 @@ export const AuthPage: React.FC = () => {
               termsVersion: TERMS_VERSION,
               acceptedTermsAt: new Date().toISOString(),
           }, { merge: true });
-          trackPixelCompleteRegistration(
-            { method: 'google' },
-            { user_data: { email: result.user.email || undefined } },
-          );
-          navigate('/bem-vindo', { state: { from }, replace: true });
+          try {
+            trackPixelCompleteRegistration(
+              { method: 'google' },
+              { user_data: { email: result.user.email || undefined } },
+            );
+          } catch {
+            /* pixel nunca bloqueia o cadastro */
+          }
+          navigate('/bem-vindo', { state: { from: fromPath, justRegistered: true }, replace: true });
           return;
       }
-      navigate(from, { replace: true });
+      navigate(fromPath, { replace: true });
     } catch (err: any) {
       if (err.code !== 'auth/popup-closed-by-user' && err.code !== 'auth/cancelled-popup-request') {
         console.error('Google Sign-in error:', err);
@@ -84,11 +102,16 @@ export const AuthPage: React.FC = () => {
     e.preventDefault();
     setLoading(true);
     setError('');
+    setSuggestLogin(false);
+
+    // Guarda o uid criado para recuperação: se o Auth criou mas o Firestore
+    // falhou, ainda navegamos (o seed do Provider completa a ficha).
+    let createdUid: string | null = null;
 
     try {
       if (isLogin) {
         await signInWithEmailAndPassword(auth, email, password);
-        navigate(from, { replace: true });
+        navigate(fromPath, { replace: true });
       } else {
         if (!name.trim()) {
            setError('Por favor, informe seu nome.');
@@ -101,20 +124,26 @@ export const AuthPage: React.FC = () => {
            return;
         }
         const userCredential = await createUserWithEmailAndPassword(auth, email, password);
-        
-        await updateProfile(userCredential.user, {
-           displayName: name
-        });
+        createdUid = userCredential.user.uid;
+
+        try {
+          await updateProfile(userCredential.user, {
+             displayName: name
+          });
+        } catch (profileErr) {
+          // Não-bloqueante: o displayName pode ser completado depois.
+          console.warn('updateProfile falhou (não-bloqueante):', profileErr);
+        }
 
         const { doc, setDoc } = await import('firebase/firestore');
         const userRef = doc(db, 'users', userCredential.user.uid);
-        // merge:true — conta nova nasce free, mas nunca apagar campos se a ficha
-        // já existir por algum caminho (ex: pré-criada pelo admin).
         // KYC gravado já no cadastro: accountType + perfil conforme o tipo.
+        // Estes campos estão na allow-list de UPDATE das rules.
         const kycFields: Record<string, unknown> = {
             accountType,
             kycStatus: 'declared',
             kycCompletedAt: new Date().toISOString(),
+            updatedAt: new Date().toISOString(),
         };
         if (accountType === 'professional') {
             kycFields.agencyName = agencyName.trim();
@@ -124,29 +153,76 @@ export const AuthPage: React.FC = () => {
             kycFields.celebrantRole = celebrantRole;
             if (phone.trim()) kycFields.phone = phone.trim();
         }
-        await setDoc(userRef, {
-            uid: userCredential.user.uid,
-            name: name,
-            email: email,
-            plan: 'free',
-            termsVersion: TERMS_VERSION,
-            acceptedTermsAt: new Date().toISOString(),
-            ...kycFields,
-        }, { merge: true });
-        trackPixelCompleteRegistration(
-          { method: 'email' },
-          { user_data: { email } },
-        );
-        
-        navigate(from, { replace: true });
+        // Tentativa 1 (CREATE): ficha completa de conta nova. As rules de
+        // create permitem campos extra (plan/terms), então incluímos aqui.
+        try {
+          await setDoc(userRef, {
+              uid: userCredential.user.uid,
+              name: name,
+              email: email,
+              plan: 'free',
+              termsVersion: TERMS_VERSION,
+              acceptedTermsAt: new Date().toISOString(),
+              ...kycFields,
+          }, { merge: true });
+        } catch (createErr: any) {
+          const code = createErr?.code || '';
+          // Tentativa 2 (UPDATE): o auto-seed do FirebaseProvider pode ter
+          // criado a ficha primeiro (race). Nesse caso o write é avaliado
+          // como UPDATE, que PROÍBE plan/termsVersion/acceptedTermsAt.
+          // Re-tenta só com campos da allow-list (+ uid/name/email iguais).
+          if (code === 'permission-denied' || code === 'permission_denied' || /permission|denied/i.test(String(createErr?.message || ''))) {
+            console.warn('setDoc create negado (provável race com seed), a tentar update-safe:', createErr);
+            await setDoc(userRef, {
+                uid: userCredential.user.uid,
+                name: name,
+                email: email,
+                ...kycFields,
+            }, { merge: true });
+          } else {
+            throw createErr;
+          }
+        }
+        // Pixel fire-and-forget: nunca pode abortar o navigate.
+        try {
+          trackPixelCompleteRegistration(
+            { method: 'email' },
+            { user_data: { email } },
+          );
+        } catch {
+          /* pixel bloqueado — segue para o dashboard na mesma */
+        }
+
+        goDashboardFresh();
       }
     } catch (err: any) {
+      // Recuperação: conta Auth já existe mas Firestore falhou (offline,
+      // permission transitória, etc). Não prender o user no /auth — o seed
+      // do Provider completa a ficha; levar ao dashboard com boas-vindas.
+      const authUidNow = auth.currentUser?.uid || createdUid;
+      const isFirestoreAftermath =
+        !!authUidNow &&
+        !isLogin &&
+        err?.code !== 'auth/email-already-in-use' &&
+        !String(err?.code || '').startsWith('auth/');
+      if (isFirestoreAftermath) {
+        console.warn('Cadastro Auth OK mas Firestore falhou; a recuperar para o dashboard:', err);
+        goDashboardFresh();
+        return;
+      }
       if (err.code === 'auth/email-already-in-use') {
-        setError('Este e-mail já está em uso.');
+        setError('Este e-mail já está em uso. Tente fazer login.');
+        setSuggestLogin(true);
       } else if (err.code === 'auth/wrong-password' || err.code === 'auth/user-not-found' || err.code === 'auth/invalid-credential') {
         setError('E-mail ou senha inválidos.');
       } else if (err.code === 'auth/weak-password') {
         setError('A senha deve ter pelo menos 6 caracteres.');
+      } else if (err.code === 'auth/invalid-email') {
+        setError('E-mail inválido. Verifique e tente de novo.');
+      } else if (err.code === 'auth/too-many-requests') {
+        setError('Muitas tentativas. Aguarde um pouco e tente de novo.');
+      } else if (err.code === 'auth/network-request-failed') {
+        setError('Sem ligação à internet. Verifique a rede e tente de novo.');
       } else {
         console.error('Registration/Login error:', err);
         setError('Ocorreu um erro. Tente novamente mais tarde.');
@@ -159,6 +235,7 @@ export const AuthPage: React.FC = () => {
   const toggleMode = () => {
     setIsLogin(!isLogin);
     setError('');
+    setSuggestLogin(false);
     setPassword('');
   };
 
@@ -342,6 +419,15 @@ export const AuthPage: React.FC = () => {
           {error && (
             <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }} className="p-3 bg-red-50 text-red-600 border border-red-100 rounded-lg text-sm text-center">
               {error}
+              {suggestLogin && !isLogin && (
+                <button
+                  type="button"
+                  onClick={toggleMode}
+                  className="mt-2 w-full h-10 bg-brand-blue text-white font-bold rounded-xl text-sm hover:bg-brand-blue/90 transition-colors cursor-pointer"
+                >
+                  Fazer login com este e-mail
+                </button>
+              )}
             </motion.div>
           )}
 

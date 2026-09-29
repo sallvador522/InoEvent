@@ -21,7 +21,7 @@ import {
 } from "../../components/FirebaseProvider";
 import { getGuestLimit, normalizePlanId, getPlanConfig, canUseFeature, getEventCreationLimit } from "../../lib/entitlements";
 import { normalizeAccountType } from "../../types";
-import { Link, useNavigate } from "react-router-dom";
+import { Link, useNavigate, useLocation } from "react-router-dom";
 import { Button } from "../../components/ui/Button";
 import {
   Calendar,
@@ -45,6 +45,7 @@ import { Navbar } from "../../components/Navbar";
 import { SupportModal } from "../../components/SupportModal";
 import { Skeleton } from "../../components/ui/Skeleton";
 import { OnboardingWizard } from "./OnboardingWizard";
+import { WelcomeModal } from "./WelcomeModal";
 
 import { getEventByLayoutMode } from "../../mockData";
 import { FirstEventFreeModal } from "./FirstEventFreeModal";
@@ -66,7 +67,10 @@ export const UserDashboard: React.FC = () => {
   // Promo 1º evento grátis: 1x por sessão, só se há rascunho free elegível.
   const [promoEvent, setPromoEvent] = useState<any | null>(null);
   const [promoDismissed, setPromoDismissed] = useState(false);
+  // Boas-vindas pós-cadastro: 1x por conta, vindo de state.justRegistered.
+  const [showWelcome, setShowWelcome] = useState(false);
   const navigate = useNavigate();
+  const location = useLocation();
 
   // Subscrição em Tempo Real para as Notificações do Usuário
   useEffect(() => {
@@ -166,10 +170,40 @@ export const UserDashboard: React.FC = () => {
     fetchEvents();
   }, [user]);
 
+  // Boas-vindas pós-cadastro: mostra 1x por conta quando a navegação traz
+  // `state.justRegistered` (signup e-mail ou Google via /bem-vindo).
+  // Prioridade sobre a promo: enquanto aberto, a promo não dispara.
+  useEffect(() => {
+    if (!user || loading) return;
+    const flagged = (location.state as any)?.justRegistered === true;
+    if (!flagged) return;
+    try {
+      if (localStorage.getItem(`ino_welcome_seen_${user.uid}`) === '1') return;
+    } catch {
+      /* storage indisponível — mostra na mesma */
+    }
+    setShowWelcome(true);
+    // Limpa o flag do histórico para não reabrir no "voltar".
+    try {
+      window.history.replaceState({}, document.title);
+    } catch {
+      /* noop */
+    }
+  }, [user, loading, location.state]);
+
+  const dismissWelcome = () => {
+    setShowWelcome(false);
+    try {
+      if (user) localStorage.setItem(`ino_welcome_seen_${user.uid}`, '1');
+    } catch {
+      /* noop */
+    }
+  };
+
   // Promo 1º evento grátis: abre 1x por sessão quando há rascunho free elegível
   // (não-chá, não-pago), conta free e promo nunca usada.
   useEffect(() => {
-    if (promoDismissed || promoEvent || loading) return;
+    if (promoDismissed || promoEvent || loading || showWelcome) return;
     if (!userProfile || normalizePlanId((userProfile as any)?.plan) !== 'free') return;
     if ((userProfile as any)?.firstEventFreeUsed === true) return;
     const eligible = events.find((e: any) =>
@@ -178,7 +212,7 @@ export const UserDashboard: React.FC = () => {
       e?.isPublished === false
     );
     if (eligible) setPromoEvent(eligible);
-  }, [events, userProfile, loading, promoDismissed, promoEvent]);
+  }, [events, userProfile, loading, promoDismissed, promoEvent, showWelcome]);
 
   const handleDeleteEvent = async () => {
     if (!eventToDelete) return;
@@ -867,6 +901,17 @@ export const UserDashboard: React.FC = () => {
             userEmail={user.email || (userProfile as any)?.email || ''}
             onClose={() => { setPromoEvent(null); setPromoDismissed(true); }}
             onDismiss={() => { setPromoEvent(null); setPromoDismissed(true); }}
+          />
+        )}
+      </AnimatePresence>
+
+      <AnimatePresence>
+        {showWelcome && user && (
+          <WelcomeModal
+            name={(userProfile as any)?.name || user.displayName || (userProfile as any)?.email || ''}
+            onClose={dismissWelcome}
+            onCreateEvent={() => { dismissWelcome(); navigate('/templates'); }}
+            onViewPlans={() => { dismissWelcome(); navigate('/plans'); }}
           />
         )}
       </AnimatePresence>

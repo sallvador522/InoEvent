@@ -46,7 +46,9 @@ import toast from "react-hot-toast";
 import { copyToClipboard } from "../../lib/clipboard";
 import { uploadEventAudio, deleteEventAudio, isOwnStorageAudio } from "../../lib/audioUpload";
 import { QRCodeSVG } from "qrcode.react";
+import { Play } from "lucide-react";
 import { exportPassPng } from "../../lib/passExport";
+import { firstGalleryPhoto } from "../../lib/passImage";
 import { EventPass, supportsElegantPass } from "../../components/passes/EventPass";
 import { SEO } from "../../components/SEO";
 import { getOptimizedImageUrl, OptimizeImageOptions } from "../../lib/imageOptimizer";
@@ -6752,14 +6754,9 @@ const LimintsoGoldLayout: React.FC<{
                 }}
                 className="group relative px-10 py-4.5 bg-[#C5A880] hover:bg-[#b49232] text-slate-950 rounded-full shadow-[0_10px_35px_rgba(0,0,0,0.4)] text-xs uppercase tracking-[0.25em] font-sans font-bold transition-all duration-500 hover:scale-105 active:scale-95 flex items-center space-x-2.5 cursor-pointer border border-[#C5A880]/20"
               >
-                <span className="material-symbols-outlined text-sm text-slate-950 transition-colors">
-                  play_arrow
-                </span>
+                <Play size={14} className="text-slate-950" fill="currentColor" aria-hidden="true" />
                 <span>VER CONVITE</span>
               </button>
-              <p className="text-[9px] uppercase tracking-[0.15em] text-[#C5A880]/70 font-sans">
-                Clique para escutar a música
-              </p>
             </motion.div>
           </motion.div>
         )}
@@ -8837,7 +8834,7 @@ const RSVPForm: React.FC<{ event: EventDetails; onClose: () => void; simMode?: b
                       time: event.time,
                       locationName: event.locationName,
                       address: event.address,
-                      heroImage: event.heroImage,
+                      heroImage: event.heroImage || firstGalleryPhoto(event.gallery),
                     }}
                     guestName={successData.name}
                     guestId={successData.id}
@@ -8860,7 +8857,7 @@ const RSVPForm: React.FC<{ event: EventDetails; onClose: () => void; simMode?: b
                   time: event.time,
                   locationName: event.locationName,
                   address: event.address,
-                  heroImage: event.heroImage,
+                  heroImage: event.heroImage || firstGalleryPhoto(event.gallery),
                 }}
                 guestName={successData.name}
                 guestId={successData.id}

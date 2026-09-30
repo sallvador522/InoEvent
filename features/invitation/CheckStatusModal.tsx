@@ -6,6 +6,7 @@ import { db } from '../../components/FirebaseProvider';
 import toast from 'react-hot-toast';
 import { QRCodeSVG } from 'qrcode.react';
 import { exportPassPng } from '../../lib/passExport';
+import { firstGalleryPhoto } from '../../lib/passImage';
 import { EventPass, supportsElegantPass } from '../../components/passes/EventPass';
 
 interface CheckStatusModalProps {
@@ -199,7 +200,7 @@ export const CheckStatusModal: React.FC<CheckStatusModalProps> = ({ isOpen, onCl
                             time: event.time,
                             locationName: event.locationName,
                             address: event.address,
-                            heroImage: event.heroImage,
+                            heroImage: event.heroImage || firstGalleryPhoto(event.gallery),
                           }}
                           guestName={result.name}
                           guestId={result.id}
@@ -219,7 +220,7 @@ export const CheckStatusModal: React.FC<CheckStatusModalProps> = ({ isOpen, onCl
                           time: event.time,
                           locationName: event.locationName,
                           address: event.address,
-                          heroImage: event.heroImage,
+                          heroImage: event.heroImage || firstGalleryPhoto(event.gallery),
                         }}
                         guestName={result.name}
                         guestId={result.id}

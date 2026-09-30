@@ -34,7 +34,7 @@ import {
 } from "firebase/firestore";
 import { createEventViaApi } from "../../lib/eventApi";
 import { useCooldown } from "../../lib/useCooldown";
-import { IBAN_PREFIX, canonicalIban, isValidAngolaIban, ibanError, splitIban, formatIbanGroups } from "../../lib/iban";
+import { IBAN_PREFIX, canonicalIban, isValidAngolaIban, ibanError, splitIban, formatIbanGroups, isIbanGift } from "../../lib/iban";
 import {
   signInWithEmailAndPassword,
   createUserWithEmailAndPassword,
@@ -2146,7 +2146,7 @@ const InvitationView: React.FC = () => {
                                 return <p className="text-[10px] text-red-400 font-light mt-1">{ibanError(raw)}</p>;
                               })()}
                               <p className="text-[10px] text-slate-500 font-light mt-1">
-                                IBAN (AO06 + 19 dígitos), Pix ou link — é o que o botão Copiar usa. Vazio esconde a conta no convite.
+                                IBAN (AO06 + 21 dígitos), Pix ou link — é o que o botão Copiar usa. Vazio esconde a conta no convite.
                               </p>
                             </div>
 
@@ -5653,8 +5653,8 @@ const LuxuryLayout: React.FC<{
                     </p>
                   </div>
 
-                  {/* IBAN DISPLAY */}
-                  {gift.type === "IBAN" && (
+                  {/* IBAN DISPLAY (inclui legados do painel sem `type`) */}
+                  {isIbanGift(gift) && (
                     <div className="bg-black/60 p-4 rounded-lg border border-[#BF9B30]/30 shadow-inner">
                       <p className="text-[10px] text-[#BF9B30] mb-2 uppercase tracking-widest font-bold">
                         Enviar Presentes
@@ -6487,7 +6487,7 @@ const BabyShowerLayout: React.FC<{
                   )}
                   <div>
                     <span className="text-[10px] uppercase font-bold tracking-widest opacity-40">
-                      {gift.type === "IBAN" ? "Transferência Bancária" : "Link Externo"}
+                      {isIbanGift(gift) ? "Transferência Bancária" : "Link Externo"}
                     </span>
                     <h4 className="text-lg font-serif mt-2 mb-1">{gift.title}</h4>
                     <p className={`text-xs ${secondaryText} line-clamp-2`}>
@@ -6496,11 +6496,16 @@ const BabyShowerLayout: React.FC<{
                   </div>
 
                   <div className="mt-6 pt-4 border-t border-black/5 flex items-center justify-between">
-                    {gift.type === "IBAN" ? (
+                    {isIbanGift(gift) ? (
                       <div className="w-full">
                         <span className="text-[9px] uppercase font-bold opacity-30 block">
                           {(gift as any).bankName || (gift as any).bank || "BAI"}
                         </span>
+                        {(gift as any).accountName && (
+                          <span className="text-[9px] font-bold opacity-40 block">
+                            {(gift as any).accountName}
+                          </span>
+                        )}
                         <div className="flex items-center justify-between gap-2 mt-1">
                           <code className="text-[11px] font-mono break-all line-clamp-1 select-all bg-black/5 px-2 py-1 rounded">
                             {formatIbanGroups((gift as any).value ?? (gift as any).account ?? '')}
@@ -6516,13 +6521,17 @@ const BabyShowerLayout: React.FC<{
                           </button>
                         </div>
                       </div>
-                    ) : (
+                    ) : (gift as any).url ? (
                       <button
                         onClick={() => window.open(gift.url, "_blank")}
                         className="w-full h-10 rounded-xl bg-black/5 hover:bg-black/10 transition-colors text-xs font-bold flex items-center justify-center gap-2"
                       >
                         Visitar Loja <span className="material-symbols-outlined text-xs">arrow_outward</span>
                       </button>
+                    ) : (
+                      <div className="w-full h-10 rounded-xl bg-black/5 text-xs font-bold flex items-center justify-center">
+                        {Number((gift as any).price || 0).toLocaleString('pt-AO')} Kz
+                      </div>
                     )}
                   </div>
                 </div>
@@ -7267,16 +7276,19 @@ const LimintsoGoldLayout: React.FC<{
               {event.gifts.map((gift, i) => (
                 <FadeInSection key={i} className="bg-[#FCFAF6] border border-[#dcb349]/10 rounded-2xl p-6 shadow-sm">
                   <span className="text-[10px] uppercase font-bold tracking-widest text-[#b49232] opacity-80 block mb-2">
-                    {gift.type === "IBAN" ? "Transferência Bancária" : "Link Externo"}
+                    {isIbanGift(gift) ? "Transferência Bancária" : "Link Externo"}
                   </span>
                   <h4 className="text-base font-serif font-bold text-slate-800 mb-1">{gift.title}</h4>
                   <p className="text-xs text-slate-500 leading-relaxed mb-4">{gift.description}</p>
                   
-                  {gift.type === "IBAN" && (
+                  {isIbanGift(gift) && (
                       <div className="bg-white border border-[#dcb349]/10 rounded-xl p-3 flex items-center justify-between gap-2 shadow-sm">
                         <div className="truncate">
                           <span className="text-[9px] uppercase font-bold text-slate-400 block">{gift.bankName || "BAI"}</span>
                           <code className="text-[11px] font-mono font-bold text-slate-700 select-all">{formatIbanGroups(gift.value)}</code>
+                          {(gift as any).accountName && (
+                            <span className="text-[10px] text-slate-500 block">{(gift as any).accountName}</span>
+                          )}
                         </div>
                         <button
                           onClick={() => {
@@ -8316,12 +8328,18 @@ const LimintsoMeLayout: React.FC<{
                   {event.gifts.map((gift, i) => (
                     <FadeInSection key={i} className="bg-white border border-[#E9BE5D]/10 rounded-3xl p-8 shadow-sm text-center space-y-4">
                       <span className="josefin-font text-[10px] uppercase font-bold tracking-widest text-[#E9BE5D] block">
-                        {gift.type === "IBAN" ? "Transferência Bancária" : "Link Externo"}
+                        {isIbanGift(gift) ? "Transferência Bancária" : "Link Externo"}
                       </span>
                       <h4 className="josefin-font text-lg font-bold text-slate-800">{gift.title}</h4>
                       <p className="montserrat-font text-xs text-slate-500 leading-relaxed">{gift.description}</p>
                       
+                      {isIbanGift(gift) ? (
                       <div className="p-4 bg-amber-50/50 rounded-2xl border border-amber-100 inline-block w-full">
+                        {(gift as any).bankName || (gift as any).accountName ? (
+                          <span className="montserrat-font text-[10px] uppercase font-bold tracking-widest text-slate-400 block mb-1">
+                            {(gift as any).bankName || ''}{(gift as any).bankName && (gift as any).accountName ? ' · ' : ''}{(gift as any).accountName || ''}
+                          </span>
+                        ) : null}
                         <span className="montserrat-font text-sm font-semibold text-slate-800 tracking-wider select-all block break-all">
                           {formatIbanGroups(gift.value)}
                         </span>
@@ -8335,6 +8353,13 @@ const LimintsoMeLayout: React.FC<{
                           Copiar
                         </button>
                       </div>
+                      ) : (
+                      <div className="p-4 bg-amber-50/50 rounded-2xl border border-amber-100 inline-block w-full">
+                        <span className="montserrat-font text-sm font-semibold text-slate-800 tracking-wider block">
+                          {Number((gift as any).price || 0).toLocaleString('pt-AO')} Kz
+                        </span>
+                      </div>
+                      )}
                     </FadeInSection>
                   ))}
                 </div>
@@ -8543,7 +8568,7 @@ const RSVPForm: React.FC<{ event: EventDetails; onClose: () => void; simMode?: b
   const RECEIPT_MAX_BYTES = 1 * 1024 * 1024;
   const RECEIPT_ACCEPT = 'image/jpeg,image/png,application/pdf';
   const hasIbanGift =
-    ((event as any).gifts as any[] | undefined)?.some((g) => g?.type === 'IBAN') ||
+    ((event as any).gifts as any[] | undefined)?.some((g) => isIbanGift(g)) ||
     Boolean((event as any).iban && (event as any).accountName);
   const [successData, setSuccessData] = useState<{
     id: string;

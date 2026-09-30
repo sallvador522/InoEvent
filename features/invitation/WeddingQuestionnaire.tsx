@@ -947,7 +947,7 @@ export const WeddingQuestionnaire: React.FC = () => {
                       className={`${inputCls} !rounded-l-none font-mono`}
                       value={formatIbanBodyDots(iban)}
                       onChange={(e) => setIban(IBAN_PREFIX + e.target.value.replace(/\D/g, '').slice(0, IBAN_BODY_LENGTH))}
-                      placeholder="0000.0000.0000.0000.000"
+                      placeholder="0000.0000.0000.0000.00000"
                       inputMode="numeric"
                       autoComplete="off"
                       maxLength={IBAN_BODY_LENGTH + 4}

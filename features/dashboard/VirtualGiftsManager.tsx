@@ -4,18 +4,26 @@ import { Plus, Trash2, Gift, Edit2, CheckCircle2 } from 'lucide-react';
 import { doc, updateDoc, collection, getDocs, orderBy, query } from 'firebase/firestore';
 import { db } from '../../components/FirebaseProvider';
 import { toast } from 'react-hot-toast';
+import { IBAN_PREFIX, IBAN_BODY_LENGTH, canonicalIban, isValidAngolaIban, ibanError, formatIbanBodyDots } from '../../lib/iban';
 
 interface GiftItem {
   id: string;
   title: string;
   price: number;
   emoji: string;
+  value?: string;
+  bankName?: string;
+  accountName?: string;
 }
 
 export const VirtualGiftsManager: React.FC<{ event: any }> = ({ event }) => {
    const [gifts, setGifts] = useState<GiftItem[]>(event.gifts || []);
    const [isEditing, setIsEditing] = useState(false);
    const [newGift, setNewGift] = useState({ title: '', price: '', emoji: '🎁' });
+   // IBAN + titular OBRIGATÓRIOS: sem eles o convidado não tem para onde transferir.
+   const [newIban, setNewIban] = useState('');
+   const [newTitular, setNewTitular] = useState('');
+   const [newBanco, setNewBanco] = useState('');
    const [contributions, setContributions] = useState<any[]>([]);
    const [isLoadingContribs, setIsLoadingContribs] = useState(true);
    const [isSavingGift, setIsSavingGift] = useState(false);
@@ -49,13 +57,24 @@ export const VirtualGiftsManager: React.FC<{ event: any }> = ({ event }) => {
             toast.error('Preencha os campos de nome e valor.');
             return;
         }
+        if (!isValidAngolaIban(newIban)) {
+            toast.error(`IBAN inválido: ${ibanError(newIban) || 'verifique os dígitos.'}`);
+            return;
+        }
+        if (!newTitular.trim()) {
+            toast.error('Informe o nome do titular da conta.');
+            return;
+        }
         if (isSavingGift) return;
 
         const updatedGifts = [...gifts, { 
             id: Math.random().toString(36).substr(2, 9), 
             title: newGift.title, 
             price: Number(newGift.price), 
-            emoji: newGift.emoji 
+            emoji: newGift.emoji,
+            value: canonicalIban(newIban),
+            bankName: newBanco.trim(),
+            accountName: newTitular.trim(),
         }];
         
         setIsSavingGift(true);
@@ -63,6 +82,9 @@ export const VirtualGiftsManager: React.FC<{ event: any }> = ({ event }) => {
             await updateDoc(doc(db, 'events', event.id), { gifts: updatedGifts });
             setGifts(updatedGifts);
             setNewGift({ title: '', price: '', emoji: '🎁' });
+            setNewIban('');
+            setNewTitular('');
+            setNewBanco('');
             toast.success('Lista de Presentes atualizada!');
             setIsEditing(false);
         } catch(e) {
@@ -131,15 +153,51 @@ export const VirtualGiftsManager: React.FC<{ event: any }> = ({ event }) => {
                                    value={newGift.title} onChange={e => setNewGift({...newGift, title: e.target.value})} 
                                />
                            </div>
-                           <div className="sm:col-span-4">
-                               <label className="text-xs font-bold text-slate-500 mb-1 block">Valor (Kwanzas)</label>
-                               <input 
-                                   type="number"
-                                   className="w-full bg-white border border-slate-200 rounded-xl px-4 py-3 outline-none focus:border-brand-blue/50 focus:ring-2 focus:ring-brand-blue/20" 
-                                   placeholder="Ex: 50000"
-                                   value={newGift.price} onChange={e => setNewGift({...newGift, price: e.target.value})} 
-                               />
-                           </div>
+                            <div className="sm:col-span-4">
+                                <label className="text-xs font-bold text-slate-500 mb-1 block">Valor (Kwanzas)</label>
+                                <input 
+                                    type="number"
+                                    className="w-full bg-white border border-slate-200 rounded-xl px-4 py-3 outline-none focus:border-brand-blue/50 focus:ring-2 focus:ring-brand-blue/20" 
+                                    placeholder="Ex: 50000"
+                                    value={newGift.price} onChange={e => setNewGift({...newGift, price: e.target.value})} 
+                                />
+                            </div>
+                            <div className="sm:col-span-5">
+                                <label className="text-xs font-bold text-slate-500 mb-1 block">IBAN para receber *</label>
+                                <div className="flex items-stretch gap-0">
+                                    <span aria-hidden="true" className="inline-flex items-center px-3 rounded-l-xl border border-r-0 border-slate-200 bg-slate-100 text-slate-700 font-mono font-bold text-xs select-none">
+                                        {IBAN_PREFIX}
+                                    </span>
+                                    <input
+                                        className="w-full bg-white border border-slate-200 rounded-r-xl px-4 py-3 outline-none focus:border-brand-blue/50 focus:ring-2 focus:ring-brand-blue/20 font-mono"
+                                        placeholder="0000.0000.0000.0000.00000"
+                                        inputMode="numeric"
+                                        autoComplete="off"
+                                        maxLength={IBAN_BODY_LENGTH + 4}
+                                        value={formatIbanBodyDots(newIban)}
+                                        onChange={e => setNewIban(IBAN_PREFIX + e.target.value.replace(/\D/g, '').slice(0, IBAN_BODY_LENGTH))}
+                                    />
+                                </div>
+                                {newIban.trim() !== '' && ibanError(newIban) && (
+                                    <p className="text-[11px] text-red-500 mt-1">{ibanError(newIban)}</p>
+                                )}
+                            </div>
+                            <div className="sm:col-span-4">
+                                <label className="text-xs font-bold text-slate-500 mb-1 block">Nome do Titular *</label>
+                                <input
+                                    className="w-full bg-white border border-slate-200 rounded-xl px-4 py-3 outline-none focus:border-brand-blue/50 focus:ring-2 focus:ring-brand-blue/20"
+                                    placeholder="Ex: Ana Clara dos Santos"
+                                    value={newTitular} onChange={e => setNewTitular(e.target.value)}
+                                />
+                            </div>
+                            <div className="sm:col-span-3">
+                                <label className="text-xs font-bold text-slate-500 mb-1 block">Banco (opcional)</label>
+                                <input
+                                    className="w-full bg-white border border-slate-200 rounded-xl px-4 py-3 outline-none focus:border-brand-blue/50 focus:ring-2 focus:ring-brand-blue/20"
+                                    placeholder="BAI, BFA…"
+                                    value={newBanco} onChange={e => setNewBanco(e.target.value)}
+                                />
+                            </div>
                             <div className="sm:col-span-12 flex justify-end gap-2 mt-2">
                                 <button onClick={() => setIsEditing(false)} className="px-5 py-2.5 rounded-xl font-bold bg-slate-200 text-slate-600 hover:bg-slate-300">Cancelar</button>
                                 <button onClick={handleAddGift} disabled={isSavingGift} className="px-5 py-2.5 rounded-xl font-bold bg-brand-blue text-white hover:bg-blue-700 disabled:opacity-60 inline-flex items-center gap-2">

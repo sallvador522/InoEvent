@@ -1,20 +1,21 @@
 /**
- * IBAN Angola — padrão AO06 (AO + dígitos de controlo 06 + 19 dígitos BBAN).
+ * IBAN Angola — padrão AO06 (AO + dígitos de controlo 06 + 21 dígitos BBAN:
+ * banco 4 + balcão 4 + conta 11 + controlo nacional 2). Total: 25 caracteres.
  *
  * Regra de negócio: o prefixo é SEMPRE AO06. Para nunca corromper dados,
  * NADA é "adivinhado": prefixo estrangeiro (ex. AO07) é inválido, não convertido.
  *
  * - `cleanIban()`: maiúsculas, sem espaços/pontos/traços.
  * - `splitIban()`: separa prefixo fixo do corpo digitável (chip AO06 + input).
- * - `canonicalIban()`: forma canónica para guardar/copiar ("AO06" + 19 dígitos).
- * - `isValidAngolaIban()`: exatamente AO06 + 19 dígitos.
+ * - `canonicalIban()`: forma canónica para guardar/copiar ("AO06" + 21 dígitos).
+ * - `isValidAngolaIban()`: exatamente AO06 + 21 dígitos.
  * - `formatIbanGroups()`: exibição agrupada (estética).
  * - `ibanError()`: texto curto de erro para o formulário.
  */
 
 export const IBAN_PREFIX = 'AO06';
 /** Dígitos após o prefixo fixo. */
-export const IBAN_BODY_LENGTH = 19;
+export const IBAN_BODY_LENGTH = 21;
 /** Comprimento total canónico. */
 export const IBAN_LENGTH = IBAN_PREFIX.length + IBAN_BODY_LENGTH; // 25
 
@@ -48,9 +49,23 @@ export function splitIban(raw: string | null | undefined): { prefix: string; bod
   return { prefix: IBAN_PREFIX, body: ibanBody(raw) };
 }
 
-/** IBAN angolano válido: exatamente AO06 + 19 dígitos. */
+/** IBAN angolano válido: exatamente AO06 + 21 dígitos. */
 export function isValidAngolaIban(raw: string | null | undefined): boolean {
   return new RegExp(`^${IBAN_PREFIX}\\d{${IBAN_BODY_LENGTH}}$`).test(canonicalIban(raw));
+}
+
+/**
+ * O presente paga por transferência? Cobre os dois formatos:
+ * - Creation flow (EventCreator): `type: 'IBAN'` explícito;
+ * - Legado do painel: sem `type`, mas com `value` gravado (sempre IBAN —
+ *   o painel nunca criou presentes do tipo LINK).
+ * Sem isto, presentes do painel aparecem como "Link Externo" sem IBAN
+ * e o RSVP não oferece o comprovante.
+ */
+export function isIbanGift(g: any): boolean {
+  if (!g) return false;
+  if (g.type === 'IBAN') return true;
+  return !g.type && typeof g.value === 'string' && g.value.trim() !== '';
 }
 
 /** Exibição agrupada: "AO06 1234 5678 ..." (estética; copiar usa o canónico). */
@@ -73,7 +88,7 @@ export function formatIbanBodyDots(raw: string | null | undefined): string {
 /** Texto curto de erro para o formulário (null = ok). */
 export function ibanError(raw: string | null | undefined): string | null {
   const cleaned = cleanIban(raw);
-  if (!cleaned) return 'Preencha os 19 dígitos após o AO06.';
+  if (!cleaned) return `Preencha os ${IBAN_BODY_LENGTH} dígitos após o AO06.`;
   if (/^AO/.test(cleaned) && !cleaned.startsWith(IBAN_PREFIX)) {
     return 'IBAN deve começar por AO06.';
   }

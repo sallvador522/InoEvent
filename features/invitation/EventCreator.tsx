@@ -296,6 +296,14 @@ export const EventCreator: React.FC = () => {
         toast.error(`IBAN inválido: ${ibanError(newGiftValue) || 'verifique os dígitos.'}`);
         return;
       }
+      if (!newGiftBank.trim()) {
+        toast.error('Informe o nome do banco da conta.');
+        return;
+      }
+      if (!newGiftAccount.trim()) {
+        toast.error('Informe o nome do titular da conta.');
+        return;
+      }
     } else if (!/^https?:\/\//i.test(newGiftValue.trim())) {
       toast.error('Cole um link válido (https://…).');
       return;
@@ -305,12 +313,13 @@ export const EventCreator: React.FC = () => {
       title: newGiftTitle,
       value: newGiftType === 'IBAN' ? canonicalIban(newGiftValue) : newGiftValue.trim(),
       description: newGiftDesc,
-      bankName: newGiftBank,
-      accountName: newGiftAccount
+      bankName: newGiftBank.trim(),
+      accountName: newGiftAccount.trim()
     }]);
     setNewGiftTitle('');
     setNewGiftValue('');
     setNewGiftDesc('');
+    setNewGiftBank('');
     setNewGiftAccount('');
     toast.success('Mimo incluído com sucesso!');
   };
@@ -1034,7 +1043,7 @@ export const EventCreator: React.FC = () => {
                                     type="text"
                                     value={formatIbanBodyDots(newGiftValue)}
                                     onChange={(e) => setNewGiftValue(IBAN_PREFIX + e.target.value.replace(/\D/g, '').slice(0, IBAN_BODY_LENGTH))}
-                                    placeholder="0000.0000.0000.0000.000"
+                                    placeholder="0000.0000.0000.0000.00000"
                                     inputMode="numeric"
                                     autoComplete="off"
                                     maxLength={IBAN_BODY_LENGTH + 4}
@@ -1059,7 +1068,7 @@ export const EventCreator: React.FC = () => {
                           </div>
 
                           <div>
-                            <label className="text-[10px] font-bold text-slate-500 block mb-1 uppercase tracking-wider">Nome de Banco</label>
+                            <label className="text-[10px] font-bold text-slate-500 block mb-1 uppercase tracking-wider">Nome de Banco{newGiftType === 'IBAN' ? ' *' : ''}</label>
                             <input
                               type="text"
                               value={newGiftBank}
@@ -1070,7 +1079,7 @@ export const EventCreator: React.FC = () => {
                           </div>
 
                           <div>
-                            <label className="text-[10px] font-bold text-slate-500 block mb-1 uppercase tracking-wider">Nome do Titular</label>
+                            <label className="text-[10px] font-bold text-slate-500 block mb-1 uppercase tracking-wider">Nome do Titular{newGiftType === 'IBAN' ? ' *' : ''}</label>
                             <input
                               type="text"
                               value={newGiftAccount}

@@ -38,7 +38,7 @@ const FAQ_ITEMS: FAQItem[] = [
   },
   {
     q: "É possível configurar uma lista de presentes ou contribuições?",
-    a: "Sim, de forma integrada e muito elegante! No painel de controle, pode criar uma lista de presentes virtuais (cotas engraçadas, lua de mel, etc.) com valores em Kwanza. Os convidados escolhem o presente na página e fazem a transferência por IBAN (BAI, BFA, BIC, SOL, etc.), e o painel regista cada contribuição recebida para acompanhar tudo num só lugar.",
+    a: "Sim! Pode criar uma lista de presentes virtuais (cotas engraçadas, lua de mel, etc.) com valores em Kwanza e o vosso IBAN (BAI, BFA, BIC, SOL, etc.). Os convidados escolhem o presente na página e fazem a transferência na app do banco. Nota: a confirmação do dinheiro é no extrato do banco — a plataforma não debita nem confirma transferências automaticamente.",
     category: "features",
     icon: Heart
   },

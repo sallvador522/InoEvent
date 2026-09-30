@@ -60,6 +60,16 @@ export function formatIbanGroups(canonical: string | null | undefined): string {
   return v.replace(/(.{4})/g, '$1 ').trim();
 }
 
+/**
+ * Corpo digitável agrupado por pontos: "1234.5678.9012.3456.789".
+ * Só exibição no input — gravar/copiar usa sempre o canónico sem pontos.
+ */
+export function formatIbanBodyDots(raw: string | null | undefined): string {
+  const body = ibanBody(raw);
+  if (!body) return '';
+  return body.replace(/(.{4})/g, '$1.').replace(/\.$/, '');
+}
+
 /** Texto curto de erro para o formulário (null = ok). */
 export function ibanError(raw: string | null | undefined): string | null {
   const cleaned = cleanIban(raw);

@@ -46,7 +46,7 @@ import toast from "react-hot-toast";
 import { copyToClipboard } from "../../lib/clipboard";
 import { uploadEventAudio, deleteEventAudio, isOwnStorageAudio } from "../../lib/audioUpload";
 import { QRCodeSVG } from "qrcode.react";
-import { Play } from "lucide-react";
+import { Play, Sparkles, ChevronUp, ChevronDown, PartyPopper, Lock } from "lucide-react";
 import { exportPassPng } from "../../lib/passExport";
 import { firstGalleryPhoto } from "../../lib/passImage";
 import { EventPass, supportsElegantPass } from "../../components/passes/EventPass";
@@ -2423,9 +2423,7 @@ const InvitationView: React.FC = () => {
               onClick={() => setIsBannerCollapsed(!isBannerCollapsed)}
             >
               <span className="w-8 h-8 rounded-full bg-[#BF9B30] flex items-center justify-center text-[#0F1419] font-black shadow-[0_0_15px_rgba(191,155,48,0.4)] shrink-0">
-                <span className="material-symbols-outlined text-[18px]">
-                  celebration
-                </span>
+                <PartyPopper size={16} aria-hidden="true" />
               </span>
 
               <div
@@ -2444,9 +2442,9 @@ const InvitationView: React.FC = () => {
                 </span>
               </div>
 
-              <span className="material-symbols-outlined text-[#BF9B30] transition-all duration-300 shrink-0">
-                {!isBannerCollapsed ? "expand_less" : "expand_more"}
-              </span>
+              {!isBannerCollapsed
+                ? <ChevronUp size={16} className="text-[#BF9B30] transition-all duration-300 shrink-0" aria-hidden="true" />
+                : <ChevronDown size={16} className="text-[#BF9B30] transition-all duration-300 shrink-0" aria-hidden="true" />}
             </div>
 
             {/* Actions */}
@@ -2467,9 +2465,7 @@ const InvitationView: React.FC = () => {
                 onTouchStart={prefetchQuestionnaire}
                 className="px-3 md:px-5 py-2 bg-[#BF9B30] hover:bg-white text-[#0F1419] text-[9px] md:text-xs font-bold uppercase tracking-widest rounded-full shadow-[0_0_20px_rgba(191,155,48,0.3)] flex items-center gap-1 transition-all cursor-pointer whitespace-nowrap active:scale-95 shrink-0"
               >
-                <span className="material-symbols-outlined text-[14px]">
-                  magic_button
-                </span>
+                <Sparkles size={14} aria-hidden="true" />
                 <span className="hidden sm:inline">Usar este Modelo</span>
                 <span className="sm:hidden">Usar</span>
               </button>
@@ -2485,9 +2481,7 @@ const InvitationView: React.FC = () => {
           <div className="bg-[#0F1419]/95 backdrop-blur-xl border border-[#BF9B30]/30 rounded-full p-2 pr-2 flex items-center justify-between gap-2 sm:gap-3 shadow-[0_10px_40px_rgba(0,0,0,0.5)]">
             <span className="flex items-center gap-2 pl-2 min-w-0">
               <span className="w-8 h-8 rounded-full bg-[#BF9B30] flex items-center justify-center text-[#0F1419] font-black shrink-0">
-                <span className="material-symbols-outlined text-[18px]">
-                  lock
-                </span>
+                <Lock size={16} aria-hidden="true" />
               </span>
               <span className="text-[9px] md:text-xs font-bold text-white whitespace-nowrap overflow-hidden text-ellipsis">
                 Entre para usar este modelo

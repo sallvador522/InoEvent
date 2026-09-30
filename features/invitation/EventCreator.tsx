@@ -15,7 +15,7 @@ import { LayoutMode } from '../../types';
 import { migrateCoverToStorage } from '../../lib/imageStorage';
 import { createEventViaApi } from '../../lib/eventApi';
 import { useCooldown } from '../../lib/useCooldown';
-import { IBAN_PREFIX, IBAN_BODY_LENGTH, canonicalIban, isValidAngolaIban, ibanError, splitIban, formatIbanGroups } from '../../lib/iban';
+import { IBAN_PREFIX, IBAN_BODY_LENGTH, canonicalIban, isValidAngolaIban, ibanError, formatIbanGroups, formatIbanBodyDots } from '../../lib/iban';
 import { LocationPinPicker } from '../../components/LocationPinPicker';
 import { MapsProvider } from '../../components/MapsProvider';
 
@@ -1032,12 +1032,12 @@ export const EventCreator: React.FC = () => {
                                   </span>
                                   <input
                                     type="text"
-                                    value={splitIban(newGiftValue).body}
+                                    value={formatIbanBodyDots(newGiftValue)}
                                     onChange={(e) => setNewGiftValue(IBAN_PREFIX + e.target.value.replace(/\D/g, '').slice(0, IBAN_BODY_LENGTH))}
-                                    placeholder="19 dígitos da conta"
+                                    placeholder="0000.0000.0000.0000.000"
                                     inputMode="numeric"
                                     autoComplete="off"
-                                    maxLength={IBAN_BODY_LENGTH}
+                                    maxLength={IBAN_BODY_LENGTH + 4}
                                     className="w-full bg-white border border-slate-200 rounded-r-xl p-2.5 outline-none text-xs font-mono"
                                   />
                                 </div>

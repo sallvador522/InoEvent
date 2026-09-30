@@ -6,7 +6,7 @@ import { useFirebase, db } from '../../components/FirebaseProvider';
 import { Navbar } from '../../components/Navbar';
 import { SEO } from '../../components/SEO';
 import { normalizePlanId, getEventCreationLimit, isBusinessPlan } from '../../config/plans';
-import { uploadEventAudio, deleteEventAudio, isOwnStorageAudio, formatAudioSize, MAX_AUDIO_BYTES } from '../../lib/audioUpload';
+import { uploadEventAudioWithProgress, deleteEventAudio, isOwnStorageAudio, formatAudioSize, MAX_AUDIO_BYTES } from '../../lib/audioUpload';
 import { ArrowLeft, ArrowRight, Check, Plus, Trash2, Gift } from 'lucide-react';
 import toast from 'react-hot-toast';
 import { LocationPinPicker } from '../../components/LocationPinPicker';
@@ -16,7 +16,7 @@ import { layoutSupports, hiddenSectionsFor, SECTION_LABELS } from './lib/layoutS
 import { IMAGE_ACCEPT, validateImageFile } from '../../lib/imageValidation';
 import { migrateCoverToStorage } from '../../lib/imageStorage';
 import { createEventViaApi } from '../../lib/eventApi';
-import { IBAN_PREFIX, IBAN_BODY_LENGTH, canonicalIban, isValidAngolaIban, ibanError, splitIban } from '../../lib/iban';
+import { IBAN_PREFIX, IBAN_BODY_LENGTH, canonicalIban, isValidAngolaIban, ibanError, formatIbanBodyDots } from '../../lib/iban';
 import { useCooldown } from '../../lib/useCooldown';
 
 // Todos os temas livres para escolher — o pagamento acontece na ativação (planos)
@@ -130,6 +130,8 @@ export const WeddingQuestionnaire: React.FC = () => {
   const [gallery, setGallery] = useState<string[]>([]);
   const [musicTrack, setMusicTrack] = useState('romantic');
   const [uploadingMusic, setUploadingMusic] = useState(false);
+  const [musicProgress, setMusicProgress] = useState(0);
+  const [musicFileName, setMusicFileName] = useState('');
   const [uploadingPhoto, setUploadingPhoto] = useState(false);
   const [uploadingGallery, setUploadingGallery] = useState(false);
   const musicRef = useRef<HTMLInputElement>(null);
@@ -310,6 +312,10 @@ export const WeddingQuestionnaire: React.FC = () => {
 
   const next = async () => {
     if (busyRef.current || saving) return;
+    if (uploadingMusic) {
+      toast.error('Aguarde o envio da música terminar.');
+      return;
+    }
     // Validação por passo (id, não índice — a lista muda com o tema escolhido)
     if (currentStepId === 'couple' && (!brideName.trim() || !groomName.trim())) {
       toast.error('Diga-nos o nome da noiva e do noivo.');
@@ -767,6 +773,7 @@ export const WeddingQuestionnaire: React.FC = () => {
                       </button>
                     </div>
                   ) : (
+                    <>
                     <button
                       type="button"
                       disabled={uploadingMusic}
@@ -776,6 +783,22 @@ export const WeddingQuestionnaire: React.FC = () => {
                     >
                       {uploadingMusic ? 'A enviar música…' : 'Escolher mp3 do dispositivo'}
                     </button>
+                    {uploadingMusic && (
+                      <div className="mt-3" role="status" aria-live="polite" aria-label={`A enviar música: ${musicProgress}%`}>
+                        <div className="flex items-center justify-between text-[11px] font-bold uppercase tracking-wider text-slate-500 mb-1.5">
+                          <span className="truncate max-w-[70%]">{musicFileName || 'A enviar música…'}</span>
+                          <span className="text-[#1B365D] tabular-nums">{musicProgress}%</span>
+                        </div>
+                        <div className="h-2.5 rounded-full bg-slate-100 border border-slate-200 overflow-hidden">
+                          <div
+                            className="h-full rounded-full bg-gradient-to-r from-[#1B365D] to-[#C5A028]"
+                            style={{ width: `${musicProgress}%`, transition: 'width 200ms ease' }}
+                          />
+                        </div>
+                        <p className="text-[11px] text-slate-400 font-light mt-1.5">Aguarde o envio terminar — não feche nem avance.</p>
+                      </div>
+                    )}
+                    </>
                   )}
                   <input
                     type="file"
@@ -785,9 +808,11 @@ export const WeddingQuestionnaire: React.FC = () => {
                       e.target.value = '';
                       if (!file || !user) return;
                       setUploadingMusic(true);
+                      setMusicProgress(0);
+                      setMusicFileName(file.name);
                       try {
                         const old = musicTrack;
-                        const url = await uploadEventAudio(file, user.uid);
+                        const url = await uploadEventAudioWithProgress(file, user.uid, setMusicProgress);
                         setMusicTrack(url);
                         await saveDraft({ musicTrack: url });
                         await deleteEventAudio(isOwnStorageAudio(old) ? old : null);
@@ -818,10 +843,10 @@ export const WeddingQuestionnaire: React.FC = () => {
                   <span className={labelCls}>Adicionar momento</span>
                   <div className="grid grid-cols-3 gap-2">
                     <input
+                      type="time"
                       className={inputCls}
                       value={newTime}
                       onChange={(e) => setNewTime(e.target.value)}
-                      placeholder="Ex: 18:00"
                       aria-label="Hora do momento"
                     />
                     <input
@@ -895,7 +920,7 @@ export const WeddingQuestionnaire: React.FC = () => {
                   Presentes
                 </h1>
                 <p className="text-slate-500 font-light mb-8">
-                  Cotas em Kwanza + o vosso IBAN. Os convidados transferem e o painel regista.
+                  Cotas em Kwanza + o vosso IBAN. Receba presentes dos seus convidados por transferência.
                 </p>
                 <div className="grid grid-cols-3 gap-4 mb-4">
                   <div>
@@ -920,18 +945,17 @@ export const WeddingQuestionnaire: React.FC = () => {
                     <input
                       id="wq-iban"
                       className={`${inputCls} !rounded-l-none font-mono`}
-                      value={splitIban(iban).body}
+                      value={formatIbanBodyDots(iban)}
                       onChange={(e) => setIban(IBAN_PREFIX + e.target.value.replace(/\D/g, '').slice(0, IBAN_BODY_LENGTH))}
-                      placeholder="19 dígitos da conta"
+                      placeholder="0000.0000.0000.0000.000"
                       inputMode="numeric"
                       autoComplete="off"
-                      maxLength={IBAN_BODY_LENGTH}
+                      maxLength={IBAN_BODY_LENGTH + 4}
                     />
                   </div>
                   {ibanError(iban) && iban.trim() !== '' && (
                     <p className="text-xs text-red-500 mt-1.5">{ibanError(iban)}</p>
                   )}
-                  <p className="text-xs text-slate-400 mt-1.5">Padrão Angola: AO06 + 19 dígitos, sem espaços.</p>
                 </div>
                 <span className={labelCls}>Cotas de presente</span>
                 <div className="flex flex-col sm:flex-row gap-2 mb-3">
@@ -1106,7 +1130,7 @@ export const WeddingQuestionnaire: React.FC = () => {
             <button
               type="button"
               onClick={next}
-              disabled={saving}
+              disabled={saving || uploadingMusic}
               className="min-h-[48px] inline-flex items-center gap-2 px-7 rounded-full font-bold bg-[#1B365D] text-white hover:bg-[#224373] disabled:opacity-60 text-xs uppercase tracking-wider cursor-pointer"
               style={{ transition: 'background-color 200ms ease' }}
             >

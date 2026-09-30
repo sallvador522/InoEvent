@@ -1,4 +1,4 @@
-import { getStorage, ref, uploadBytes, getDownloadURL, deleteObject } from 'firebase/storage';
+import { getStorage, ref, uploadBytesResumable, getDownloadURL, deleteObject } from 'firebase/storage';
 
 export const MAX_AUDIO_BYTES = 6 * 1024 * 1024;
 
@@ -10,20 +10,54 @@ export const formatAudioSize = (bytes: number): string => {
 
 /** Sobe mp3 para o Storage (events/{uid}/music-*) e devolve URL pública. Teto 6MB. */
 export async function uploadEventAudio(file: File, uid: string): Promise<string> {
+  return uploadEventAudioWithProgress(file, uid);
+}
+
+/**
+ * Igual ao uploadEventAudio mas reporta progresso 0-100 via onProgress
+ * (para barra de estado no formulário — o utilizador aguarda o fim).
+ */
+export function uploadEventAudioWithProgress(
+  file: File,
+  uid: string,
+  onProgress?: (pct: number) => void,
+): Promise<string> {
   if (!file.type.startsWith('audio/')) {
-    throw new Error('O ficheiro tem de ser áudio (mp3).');
+    return Promise.reject(new Error('O ficheiro tem de ser áudio (mp3).'));
   }
   if (file.size > MAX_AUDIO_BYTES) {
-    throw new Error(
-      `Áudio com ${formatAudioSize(file.size)} — o limite é ${formatAudioSize(MAX_AUDIO_BYTES)}. Comprima ou corte a música.`
+    return Promise.reject(
+      new Error(
+        `Áudio com ${formatAudioSize(file.size)} — o limite é ${formatAudioSize(MAX_AUDIO_BYTES)}. Comprima ou corte a música.`
+      )
     );
   }
   const storage = getStorage();
   const path = `events/${uid}/music-${Date.now()}.mp3`;
-  const snap = await uploadBytes(ref(storage, path), file, {
+  const task = uploadBytesResumable(ref(storage, path), file, {
     contentType: file.type || 'audio/mpeg',
   });
-  return getDownloadURL(snap.ref);
+  onProgress?.(0);
+  return new Promise<string>((resolve, reject) => {
+    task.on(
+      'state_changed',
+      (snap) => {
+        const pct = snap.totalBytes > 0
+          ? Math.min(100, Math.round((snap.bytesTransferred / snap.totalBytes) * 100))
+          : 0;
+        onProgress?.(pct);
+      },
+      (err) => reject(err instanceof Error ? err : new Error('Falha no envio do áudio.')),
+      async () => {
+        try {
+          onProgress?.(100);
+          resolve(await getDownloadURL(task.snapshot.ref));
+        } catch (e) {
+          reject(e instanceof Error ? e : new Error('Falha ao obter o áudio enviado.'));
+        }
+      },
+    );
+  });
 }
 
 /** Apaga áudio antigo do NOSSO Storage (best-effort). Nunca toca em URLs externas. */

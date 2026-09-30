@@ -38,6 +38,12 @@ export const AdminDashboard: React.FC = () => {
   const [auditSearch, setAuditSearch] = useState('');
   const [suspendingId, setSuspendingId] = useState<string | null>(null);
   const [deletingEventId, setDeletingEventId] = useState<string | null>(null);
+  // Limpeza única de comprovantes órfãos (Storage receipts/ de eventos apagados).
+  const [cleanupLoading, setCleanupLoading] = useState(false);
+  const [cleanupResult, setCleanupResult] = useState<{
+    dryRun: boolean; orphanEvents: number; orphanFiles: number;
+    orphanBytes: number; deletedFiles: number; truncated: boolean;
+  } | null>(null);
   // Equipa (RBAC): lista de admins + gestão (só super-admin gere).
   const [team, setTeam] = useState<any[]>([]);
   const [teamLoading, setTeamLoading] = useState(false);
@@ -623,6 +629,36 @@ export const AdminDashboard: React.FC = () => {
 
   // Espelho readonly ("ver como usuário"): sem writes, com auditoria de acesso.
   const [mirrorUser, setMirrorUser] = useState<any | null>(null);
+  // Limpeza única de comprovantes órfãos: 1º clique = dry-run (conta),
+  // 2º clique (com confirm) = apaga. Sempre via servidor (só admin).
+  const handleReceiptCleanup = async (confirm: boolean) => {
+    if (cleanupLoading) return;
+    if (confirm && !window.confirm('Apagar TODOS os comprovantes de eventos já apagados? Não há como desfazer.')) return;
+    setCleanupLoading(true);
+    try {
+      const token = await auth.currentUser?.getIdToken();
+      const res = await fetch('/api/admin/receipts/cleanup', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          ...(token ? { Authorization: `Bearer ${token}` } : {}),
+        },
+        body: JSON.stringify(confirm ? { confirm: true } : {}),
+      });
+      const data = await res.json().catch(() => ({}));
+      if (!res.ok) throw new Error(data?.error || 'Falha na limpeza.');
+      setCleanupResult(data);
+      if (data.dryRun) {
+        toast.success(data.orphanFiles > 0 ? `${data.orphanFiles} comprovantes órfãos encontrados.` : 'Nenhum comprovante órfão.');
+      } else {
+        toast.success(`${data.deletedFiles} comprovantes apagados!`);
+      }
+    } catch (e: any) {
+      toast.error(e?.message || 'Falha na limpeza.');
+    } finally {
+      setCleanupLoading(false);
+    }
+  };
 
   const openMirror = async (user: any) => {
     if (!user?.id) return;
@@ -1487,6 +1523,39 @@ export const AdminDashboard: React.FC = () => {
     });
     return (
     <div className="bg-white rounded-2xl shadow-sm border border-slate-100 overflow-hidden">
+      {/* Manutenção Storage: comprovantes órfãos (eventos apagados antes da limpeza automática) */}
+      <div className="px-4 py-3 border-b border-slate-100 bg-amber-50/50 flex flex-col sm:flex-row sm:items-center gap-2 sm:gap-3">
+        <div className="flex items-center gap-2 text-sm">
+          <span className="material-symbols-outlined text-amber-600 text-lg">cleaning_services</span>
+          <span className="font-bold text-slate-700">Comprovantes órfãos</span>
+          {cleanupResult && (
+            <span className="text-xs text-slate-500">
+              {cleanupResult.orphanFiles > 0
+                ? `${cleanupResult.orphanFiles} ficheiros (${(cleanupResult.orphanBytes / 1024).toFixed(0)} KB) em ${cleanupResult.orphanEvents} eventos apagados`
+                : 'nada a limpar'}
+              {cleanupResult.truncated ? ' · lista parcial, repete após apagar' : ''}
+              {!cleanupResult.dryRun && ` · ${cleanupResult.deletedFiles} apagados`}
+            </span>
+          )}
+        </div>
+        <div className="flex gap-2 sm:ml-auto">
+          <button
+            onClick={() => handleReceiptCleanup(false)}
+            disabled={cleanupLoading}
+            className="px-3 py-1.5 text-xs font-bold rounded-lg bg-white border border-slate-200 text-slate-600 hover:bg-slate-50 disabled:opacity-60 cursor-pointer"
+          >
+            {cleanupLoading ? 'A verificar…' : 'Verificar'}
+          </button>
+          <button
+            onClick={() => handleReceiptCleanup(true)}
+            disabled={cleanupLoading || !cleanupResult?.dryRun || (cleanupResult?.orphanFiles || 0) === 0}
+            title={!cleanupResult?.dryRun ? 'Corre “Verificar” primeiro' : undefined}
+            className="px-3 py-1.5 text-xs font-bold rounded-lg bg-red-500 text-white hover:bg-red-600 disabled:opacity-50 cursor-pointer"
+          >
+            Apagar órfãos
+          </button>
+        </div>
+      </div>
       <div className="p-4 border-b border-slate-100 flex flex-col lg:flex-row gap-3 lg:items-center bg-slate-50/50">
         <div className="flex w-full lg:w-auto relative">
           <span className="material-symbols-outlined absolute left-3 top-1/2 -translate-y-1/2 text-slate-400 text-sm">search</span>

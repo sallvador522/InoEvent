@@ -1,6 +1,6 @@
 import React from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
-import { X, CheckCircle2, Clock, Users, MessageSquare, Phone, Calendar } from 'lucide-react';
+import { X, CheckCircle2, Clock, Users, MessageSquare, Phone, Calendar, Receipt, FileText, Image as ImageIcon, ExternalLink } from 'lucide-react';
 
 export const GuestDetailsModal = ({ isOpen, onClose, guest }: { isOpen: boolean, onClose: () => void, guest: any }) => {
     if (!guest) return null;
@@ -75,6 +75,26 @@ export const GuestDetailsModal = ({ isOpen, onClose, guest }: { isOpen: boolean,
                                         <span className="text-xs font-bold uppercase tracking-wider">Mensagem Deixada</span>
                                     </div>
                                     <p className="text-slate-700 italic text-sm">"{guest.message}"</p>
+                                </div>
+                            )}
+
+                            {guest.receiptUrl && (
+                                <div className="bg-amber-50 rounded-2xl p-4 border border-amber-200">
+                                    <div className="flex items-center gap-2 text-amber-700 mb-2">
+                                        <Receipt size={14} />
+                                        <span className="text-xs font-bold uppercase tracking-wider">Comprovante do presente</span>
+                                    </div>
+                                    <p className="text-slate-600 text-xs mb-3 truncate">{guest.receiptName || 'Comprovante anexado'}</p>
+                                    <a
+                                        href={guest.receiptUrl}
+                                        target="_blank"
+                                        rel="noopener noreferrer"
+                                        className="w-full bg-amber-500 hover:bg-amber-600 text-white py-2.5 rounded-xl font-bold text-sm transition-colors flex items-center justify-center gap-2"
+                                    >
+                                        {guest.receiptKind === 'pdf' ? <FileText size={16} /> : <ImageIcon size={16} />}
+                                        Abrir {guest.receiptKind === 'pdf' ? 'PDF' : 'imagem'}
+                                        <ExternalLink size={14} />
+                                    </a>
                                 </div>
                             )}
 

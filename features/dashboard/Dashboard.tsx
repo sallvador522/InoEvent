@@ -1,6 +1,6 @@
 import React, { useState, useEffect, useRef } from 'react';
 import { useParams, Link, useNavigate, useSearchParams } from 'react-router-dom';
-import { Users, CheckCircle2, QrCode, Share2, Download, Clock, Search, MessageSquare, ArrowLeft, MoreHorizontal, Settings, Copy, Check, Edit2, Trash2, Plus, MessageCircle, UploadCloud, Gem, Camera, Bell, BellOff, Volume2, Printer } from 'lucide-react';
+import { Users, CheckCircle2, QrCode, Share2, Download, Clock, Search, MessageSquare, ArrowLeft, MoreHorizontal, Settings, Copy, Check, Edit2, Trash2, Plus, MessageCircle, UploadCloud, Gem, Gift, Camera, Bell, BellOff, Volume2, Printer, Eye } from 'lucide-react';
 import { motion, AnimatePresence } from 'framer-motion';
 import { Virtuoso } from 'react-virtuoso';
 import { doc, collection, onSnapshot, deleteDoc, updateDoc, setDoc } from 'firebase/firestore';
@@ -22,6 +22,7 @@ import { ExecutiveReportModal } from './ExecutiveReportModal';
 import { GuestDetailsModal } from './GuestDetailsModal';
 
 import { copyToClipboard } from '../../lib/clipboard';
+import { openInviteShareWhatsApp } from '../../lib/inviteShare';
 import { getGuestLimit, normalizePlanId, canUseFeature, getPlanConfig, isAccountActive } from '../../lib/entitlements';
 
 export const Dashboard = () => {
@@ -590,6 +591,20 @@ export const Dashboard = () => {
         try {
             if (!id) return;
 
+            // Comprovantes do Storage: sem isto ficam órfãos (sem regra pública
+            // de escrita, só o servidor apaga). Best-effort: nunca trava o resto.
+            try {
+                const token = await auth.currentUser?.getIdToken();
+                if (token) {
+                    await fetch(`/api/events/${id}/receipts`, {
+                        method: 'DELETE',
+                        headers: { Authorization: `Bearer ${token}` },
+                    });
+                }
+            } catch (e) {
+                console.warn('Falha ao limpar comprovantes (best-effort):', e);
+            }
+
             // Delete associated storage files (audio, image urls, etc.) before deleting the database record
             if (event) {
                 try {
@@ -655,6 +670,18 @@ export const Dashboard = () => {
         setIsDeleting(true);
         setDeletingGuestId(guestId);
         try {
+            // Apaga também o comprovante do guest (best-effort, via servidor).
+            try {
+                const token = await auth.currentUser?.getIdToken();
+                if (token && id) {
+                    await fetch(`/api/events/${id}/receipts/${guestId}`, {
+                        method: 'DELETE',
+                        headers: { Authorization: `Bearer ${token}` },
+                    });
+                }
+            } catch (e) {
+                console.warn('Falha ao limpar comprovante (best-effort):', e);
+            }
             const guestRef = doc(db, 'events', id!, 'guests', guestId);
             await deleteDoc(guestRef);
             toast.success("Convidado removido!");
@@ -689,12 +716,13 @@ export const Dashboard = () => {
     // a cada render (digitação na busca, hover, qualquer snapshot). Agora só
     // recalculam quando guests/busca/filtro mudam — e a lista renderiza via
     // Virtuoso (só ~15 linhas no DOM em vez de N).
-    const { confirmedCount, pendingCount, declinedCount, checkedInCount, totalCount } = React.useMemo(() => ({
+    const { confirmedCount, pendingCount, declinedCount, checkedInCount, totalCount, giftsReceivedCount } = React.useMemo(() => ({
         confirmedCount: guests.filter(g => g.status === 'CONFIRMED').length,
         pendingCount: guests.filter(g => g.status === 'PENDING').length,
         declinedCount: guests.filter(g => g.status === 'DECLINED').length,
         checkedInCount: guests.filter(g => g.checkedIn).length,
         totalCount: guests.length,
+        giftsReceivedCount: guests.filter(g => !!g.receiptUrl).length,
     }), [guests]);
 
     const filteredGuests = React.useMemo(() => {
@@ -931,7 +959,7 @@ export const Dashboard = () => {
     return (
         <div className="min-h-screen w-full overflow-x-hidden bg-[#FDFDFD] pb-20 font-display text-slate-800">
             {/* Minimalist Top Navbar */}
-            <nav className="sticky top-0 z-40 bg-white/80 backdrop-blur-md border-b border-slate-100 px-4 sm:px-6 py-4 flex items-center justify-between gap-2">
+            <nav className="sticky top-0 z-40 bg-white/80 backdrop-blur-md border-b border-slate-100 px-4 sm:px-6 py-3 sm:py-4 flex flex-wrap items-center justify-between gap-x-2 gap-y-3">
                 <div className="flex items-center gap-3 sm:gap-4 min-w-0 flex-1">
                 <button type="button" onClick={() => navigate(-1)} className="w-10 h-10 shrink-0 flex items-center justify-center rounded-full hover:bg-slate-100 text-slate-500 transition-colors outline-none cursor-pointer">
                         <ArrowLeft size={20} />
@@ -948,7 +976,7 @@ export const Dashboard = () => {
                         </div>
                     </div>
                 </div>
-                <div className="flex items-center gap-2 shrink-0">
+                <div className="flex items-center gap-2 shrink-0 flex-wrap justify-end w-full sm:w-auto">
                     {/* Suporte VIP: 'priority_support' (VIP/Business). Antes: qualquer
                         pago via isPaidPlan — o Premium via sem o ter no pacote. */}
                     {canUseFeature(eventPlanId, 'priority_support') && (
@@ -993,7 +1021,7 @@ export const Dashboard = () => {
                         onClick={() => {
                             window.open(`/invite/${event.id}`, '_blank', 'noopener,noreferrer');
                         }}
-                        className="px-4 py-2 bg-brand-blue text-white rounded-full font-bold text-sm hover:bg-brand-blue/90 shadow-lg shadow-brand-blue/20 transition-all cursor-pointer"
+                        className="px-3 sm:px-4 py-2 bg-brand-blue text-white rounded-full font-bold text-xs sm:text-sm hover:bg-brand-blue/90 shadow-lg shadow-brand-blue/20 transition-all cursor-pointer whitespace-nowrap"
                     >
                         {isShareLocked ? 'Pré-visualizar' : 'Ver Convite'}
                     </button>
@@ -1002,9 +1030,9 @@ export const Dashboard = () => {
                             window.open(`/invite/${event.id}?simular=1`, '_blank', 'noopener,noreferrer');
                         }}
                         title="Testar como convidado: RSVP, consulta e check-in sem gravar nada"
-                        className="px-4 py-2 bg-white border border-amber-300 text-amber-700 rounded-full font-bold text-sm hover:bg-amber-50 shadow-sm transition-all cursor-pointer whitespace-nowrap"
+                        className="px-3 sm:px-4 py-2 bg-white border border-amber-300 text-amber-700 rounded-full font-bold text-xs sm:text-sm hover:bg-amber-50 shadow-sm transition-all cursor-pointer whitespace-nowrap inline-flex items-center gap-1.5"
                     >
-                        🎭 Ver como convidado
+                        <Eye size={14} aria-hidden="true" /> Simulação
                     </button>
                 </div>
             </nav>
@@ -1055,51 +1083,69 @@ export const Dashboard = () => {
                         <h2 className="text-4xl font-serif text-brand-blue mb-2">Visão Geral</h2>
                         <p className="text-slate-500">Acompanhe as confirmações de presença do seu evento em tempo real.</p>
                     </div>
-                    <div className="flex flex-col sm:flex-row gap-2 w-full md:w-auto">
-                        <div className="flex bg-slate-50 p-2 rounded-2xl border border-slate-200 flex-1 md:flex-initial h-14">
-                            <div className="px-4 flex items-center text-slate-500 text-sm truncate max-w-[150px]">
-                                {`${getPublicOrigin()}/invite/${event.id}`}
+                    <div className="flex flex-col gap-3 w-full md:w-auto md:items-end">
+                        <div className="flex flex-col sm:flex-row gap-2 w-full md:w-auto">
+                            <div className="flex bg-slate-50 p-2 rounded-2xl border border-slate-200 flex-1 md:flex-initial h-14">
+                                <div className="px-4 flex items-center text-slate-500 text-sm truncate max-w-[150px]">
+                                    {`${getPublicOrigin()}/invite/${event.id}`}
+                                </div>
+                                <button 
+                                    onClick={handleCopyLink}
+                                    className={`px-4 py-2 rounded-xl text-sm font-bold flex items-center gap-2 transition-all ${
+                                        copied ? 'bg-green-500 text-white' : 'bg-white text-brand-blue shadow-sm hover:shadow-md'
+                                    }`}
+                                >
+                                    {copied ? <Check size={16} /> : <Copy size={16} />}
+                                    {copied ? 'Copiado!' : 'Convite'}
+                                </button>
                             </div>
-                            <button 
-                                onClick={handleCopyLink}
-                                className={`px-4 py-2 rounded-xl text-sm font-bold flex items-center gap-2 transition-all ${
-                                    copied ? 'bg-green-500 text-white' : 'bg-white text-brand-blue shadow-sm hover:shadow-md'
-                                }`}
+                            <button
+                                type="button"
+                                onClick={() => {
+                                    if (!requirePaidForShare()) return;
+                                    openInviteShareWhatsApp(event, `${getPublicOrigin()}/invite/${event.id}`);
+                                }}
+                                title="Partilhar o convite no WhatsApp"
+                                className="h-14 px-6 bg-[#25D366] text-white rounded-2xl font-bold text-sm hover:bg-[#20bd5a] disabled:opacity-60 shadow-md transition-all flex items-center justify-center gap-2 whitespace-nowrap cursor-pointer"
                             >
-                                {copied ? <Check size={16} /> : <Copy size={16} />}
-                                {copied ? 'Copiado!' : 'Convite'}
+                                <MessageCircle size={16} /> Partilhar convite
                             </button>
                         </div>
-                        <button 
-                            onClick={async () => {
-                                if (!requirePaidForShare()) return;
-                                if (isGenLink) return;
-                                setIsGenLink(true);
-                                try {
-                                    let token = event.clientToken;
-                                    if (!token) {
-                                        token = Math.random().toString(36).substring(2, 8).toUpperCase();
-                                        await updateDoc(doc(db, 'events', event.id), { clientToken: token });
+                        <div className="w-full bg-amber-50/70 border border-amber-200/70 rounded-2xl p-3 flex flex-col sm:flex-row sm:items-center gap-2 sm:gap-3">
+                            <button 
+                                onClick={async () => {
+                                    if (!requirePaidForShare()) return;
+                                    if (isGenLink) return;
+                                    setIsGenLink(true);
+                                    try {
+                                        let token = event.clientToken;
+                                        if (!token) {
+                                            token = Math.random().toString(36).substring(2, 8).toUpperCase();
+                                            await updateDoc(doc(db, 'events', event.id), { clientToken: token });
+                                        }
+                                        const link = `${getPublicOrigin()}/client-dashboard/${event.id}?token=${token}`;
+                                        copyToClipboard(link);
+                                        toast.success("Link do parceiro(a) copiado para a área de transferência!");
+                                    } catch {
+                                        toast.error("Falha ao gerar link.");
+                                    } finally {
+                                        setIsGenLink(false);
                                     }
-                                    const link = `${getPublicOrigin()}/client-dashboard/${event.id}?token=${token}`;
-                                    copyToClipboard(link);
-                                    toast.success("Link do cliente copiado para a área de transferência!");
-                                } catch {
-                                    toast.error("Falha ao gerar link.");
-                                } finally {
-                                    setIsGenLink(false);
-                                }
-                            }}
-                            disabled={isGenLink}
-                            className="h-14 px-6 bg-[#BF9B30] text-slate-900 rounded-2xl font-bold text-sm hover:bg-[#BF9B30]/90 disabled:opacity-60 shadow-md transition-all flex items-center justify-center gap-2 whitespace-nowrap"
-                        >
-                            {isGenLink ? (
-                              <span className="w-4 h-4 border-2 border-slate-700/30 border-t-slate-900 rounded-full animate-spin" aria-hidden="true" />
-                            ) : (
-                              <Share2 size={16} />
-                            )}
-                            {isGenLink ? 'A gerar…' : 'Link do Cliente'}
-                        </button>
+                                }}
+                                disabled={isGenLink}
+                                className="px-5 py-2.5 bg-[#BF9B30] text-slate-900 rounded-xl font-bold text-xs sm:text-sm hover:bg-[#BF9B30]/90 disabled:opacity-60 shadow-md transition-all flex items-center justify-center gap-2 whitespace-nowrap cursor-pointer shrink-0"
+                            >
+                                {isGenLink ? (
+                                  <span className="w-4 h-4 border-2 border-slate-700/30 border-t-slate-900 rounded-full animate-spin" aria-hidden="true" />
+                                ) : (
+                                  <Share2 size={16} />
+                                )}
+                                {isGenLink ? 'A gerar…' : 'Link do parceiro(a)'}
+                            </button>
+                            <p className="text-[11px] sm:text-xs text-slate-500 leading-relaxed">
+                                Envie ao seu parceiro(a): ele acompanha confirmações, presentes e mesas em tempo real, sem poder editar nada.
+                            </p>
+                        </div>
                     </div>
                 </div>
 
@@ -1226,7 +1272,7 @@ export const Dashboard = () => {
                 </div>
 
                 {/* Spatial UI Stats Cards */}
-                <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-5 gap-4 mb-12">
+                <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-6 gap-4 mb-12">
                     <StatCard title="Total" value={totalCount} icon={Users} color="bg-blue-50 text-blue-600" />
                     {event?.type !== 'BRIDAL_SHOWER' && (
                         <StatCard title="Entraram" value={checkedInCount} icon={CheckCircle2} color="bg-emerald-50 text-emerald-600" />
@@ -1234,6 +1280,7 @@ export const Dashboard = () => {
                     <StatCard title="Confirmados" value={confirmedCount} icon={CheckCircle2} color="bg-green-50 text-green-600" />
                     <StatCard title="Pendentes" value={pendingCount} icon={Clock} color="bg-orange-50 text-orange-600" />
                     <StatCard title="Recusados" value={declinedCount} icon={Users} color="bg-red-50 text-red-600" />
+                    <StatCard title="Presentes" value={giftsReceivedCount} icon={Gift} color="bg-amber-50 text-amber-600" />
                 </div>
 
                 <GuestsProgressBar guests={guests} className="mb-6" />

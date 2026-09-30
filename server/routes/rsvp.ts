@@ -1,13 +1,16 @@
 /**
  * RSVP & Guest Routes — Guest management and RSVP submissions.
- * 
+ *
  * Routes:
- *   GET  /api/events/:id/guests      — List guests (token-authenticated)
- *   POST /api/events/:id/rsvp        — Submit RSVP
- *   GET  /api/events/:id/rsvp-status — Check RSVP status by phone
+ *   GET    /api/events/:id/guests            — List guests (token-authenticated)
+ *   POST   /api/events/:id/rsvp              — Submit RSVP (+ comprovante opcional)
+ *   GET    /api/events/:id/rsvp-status       — Check RSVP status by phone
+ *   DELETE /api/events/:id/receipts          — Apagar TODOS os comprovantes (dono)
+ *   DELETE /api/events/:id/receipts/:guestId — Apagar comprovante de um guest (dono)
  */
 import { Router } from 'express';
-import { getDb, getEventDetails, readLocalGuests, writeLocalGuest, fetchFirestoreGuestsWebSDK } from '../lib/firebase-admin.js';
+import multer from 'multer';
+import { getDb, getEventDetails, readLocalGuests, writeLocalGuest, fetchFirestoreGuestsWebSDK, admin } from '../lib/firebase-admin.js';
 import { apiRateLimiter, rsvpRateLimiter } from '../middleware/index.js';
 import { logger } from '../../lib/logger.js';
 import { normalizePlanId, getGuestLimit, getPlanConfig } from '../../config/plans.js';
@@ -19,6 +22,62 @@ const router = Router();
 
 async function getAuthUser(req: any) {
   return getAdminAuthUser(req);
+}
+
+// --- Comprovante do presente (RSVP): imagens + PDF, máx 1MB, em memória.
+// O convidado é público (sem login) — por isso o upload passa pelo servidor
+// (Admin SDK bypassa rules) em vez de regra pública no Storage (spam).
+export const RECEIPT_MAX_BYTES = 1 * 1024 * 1024;
+const RECEIPT_MIMES = ['image/jpeg', 'image/png', 'application/pdf'];
+const receiptUpload = multer({
+  storage: multer.memoryStorage(),
+  limits: { fileSize: RECEIPT_MAX_BYTES, files: 1 },
+  fileFilter: (_req, file, cb) => {
+    if (RECEIPT_MIMES.includes(file.mimetype)) cb(null, true);
+    else cb(new Error('RECEIPT_INVALID_TYPE'));
+  },
+});
+
+// Converte erros do multer em 400 com mensagem (em vez do 500 global).
+function parseReceipt(req: any, res: any, next: any) {
+  receiptUpload.single('receipt')(req, res, (err: any) => {
+    if (err) {
+      if (err.code === 'LIMIT_FILE_SIZE') {
+        return res.status(400).json({ error: 'Comprovante maior que 1MB. Envie imagem ou PDF mais leve.' });
+      }
+      return res.status(400).json({ error: 'Comprovante inválido. Envie imagem (JPEG/PNG) ou PDF.' });
+    }
+    next();
+  });
+}
+
+/** Grava o comprovante no Storage e devolve URL assinada (longa duração). Null em falha. */
+async function saveReceipt(
+  eventId: string,
+  guestId: string,
+  file: { buffer: Buffer; mimetype: string; originalname?: string },
+): Promise<{ url: string; name: string; kind: 'image' | 'pdf' } | null> {
+  try {
+    const bucket = admin.storage().bucket();
+    const ext = file.mimetype === 'application/pdf' ? 'pdf' : file.mimetype === 'image/png' ? 'png' : 'jpg';
+    const dest = `receipts/${eventId}/${guestId}.${ext}`;
+    await bucket.file(dest).save(file.buffer, {
+      contentType: file.mimetype,
+      metadata: { cacheControl: 'public, max-age=31536000' },
+    });
+    const [url] = await bucket.file(dest).getSignedUrl({
+      action: 'read',
+      expires: '2036-01-01T00:00:00Z',
+    });
+    return {
+      url,
+      name: file.originalname || `comprovante.${ext}`,
+      kind: ext === 'pdf' ? 'pdf' : 'image',
+    };
+  } catch (e: any) {
+    logger.warn(`Falha ao gravar comprovante do RSVP no evento ${eventId}: ${e?.message || e}`);
+    return null;
+  }
 }
 
 // --- List Guests ---
@@ -113,9 +172,22 @@ router.get('/api/events/:id/guests', apiRateLimiter, async (req, res) => {
 });
 
 // --- Submit RSVP ---
-router.post('/api/events/:id/rsvp', rsvpRateLimiter, async (req, res) => {
+// Aceita JSON (sem comprovante) ou multipart (comprovante em `receipt` +
+// `guestData` como string JSON). Resposta inclui `receiptSaved` quando veio ficheiro.
+router.post('/api/events/:id/rsvp', rsvpRateLimiter, parseReceipt, async (req, res) => {
     const id = req.params.id as string;
-    const { phone, guestData } = req.body;
+    let { phone, guestData } = req.body as any;
+    if (typeof guestData === 'string') {
+        try {
+            guestData = JSON.parse(guestData);
+        } catch {
+            return res.status(400).json({ error: 'Dados inválidos.' });
+        }
+    }
+    const receiptFile = (req as any).file as { buffer: Buffer; mimetype: string; originalname?: string; size: number } | undefined;
+    if (receiptFile && (receiptFile.size > RECEIPT_MAX_BYTES || !RECEIPT_MIMES.includes(receiptFile.mimetype))) {
+        return res.status(400).json({ error: 'Comprovante inválido. Envie imagem (JPEG/PNG) ou PDF de até 1MB.' });
+    }
     logger.info(`RSVP route hit para evento ${id}`, { category: 'DATABASE', data: { phone, body: req.body } });
     try {
         const event = await getEventDetails(id);
@@ -206,8 +278,23 @@ router.post('/api/events/:id/rsvp', rsvpRateLimiter, async (req, res) => {
                 ...guestData,
                 createdAt: new Date().toISOString()
             });
-            
-            return res.json({ success: true, guestId: newGuestRef.id });
+
+            // Comprovante do presente (opcional): grava no Storage e anexa ao guest.
+            // O RSVP nunca é bloqueado por falha no comprovante.
+            let receiptSaved = false;
+            if (receiptFile) {
+                const saved = await saveReceipt(id, newGuestRef.id, receiptFile);
+                if (saved) {
+                    await newGuestRef.update({
+                        receiptUrl: saved.url,
+                        receiptName: saved.name,
+                        receiptKind: saved.kind,
+                    });
+                    receiptSaved = true;
+                }
+            }
+
+            return res.json({ success: true, guestId: newGuestRef.id, receiptSaved });
         } catch (dbErr: any) {
             const isPermissionError = dbErr.message?.includes('PERMISSION_DENIED') || dbErr.message?.includes('Missing or insufficient permissions');
             if (isPermissionError || process.env.NODE_ENV !== 'production') {
@@ -245,7 +332,9 @@ router.post('/api/events/:id/rsvp', rsvpRateLimiter, async (req, res) => {
                 };
                 writeLocalGuest(id, newGuest);
                 
-                return res.json({ success: true, guestId: mockId });
+                // Fallback local não grava comprovante (sem Storage) — o
+                // frontend avisa para reenviar online.
+                return res.json({ success: true, guestId: mockId, receiptSaved: false });
             }
             throw dbErr;
         }
@@ -305,6 +394,61 @@ router.get('/api/events/:id/rsvp-status', apiRateLimiter, async (req, res) => {
     } catch (err) {
         logger.error(`Erro ao consultar status do rsvp para o evento ${id}:`, { category: 'DATABASE', data: err });
         res.status(500).json({ error: 'Server error' });
+    }
+});
+
+// --- Apagar comprovantes (dono do evento ou admin) ---
+// Evita ficheiros órfãos no Storage ao apagar evento/convidado.
+// O cliente nunca apaga direto (sem regra pública) — passa pelo servidor.
+async function requireEventOwner(req: any, res: any, id: string) {
+    const authUser = await getAuthUser(req);
+    if (!authUser) {
+        res.status(401).json({ error: 'Não autenticado.' });
+        return null;
+    }
+    const event = await getEventDetails(id);
+    if (!event) {
+        res.status(404).json({ error: 'Not found' });
+        return null;
+    }
+    const owner = (event as any).ownerId === authUser.uid;
+    if (!owner && !checkIsAdmin(authUser)) {
+        res.status(403).json({ error: 'Sem permissão.' });
+        return null;
+    }
+    return event;
+}
+
+// DELETE /api/events/:id/receipts — todos os comprovantes do evento.
+router.delete('/api/events/:id/receipts', apiRateLimiter, async (req, res) => {
+    const id = req.params.id as string;
+    try {
+        const event = await requireEventOwner(req, res, id);
+        if (!event) return;
+        const bucket = admin.storage().bucket();
+        const [files] = await bucket.getFiles({ prefix: `receipts/${id}/` });
+        await Promise.all(files.map((f) => f.delete().catch(() => undefined)));
+        return res.json({ success: true, deleted: files.length });
+    } catch (err: any) {
+        logger.error(`Erro ao apagar comprovantes do evento ${id}:`, { category: 'DATABASE', data: err?.message || err });
+        return res.status(500).json({ error: 'Falha ao apagar comprovantes.' });
+    }
+});
+
+// DELETE /api/events/:id/receipts/:guestId — comprovante de um convidado.
+router.delete('/api/events/:id/receipts/:guestId', apiRateLimiter, async (req, res) => {
+    const id = req.params.id as string;
+    const guestId = req.params.guestId as string;
+    try {
+        const event = await requireEventOwner(req, res, id);
+        if (!event) return;
+        const bucket = admin.storage().bucket();
+        const [files] = await bucket.getFiles({ prefix: `receipts/${id}/${guestId}.` });
+        await Promise.all(files.map((f) => f.delete().catch(() => undefined)));
+        return res.json({ success: true, deleted: files.length });
+    } catch (err: any) {
+        logger.error(`Erro ao apagar comprovante ${guestId} do evento ${id}:`, { category: 'DATABASE', data: err?.message || err });
+        return res.status(500).json({ error: 'Falha ao apagar comprovante.' });
     }
 });
 

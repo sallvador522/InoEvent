@@ -1,6 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { useParams, useSearchParams, Link } from 'react-router-dom';
-import { Users, CheckCircle2, Clock, Search, ExternalLink, ShieldCheck, Printer } from 'lucide-react';
+import { Users, CheckCircle2, Clock, Search, ExternalLink, ShieldCheck, Printer, Gift, MessageCircle } from 'lucide-react';
 import { Virtuoso } from 'react-virtuoso';
 import { doc, collection, onSnapshot, getDoc } from 'firebase/firestore';
 import { db } from '../../components/FirebaseProvider';
@@ -8,6 +8,7 @@ import { GuestsProgressBar } from './GuestsProgressBar';
 import { normalizePlanId, canUseFeature } from '../../lib/entitlements';
 import { ResponsiveContainer, PieChart, Pie, Cell, LineChart, Line, XAxis, YAxis, Tooltip } from 'recharts';
 import { ExecutiveReportModal } from './ExecutiveReportModal';
+import { openInviteShareWhatsApp } from '../../lib/inviteShare';
 import { Skeleton } from '../../components/ui/Skeleton';
 import { GuestDetailsModal } from './GuestDetailsModal';
 
@@ -115,12 +116,13 @@ export const ClientDashboard = () => {
     // Contagens + lista filtrada memoizadas (mesmo padrão do Dashboard):
     // evitam filters O(n) por render e preparam a lista virtualizada.
     // Declarados junto aos states, ANTES de qualquer early return (regras dos hooks).
-    const { confirmedCount, pendingCount, declinedCount, checkedInCount, totalCount } = React.useMemo(() => ({
+    const { confirmedCount, pendingCount, declinedCount, checkedInCount, totalCount, giftsReceivedCount } = React.useMemo(() => ({
         confirmedCount: guests.filter(g => g.status === 'CONFIRMED').length,
         pendingCount: guests.filter(g => g.status === 'PENDING').length,
         declinedCount: guests.filter(g => g.status === 'DECLINED').length,
         checkedInCount: guests.filter(g => g.checkedIn).length,
         totalCount: guests.length,
+        giftsReceivedCount: guests.filter(g => !!g.receiptUrl).length,
     }), [guests]);
 
     const filteredGuests = React.useMemo(() => {
@@ -197,13 +199,15 @@ export const ClientDashboard = () => {
                     <div className="flex items-center gap-2">
                         {agencyLogo ? (
                             <img src={agencyLogo} alt={agencyName} className="h-10 object-contain rounded" />
+                        ) : agencyName === "InoEvents Partner" ? (
+                            <img src="/logo-192.png" alt="InoEvents" className="h-10 w-10 object-contain rounded-xl" />
                         ) : (
                             <div className="w-8 h-8 bg-brand-blue rounded-xl flex items-center justify-center transform rotate-3">
                                 <div className="w-3 h-3 bg-white rounded-full"></div>
                             </div>
                         )}
                         <span className="font-serif font-bold text-xl tracking-wide text-brand-blue">
-                           {agencyName}
+                           {agencyName === "InoEvents Partner" && !agencyLogo ? "InoEvents" : agencyName}
                         </span>
                     </div>
                     <div className="flex items-center gap-3">
@@ -218,7 +222,7 @@ export const ClientDashboard = () => {
                         )}
                         <div className="text-xs font-bold bg-slate-100 text-slate-500 px-3 py-1.5 rounded-full flex items-center gap-2">
                             <ShieldCheck size={14} className="text-brand-blue" />
-                            Visão do Cliente
+                            Visão do parceiro(a)
                         </div>
                     </div>
                 </div>
@@ -237,6 +241,17 @@ export const ClientDashboard = () => {
                     </div>
                     
                     <div className="flex flex-col md:flex-row items-center gap-3 w-full md:w-auto">
+                        <button
+                            type="button"
+                            onClick={() => {
+                                const origin = typeof window !== 'undefined' ? window.location.origin : 'https://www.inoevent.online';
+                                openInviteShareWhatsApp(event, `${origin}/invite/${event.id}`);
+                            }}
+                            title="Partilhar o convite no WhatsApp"
+                            className="flex bg-[#25D366] hover:bg-[#20bd5a] text-white border border-[#25D366] px-6 py-3 rounded-full font-bold text-sm shadow-sm hover:shadow-md transition-all gap-2 items-center w-full md:w-auto justify-center cursor-pointer"
+                        >
+                            <MessageCircle size={16} /> Partilhar convite
+                        </button>
                         {event?.isBlocked || (event?.scheduledBlockDate && new Date(event.scheduledBlockDate) <= new Date()) ? (
                             <div className="flex bg-red-50 border border-red-200 px-6 py-3 rounded-full font-bold text-sm text-red-600 shadow-sm gap-2 items-center w-full md:w-auto justify-center cursor-not-allowed">
                                 <span className="material-symbols-outlined text-[16px]">lock</span> Convite Bloqueado
@@ -250,12 +265,13 @@ export const ClientDashboard = () => {
                 </div>
 
                 {/* Status Cards */}
-                <div className="grid grid-cols-2 md:grid-cols-5 gap-4 mb-8">
+                <div className="grid grid-cols-2 md:grid-cols-6 gap-4 mb-8">
                     <StatCard title="Total" value={totalCount} icon={Users} color="bg-slate-100 text-slate-600" />
                     <StatCard title="Entraram" value={checkedInCount} icon={CheckCircle2} color="bg-emerald-50 text-emerald-600" />
                     <StatCard title="Confirmados" value={confirmedCount} icon={CheckCircle2} color="bg-green-50 text-green-600" />
                     <StatCard title="Pendentes" value={pendingCount} icon={Clock} color="bg-amber-50 text-amber-600" />
                     <StatCard title="Recusados" value={declinedCount} icon={Users} color="bg-red-50 text-red-600" />
+                    <StatCard title="Presentes" value={giftsReceivedCount} icon={Gift} color="bg-amber-50 text-amber-600" />
                 </div>
 
                 <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6 mb-8">

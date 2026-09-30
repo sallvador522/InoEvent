@@ -46,7 +46,7 @@ import toast from "react-hot-toast";
 import { copyToClipboard } from "../../lib/clipboard";
 import { uploadEventAudio, deleteEventAudio, isOwnStorageAudio } from "../../lib/audioUpload";
 import { QRCodeSVG } from "qrcode.react";
-import { Play, Sparkles, ChevronUp, ChevronDown, PartyPopper, Lock } from "lucide-react";
+import { Play, Sparkles, ChevronUp, ChevronDown, PartyPopper, Lock, Users } from "lucide-react";
 import { exportPassPng } from "../../lib/passExport";
 import { firstGalleryPhoto } from "../../lib/passImage";
 import { EventPass, supportsElegantPass } from "../../components/passes/EventPass";
@@ -8537,10 +8537,20 @@ const RSVPForm: React.FC<{ event: EventDetails; onClose: () => void; simMode?: b
   const [message, setMessage] = useState("");
   const [dietaryRestrictions, setDietaryRestrictions] = useState("");
   const [loading, setLoading] = useState(false);
+  // Comprovante do presente: só quando o evento recebe por IBAN; imagens + PDF, máx 1MB.
+  const [receiptFile, setReceiptFile] = useState<File | null>(null);
+  const receiptRef = useRef<HTMLInputElement>(null);
+  const RECEIPT_MAX_BYTES = 1 * 1024 * 1024;
+  const RECEIPT_ACCEPT = 'image/jpeg,image/png,application/pdf';
+  const hasIbanGift =
+    ((event as any).gifts as any[] | undefined)?.some((g) => g?.type === 'IBAN') ||
+    Boolean((event as any).iban && (event as any).accountName);
   const [successData, setSuccessData] = useState<{
     id: string;
     name: string;
   } | null>(null);
+  // Lotação esgotada: modal a pedir contacto com os anfitriões (não toast).
+  const [limitReached, setLimitReached] = useState(false);
   // Passe elegante (Ouro Imperial): export PNG em tamanho real via nó escondido.
   const passExportRef = useRef<HTMLDivElement>(null);
   const [downloadingPass, setDownloadingPass] = useState(false);
@@ -8609,17 +8619,35 @@ const RSVPForm: React.FC<{ event: EventDetails; onClose: () => void; simMode?: b
       // Servidor primeiro: impõe limite de convidados, expiração, bloqueio e
       // ativação do convite. A escrita direta abaixo é SÓ fallback (servidor
       // inalcançável/offline) — nunca para contornar uma recusa do servidor.
+      // Com comprovante, o envio é multipart (o fallback local não o suporta).
+      let receiptWarn = false;
+      const useReceipt = !!receiptFile && status === "yes" && hasIbanGift && !simMode;
       try {
-        const res = await fetch(`/api/events/${event.id}/rsvp`, {
-          method: "POST",
-          headers: {
-            "Content-Type": "application/json",
-          },
-          body: JSON.stringify({ phone, guestData }),
-        });
+        const res = await (async () => {
+          if (useReceipt && receiptFile) {
+            const form = new FormData();
+            form.append('phone', phone);
+            form.append('guestData', JSON.stringify(guestData));
+            form.append('receipt', receiptFile, receiptFile.name);
+            return fetch(`/api/events/${event.id}/rsvp`, { method: "POST", body: form });
+          }
+          return fetch(`/api/events/${event.id}/rsvp`, {
+            method: "POST",
+            headers: {
+              "Content-Type": "application/json",
+            },
+            body: JSON.stringify({ phone, guestData }),
+          });
+        })();
 
         if (!res.ok) {
           const errData = await res.json().catch(() => ({}));
+          if (errData.code === 'GUEST_LIMIT_REACHED') {
+            toast.dismiss(toastId);
+            setLimitReached(true);
+            setLoading(false);
+            return;
+          }
           toast.error(errData.error || "Erro ao confirmar presença.", { id: toastId });
           setLoading(false);
           return;
@@ -8627,8 +8655,17 @@ const RSVPForm: React.FC<{ event: EventDetails; onClose: () => void; simMode?: b
 
         const data = await res.json();
         guestId = data.guestId;
+        if (useReceipt && data.receiptSaved === false) receiptWarn = true;
         console.log("RSVP gravado via backend API:", guestId);
       } catch (fetchErr) {
+        if (useReceipt) {
+          // Sem servidor não há para onde enviar o comprovante — não gravar
+          // local sem ele (o painel conta presentes pelo comprovante).
+          console.warn("Servidor inalcançável com comprovante anexado.", fetchErr);
+          toast.error("Sem ligação — o comprovante precisa de internet. Tente de novo online.", { id: toastId });
+          setLoading(false);
+          return;
+        }
         console.warn("Servidor inalcançável, tentando escrita direta (fallback)...", fetchErr);
 
         try {
@@ -8665,6 +8702,9 @@ const RSVPForm: React.FC<{ event: EventDetails; onClose: () => void; simMode?: b
           : "Sua justificativa foi enviada com sucesso.",
         { id: toastId },
       );
+      if (receiptWarn) {
+        toast.error("Presença gravada, mas o comprovante falhou. Fale com os anfitriões.");
+      }
 
       if (status === "yes") {
         trackPixelLead(
@@ -8930,6 +8970,7 @@ const RSVPForm: React.FC<{ event: EventDetails; onClose: () => void; simMode?: b
   }
 
   return (
+    <>
     <form className="space-y-6" onSubmit={handleSubmit}>
       <p className={`text-sm leading-relaxed ${isLuxury ? "text-gray-400" : isLimintso ? "text-slate-500 font-serif italic" : "opacity-70"}`}>
         {isBridal
@@ -9072,6 +9113,65 @@ const RSVPForm: React.FC<{ event: EventDetails; onClose: () => void; simMode?: b
             disabled={loading}
           />
         </div>
+
+        {status === "yes" && hasIbanGift && !simMode && (
+          <div>
+            <label
+              className={`text-xs font-bold uppercase tracking-wider mb-1.5 block ${isLuxury ? "text-[#BF9B30]" : isLimintso ? "text-[#8a6d1c]" : "opacity-50"}`}
+            >
+              Comprovante do presente (Opcional)
+            </label>
+            <input
+              type="file"
+              ref={receiptRef}
+              accept={RECEIPT_ACCEPT}
+              className="hidden"
+              disabled={loading}
+              onChange={(e) => {
+                const f = e.target.files?.[0] || null;
+                e.target.value = '';
+                if (!f) return;
+                if (!['image/jpeg', 'image/png', 'application/pdf'].includes(f.type)) {
+                  toast.error('Comprovante inválido. Envie imagem (JPEG/PNG) ou PDF.');
+                  return;
+                }
+                if (f.size > RECEIPT_MAX_BYTES) {
+                  toast.error('Comprovante maior que 1MB. Envie um ficheiro mais leve.');
+                  return;
+                }
+                setReceiptFile(f);
+              }}
+            />
+            {receiptFile ? (
+              <div className={`w-full border rounded-xl px-4 py-3 flex items-center gap-3 ${isLuxury ? "border-gray-600 bg-transparent" : isLimintso ? "border-[#dcb349]/40 bg-[#FCFAF6]" : "border-gray-300 bg-transparent"}`}>
+                <span className={`text-xs font-bold truncate flex-1 ${isLuxury ? "text-white" : "text-slate-800"}`}>
+                  {receiptFile.name}
+                </span>
+                <span className="text-[11px] text-slate-400 shrink-0">
+                  {(receiptFile.size / 1024).toFixed(0)} KB
+                </span>
+                <button
+                  type="button"
+                  disabled={loading}
+                  onClick={() => setReceiptFile(null)}
+                  aria-label="Remover comprovante"
+                  className="shrink-0 text-slate-400 hover:text-red-500 font-bold px-1 cursor-pointer"
+                >
+                  ✕
+                </button>
+              </div>
+            ) : (
+              <button
+                type="button"
+                disabled={loading}
+                onClick={() => receiptRef.current?.click()}
+                className={`w-full border border-dashed rounded-xl py-3.5 px-4 text-xs font-bold uppercase tracking-wider transition-all active:scale-[0.98] disabled:opacity-60 cursor-pointer ${isLuxury ? "border-gray-600 text-gray-300 hover:border-[#BF9B30]" : isLimintso ? "border-[#dcb349]/50 text-[#8a6d1c] hover:border-[#b49232] bg-white" : "border-gray-300 text-slate-500 hover:border-black"}`}
+              >
+                Anexar comprovante (imagem ou PDF, máx 1MB)
+              </button>
+            )}
+          </div>
+        )}
       </div>
 
       <Button
@@ -9099,6 +9199,47 @@ const RSVPForm: React.FC<{ event: EventDetails; onClose: () => void; simMode?: b
             : "ENVIAR JUSTIFICATIVA"}
       </Button>
     </form>
+    <AnimatePresence>
+      {limitReached && (
+        <motion.div
+          initial={{ opacity: 0 }}
+          animate={{ opacity: 1 }}
+          exit={{ opacity: 0 }}
+          className="fixed inset-0 z-[120] flex items-center justify-center p-4 bg-slate-900/60 backdrop-blur-sm"
+          role="dialog"
+          aria-modal="true"
+          aria-label="Limite de convidados atingido"
+        >
+          <motion.div
+            initial={{ scale: 0.95, y: 20 }}
+            animate={{ scale: 1, y: 0 }}
+            exit={{ scale: 0.95, y: 20 }}
+            className="bg-white rounded-3xl p-8 max-w-sm w-full shadow-2xl border border-slate-100 text-center"
+          >
+            <div className="w-16 h-16 mx-auto mb-4 rounded-full bg-amber-50 border border-amber-200 flex items-center justify-center">
+              <Users size={30} className="text-amber-600" aria-hidden="true" />
+            </div>
+            <h3 className="text-xl font-serif font-bold text-slate-800 mb-2">
+              Lotação esgotada
+            </h3>
+            <p className="text-sm text-slate-500 leading-relaxed mb-2">
+              Este evento já atingiu o limite de convidados do plano contratado.
+            </p>
+            <p className="text-sm text-slate-500 leading-relaxed mb-6">
+              Para garantir o teu lugar, entra em contacto diretamente com o dono do evento (os anfitriões) — só eles podem libertar mais vagas.
+            </p>
+            <button
+              type="button"
+              onClick={() => { setLimitReached(false); onClose(); }}
+              className="w-full py-3.5 rounded-2xl font-bold text-sm bg-slate-900 text-white hover:bg-slate-800 active:scale-[0.98] transition-all cursor-pointer"
+            >
+              Entendi
+            </button>
+          </motion.div>
+        </motion.div>
+      )}
+    </AnimatePresence>
+    </>
   );
 };
 

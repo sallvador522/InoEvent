@@ -31,7 +31,8 @@ export type AuditAction =
   | 'ticket.status'
   | 'promo.first_event'
   | 'privacy.export'
-  | 'privacy.delete';
+  | 'privacy.delete'
+  | 'receipts.cleanup';
 
 export async function logAudit(input: {
   actorEmail: string;

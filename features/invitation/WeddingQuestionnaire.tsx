@@ -437,7 +437,6 @@ export const WeddingQuestionnaire: React.FC = () => {
   };
 
   return (
-    <MapsProvider>
     <div className="min-h-screen bg-[#FDFBF7] text-slate-900 font-display">
       <SEO
         title="Criar convite de casamento"
@@ -521,6 +520,10 @@ export const WeddingQuestionnaire: React.FC = () => {
                 </div>
                 <div className="mb-4">
                   <span className={labelCls}>Local do evento *</span>
+                  {/* MapsProvider só aqui: o script do Google Maps (≈1MB) só
+                      baixa quando o passo "Quando e onde" abre — a abertura do
+                      questionário nunca espera por ele. */}
+                  <MapsProvider>
                   <LocationPinPicker
                     latitude={latitude}
                     longitude={longitude}
@@ -565,6 +568,7 @@ export const WeddingQuestionnaire: React.FC = () => {
                       setLocationSource(null);
                     }}
                   />
+                  </MapsProvider>
                 </div>
                 <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
                   <div>
@@ -1136,6 +1140,5 @@ export const WeddingQuestionnaire: React.FC = () => {
         </div>
       </main>
     </div>
-    </MapsProvider>
   );
 };

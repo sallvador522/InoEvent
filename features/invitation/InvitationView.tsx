@@ -635,6 +635,12 @@ const InvitationView: React.FC = () => {
     }
   })();
 
+  // Prefetch do questionário no hover/toque do "Usar": o chunk baixa antes
+  // do clique, por isso a navegação abre instantânea mesmo em rede lenta.
+  const prefetchQuestionnaire = () => {
+    import('./WeddingQuestionnaire').catch(() => {});
+  };
+
   const handleUseTemplate = () => {
     if (!user) {
       toast.error("Por favor, faça login ou crie uma conta para personalizar este modelo!");
@@ -2311,7 +2317,7 @@ const InvitationView: React.FC = () => {
       {/* Faixa de simulação — dono a testar como convidado, nada é gravado */}
       {isGuestSim && (
         <div className="fixed top-0 left-0 right-0 z-[9998] bg-amber-500 text-black text-center text-xs font-bold uppercase tracking-widest px-3 py-2">
-          🎭 Simulação — nada será gravado
+          🎭 Simulação
         </div>
       )}
       {/* WELCOME ENVELOPE OVERLAY (os Limintso têm capa própria — sem envelope duplo) */}
@@ -2456,6 +2462,9 @@ const InvitationView: React.FC = () => {
 
               <button
                 onClick={handleUseTemplate}
+                onMouseEnter={prefetchQuestionnaire}
+                onFocus={prefetchQuestionnaire}
+                onTouchStart={prefetchQuestionnaire}
                 className="px-3 md:px-5 py-2 bg-[#BF9B30] hover:bg-white text-[#0F1419] text-[9px] md:text-xs font-bold uppercase tracking-widest rounded-full shadow-[0_0_20px_rgba(191,155,48,0.3)] flex items-center gap-1 transition-all cursor-pointer whitespace-nowrap active:scale-95 shrink-0"
               >
                 <span className="material-symbols-outlined text-[14px]">

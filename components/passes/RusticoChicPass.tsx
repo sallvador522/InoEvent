@@ -1,5 +1,6 @@
 import React from 'react';
 import { QRCodeSVG } from 'qrcode.react';
+import { PassPhoto } from './PassPhoto';
 import { RUSTICO_CHIC, PASS_SIZE, formatPassDateTime, monogram } from '../../lib/passTheme';
 import type { PassEventData } from './OuroImperialPass';
 import { PassFooter } from './PassFooter';
@@ -53,10 +54,9 @@ export const RusticoChicPass = React.forwardRef<HTMLDivElement, Props>(({ event,
             position: 'relative',
           }}
         >
-          <img
-            src={event.heroImage || '/chany-pedro-preview.webp'}
-            alt="Casal"
-            crossOrigin="anonymous"
+          <PassPhoto
+            src={event.heroImage}
+            fallback="/chany-pedro-preview.webp"
             style={{ width: '100%', height: '100%', objectFit: 'cover', objectPosition: 'center 25%' }}
           />
           <div

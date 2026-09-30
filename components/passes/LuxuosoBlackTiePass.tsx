@@ -1,5 +1,6 @@
 import React from 'react';
 import { QRCodeSVG } from 'qrcode.react';
+import { PassPhoto } from './PassPhoto';
 import { LUXUOSO_BLACK_TIE, PASS_SIZE, formatPassDateTime } from '../../lib/passTheme';
 import type { PassEventData } from './OuroImperialPass';
 import { PassFooter } from './PassFooter';
@@ -72,10 +73,9 @@ export const LuxuosoBlackTiePass = React.forwardRef<HTMLDivElement, Props>(({ ev
             position: 'relative',
           }}
         >
-          <img
-            src={event.heroImage || '/chany-pedro-preview.webp'}
-            alt="Casal"
-            crossOrigin="anonymous"
+          <PassPhoto
+            src={event.heroImage}
+            fallback="/chany-pedro-preview.webp"
             style={{ width: '100%', height: '100%', objectFit: 'cover', objectPosition: 'center 20%' }}
           />
           <div

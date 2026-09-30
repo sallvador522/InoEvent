@@ -5,7 +5,7 @@ import { collection, query, where, getDocs, doc, getDoc } from 'firebase/firesto
 import { db } from '../../components/FirebaseProvider';
 import toast from 'react-hot-toast';
 import { QRCodeSVG } from 'qrcode.react';
-import { toPng } from 'html-to-image';
+import { exportPassPng } from '../../lib/passExport';
 import { EventPass, supportsElegantPass } from '../../components/passes/EventPass';
 
 interface CheckStatusModalProps {
@@ -93,17 +93,15 @@ export const CheckStatusModal: React.FC<CheckStatusModalProps> = ({ isOpen, onCl
       btoa(unescape(encodeURIComponent(svgData)));
   };
 
-  // Passe elegante (Ouro Imperial): export PNG real; fallback QR simples.
+  // Passe elegante (Ouro Imperial): export PNG tolerante a falhas;
+  // fallback final: QR simples (nunca sair sem passe).
   const handleDownloadPass = async () => {
     if (!result || downloadingPass) return;
     setDownloadingPass(true);
     const toastId = toast.loading("A gerar o teu passe…");
     try {
-      try {
-        await (document as any).fonts?.ready;
-      } catch { /* segue sem fontes */ }
       if (!passExportRef.current) throw new Error("no-node");
-      const dataUrl = await toPng(passExportRef.current, { pixelRatio: 2, cacheBust: true });
+      const dataUrl = await exportPassPng(passExportRef.current);
       const clean = (s: string) => (s || '').replace(/[^a-zA-Z0-9À-ÿ ]/g, "").trim().replace(/\s+/g, "_") || "Convite";
       const a = document.createElement("a");
       a.download = `Passe_${clean(event.title)}_${clean(result.name)}.png`;
@@ -111,8 +109,8 @@ export const CheckStatusModal: React.FC<CheckStatusModalProps> = ({ isOpen, onCl
       a.click();
       toast.success("Passe descarregado!", { id: toastId });
     } catch {
-      toast.error("Falha no passe elegante — a descarregar QR simples.", { id: toastId });
       handleDownloadQR();
+      toast.success("QR descarregado!", { id: toastId });
     } finally {
       setDownloadingPass(false);
     }

@@ -46,7 +46,7 @@ import toast from "react-hot-toast";
 import { copyToClipboard } from "../../lib/clipboard";
 import { uploadEventAudio, deleteEventAudio, isOwnStorageAudio } from "../../lib/audioUpload";
 import { QRCodeSVG } from "qrcode.react";
-import { toPng } from "html-to-image";
+import { exportPassPng } from "../../lib/passExport";
 import { EventPass, supportsElegantPass } from "../../components/passes/EventPass";
 import { SEO } from "../../components/SEO";
 import { getOptimizedImageUrl, OptimizeImageOptions } from "../../lib/imageOptimizer";
@@ -8718,17 +8718,15 @@ const RSVPForm: React.FC<{ event: EventDetails; onClose: () => void; simMode?: b
   };
 
   // Passe elegante: exporta o nó em tamanho real (1080×1350) em PNG.
-  // Fallback: QR simples (nunca sair sem passe).
+  // Tolerante a imagens sem CORS: retry de resolução + placeholder.
+  // Fallback final: QR simples (nunca sair sem passe).
   const handleDownloadPass = async () => {
     if (!successData || downloadingPass) return;
     setDownloadingPass(true);
     const toastId = toast.loading("A gerar o teu passe…");
     try {
-      try {
-        await (document as any).fonts?.ready;
-      } catch { /* segue sem fontes */ }
       if (!passExportRef.current) throw new Error("no-node");
-      const dataUrl = await toPng(passExportRef.current, { pixelRatio: 2, cacheBust: true });
+      const dataUrl = await exportPassPng(passExportRef.current);
       const clean = (s: string) => s.replace(/[^a-zA-Z0-9À-ÿ ]/g, "").trim().replace(/\s+/g, "_") || "Convite";
       const a = document.createElement("a");
       a.download = `Passe_${clean(event.title)}_${clean(successData.name)}.png`;
@@ -8736,8 +8734,8 @@ const RSVPForm: React.FC<{ event: EventDetails; onClose: () => void; simMode?: b
       a.click();
       toast.success("Passe descarregado!", { id: toastId });
     } catch {
-      toast.error("Falha no passe elegante — a descarregar QR simples.", { id: toastId });
       handleDownloadQR();
+      toast.success("QR descarregado!", { id: toastId });
     } finally {
       setDownloadingPass(false);
     }

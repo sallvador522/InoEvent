@@ -1,0 +1,8 @@
+[
+  {
+    "origin": ["https://www.inoevent.online", "https://inoevent.online", "http://localhost:5173", "http://localhost:3000"],
+    "method": ["GET"],
+    "responseHeader": ["Content-Type"],
+    "maxAgeSeconds": 3600
+  }
+]

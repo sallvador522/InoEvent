@@ -1,5 +1,6 @@
 import React from 'react';
 import { QRCodeSVG } from 'qrcode.react';
+import { PassPhoto } from './PassPhoto';
 import { OURO_IMPERIAL, PASS_SIZE, formatPassDateTime, monogram } from '../../lib/passTheme';
 import { PassFooter } from './PassFooter';
 
@@ -60,10 +61,9 @@ export const OuroImperialPass = React.forwardRef<HTMLDivElement, Props>(({ event
             position: 'relative',
           }}
         >
-          <img
-            src={event.heroImage || '/chany-pedro-preview.webp'}
-            alt="Casal"
-            crossOrigin="anonymous"
+          <PassPhoto
+            src={event.heroImage}
+            fallback="/chany-pedro-preview.webp"
             style={{ width: '100%', height: '100%', objectFit: 'cover', objectPosition: 'center 20%' }}
           />
           <div

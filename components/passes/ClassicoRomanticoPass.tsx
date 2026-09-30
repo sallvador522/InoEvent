@@ -1,5 +1,6 @@
 import React from 'react';
 import { QRCodeSVG } from 'qrcode.react';
+import { PassPhoto } from './PassPhoto';
 import { CLASSICO_ROMANTICO, PASS_SIZE, formatPassDateTime } from '../../lib/passTheme';
 import { PassFooter } from './PassFooter';
 import type { PassEventData } from './OuroImperialPass';
@@ -54,10 +55,9 @@ export const ClassicoRomanticoPass = React.forwardRef<HTMLDivElement, Props>(({ 
             position: 'relative',
           }}
         >
-          <img
-            src={event.heroImage || '/templaClassic/classPrinci-1.webp'}
-            alt="Casal"
-            crossOrigin="anonymous"
+          <PassPhoto
+            src={event.heroImage}
+            fallback="/templaClassic/classPrinci-1.webp"
             style={{ width: '100%', height: '100%', objectFit: 'cover', objectPosition: 'center 20%' }}
           />
           <div

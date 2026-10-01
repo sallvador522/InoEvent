@@ -34,3 +34,6 @@ firebase-debug.log
 firebase-debug.*.log
 .gemini/
 mcp.json
+
+# Local dev fallback DB (runtime data, never commit)
+local_guests_db.json

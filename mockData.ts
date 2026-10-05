@@ -42,7 +42,7 @@ export interface EventDetails {
   mapImage?: string;
   gallery?: string[];
   timeline: { time: string; title: string; description: string }[];
-  dressCode?: { title: string; description: string; image?: string };
+  dressCode?: { title: string; description: string };
   gifts?: {
     type: string;
     title: string;
@@ -76,9 +76,11 @@ export const EVENTS: EventDetails[] = [
     time: "12:00",
     locationName: "Complexo Lookal",
     address: "Ilha de Luanda, Luanda, Angola",
+    formattedAddress: "Complexo Lookal, Ilha de Luanda, Luanda, Angola",
+    mapsUrl: "https://www.google.com/maps/search/?api=1&query=Lookal%20Ocean%20Club%20Ilha%20de%20Luanda%20Angola",
     receptionName: "Copo d'água",
-    receptionAddress: "Lookal Ocean Club, Ilha de Luanda",
-    mapLink: "https://maps.google.com/?q=Lookal+Ocean+Club+Luanda",
+    receptionAddress: "Lookal Ocean Club, Ilha de Luanda, Luanda, Angola",
+    mapLink: "https://maps.google.com/?q=Lookal+Ocean+Club+Luanda+Angola",
     heroImage: "/chany-pedro-preview.webp",
     description:
       "Temos a honra de convidá-lo(a) a comemorar esta data especial connosco. Venha juntar-se a nós e ajudar-nos a celebrar o nosso enlace matrimonial de acordo com a agenda abaixo:",
@@ -110,8 +112,6 @@ export const EVENTS: EventDetails[] = [
       title: "Formal / Esporte Fino",
       description:
         "Sugerimos trajes finos formais para celebrar connosco em grande elegância.",
-      image:
-        "https://images.unsplash.com/photo-1511285560982-1356c11d4606?q=80&w=2670&auto=format&fit=crop",
     },
     gifts: [
       {
@@ -144,9 +144,11 @@ Anacanizia Lopes Lima`,
     time: "11:00",
     locationName: "Salão Noblesse Talatona",
     address: "Via AL14, Talatona, Luanda, Angola",
+    formattedAddress: "Salão Noblesse, Via AL14, Talatona, Luanda, Angola",
+    mapsUrl: "https://www.google.com/maps/search/?api=1&query=Sal%C3%A3o%20Noblesse%20Talatona%20Luanda%20Angola",
     receptionName: "Copo d'água",
-    receptionAddress: "Salão Noblesse, Talatona, Luanda",
-    mapLink: "https://maps.google.com/?q=Talatona+Luanda",
+    receptionAddress: "Salão Noblesse, Talatona, Luanda, Angola",
+    mapLink: "https://maps.google.com/?q=Talatona+Luanda+Angola",
     heroImage: "https://images.unsplash.com/photo-1583939003579-730e3918a45a?q=80&w=1200&auto=format&fit=crop",
     description: `I Coríntios 13: 4-7
 Aqui começa o nosso lar, erguido sobre a fé e o amor de Deus.
@@ -180,8 +182,6 @@ Cada passo que damos é promessa de que ele será sempre o alicerce da nossa Fam
       title: "Formal / Passeio Completo",
       description:
         "Sugerimos trajes finos formais para celebrar connosco em grande elegância.",
-      image:
-        "https://images.unsplash.com/photo-1511285560982-1356c11d4606?q=80&w=2670&auto=format&fit=crop",
     },
     gifts: [
       {
@@ -213,6 +213,9 @@ Cada passo que damos é promessa de que ele será sempre o alicerce da nossa Fam
     time: "18:00",
     locationName: "Espaço Elegance",
     address: "Talatona, Luanda",
+    formattedAddress: "Espaço Elegance, Talatona, Luanda, Angola",
+    mapsUrl: "https://www.google.com/maps/search/?api=1&query=Espa%C3%A7o%20Elegance%20Talatona%20Luanda%20Angola",
+    mapLink: "https://www.google.com/maps/search/?api=1&query=Espa%C3%A7o%20Elegance%20Talatona%20Luanda%20Angola",
     heroImage: "/templaClassic/classPrinci-1.webp",
     description:
       "Um dia inesquecível de celebração do nosso amor. Junte-se a nós para brindarmos à vida e à felicidade (Modelo Essencial).",
@@ -242,7 +245,11 @@ Cada passo que damos é promessa de que ele será sempre o alicerce da nossa Fam
     time: "16:00",
     locationName: "Solar dos Hibiscos",
     address: "Mussulo, Luanda, Angola",
-    heroImage: "https://images.unsplash.com/photo-1515934751635-c81c6bc9a2d8?q=80&w=2574&auto=format&fit=crop",
+    formattedAddress: "Solar dos Hibiscos, Mussulo, Luanda, Angola",
+    mapsUrl: "https://www.google.com/maps/search/?api=1&query=Solar%20dos%20Hibiscos%20Mussulo%20Luanda%20Angola",
+    mapLink: "https://www.google.com/maps/search/?api=1&query=Solar%20dos%20Hibiscos%20Mussulo%20Luanda%20Angola",
+    // Foto dos noivos (secção da Cerimónia) — a capa do Etéreo é fixa no tema.
+    heroImage: "https://images.unsplash.com/photo-1519741497674-611481863552?q=80&w=1200&auto=format&fit=crop",
     description:
       '"O amor é paciente, o amor é bondoso. Não inveja, não se vangloria, não se orgulha." (1 Coríntios 13:4). Sua presença é essencial neste novo capítulo de nossas vidas.',
     musicTrack: "Turning Page - Sleeping At Last",
@@ -276,8 +283,6 @@ Cada passo que damos é promessa de que ele será sempre o alicerce da nossa Fam
       title: "Esporte Fino",
       description:
         "Sugerimos tons claros e tecidos leves. O conforto é primordial.",
-      image:
-        "https://images.unsplash.com/photo-1490427712608-588e68359dbd?q=80&w=2670&auto=format&fit=crop",
     },
     gifts: [
       {
@@ -304,8 +309,12 @@ Fernando Rafael Menezes`,
     time: "16:30",
     locationName: "Quinta das Palmeiras",
     address: "Talatona, Luanda, Angola",
+    formattedAddress: "Quinta das Palmeiras, Talatona, Luanda, Angola",
+    mapsUrl: "https://www.google.com/maps/search/?api=1&query=Quinta%20das%20Palmeiras%20Talatona%20Luanda%20Angola",
+    mapLink: "https://www.google.com/maps/search/?api=1&query=Quinta%20das%20Palmeiras%20Talatona%20Luanda%20Angola",
+    // Foto dos noivos (secção da Cerimónia) — a capa do Jardim é fixa no tema.
     heroImage:
-      "https://images.unsplash.com/photo-1523438885200-e635ba2c371e?q=80&w=2574&auto=format&fit=crop",
+      "https://images.unsplash.com/photo-1583939003579-730e3918a45a?q=80&w=1200&auto=format&fit=crop",
     description:
       '"O amor é paciente, o amor é bondoso. Tudo sofre, tudo crê, tudo espera, tudo suporta." (1 Coríntios 13:4-7). Sua presença tornará nosso sonho ainda mais perfeito.',
     musicTrack: "La Vie En Rose - Instrumental",
@@ -349,8 +358,6 @@ Fernando Rafael Menezes`,
     dressCode: {
       title: "Passeio Completo",
       description: "Tons pastéis e tecidos leves são bem-vindos. Evite branco.",
-      image:
-        "https://images.unsplash.com/photo-1502035618526-6b2f1f5bca1b?q=80&w=2576&auto=format&fit=crop",
     },
   },
   {
@@ -366,9 +373,11 @@ Fernando Rafael Menezes`,
     time: "19:00",
     locationName: "Igreja N. Sra. dos Remédios",
     address: "Rua Rainha Ginga, Luanda, Angola",
+    formattedAddress: "Igreja N. Sra. dos Remédios, Rua Rainha Ginga, Luanda, Angola",
+    mapsUrl: "https://www.google.com/maps/search/?api=1&query=Igreja%20N%20Sra%20dos%20Rem%C3%A9dios%20Luanda%20Angola",
     receptionName: "Epic Sana Luanda",
-    receptionAddress: "Rua da Missão, Luanda",
-    mapLink: "https://goo.gl/maps/example",
+    receptionAddress: "Rua da Missão, Luanda, Angola",
+    mapLink: "https://www.google.com/maps/search/?api=1&query=Igreja%20N%20Sra%20dos%20Rem%C3%A9dios%20Luanda%20Angola",
     heroImage:
       "https://images.unsplash.com/photo-1537633552985-df8429e8048b?q=80&w=2670&auto=format&fit=crop",
     description:
@@ -409,6 +418,9 @@ Fernando Rafael Menezes`,
     time: "15:00",
     locationName: "Fazenda Pôr do Sol",
     address: "Viana, Luanda, Angola",
+    formattedAddress: "Fazenda Pôr do Sol, Viana, Luanda, Angola",
+    mapsUrl: "https://www.google.com/maps/search/?api=1&query=Fazenda%20P%C3%B4r%20do%20Sol%20Viana%20Luanda%20Angola",
+    mapLink: "https://www.google.com/maps/search/?api=1&query=Fazenda%20P%C3%B4r%20do%20Sol%20Viana%20Luanda%20Angola",
     heroImage:
       "https://images.unsplash.com/photo-1465495976277-4387d4b0b4c6?q=80&w=2670&auto=format&fit=crop",
     description:
@@ -448,8 +460,6 @@ Fernando Rafael Menezes`,
       title: "Casual Chic",
       description:
         "Salto grosso é recomendado para as mulheres devido ao gramado. Tons terrosos combinam com o cenário.",
-      image:
-        "https://images.unsplash.com/photo-1483985988355-763728e1935b?q=80&w=2670&auto=format&fit=crop",
     },
     gifts: [
       {
@@ -473,6 +483,9 @@ Fernando Rafael Menezes`,
     time: "20:00",
     locationName: "Galeria 12",
     address: "Ilha de Luanda, Angola",
+    formattedAddress: "Galeria 12, Ilha de Luanda, Luanda, Angola",
+    mapsUrl: "https://www.google.com/maps/search/?api=1&query=Galeria%2012%20Ilha%20de%20Luanda%20Angola",
+    mapLink: "https://www.google.com/maps/search/?api=1&query=Galeria%2012%20Ilha%20de%20Luanda%20Angola",
     heroImage:
       "https://images.unsplash.com/photo-1510076857177-7470076d4098?q=80&w=2672&auto=format&fit=crop",
     description:
@@ -499,8 +512,6 @@ Fernando Rafael Menezes`,
       title: "Black & White",
       description:
         "Pedimos que todos os convidados vistam apenas preto ou branco. Ousadia é bem-vinda.",
-      image:
-        "https://images.unsplash.com/photo-1550614000-4b9519e02a48?q=80&w=2574&auto=format&fit=crop",
     },
     gifts: [
       {
@@ -522,9 +533,11 @@ Fernando Rafael Menezes`,
     time: "14h às 19h",
     locationName: "Casa da Noiva",
     address: "Luanda, Angola",
+    formattedAddress: "Casa da Noiva, Luanda, Angola",
+    mapsUrl: "https://www.google.com/maps/search/?api=1&query=Casa%20da%20Noiva%20Luanda%20Angola",
     receptionName: "",
     receptionAddress: "",
-    mapLink: "https://goo.gl/maps/example",
+    mapLink: "https://www.google.com/maps/search/?api=1&query=Casa%20da%20Noiva%20Luanda%20Angola",
     heroImage: "/bridal-templates/templateCha1.webp",
     description:
       "Você é uma pessoa muito especial na minha vida e por isso, quero que esteja presente no meu chá de panela! Vamos reunir a mulherada e comemorar!",
@@ -544,6 +557,9 @@ Fernando Rafael Menezes`,
     time: "14h às 19h",
     locationName: "Casa da Noiva",
     address: "Talatona, Luanda",
+    formattedAddress: "Casa da Noiva, Talatona, Luanda, Angola",
+    mapsUrl: "https://www.google.com/maps/search/?api=1&query=Casa%20da%20Noiva%20Talatona%20Luanda%20Angola",
+    mapLink: "https://www.google.com/maps/search/?api=1&query=Casa%20da%20Noiva%20Talatona%20Luanda%20Angola",
     heroImage: "/bridal-templates/templateCha2.webp",
     description: `Você é uma pessoa muito especial na minha vida e por isso, quero que esteja presente no meu chá de panela!
 Vamos reunir a mulherada e comemorar!`,
@@ -562,6 +578,9 @@ Vamos reunir a mulherada e comemorar!`,
     time: "15:00",
     locationName: "Rooftop Bar",
     address: "Luanda, Angola",
+    formattedAddress: "Rooftop Bar, Luanda, Angola",
+    mapsUrl: "https://www.google.com/maps/search/?api=1&query=Rooftop%20Bar%20Luanda%20Angola",
+    mapLink: "https://www.google.com/maps/search/?api=1&query=Rooftop%20Bar%20Luanda%20Angola",
     heroImage: "/bridal-templates/templateCha3.webp",
     description:
       "Um encontro intimista, minimalista e cheio de charme. Venha brindar comigo este novo capítulo em um chá de panela especial.",
@@ -580,6 +599,9 @@ Vamos reunir a mulherada e comemorar!`,
     time: "16:00",
     locationName: "Jardim de Inverno",
     address: "Talatona, Luanda",
+    formattedAddress: "Jardim de Inverno, Talatona, Luanda, Angola",
+    mapsUrl: "https://www.google.com/maps/search/?api=1&query=Jardim%20de%20Inverno%20Talatona%20Luanda%20Angola",
+    mapLink: "https://www.google.com/maps/search/?api=1&query=Jardim%20de%20Inverno%20Talatona%20Luanda%20Angola",
     heroImage: "/bridal-templates/templateCha4.webp",
     description:
       "Vista-se com amor e venha tomar uma xícara de chá comigo. Uma tarde vintage para celebrarmos juntas o meu chá de panela!",
@@ -598,6 +620,9 @@ Vamos reunir a mulherada e comemorar!`,
     time: "15:00",
     locationName: "Espaço Gastrô",
     address: "Mutamba, Luanda",
+    formattedAddress: "Espaço Gastrô, Mutamba, Luanda, Angola",
+    mapsUrl: "https://www.google.com/maps/search/?api=1&query=Espa%C3%A7o%20Gastr%C3%B4%20Mutamba%20Luanda%20Angola",
+    mapLink: "https://www.google.com/maps/search/?api=1&query=Espa%C3%A7o%20Gastr%C3%B4%20Mutamba%20Luanda%20Angola",
     heroImage:
       "https://images.unsplash.com/photo-1556910103-1c02745a872f?q=80&w=2000&auto=format&fit=crop",
     description:
@@ -628,7 +653,9 @@ Vamos reunir a mulherada e comemorar!`,
     time: "14:00",
     locationName: "Espaço das Palmeiras",
     address: "Ilha do Cabo, Luanda",
-    mapLink: "https://maps.app.goo.gl/Tropical",
+    formattedAddress: "Espaço das Palmeiras, Ilha do Cabo, Luanda, Angola",
+    mapsUrl: "https://www.google.com/maps/search/?api=1&query=Espa%C3%A7o%20das%20Palmeiras%20Ilha%20do%20Cabo%20Luanda%20Angola",
+    mapLink: "https://www.google.com/maps/search/?api=1&query=Espa%C3%A7o%20das%20Palmeiras%20Ilha%20do%20Cabo%20Luanda%20Angola",
     heroImage:
       "https://images.unsplash.com/photo-1528458909336-e7a0adfed0a5?ixlib=rb-4.0.3&auto=format&fit=crop&w=800&q=80",
     description:
@@ -658,6 +685,9 @@ Vamos reunir a mulherada e comemorar!`,
     time: "15:00",
     locationName: "Salão de Festas - Condomínio Rosas",
     address: "Talatona, Luanda, Angola",
+    formattedAddress: "Salão de Festas Condomínio Rosas, Talatona, Luanda, Angola",
+    mapsUrl: "https://www.google.com/maps/search/?api=1&query=Condominio%20Rosas%20Talatona%20Luanda%20Angola",
+    mapLink: "https://www.google.com/maps/search/?api=1&query=Condominio%20Rosas%20Talatona%20Luanda%20Angola",
     heroImage:
       "https://images.unsplash.com/photo-1519689680058-324335c77eb2?q=80&w=2000&auto=format&fit=crop",
     description:
@@ -687,6 +717,9 @@ Vamos reunir a mulherada e comemorar!`,
     time: "16:00",
     locationName: "Jardim da Vovó",
     address: "Viana, Luanda, Angola",
+    formattedAddress: "Jardim da Vovó, Viana, Luanda, Angola",
+    mapsUrl: "https://www.google.com/maps/search/?api=1&query=Jardim%20da%20Vov%C3%B3%20Viana%20Luanda%20Angola",
+    mapLink: "https://www.google.com/maps/search/?api=1&query=Jardim%20da%20Vov%C3%B3%20Viana%20Luanda%20Angola",
     heroImage:
       "https://images.unsplash.com/photo-1541014741259-df5290b3785a?q=80&w=2000&auto=format&fit=crop",
     description:

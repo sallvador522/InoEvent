@@ -653,6 +653,11 @@ export const WeddingQuestionnaire: React.FC = () => {
                       className="hidden"
                     />
                   </div>
+                  {layout === 'GARDEN' || layout === 'MODERN' ? (
+                    <p className="text-[11px] text-slate-500 font-light mt-2">
+                      Neste tema a capa é fixa — esta foto aparece na secção dos Noivos.
+                    </p>
+                  ) : null}
                 </div>
                 {layoutSupports(layout, 'gallery') && (
                 <div className="mb-4">

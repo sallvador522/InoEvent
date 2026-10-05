@@ -397,18 +397,6 @@ export const LandingPage: React.FC = () => {
             </motion.div>
         </section>
 
-        {/* Legenda — já no creme */}
-        <div className="bg-[#FDFBF7] flex items-center justify-center gap-3 text-center px-6 py-8">
-           <span className="h-px w-8 bg-[#C5A028]/60" />
-           <span className="text-sm text-slate-500 font-light">
-              O catálogo em montra.
-              <Link to="/templates" className="ml-2 text-xs font-bold uppercase tracking-[0.18em] text-[#1B365D] hover:text-[#8a6d1c] whitespace-nowrap" style={{ transition: 'color 200ms ease' }}>
-                 Ver todos →
-              </Link>
-           </span>
-           <span className="h-px w-8 bg-[#C5A028]/60" />
-        </div>
-
         {/* Como funciona — três gestos */}
         <section id="features" className="px-6 pt-4 md:pt-8 pb-4 md:pb-8 w-full">
           <div className="max-w-3xl mx-auto">
@@ -503,9 +491,9 @@ export const LandingPage: React.FC = () => {
         {/* Prova MAP — exemplo real lazy, fora do hero para não pesar o LCP */}
         <section id="mapa" className="px-6 py-16 md:py-24 w-full scroll-mt-24" aria-label="Exemplo de mapa do convite">
           <div className="max-w-3xl mx-auto text-center">
-            <span className="inline-flex items-center gap-2 rounded-full bg-emerald-50 border border-emerald-200 px-4 py-1.5 text-[11px] font-bold uppercase tracking-[0.14em] text-emerald-700">
-              <MapPin size={14} className="text-emerald-600 shrink-0" />
-              Exemplo real
+            <span className="inline-flex items-center gap-2 rounded-full bg-[#1B365D] border border-[#1B365D] px-4 py-2 text-[11px] font-bold uppercase tracking-[0.14em] text-white/90 shadow-lg shadow-brand-blue/20">
+              <MapPin size={14} className="text-[#E9BE5D] shrink-0" />
+              Mapa + Como chegar incluído
             </span>
             <h2 className="mt-4 text-3xl md:text-[2.75rem] font-serif font-bold text-[#1B365D] tracking-tight leading-[1.1]">
               O convite vem com <span className="italic font-medium text-[#8a6d1c]">mapa bonito</span>

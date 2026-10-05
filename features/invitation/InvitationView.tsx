@@ -110,6 +110,7 @@ import { AgencyBrand } from "./components/AgencyBrand";
 import { EditableImageWrapper } from "./components/EditableImageWrapper";
 import { compressImage } from "./components/EditableImageWrapper";
 import { getRSVPText } from "./lib/rsvpText";
+import { withAngolaBias } from "../../lib/maps";
 import { CheckStatusModal } from "./CheckStatusModal";
 import { trackPixelLead } from "../../lib/metaPixel";
 import { IMAGE_ACCEPT, validateImageFile } from "../../lib/imageValidation";
@@ -1512,8 +1513,15 @@ const InvitationView: React.FC = () => {
 
                         <div>
                           <label className="block text-xs font-semibold text-[#BF9B30] mb-2 uppercase tracking-widest">
-                            Imagem de Capa (URL)
+                            {localEvent?.layoutMode === "GARDEN" || localEvent?.layoutMode === "MODERN"
+                              ? "Foto dos Noivos — Cerimónia (URL)"
+                              : "Imagem de Capa (URL)"}
                           </label>
+                          {localEvent?.layoutMode === "GARDEN" || localEvent?.layoutMode === "MODERN" ? (
+                            <p className="text-[10px] text-slate-500 font-light mb-2">
+                              A capa deste tema é fixa — esta foto aparece na secção dos Noivos.
+                            </p>
+                          ) : null}
                           <div className="flex gap-3 items-center">
                             {localEvent?.heroImage ? (
                               <img
@@ -2018,7 +2026,7 @@ const InvitationView: React.FC = () => {
                           <span className="text-xs font-bold text-[#BF9B30] uppercase tracking-widest block">
                             1. Dress Code / Sugestão de Traje
                           </span>
-                          <p className="text-[10px] text-slate-500 font-light mt-1">Visível nos temas Moderno, Rústico e Industrial.</p>
+                          <p className="text-[10px] text-slate-500 font-light mt-1">Texto do traje — sem imagem (igual ao questionário).</p>
                           <div>
                             <label className="block text-[10px] text-gray-400 mb-1.5 uppercase tracking-wider">
                               Descrição do Código de Vestimenta
@@ -2028,7 +2036,6 @@ const InvitationView: React.FC = () => {
                               onChange={(e) => {
                                 const existing = localEvent?.dressCode || {
                                   description: "",
-                                  image: "",
                                 };
                                 updateField("dressCode", {
                                   ...existing,
@@ -2037,26 +2044,6 @@ const InvitationView: React.FC = () => {
                               }}
                               rows={3}
                               className="w-full bg-[#0F1419] border border-[#BF9B30]/20 rounded-xl px-4 py-2.5 text-sm text-white focus:outline-none focus:border-[#BF9B30] transition-colors custom-scrollbar"
-                            />
-                          </div>
-                          <div>
-                            <label className="block text-[10px] text-gray-400 mb-1.5 uppercase tracking-wider">
-                              Link de Imagem Referência (URL)
-                            </label>
-                            <input
-                              type="text"
-                              value={localEvent?.dressCode?.image || ""}
-                              onChange={(e) => {
-                                const existing = localEvent?.dressCode || {
-                                  description: "",
-                                  image: "",
-                                };
-                                updateField("dressCode", {
-                                  ...existing,
-                                  image: e.target.value,
-                                });
-                              }}
-                              className="w-full bg-[#0F1419] border border-[#BF9B30]/20 rounded-xl px-4 py-2.5 text-xs text-white focus:outline-none focus:border-[#BF9B30] transition-colors"
                             />
                           </div>
                         </div>
@@ -3396,26 +3383,23 @@ const ModernLayout: React.FC<{
   const accentText = "text-[#8A817C]"; // Taupe gray
   const darkText = "text-[#2C2C2C]";
   const bgSoft = "bg-[#F9F9F9]";
+  // Capa fixa do tema Etéreo — nunca editável (nem em edição). A foto do
+  // casal (event.heroImage) vive na secção da Cerimónia ("Os Noivos").
+  const MODERN_FIXED_HERO =
+    "https://images.unsplash.com/photo-1515934751635-c81c6bc9a2d8?q=80&w=2574&auto=format&fit=crop";
 
   return (
     <div className="min-h-screen bg-[#FDFDFD] font-serif text-[#333] pb-32">
-      {/* 1. HERO - Minimalist Split or Overlay */}
+      {/* 1. HERO - Minimalist Split or Overlay (capa fixa do tema) */}
       <div className="h-screen w-full p-0">
         <div className="h-full relative w-full overflow-hidden">
-          <EditableImageWrapper
-            src={event.heroImage}
-            onChange={(newVal) => updateField?.("heroImage", newVal)}
-            isEditing={isEditing}
-            className="absolute inset-0"
-          >
-            <motion.div
-              initial={{ scale: 1.1, opacity: 0 }}
-              animate={{ scale: 1, opacity: 1 }}
-              transition={{ duration: 2.6, ease: "easeInOut" }}
-              className="absolute inset-0 bg-cover bg-center"
-              style={{ backgroundImage: `url('${getImageUrl(event.heroImage, { width: 1200, quality: 80 })}')` }}
-            />
-          </EditableImageWrapper>
+          <motion.div
+            initial={{ scale: 1.1, opacity: 0 }}
+            animate={{ scale: 1, opacity: 1 }}
+            transition={{ duration: 2.6, ease: "easeInOut" }}
+            className="absolute inset-0 bg-cover bg-center"
+            style={{ backgroundImage: `url('${MODERN_FIXED_HERO}')` }}
+          />
           <div className="absolute inset-0 bg-white/30 mix-blend-screen pointer-events-none" />
           <div className="absolute inset-0 bg-gradient-to-b from-transparent via-transparent to-[#FDFDFD] pointer-events-none" />
 
@@ -3440,7 +3424,7 @@ const ModernLayout: React.FC<{
               <div className="w-10 h-px bg-[#C2B280] mx-auto my-6"></div>
               <p className="text-sm font-display uppercase tracking-widest text-gray-600">
                 <EditableField
-                  value={event.date}
+                  value={isEditing ? event.date : formatDateLong(event.date)}
                   onChange={(newVal) => updateField?.("date", newVal)}
                   isEditing={isEditing}
                   className="text-sm font-display uppercase tracking-widest text-gray-600 text-center"
@@ -3498,67 +3482,103 @@ const ModernLayout: React.FC<{
         className="max-w-5xl mx-auto px-6 mb-24"
       >
         <div className="space-y-24">
-          {/* Ceremony */}
+          {/* Os Noivos — a foto principal (event.heroImage) vive aqui.
+              O local da festa mora no cartão "Como chegar" (TravelMap). */}
           <FadeInSection className="flex flex-col md:flex-row items-center gap-12">
             <div className="w-full md:w-1/2 aspect-[4/5] bg-gray-100 relative overflow-hidden group">
-              <img
-                src={getImageUrl(event.heroImage, { width: 800 })}
-                alt={event.title || "Foto do casal"}
-                className="w-full h-full object-cover grayscale group-hover:grayscale-0 transition-all duration-700"
-                loading="lazy"
-                referrerPolicy="no-referrer"
-              />
+              <EditableImageWrapper
+                src={event.heroImage}
+                onChange={(newVal) => updateField?.("heroImage", newVal)}
+                isEditing={isEditing}
+                className="w-full h-full"
+              >
+                <img
+                  src={getImageUrl(event.heroImage, { width: 800 })}
+                  alt={event.title || "Foto do casal"}
+                  className="w-full h-full object-cover grayscale group-hover:grayscale-0 transition-all duration-700"
+                  loading="lazy"
+                  referrerPolicy="no-referrer"
+                />
+              </EditableImageWrapper>
               <div className="absolute top-4 left-4 bg-white px-4 py-2 text-xs font-bold tracking-widest uppercase">
-                Cerimônia
+                Os Noivos
               </div>
             </div>
             <div className="w-full md:w-1/2 text-center md:text-left space-y-4">
               <h2 className="text-4xl font-serif text-[#1a1a1a]">
                 <EditableField
-                  value={event.locationName}
-                  onChange={(newVal) => updateField?.("locationName", newVal)}
+                  value={event.title}
+                  onChange={(newVal) => updateField?.("title", newVal)}
                   isEditing={isEditing}
                   className="text-4xl font-serif text-[#1a1a1a] text-center md:text-left"
                 />
               </h2>
+              {(isEditing || event.brideParents || event.groomParents) ? (
+                <p className="text-[11px] uppercase tracking-[0.2em] text-gray-500">
+                  {event.brideParents ? (
+                    <>
+                      Filha de{" "}
+                      <EditableField
+                        value={event.brideParents}
+                        onChange={(newVal) => updateField?.("brideParents", newVal)}
+                        isEditing={isEditing}
+                        className="text-[11px] uppercase tracking-[0.2em] text-gray-500 text-center md:text-left"
+                      />
+                    </>
+                  ) : null}
+                  {event.brideParents && event.groomParents ? " · " : null}
+                  {event.groomParents ? (
+                    <>
+                      Filho de{" "}
+                      <EditableField
+                        value={event.groomParents}
+                        onChange={(newVal) => updateField?.("groomParents", newVal)}
+                        isEditing={isEditing}
+                        className="text-[11px] uppercase tracking-[0.2em] text-gray-500 text-center md:text-left"
+                      />
+                    </>
+                  ) : null}
+                </p>
+              ) : null}
               <p className="text-[#C2B280] font-display uppercase tracking-widest text-sm">
                 <EditableField
-                  value={event.time}
-                  onChange={(newVal) => updateField?.("time", newVal)}
+                  value={isEditing ? event.date : formatDateLong(event.date)}
+                  onChange={(newVal) => updateField?.("date", newVal)}
                   isEditing={isEditing}
                   className="text-[#C2B280] font-display uppercase tracking-widest text-sm text-center md:text-left"
                 />
+                {event.time ? ` • ${event.time}` : null}
               </p>
-              {event.address ? (
               <p className="text-gray-500 leading-relaxed font-light text-lg">
                 <EditableField
-                  value={event.address}
-                  onChange={(newVal) => updateField?.("address", newVal)}
-                  isEditing={false}
+                  value={event.hosts || "Convidam para o seu casamento"}
+                  onChange={(newVal) => updateField?.("hosts", newVal)}
+                  isEditing={isEditing}
                   className="text-gray-500 leading-relaxed font-light text-lg text-center md:text-left"
                   multiline
                 />
               </p>
-              ) : null}
-              <button
-                onClick={() => window.open(event.mapLink || "#", "_blank")}
-                className="mt-4 inline-block border-b border-black pb-1 text-xs font-bold uppercase tracking-widest hover:text-[#C2B280] hover:border-[#C2B280] transition-colors"
-              >
-                Ver Localização
-              </button>
             </div>
           </FadeInSection>
 
-          {/* Reception */}
-          {event.receptionName && (
+          {/* Reception — aparece com nome e/ou endereço; foto só com mapImage real */}
+          {(event.receptionName || event.receptionAddress || isEditing) && (
             <FadeInSection className="flex flex-col md:flex-row-reverse items-center gap-12">
               <div className="w-full md:w-1/2 aspect-[4/5] bg-gray-100 relative overflow-hidden group">
-                <img
-                  src={getImageUrl(event.mapImage, { width: 800 })}
-                  className="w-full h-full object-cover grayscale group-hover:grayscale-0 transition-all duration-700"
-                  loading="lazy"
-                  referrerPolicy="no-referrer"
-                />
+                {event.mapImage ? (
+                  <img
+                    src={getImageUrl(event.mapImage, { width: 800 })}
+                    alt={event.receptionName || "Recepção"}
+                    className="w-full h-full object-cover grayscale group-hover:grayscale-0 transition-all duration-700"
+                    loading="lazy"
+                    referrerPolicy="no-referrer"
+                    onError={(e) => { (e.target as HTMLImageElement).style.display = 'none'; }}
+                  />
+                ) : (
+                  <div className="w-full h-full flex items-center justify-center bg-[#F4F4F4] text-gray-300 text-xs uppercase tracking-widest px-6 text-center">
+                    {isEditing ? "Adicione a foto da receção no Estúdio" : "Recepção"}
+                  </div>
+                )}
                 <div className="absolute top-4 right-4 bg-white px-4 py-2 text-xs font-bold tracking-widest uppercase">
                   Recepção
                 </div>
@@ -3566,7 +3586,7 @@ const ModernLayout: React.FC<{
               <div className="w-full md:w-1/2 text-center md:text-right space-y-4">
                 <h2 className="text-4xl font-serif text-[#1a1a1a]">
                   <EditableField
-                    value={event.receptionName}
+                    value={event.receptionName || (isEditing ? "" : "Recepção")}
                     onChange={(newVal) =>
                       updateField?.("receptionName", newVal)
                     }
@@ -3591,7 +3611,9 @@ const ModernLayout: React.FC<{
                 <button
                   onClick={() =>
                     window.open(
-                      `https://maps.google.com/?q=${event.receptionAddress}`,
+                      event.mapsUrl ||
+                        event.mapLink ||
+                        `https://www.google.com/maps/search/?api=1&query=${encodeURIComponent(withAngolaBias([event.receptionName, event.receptionAddress].filter(Boolean).join(', ') || event.receptionAddress || 'Local do Evento'))}`,
                       "_blank",
                     )
                   }
@@ -3699,14 +3721,6 @@ const ModernLayout: React.FC<{
                 multiline
               />
             </p>
-            {event.dressCode?.image && (
-              <div className="w-24 h-24 rounded-full overflow-hidden mb-4 grayscale opacity-80">
-                <img
-                  src={event.dressCode.image}
-                  className="w-full h-full object-cover"
-                />
-              </div>
-            )}
           </FadeInSection>
 
           {/* GUESTBOOK / MURAL DE RECADOS — só em planos com guestbook */}
@@ -3808,8 +3822,8 @@ const ModernLayout: React.FC<{
         </div>
       </EditableSectionWrapper>
 
-      {/* 7. GALLERY (Masonry-ish) */}
-      {event.gallery && (
+      {/* 7. GALLERY (Masonry-ish) — só com fotos reais */}
+      {event.gallery && event.gallery.length > 0 && (
         <FadeInSection className="w-full">
           <div className="grid grid-cols-1 md:grid-cols-3">
             {(event.gallery || []).map((img, i) => (
@@ -3825,6 +3839,10 @@ const ModernLayout: React.FC<{
                 >
                   <img
                     src={getImageUrl(img)}
+                    alt={`Foto ${i + 1} do casal`}
+                    loading="lazy"
+                    referrerPolicy="no-referrer"
+                    onError={(e) => { (e.target as HTMLImageElement).style.display = 'none'; }}
                     className="w-full h-full object-cover transition-transform duration-1000 group-hover:scale-110"
                   />
                 </EditableImageWrapper>
@@ -3857,7 +3875,7 @@ const ModernLayout: React.FC<{
         >
         <FadeInSection delay={0.1} className="max-w-3xl mx-auto px-6 mt-16">
           <p className="text-center text-[11px] font-bold uppercase tracking-[0.2em] text-[#C2B280] mb-4">Como chegar</p>
-          <TravelMap chrome="guest" tone="classic" event={event} isEditing={isEditing} onFieldChange={updateField} />
+          <TravelMap chrome="guest" tone="minimal" event={event} isEditing={isEditing} onFieldChange={updateField} />
         </FadeInSection>
         </EditableSectionWrapper>
 
@@ -3913,26 +3931,23 @@ const GardenLayout: React.FC<{
   const isPremium = isEditing || (event && EVENTS.some((e) => e.id === event.id)) || canUseFeature(normalizePlanId((event as any)?.plan ?? (event as any)?.planId), 'premium_themes');
   const accentColor = "text-[#5D6D55]"; // Sage green
   const accentBg = "bg-[#5D6D55]";
+  // Capa fixa do tema Jardim — nunca editável (nem em edição). A foto do
+  // casal (event.heroImage) vive na secção da Cerimónia ("Os Noivos").
+  const GARDEN_FIXED_HERO =
+    "https://images.unsplash.com/photo-1523438885200-e635ba2c371e?q=80&w=2574&auto=format&fit=crop";
 
   return (
     <div className="min-h-screen bg-[#F9F6F2] font-serif text-[#4A4A4A] pb-28 overflow-x-hidden selection:bg-[#D6CFC7]">
-      {/* 1. HERO WITH OVERLAY */}
+      {/* 1. HERO WITH OVERLAY (capa fixa do tema) */}
       <div className="">
         <div className="relative h-[85vh] w-full overflow-hidden">
-          <EditableImageWrapper
-            src={event.heroImage}
-            onChange={(newVal) => updateField?.("heroImage", newVal)}
-            isEditing={isEditing}
-            className="absolute inset-0"
-          >
-            <motion.div
-              initial={{ scale: 1.1 }}
-              animate={{ scale: 1 }}
-              transition={{ duration: 10, ease: "linear" }}
-              className="absolute inset-0 bg-cover bg-center"
-              style={{ backgroundImage: `url('${getImageUrl(event.heroImage, { width: 1200, quality: 80 })}')` }}
-            />
-          </EditableImageWrapper>
+          <motion.div
+            initial={{ scale: 1.1 }}
+            animate={{ scale: 1 }}
+            transition={{ duration: 10, ease: "linear" }}
+            className="absolute inset-0 bg-cover bg-center"
+            style={{ backgroundImage: `url('${GARDEN_FIXED_HERO}')` }}
+          />
           <div className="absolute inset-0 bg-white/20 mix-blend-overlay pointer-events-none" />
           <div className="absolute inset-0 bg-gradient-to-t from-[#F9F6F2] via-transparent to-transparent h-40 bottom-0 top-auto pointer-events-none" />
 
@@ -3958,7 +3973,7 @@ const GardenLayout: React.FC<{
               </h1>
               <p className="mt-4 font-sans text-sm uppercase tracking-widest text-gray-500">
                 <EditableField
-                  value={event.date}
+                  value={isEditing ? event.date : formatDateLong(event.date)}
                   onChange={(newVal) => updateField?.("date", newVal)}
                   isEditing={isEditing}
                   className="mt-4 font-sans text-sm uppercase tracking-widest text-gray-500 text-center"
@@ -4023,53 +4038,82 @@ const GardenLayout: React.FC<{
       >
         <div className="space-y-16">
           <FadeInSection className="flex flex-col md:flex-row items-center gap-8">
+            {/* Bloco dos Noivos — a foto principal (event.heroImage) vive aqui.
+                O local da festa mora no cartão "Como chegar" (TravelMap). */}
             <div className="flex-1 text-center md:text-right order-2 md:order-1">
               <span
                 className={`inline-block px-3 py-1 rounded-full text-[10px] font-bold text-white mb-4 ${accentBg} uppercase tracking-widest`}
               >
-                Cerimônia
+                Os Noivos
               </span>
               <h3 className="text-3xl font-serif mb-2">
                 <EditableField
-                  value={event.locationName}
-                  onChange={(newVal) => updateField?.("locationName", newVal)}
+                  value={event.title}
+                  onChange={(newVal) => updateField?.("title", newVal)}
                   isEditing={isEditing}
                   className="text-3xl font-serif mb-2 text-center md:text-right"
                 />
               </h3>
+              {(isEditing || event.brideParents || event.groomParents) ? (
+                <p className="text-[11px] uppercase tracking-[0.2em] text-[#8C8C8C] mb-2">
+                  {event.brideParents ? (
+                    <>
+                      Filha de{" "}
+                      <EditableField
+                        value={event.brideParents}
+                        onChange={(newVal) => updateField?.("brideParents", newVal)}
+                        isEditing={isEditing}
+                        className="text-[11px] uppercase tracking-[0.2em] text-[#8C8C8C] text-center md:text-right"
+                      />
+                    </>
+                  ) : null}
+                  {event.brideParents && event.groomParents ? " · " : null}
+                  {event.groomParents ? (
+                    <>
+                      Filho de{" "}
+                      <EditableField
+                        value={event.groomParents}
+                        onChange={(newVal) => updateField?.("groomParents", newVal)}
+                        isEditing={isEditing}
+                        className="text-[11px] uppercase tracking-[0.2em] text-[#8C8C8C] text-center md:text-right"
+                      />
+                    </>
+                  ) : null}
+                </p>
+              ) : null}
               <p className="text-[#8C8C8C] font-sans text-sm mb-1">
                 <EditableField
-                  value={event.time}
-                  onChange={(newVal) => updateField?.("time", newVal)}
+                  value={isEditing ? event.date : formatDateLong(event.date)}
+                  onChange={(newVal) => updateField?.("date", newVal)}
                   isEditing={isEditing}
                   className="text-[#8C8C8C] font-sans text-sm mb-1 text-center md:text-right"
                 />
+                {event.time ? ` • ${event.time}` : null}
               </p>
-              {event.address ? (
               <p className="text-[#5D5C61] mb-6 leading-relaxed">
                 <EditableField
-                  value={event.address}
-                  onChange={(newVal) => updateField?.("address", newVal)}
-                  isEditing={false}
+                  value={event.hosts || "Convidam para celebrar"}
+                  onChange={(newVal) => updateField?.("hosts", newVal)}
+                  isEditing={isEditing}
                   className="text-[#5D5C61] mb-6 leading-relaxed text-center md:text-right"
                   multiline
                 />
               </p>
-              ) : null}
-              <button
-                onClick={() => window.open(event.mapLink || "#", "_blank")}
-                className={`text-xs font-bold border-b border-[#2C2C2C] pb-0.5 hover:opacity-50 transition-opacity uppercase tracking-widest`}
-              >
-                Ver no Mapa
-              </button>
             </div>
             <div className="flex-1 order-1 md:order-2">
               <div className="aspect-[3/4] rounded-t-[100px] overflow-hidden shadow-lg">
-                <img
-                  src={getImageUrl(event.heroImage, { width: 800 })}
-                  alt={event.title || "Foto do casal"}
+                <EditableImageWrapper
+                  src={event.heroImage}
+                  onChange={(newVal) => updateField?.("heroImage", newVal)}
+                  isEditing={isEditing}
+                  className="w-full h-full"
+                >
+                  <img
+                    src={getImageUrl(event.heroImage, { width: 800 })}
+                    alt={event.title || "Foto do casal"}
                   className="w-full h-full object-cover"
                 />
+                </EditableImageWrapper>
               </div>
             </div>
           </FadeInSection>
@@ -4767,7 +4811,7 @@ const RusticLayout: React.FC<{
         >
         <FadeInSection delay={0.1} className="max-w-3xl mx-auto px-6 mt-16">
           <p className="text-center text-[11px] font-bold uppercase tracking-[0.2em] text-[#8D6E63] mb-4">Como chegar</p>
-          <TravelMap chrome="guest" tone="classic" event={event} isEditing={isEditing} onFieldChange={updateField} />
+          <TravelMap chrome="guest" tone="rustic" event={event} isEditing={isEditing} onFieldChange={updateField} />
         </FadeInSection>
         </EditableSectionWrapper>
 
@@ -5254,8 +5298,8 @@ const IndustrialLayout: React.FC<{
           onEditSection={onEditSection}
         >
         <FadeInSection delay={0.1} className="max-w-3xl mx-auto px-6 py-16">
-          <p className="text-center text-[11px] font-bold uppercase tracking-[0.2em] text-gray-400 mb-4">Como chegar</p>
-          <TravelMap chrome="guest" tone="classic" event={event} isEditing={isEditing} onFieldChange={updateField} />
+          <p className="text-center text-[11px] font-bold uppercase tracking-[0.2em] text-white/60 mb-4">Como chegar</p>
+          <TravelMap chrome="guest" tone="industrial" event={event} isEditing={isEditing} onFieldChange={updateField} />
         </FadeInSection>
         </EditableSectionWrapper>
 
@@ -5769,7 +5813,7 @@ const LuxuryLayout: React.FC<{
         >
         <FadeInSection delay={0.1} className="max-w-md mx-auto px-6 mt-16 mb-24">
           <p className="text-center text-[11px] font-bold uppercase tracking-[0.2em] text-[#BF9B30] mb-4">Como chegar</p>
-          <TravelMap chrome="guest" tone="gold" event={event} isEditing={isEditing} onFieldChange={updateField} />
+          <TravelMap chrome="guest" tone="luxury" event={event} isEditing={isEditing} onFieldChange={updateField} />
         </FadeInSection>
         </EditableSectionWrapper>
 
@@ -6133,8 +6177,8 @@ const BridalShowerLayout: React.FC<{
           onEditSection={onEditSection}
         >
         <FadeInSection delay={0.1} className="max-w-md mx-auto px-6 mt-16">
-          <p className="text-center text-[11px] font-bold uppercase tracking-[0.2em] text-[#C9A8A8] mb-4">Como chegar</p>
-          <TravelMap chrome="guest" tone="bridal" event={event} isEditing={isEditing} onFieldChange={updateField} />
+          <p className={`text-center text-[11px] font-bold uppercase tracking-[0.2em] mb-4 ${isMinimal ? 'text-[#666666]' : isTropical ? 'text-[#5A7A5E]' : 'text-[#C9A8A8]'}`}>Como chegar</p>
+          <TravelMap chrome="guest" tone={isMinimal ? 'bridal-minimal' : isTropical ? 'tropical' : 'bridal'} event={event} isEditing={isEditing} onFieldChange={updateField} />
         </FadeInSection>
         </EditableSectionWrapper>
 
@@ -6539,8 +6583,8 @@ const BabyShowerLayout: React.FC<{
           onEditSection={onEditSection}
         >
         <FadeInSection delay={0.1} className="max-w-md mx-auto px-6 mt-16">
-          <p className="text-center text-[11px] font-bold uppercase tracking-[0.2em] text-[#8FA8B8] mb-4">Como chegar</p>
-          <TravelMap chrome="guest" tone="bridal" event={event} isEditing={isEditing} onFieldChange={updateField} />
+          <p className={`text-center text-[11px] font-bold uppercase tracking-[0.2em] mb-4 ${isBoy ? 'text-[#4A6A8A]' : isGirl ? 'text-[#C08A9A]' : 'text-[#8FA8B8]'}`}>Como chegar</p>
+          <TravelMap chrome="guest" tone={isBoy ? 'baby-boy' : isGirl ? 'baby-girl' : 'classic'} event={event} isEditing={isEditing} onFieldChange={updateField} />
         </FadeInSection>
         </EditableSectionWrapper>
 
@@ -7371,7 +7415,7 @@ const LimintsoGoldLayout: React.FC<{
         >
         <FadeInSection delay={0.1} className="max-w-md mx-auto px-6 mb-16">
           <p className="text-center text-[11px] font-bold uppercase tracking-[0.2em] text-[#b49232] mb-4">Como chegar</p>
-          <TravelMap chrome="guest" tone="gold" event={event} isEditing={isEditing} onFieldChange={updateField} />
+          <TravelMap chrome="guest" tone="limintso-gold" event={event} isEditing={isEditing} onFieldChange={updateField} />
         </FadeInSection>
         </EditableSectionWrapper>
 
@@ -8352,7 +8396,7 @@ const LimintsoMeLayout: React.FC<{
         >
         <FadeInSection delay={0.1} className="max-w-md mx-auto px-6 py-16">
           <p className="text-center text-[11px] font-bold uppercase tracking-[0.2em] text-[#E9BE5D] mb-4">Como chegar</p>
-          <TravelMap chrome="guest" tone="gold" event={event} isEditing={isEditing} onFieldChange={updateField} />
+          <TravelMap chrome="guest" tone="limintso-me" event={event} isEditing={isEditing} onFieldChange={updateField} />
         </FadeInSection>
         </EditableSectionWrapper>
 

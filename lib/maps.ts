@@ -63,13 +63,36 @@ export function buildEmbedSrc(event: {
   longitude?: number | null;
   address?: string;
   locationName?: string;
+  formattedAddress?: string | null;
 }): string {
   if (hasCoords(event)) {
     return `https://www.google.com/maps?q=${event.latitude},${event.longitude}&z=15&output=embed`;
   }
-  const q = (event?.locationName || event?.address || '').trim();
+  const formatted = (event?.formattedAddress || '').trim();
+  if (formatted) {
+    return `https://www.google.com/maps?q=${encodeURIComponent(withAngolaBias(formatted))}&z=15&output=embed`;
+  }
+  const name = (event?.locationName || '').trim();
+  const addr = (event?.address || '').trim();
+  const q = [name, addr].filter(Boolean).join(', ').trim();
   if (!q) return '';
-  return `https://www.google.com/maps?q=${encodeURIComponent(q)}&z=15&output=embed`;
+  return `https://www.google.com/maps?q=${encodeURIComponent(withAngolaBias(q))}&z=15&output=embed`;
+}
+
+/**
+ * Bias Angola: nomes genéricos ("Solar dos Hibiscos", "Espaço Elegance")
+ * resolvem para homónimos no Brasil sem cidade/país. Anexa contexto
+ * quando a query ainda não menciona Luanda/Angola.
+ */
+export function withAngolaBias(q: string): string {
+  const query = (q || '').trim();
+  if (!query) return query;
+  const lower = query.toLowerCase();
+  if (lower.includes('luanda') || lower.includes('angola')) return query;
+  if (lower.includes('mussulo') || lower.includes('talatona') || lower.includes('viana')) {
+    return `${query}, Luanda, Angola`;
+  }
+  return `${query}, Luanda, Angola`;
 }
 
 export interface ParsedMapLink {

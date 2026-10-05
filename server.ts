@@ -61,9 +61,12 @@ const PORT = 3000;
 // --- Middleware ---
 app.use(compression());
 
-// Static asset serving
-app.use('/assets', express.static(path.join(process.cwd(), 'dist/assets')));
-app.use(express.static(path.join(process.cwd(), 'dist')));
+// Static asset serving — dist SOMENTE em produção. Em dev o `dist/index.html`
+// fazia shadow do Vite (a landing nunca atualizava sem rebuild).
+if (process.env.NODE_ENV === 'production') {
+  app.use('/assets', express.static(path.join(process.cwd(), 'dist/assets')));
+  app.use(express.static(path.join(process.cwd(), 'dist')));
+}
 app.use(express.static(path.join(process.cwd(), 'public')));
 
 // Security headers

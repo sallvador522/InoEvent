@@ -1,15 +1,12 @@
 /* eslint-disable no-undef */
-const CACHE_NAME = 'inoevents-v6';
+const CACHE_NAME = 'inoevents-v7';
 const ASSETS_TO_CACHE = [
   '/',
   '/index.html',
   '/favicon.ico',
   '/manifest.json',
   '/android-chrome-192x192.png',
-  '/android-chrome-512x512.png',
-  '/apple-touch-icon.png',
-  'https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600&family=JetBrains+Mono:wght@400;500&display=swap',
-  'https://fonts.googleapis.com/css2?family=Playfair+Display:ital,wght@0,400;0,700;1,400&family=Plus+Jakarta+Sans:wght@400;500;600;700&display=swap'
+  '/apple-touch-icon.png'
 ];
 
 // Install Event
@@ -44,11 +41,18 @@ self.addEventListener('fetch', (event) => {
   const url = new URL(request.url);
 
   // Ignore Firebase operations and non-GET requests
-  if (request.method !== 'GET' || 
-      url.hostname.includes('firestore.googleapis.com') || 
-      url.hostname.includes('firebase') || 
+  if (request.method !== 'GET' ||
+      url.hostname.includes('firestore.googleapis.com') ||
+      url.hostname.includes('firebase') ||
       url.pathname.startsWith('/api/') ||
       url.hostname.includes('identitytoolkit.googleapis.com')) {
+    return;
+  }
+
+  // Cross-origin: never intercept (CORS/opaque failures used to crash
+  // respondWith with 'Failed to convert value to Response'). Fonts, images
+  // e CDNs passam direto ao browser.
+  if (url.origin !== self.location.origin) {
     return;
   }
 
@@ -109,6 +113,10 @@ self.addEventListener('fetch', (event) => {
             cache.put(request, responseToCache);
           });
           return networkResponse;
+        }).catch(() => {
+          // Falha de rede com stale inexistente: 504 em vez de undefined
+          // (undefined rebentava o respondWith).
+          return new Response('', { status: 504, statusText: 'Gateway Timeout (SW)' });
         });
       })
     );
@@ -127,8 +135,11 @@ self.addEventListener('fetch', (event) => {
         }
         return networkResponse;
       })
-      .catch(() => {
-        return caches.match(request);
+      .catch(async () => {
+        // Cache-miss + offline: devolver undefined rebentava o respondWith
+        // ('Failed to convert value to Response'). 504 explícito em vez disso.
+        const cached = await caches.match(request);
+        return cached || new Response('', { status: 504, statusText: 'Gateway Timeout (SW)' });
       })
   );
 });

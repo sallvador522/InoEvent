@@ -52,6 +52,7 @@ try {
     admin.initializeApp({
       credential,
       projectId: projectId,
+      storageBucket: firebaseConfig?.storageBucket || process.env.FIREBASE_STORAGE_BUCKET || undefined,
     });
   }
   const dbId = firebaseConfig ? firebaseConfig.firestoreDatabaseId : undefined;
@@ -109,7 +110,17 @@ export async function fetchFirestoreGuestsWebSDK(eventId: string) {
 
 // --- Database Helpers ---
 
-/** Returns the Firestore instance configured for the correct database ID. */
+/** Nome do bucket do Storage (firebase-applet-config.json ou env). */
+export function getStorageBucketName(): string | undefined {
+  return firebaseConfig?.storageBucket || process.env.FIREBASE_STORAGE_BUCKET || undefined;
+}
+
+/** Bucket do Storage com nome explícito (evita o default .appspot.com errado). */
+export function getStorageBucket() {
+  const name = getStorageBucketName();
+  return name ? admin.storage().bucket(name) : admin.storage().bucket();
+}
+
 export function getDb() {
   const dbId = firebaseConfig ? firebaseConfig.firestoreDatabaseId : undefined;
   if (dbId && dbId !== '(default)') {
@@ -118,12 +129,16 @@ export function getDb() {
   return getFirestore();
 }
 
-/** Fetches event details via Firestore REST API (public, no auth required). */
-export async function getEventDetails(eventId: string) {
+/** Fetches event details via Firestore REST API (public, no auth required).
+ * Pass `fields` to project only the hot attributes (SEO uses ~7) instead of
+ * the full document — less bytes over the wire, same shape for known keys.
+ */
+export async function getEventDetails(eventId: string, fields?: string[]) {
   try {
     const dbId = (firebaseConfig && firebaseConfig.firestoreDatabaseId) ? firebaseConfig.firestoreDatabaseId : '(default)';
     const projectId = (firebaseConfig && firebaseConfig.projectId) ? firebaseConfig.projectId : process.env.GOOGLE_CLOUD_PROJECT || 'dummy-project';
-    const url = `https://firestore.googleapis.com/v1/projects/${projectId}/databases/${dbId}/documents/events/${eventId}`;
+    const mask = (fields ?? []).filter(Boolean).map((f) => `mask.fieldPaths=${encodeURIComponent(f)}`).join('&');
+    const url = `https://firestore.googleapis.com/v1/projects/${projectId}/databases/${dbId}/documents/events/${eventId}${mask ? `?${mask}` : ''}`;
     const res = await fetch(url);
     if (!res.ok) {
         return null;

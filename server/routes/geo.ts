@@ -83,6 +83,8 @@ router.get('/api/geo/search', async (req, res) => {
       })
       .filter((x): x is any => x !== null);
 
+    // Zonas OSM quasi-estáticas — CDN segura-as 24h, serve stale 10min.
+    res.setHeader('Cache-Control', 'public, s-maxage=86400, stale-while-revalidate=600');
     return res.json(out);
   } catch (e: any) {
     if (e?.name === 'AbortError' || e?.name === 'TimeoutError') {
@@ -177,6 +179,8 @@ router.get('/api/geo/text-search', async (req, res) => {
       })
       .filter((x: any) => x !== null);
 
+    // Resultado Google por query (chave no URL) — 1h de CDN chega.
+    res.setHeader('Cache-Control', 'public, s-maxage=3600, stale-while-revalidate=600');
     return res.json(out);
   } catch (e: any) {
     if (e?.name === 'AbortError' || e?.name === 'TimeoutError') {
@@ -224,6 +228,7 @@ router.get('/api/geo/reverse', async (req, res) => {
     }
     const data: any = await upstream.json();
     const display = String(data?.display_name || '').trim();
+    res.setHeader('Cache-Control', 'public, s-maxage=86400, stale-while-revalidate=600');
     if (!display) return res.json({ name: '', displayName: '', latitude: lat, longitude: lon, formattedAddress: '' });
     const rLat = Number(data?.lat);
     const rLng = Number(data?.lon);

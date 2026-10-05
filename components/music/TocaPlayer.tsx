@@ -1,6 +1,7 @@
 import React, { useState, useRef, useEffect } from 'react';
 import { motion } from 'framer-motion';
 import { logger } from '../../lib/logger';
+import { Music } from 'lucide-react';
 
 interface TocaPlayerProps {
   trackName: string;
@@ -12,11 +13,14 @@ export const TocaPlayer: React.FC<TocaPlayerProps> = ({ trackName, isDark = fals
   const [isBlocked, setIsBlocked] = useState(false);
   const audioRef = useRef<HTMLAudioElement | null>(null);
 
+  // Áudio padrão de abertura dos templates de casamento.
+  const DEFAULT_WEDDING_AUDIO = '/audio/wedingOPens.ogg';
+
   // Determine the actual URL/path to play
   const getAudioUrl = () => {
     if (!trackName || trackName === "" || trackName === "romantic_piano.mp3" || trackName === "romantic") {
       // Default fallback music
-      return '/audio/oracao_do_amor.m4a';
+      return DEFAULT_WEDDING_AUDIO;
     }
     if (trackName === 'none' || trackName === 'No Music') {
       return null;
@@ -26,7 +30,7 @@ export const TocaPlayer: React.FC<TocaPlayerProps> = ({ trackName, isDark = fals
       return trackName;
     }
     // Default fallback for any other chosen names
-    return '/audio/oracao_do_amor.m4a';
+    return DEFAULT_WEDDING_AUDIO;
   };
 
   const audioUrl = getAudioUrl();
@@ -141,9 +145,7 @@ export const TocaPlayer: React.FC<TocaPlayerProps> = ({ trackName, isDark = fals
               ))}
             </span>
           ) : (
-            <span className="material-symbols-outlined text-xl" aria-hidden="true">
-              music_note
-            </span>
+            <Music size={24} className="text-xl" aria-hidden="true" />
           )}
         </motion.button>
       </div>

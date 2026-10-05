@@ -5,11 +5,27 @@ import { useFirebase, db } from '../../components/FirebaseProvider';
 import { getGuestLimit, normalizePlanId, getPlanConfig, getEventCreationLimit, isBusinessPlan } from '../../lib/entitlements';
 import { doc, getDoc, setDoc, updateDoc, collection, query, where, getDocs } from 'firebase/firestore';
 import toast from 'react-hot-toast';
-import { 
-  Plus, Trash, Music, Calendar, MapPin, Clock, 
-  User,  Gift, Save, FileText, ChevronRight, 
-  Heart, ArrowLeft, AlignLeft, Eye, Layout, Sliders, Globe,
-  Check
+import {
+  AlignLeft,
+  ArrowLeft,
+  Calendar,
+  Check,
+  ChevronRight,
+  Clock,
+  Eye,
+  FileText,
+  Gift,
+  Globe,
+  Heart,
+  Info,
+  Layout,
+  MapPin,
+  Music,
+  Plus,
+  Save,
+  Sliders,
+  Trash,
+  User,
 } from 'lucide-react';
 import { LayoutMode } from '../../types';
 import { migrateCoverToStorage } from '../../lib/imageStorage';
@@ -1154,7 +1170,7 @@ export const EventCreator: React.FC = () => {
 
             {/* Warning Message Box indicating payment only on final Save */}
             <div className="p-4 rounded-2xl bg-[#F0F4FF] border border-blue-200/50 flex gap-3 text-blue-800 text-xs leading-relaxed font-medium">
-              <span className="material-symbols-outlined text-[18px] text-brand-blue flex-shrink-0">info</span>
+              <Info size={18} className="text-[18px] text-brand-blue flex-shrink-0" />
               <div>
                 <p className="font-bold">Alta Costura sem riscos de cobrança</p>
                 <p className="text-blue-700 font-normal mt-0.5">

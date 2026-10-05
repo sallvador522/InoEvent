@@ -46,7 +46,52 @@ import toast from "react-hot-toast";
 import { copyToClipboard } from "../../lib/clipboard";
 import { uploadEventAudio, deleteEventAudio, isOwnStorageAudio } from "../../lib/audioUpload";
 import { QRCodeSVG } from "qrcode.react";
-import { Play, Sparkles, ChevronUp, ChevronDown, PartyPopper, Lock, Users } from "lucide-react";
+import {
+  ArrowDown,
+  ArrowLeft,
+  ArrowRight,
+  ArrowUp,
+  ArrowUpRight,
+  Baby,
+  BookOpen,
+  CalendarCheck,
+  CalendarDays,
+  ChevronDown,
+  ChevronUp,
+  ChevronsDown,
+  CircleCheck,
+  CirclePlus,
+  Clock,
+  CloudUpload,
+  Copy,
+  Download,
+  FilePenLine,
+  Gift,
+  Heart,
+  HeartHandshake,
+  Image,
+  Images,
+  Lock,
+  Mail,
+  Map,
+  MapPin,
+  MessageSquare,
+  NotebookPen,
+  Palette,
+  PartyPopper,
+  Play,
+  Plus,
+  Quote,
+  Shirt,
+  Sparkles,
+  Trash2,
+  TreePine,
+  Upload,
+  UserCheck,
+  Users,
+  Wallet,
+  X,
+} from 'lucide-react';
 import { exportPassPng } from "../../lib/passExport";
 import { firstGalleryPhoto } from "../../lib/passImage";
 import { EventPass, supportsElegantPass } from "../../components/passes/EventPass";
@@ -1150,9 +1195,7 @@ const InvitationView: React.FC = () => {
               onClick={() => setIsEditorBarExpanded(!isEditorBarExpanded)}
             >
               <span className="w-8 h-8 rounded-full bg-[#BF9B30] flex items-center justify-center text-[#0F1419] font-black shadow-[0_0_15px_rgba(191,155,48,0.4)] shrink-0">
-                <span className="material-symbols-outlined text-[18px]">
-                  auto_awesome
-                </span>
+                <Sparkles size={18} className="text-[18px]" />
               </span>
 
               <div
@@ -1166,9 +1209,7 @@ const InvitationView: React.FC = () => {
                 </span>
               </div>
 
-              <span className="material-symbols-outlined text-[#BF9B30] transition-all duration-300 shrink-0">
-                {isEditorBarExpanded ? "expand_less" : "expand_more"}
-              </span>
+              {isEditorBarExpanded ? <ChevronUp size={20} className="text-[#BF9B30] transition-all duration-300 shrink-0" /> : <ChevronDown size={20} className="text-[#BF9B30] transition-all duration-300 shrink-0" />}
             </div>
 
             {/* Actions */}
@@ -1181,9 +1222,7 @@ const InvitationView: React.FC = () => {
                   onClick={() => setIsOpenCover(!isOpenCover)}
                   className="px-3 md:px-4 py-2 bg-transparent border border-[#BF9B30]/40 hover:border-[#BF9B30] rounded-full text-[9px] md:text-xs font-bold text-[#BF9B30] transition-all cursor-pointer flex items-center gap-1.5 whitespace-nowrap uppercase tracking-widest hover:bg-[#BF9B30]/5 active:scale-95 shrink-0"
                 >
-                  <span className="material-symbols-outlined text-[14px]">
-                    {isOpenCover ? "auto_stories" : "edit_document"}
-                  </span>
+                  {isOpenCover ? <BookOpen size={14} className="text-[14px]" /> : <FilePenLine size={14} className="text-[14px]" />}
                   <span>{isOpenCover ? "Visualizar Capa" : "Visualizar Convite"}</span>
                 </button>
               )}
@@ -1193,9 +1232,7 @@ const InvitationView: React.FC = () => {
                 onClick={() => setRSVPOpen(true)}
                 className="px-3 md:px-4 py-2 bg-transparent border border-white/20 hover:border-[#BF9B30] rounded-full text-[9px] md:text-xs font-bold text-white transition-all cursor-pointer flex items-center gap-1 whitespace-nowrap uppercase tracking-widest hover:bg-white/5 active:scale-95 shrink-0"
               >
-                <span className="material-symbols-outlined text-[14px]">
-                  how_to_reg
-                </span>
+                <UserCheck size={14} className="text-[14px]" />
                 <span className="hidden sm:inline">Testar RSVP</span>
                 <span className="sm:hidden">RSVP</span>
               </button>
@@ -1228,9 +1265,7 @@ const InvitationView: React.FC = () => {
                   </>
                 ) : (
                   <>
-                    <span className="material-symbols-outlined text-[14px]">
-                      cloud_upload
-                    </span>
+                    <CloudUpload size={14} className="text-[14px]" />
                     <span>Publicar Alterações</span>
                   </>
                 )}
@@ -1242,9 +1277,7 @@ const InvitationView: React.FC = () => {
                 className="w-8 h-8 flex items-center justify-center bg-red-500/10 hover:bg-red-500/20 text-red-400 rounded-full transition-colors cursor-pointer active:scale-95 ml-0.5 shrink-0"
                 title="Sair sem salvar"
               >
-                <span className="material-symbols-outlined text-[16px]">
-                  close
-                </span>
+                <X size={16} className="text-[16px]" />
               </button>
             </div>
           </div>
@@ -1312,19 +1345,15 @@ const InvitationView: React.FC = () => {
                 {/* Modal Header */}
                 <div className="p-5 border-b border-[#BF9B30]/20 flex items-center justify-between bg-[#0F1419]/80 backdrop-blur-md sticky top-0 z-10">
                   <div className="flex items-center gap-2">
-                    <span className="material-symbols-outlined text-[#BF9B30]">
-                      {activeModal === "style"
-                        ? "palette"
-                        : activeModal === "hero"
-                          ? "auto_stories"
-                          : activeModal === "gallery"
-                            ? "image"
-                            : activeModal === "locations"
-                              ? "pin_drop"
-                              : activeModal === "timeline"
-                                ? "schedule"
-                                : "volunteer_activism"}
-                    </span>
+                    {(() => {
+                      const ModalIcon = activeModal === "style" ? Palette
+                        : activeModal === "hero" ? BookOpen
+                        : activeModal === "gallery" ? Image
+                        : activeModal === "locations" ? MapPin
+                        : activeModal === "timeline" ? Clock
+                        : HeartHandshake;
+                      return <ModalIcon size={20} className="text-[#BF9B30]" />;
+                    })()}
                     <span className="font-bold text-white text-sm uppercase tracking-widest">
                       {activeModal === "style" && "Editar Música de Fundo"}
                       {activeModal === "hero" && "Editar Capa & Textos"}
@@ -1338,9 +1367,7 @@ const InvitationView: React.FC = () => {
                     onClick={() => setActiveModal(null)}
                     className="w-8 h-8 rounded-full bg-white/5 hover:bg-[#BF9B30]/20 text-gray-400 hover:text-[#BF9B30] flex items-center justify-center transition-all cursor-pointer active:scale-95"
                   >
-                    <span className="material-symbols-outlined text-[16px]">
-                      close
-                    </span>
+                    <X size={16} className="text-[16px]" />
                   </button>
                 </div>
 
@@ -1354,14 +1381,14 @@ const InvitationView: React.FC = () => {
                           Música de Fundo
                         </label>
                         <select
-                          value={localEvent?.musicTrack || "/audio/oracao_do_amor.m4a"}
+                          value={localEvent?.musicTrack || "/audio/wedingOPens.ogg"}
                           onChange={(e) =>
                             updateField("musicTrack", e.target.value)
                           }
                           className="w-full bg-[#1A2026] border border-[#BF9B30]/30 rounded-xl px-4 py-3 text-sm text-white focus:outline-none focus:border-[#BF9B30] transition-colors appearance-none"
                         >
-                          <option value="/audio/oracao_do_amor.m4a">
-                            Oração do Amor (Padrão)
+                          <option value="/audio/wedingOPens.ogg">
+                            Abertura de Casamento (Padrão)
                           </option>
                           <option value="romantic_piano.mp3">
                             Piano Romântico
@@ -1599,9 +1626,7 @@ const InvitationView: React.FC = () => {
                                   aria-label="Mover foto para a esquerda"
                                   className="w-9 h-9 rounded-full bg-white/10 text-white flex items-center justify-center hover:bg-[#BF9B30]/40 transition-colors disabled:opacity-30 cursor-pointer"
                                 >
-                                  <span className="material-symbols-outlined text-[16px]">
-                                    arrow_back
-                                  </span>
+                                  <ArrowLeft size={16} className="text-[16px]" />
                                 </button>
                                 <button
                                   type="button"
@@ -1609,9 +1634,7 @@ const InvitationView: React.FC = () => {
                                   aria-label={`Eliminar foto ${idx + 1}`}
                                   className="w-9 h-9 rounded-full bg-red-600/80 text-white flex items-center justify-center hover:bg-red-500 transition-colors cursor-pointer"
                                 >
-                                  <span className="material-symbols-outlined text-[16px]">
-                                    delete
-                                  </span>
+                                  <Trash2 size={16} className="text-[16px]" />
                                 </button>
                                 <button
                                   type="button"
@@ -1620,9 +1643,7 @@ const InvitationView: React.FC = () => {
                                   aria-label="Mover foto para a direita"
                                   className="w-9 h-9 rounded-full bg-white/10 text-white flex items-center justify-center hover:bg-[#BF9B30]/40 transition-colors disabled:opacity-30 cursor-pointer"
                                 >
-                                  <span className="material-symbols-outlined text-[16px]">
-                                    arrow_forward
-                                  </span>
+                                  <ArrowRight size={16} className="text-[16px]" />
                                 </button>
                               </div>
                             </div>
@@ -1852,9 +1873,7 @@ const InvitationView: React.FC = () => {
                           onClick={addTimelineItem}
                           className="px-4 py-2 bg-[#BF9B30] hover:bg-white text-[#0F1419] text-[10px] font-bold rounded-xl flex items-center gap-1.5 shadow-[0_5px_15px_rgba(191,155,48,0.2)] transition-all uppercase tracking-widest"
                         >
-                          <span className="material-symbols-outlined text-[14px]">
-                            add
-                          </span>
+                          <Plus size={14} className="text-[14px]" />
                           <span>Nova Etapa</span>
                         </button>
                       </div>
@@ -1876,9 +1895,7 @@ const InvitationView: React.FC = () => {
                                   disabled={idx === 0}
                                   className="w-7 h-7 rounded-lg bg-[#0F1419] text-gray-400 hover:text-[#BF9B30] flex items-center justify-center disabled:opacity-30 transition-colors"
                                 >
-                                  <span className="material-symbols-outlined text-[14px]">
-                                    arrow_upward
-                                  </span>
+                                  <ArrowUp size={14} className="text-[14px]" />
                                 </button>
                                 <button
                                   type="button"
@@ -1889,18 +1906,14 @@ const InvitationView: React.FC = () => {
                                   }
                                   className="w-7 h-7 rounded-lg bg-[#0F1419] text-gray-400 hover:text-[#BF9B30] flex items-center justify-center disabled:opacity-30 transition-colors"
                                 >
-                                  <span className="material-symbols-outlined text-[14px]">
-                                    arrow_downward
-                                  </span>
+                                  <ArrowDown size={14} className="text-[14px]" />
                                 </button>
                                 <button
                                   type="button"
                                   onClick={() => deleteTimelineItem(idx)}
                                   className="w-7 h-7 rounded-lg bg-red-900/20 text-red-400 hover:bg-red-500 hover:text-white flex items-center justify-center transition-colors"
                                 >
-                                  <span className="material-symbols-outlined text-[14px]">
-                                    delete
-                                  </span>
+                                  <Trash2 size={14} className="text-[14px]" />
                                 </button>
                               </div>
                             </div>
@@ -2077,9 +2090,7 @@ const InvitationView: React.FC = () => {
                               className="absolute top-2 right-2 text-gray-500 hover:text-red-400 text-xs transition-colors"
                               title="Excluir"
                             >
-                              <span className="material-symbols-outlined text-[16px]">
-                                delete
-                              </span>
+                              <Trash2 size={16} className="text-[16px]" />
                             </button>
 
                             <div className="grid grid-cols-2 gap-3 pr-6">
@@ -2340,7 +2351,7 @@ const InvitationView: React.FC = () => {
               transition={{ delay: 0.2, duration: 0.8 }}
               className="text-center px-6 flex flex-col items-center max-w-md"
             >
-              <span className="material-symbols-outlined text-5xl mb-6 text-brand-gold opacity-80">mail</span>
+              <Mail size={20} className="text-5xl mb-6 text-brand-gold opacity-80" />
               <h1 className="font-serif text-3xl md:text-5xl mb-4 font-bold leading-tight">{activeEvent.title}</h1>
               <p className="text-slate-300 mb-10 font-sans text-sm md:text-base tracking-widest uppercase">
                 Você tem um convite
@@ -2488,7 +2499,7 @@ const InvitationView: React.FC = () => {
               </span>
             </span>
             <button
-              onClick={() => setIsAuthOpen(true)}
+              onClick={() => navigate('/auth', { state: { from: window.location.pathname + window.location.search } })}
               className="px-3 md:px-5 py-2 bg-[#BF9B30] hover:bg-white text-[#0F1419] text-[9px] md:text-xs font-bold uppercase tracking-widest rounded-full shadow-[0_0_20px_rgba(191,155,48,0.3)] transition-all cursor-pointer whitespace-nowrap active:scale-95 shrink-0"
             >
               Fazer login
@@ -2610,7 +2621,7 @@ const FloatingDesignDock: React.FC<{
           onClick={() => setIsExpanded(true)}
           className="bg-[#C5A028] hover:bg-[#d4af37] text-[#1B365D] rounded-full py-3.5 px-6 shadow-xl flex items-center gap-2 text-[10px] font-black uppercase tracking-widest transition-all hover:scale-105 active:scale-95 cursor-pointer min-h-[44px]"
         >
-          <span className="material-symbols-outlined text-sm">add_circle</span>
+          <CirclePlus size={14} className="text-sm" />
           <span>Editar secções</span>
         </button>
       </div>
@@ -2646,7 +2657,7 @@ const FloatingDesignDock: React.FC<{
           onClick={() => setIsExpanded(false)}
           className="text-slate-400 hover:text-white transition-colors cursor-pointer flex items-center justify-center p-1 hover:bg-slate-800 rounded-full"
         >
-          <span className="material-symbols-outlined text-lg">close</span>
+          <X size={20} className="text-lg" />
         </button>
       </div>
 
@@ -2661,7 +2672,7 @@ const FloatingDesignDock: React.FC<{
                 value={
                   localEvent?.musicTrack?.startsWith("data:")
                     ? "custom"
-                    : localEvent?.musicTrack || "/audio/oracao_do_amor.m4a"
+                    : localEvent?.musicTrack || "/audio/wedingOPens.ogg"
                 }
                 onChange={(e) => {
                   if (e.target.value !== "custom") {
@@ -2670,7 +2681,7 @@ const FloatingDesignDock: React.FC<{
                 }}
                 className="w-full bg-slate-950 border border-slate-800 rounded-xl px-3 py-2 text-xs text-slate-200 focus:outline-none focus:border-[#C5A028] cursor-pointer"
               >
-                <option value="/audio/oracao_do_amor.m4a">Oração do Amor (Padrão)</option>
+                <option value="/audio/wedingOPens.ogg">Abertura de Casamento (Padrão)</option>
                 <option value="romantic_piano.mp3">Piano Romântico</option>
                 <option value="acoustic_guitar.mp3">
                   Violão Acústico Solo
@@ -2684,9 +2695,7 @@ const FloatingDesignDock: React.FC<{
               </select>
 
               <label className={`flex items-center justify-center gap-2 w-full rounded-xl px-3 py-3 min-h-[48px] text-xs font-bold transition-colors cursor-pointer border ${uploadingMusic ? 'bg-[#1B365D]/5 text-slate-400 border-slate-200' : 'bg-[#1B365D]/5 hover:bg-[#1B365D]/10 text-[#1B365D] border-[#1B365D]/20'}`} style={{ transition: 'background-color 200ms ease' }}>
-                <span className="material-symbols-outlined text-sm text-[#8a6d1c]">
-                  upload_file
-                </span>
+                <Upload size={14} className="text-sm text-[#8a6d1c]" />
                 {uploadingMusic ? 'A enviar música…' : 'Fazer Upload de Música (.mp3, até 6MB)'}
                 <input
                   type="file"
@@ -2709,18 +2718,14 @@ const FloatingDesignDock: React.FC<{
               onClick={() => openModal("hero")}
               className="p-3 bg-slate-950 border border-slate-800 hover:border-[#C5A028]/50 hover:bg-slate-800 rounded-xl flex items-center gap-2 justify-center font-bold text-slate-200 transition-all cursor-pointer"
             >
-              <span className="material-symbols-outlined text-sm text-[#C5A028]">
-                auto_stories
-              </span>
+              <BookOpen size={14} className="text-sm text-[#C5A028]" />
               <span>Capa & Textos</span>
             </button>
             <button
               onClick={() => openModal("locations")}
               className="p-3 bg-slate-950 border border-slate-800 hover:border-[#C5A028]/50 hover:bg-slate-800 rounded-xl flex items-center gap-2 justify-center font-bold text-slate-200 transition-all cursor-pointer"
             >
-              <span className="material-symbols-outlined text-sm text-[#C5A028]">
-                pin_drop
-              </span>
+              <MapPin size={14} className="text-sm text-[#C5A028]" />
               <span>
                 {localEvent?.type === "BRIDAL_SHOWER"
                   ? "Localização"
@@ -2732,9 +2737,7 @@ const FloatingDesignDock: React.FC<{
                 onClick={() => openModal("timeline")}
                 className="p-3 bg-slate-950 border border-slate-800 hover:border-[#C5A028]/50 hover:bg-slate-800 rounded-xl flex items-center gap-2 justify-center font-bold text-slate-200 transition-all cursor-pointer"
               >
-                <span className="material-symbols-outlined text-sm text-[#C5A028]">
-                  schedule
-                </span>
+                <Clock size={14} className="text-sm text-[#C5A028]" />
                 <span>Cronograma</span>
               </button>
             )}
@@ -2742,18 +2745,14 @@ const FloatingDesignDock: React.FC<{
               onClick={() => openModal("gifts")}
               className={`p-3 bg-slate-950 border border-slate-800 hover:border-[#C5A028]/50 hover:bg-slate-800 rounded-xl flex items-center gap-2 justify-center font-bold text-slate-200 transition-all cursor-pointer`}
             >
-              <span className="material-symbols-outlined text-sm text-[#C5A028]">
-                account_balance_wallet
-              </span>
+              <Wallet size={14} className="text-sm text-[#C5A028]" />
               <span>Presentes</span>
             </button>
             <button
               onClick={() => openModal("gallery")}
               className={`p-3 bg-slate-950 border border-slate-800 hover:border-[#C5A028]/50 hover:bg-slate-800 rounded-xl flex items-center gap-2 justify-center font-bold text-slate-200 transition-all cursor-pointer col-span-2`}
             >
-              <span className="material-symbols-outlined text-sm text-[#C5A028]">
-                image
-              </span>
+              <Image size={14} className="text-sm text-[#C5A028]" />
               <span>Galeria de Fotos</span>
             </button>
           </div>
@@ -2810,9 +2809,7 @@ const EditableSectionWrapper: React.FC<{
     >
       {/* Floating Spatial Section Badge */}
       <div className="absolute top-4 right-4 bg-[#1B365D]/90 backdrop-blur-md text-white text-[11px] font-black uppercase tracking-widest px-3 py-1.5 rounded-full shadow-lg opacity-40 group-hover/section-layer:opacity-100 flex items-center gap-1.5 border border-white/15 z-30 select-none pointer-events-none min-h-[32px]" style={{ transition: 'opacity 200ms ease' }}>
-        <span className="material-symbols-outlined text-[12px] font-bold">
-          edit_note
-        </span>
+        <NotebookPen size={12} className="text-[12px] font-bold" />
         <span>Editar {label}</span>
       </div>
 
@@ -2976,9 +2973,7 @@ guestName: string;
                       style={{ transition: 'background-color 200ms ease, opacity 200ms ease' }}
                       title="Excluir Etapa"
                     >
-                      <span className="material-symbols-outlined text-[14px]">
-                        delete
-                      </span>
+                      <Trash2 size={14} className="text-[14px]" />
                     </button>
                   )}
                   <span className="text-brand-blue font-bold text-lg mb-1">
@@ -3688,9 +3683,7 @@ const ModernLayout: React.FC<{
       >
         <div className="contents">
           <FadeInSection className="bg-white p-16 md:p-24 flex flex-col items-center justify-center text-center border-b md:border-b-0 md:border-r border-gray-100 w-full">
-            <span className="material-symbols-outlined text-4xl text-[#C2B280] mb-6">
-              checkroom
-            </span>
+            <Shirt size={36} className="text-4xl text-[#C2B280] mb-6" />
             <h3 className="text-2xl font-serif mb-4">Dress Code</h3>
             <p className="text-gray-500 leading-relaxed max-w-sm mb-6">
               <EditableField
@@ -3724,9 +3717,7 @@ const ModernLayout: React.FC<{
           )}
 
           <FadeInSection className="bg-white p-16 md:p-24 flex flex-col items-center justify-center text-center w-full">
-            <span className="material-symbols-outlined text-4xl text-[#C2B280] mb-6">
-              featured_seasonal_and_gifts
-            </span>
+            <Gift size={36} className="text-4xl text-[#C2B280] mb-6" />
             <h3 className="text-2xl font-serif mb-4">Lista de Presentes</h3>
             <p className="text-gray-500 leading-relaxed max-w-sm mb-8">
               <EditableField
@@ -3847,9 +3838,7 @@ const ModernLayout: React.FC<{
                     className="absolute top-2 right-2 bg-rose-500 hover:bg-rose-600 text-white rounded-full w-6 h-6 flex items-center justify-center shadow-lg hover:scale-105 active:scale-95 transition-all cursor-pointer z-30 opacity-0 group-hover/gallery-item:opacity-100 animate-in fade-in"
                     title="Excluir Foto"
                   >
-                    <span className="material-symbols-outlined text-[14px]">
-                      delete
-                    </span>
+                    <Trash2 size={14} className="text-[14px]" />
                   </button>
                 )}
                 <div className="absolute inset-0 bg-black/20 opacity-0 group-hover:opacity-100 transition-opacity duration-500 pointer-events-none"></div>
@@ -3983,9 +3972,7 @@ const GardenLayout: React.FC<{
         <div className="max-w-2xl mx-auto px-6 -mt-10 relative z-10 text-center">
           <FadeInSection>
             <div className="mb-8">
-              <span className="material-symbols-outlined text-4xl text-[#D6CFC7]">
-                format_quote
-              </span>
+              <Quote size={36} className="text-4xl text-[#D6CFC7]" />
               <p className="text-xl md:text-2xl italic font-medium leading-relaxed mt-2 text-[#5D5C61]">
                 <EditableField
                   value={event.description}
@@ -4249,9 +4236,7 @@ const GardenLayout: React.FC<{
       >
         {(event.dressCode?.description || isEditing) && (
           <FadeInSection className="bg-white p-8 rounded-2xl shadow-sm border border-[#EAE5DF] text-center flex flex-col justify-center">
-            <span className="material-symbols-outlined text-3xl mb-4 text-[#8C8C8C]">
-              styler
-            </span>
+            <Palette size={30} className="text-3xl mb-4 text-[#8C8C8C]" />
             <h4 className="text-lg font-serif font-bold mb-2">Dress Code</h4>
             <p className="text-sm text-[#5D5C61]">
               <EditableField
@@ -4272,9 +4257,7 @@ const GardenLayout: React.FC<{
 
         {((event.gifts && event.gifts.length > 0) || (event as any).iban || isEditing) && (
           <FadeInSection className="bg-white p-8 rounded-2xl shadow-sm border border-[#EAE5DF] text-center flex flex-col justify-center">
-            <span className="material-symbols-outlined text-3xl mb-4 text-[#8C8C8C]">
-              card_giftcard
-            </span>
+            <Gift size={30} className="text-3xl mb-4 text-[#8C8C8C]" />
             <h4 className="text-lg font-serif font-bold mb-2">
               Lista de Presentes
             </h4>
@@ -4473,9 +4456,7 @@ const RusticLayout: React.FC<{
 
         {/* INTRO & BIBLE */}
         <FadeInSection className="max-w-2xl mx-auto text-center px-6 py-12">
-          <span className="material-symbols-outlined text-4xl text-[#A1887F] mb-4">
-            forest
-          </span>
+          <TreePine size={36} className="text-4xl text-[#A1887F] mb-4" />
           <p className="text-xl md:text-2xl font-script leading-relaxed text-[#5D4037] mb-6">
             {isEditing ? (
               <EditableField
@@ -4616,9 +4597,7 @@ const RusticLayout: React.FC<{
                     className="absolute right-2 top-2 bg-rose-500 hover:bg-rose-600 text-white rounded-full w-6 h-6 flex items-center justify-center shadow-lg hover:scale-105 active:scale-95 transition-all cursor-pointer z-30 opacity-0 group-hover/timeline-item:opacity-100 animate-in fade-in"
                     title="Excluir Etapa"
                   >
-                    <span className="material-symbols-outlined text-[14px]">
-                      delete
-                    </span>
+                    <Trash2 size={14} className="text-[14px]" />
                   </button>
                 )}
                 <div className="absolute top-1/2 -left-[45px] md:-left-[calc(50vw-50%+20px)] w-4 h-4 bg-[#8D6E63] rounded-full border-4 border-[#FFF8E1]"></div>
@@ -4660,7 +4639,7 @@ const RusticLayout: React.FC<{
         <div className="py-24 px-4">
           <FadeInSection className="max-w-5xl mx-auto space-y-12">
             <div className="text-center space-y-4">
-              <span className="material-symbols-outlined text-3xl text-[#8D6E63]">photo_library</span>
+              <Images size={30} className="text-3xl text-[#8D6E63]" />
               <h2 className="text-2xl md:text-3xl font-serif text-[#4E342E]">
                 Galeria
               </h2>
@@ -4712,9 +4691,7 @@ const RusticLayout: React.FC<{
       >
         {(event.dressCode?.description || isEditing) ? (
         <FadeInSection className="bg-[#5D4037] text-[#FDF5E6] p-10 rounded-3xl text-center flex flex-col items-center justify-center">
-          <span className="material-symbols-outlined text-4xl mb-4">
-            checkroom
-          </span>
+          <Shirt size={36} className="text-4xl mb-4" />
           <h3 className="text-2xl font-serif mb-2">Dress Code</h3>
           <p className="opacity-80 text-sm max-w-xs">
             <EditableField
@@ -4733,9 +4710,7 @@ const RusticLayout: React.FC<{
         </FadeInSection>
         ) : null}
         <FadeInSection className="bg-white border border-[#EFEBE9] p-10 rounded-3xl text-center flex flex-col items-center justify-center">
-          <span className="material-symbols-outlined text-4xl text-[#5D4037] mb-4">
-            card_giftcard
-          </span>
+          <Gift size={36} className="text-4xl text-[#5D4037] mb-4" />
           <h3 className="text-2xl font-serif text-[#4E342E] mb-2">Presentes</h3>
           {(event.gifts?.[0]?.value || (event as any).iban) ? (
             <>
@@ -4981,9 +4956,7 @@ const IndustrialLayout: React.FC<{
                     className="absolute right-2 top-2 bg-rose-500 hover:bg-rose-600 text-white rounded-full w-6 h-6 flex items-center justify-center shadow-lg hover:scale-105 active:scale-95 transition-all cursor-pointer z-30 opacity-0 group-hover/timeline-item:opacity-100 animate-in fade-in"
                     title="Excluir Etapa"
                   >
-                    <span className="material-symbols-outlined text-[14px]">
-                      delete
-                    </span>
+                    <Trash2 size={14} className="text-[14px]" />
                   </button>
                 )}
                 <span className="w-24 font-mono text-sm text-gray-500 group-hover:text-white transition-colors">
@@ -5643,9 +5616,7 @@ const LuxuryLayout: React.FC<{
                   key={i}
                   className="bg-[#1A1F26] p-6 rounded-xl border border-[#BF9B30]/20 text-center space-y-4"
                 >
-                  <span className="material-symbols-outlined text-3xl text-[#BF9B30]">
-                    featured_seasonal_and_gifts
-                  </span>
+                  <Gift size={30} className="text-3xl text-[#BF9B30]" />
                   <div>
                     <h4 className="text-white font-bold">{gift.title}</h4>
                     <p className="text-xs text-gray-400 mt-2 leading-relaxed">
@@ -5694,11 +5665,9 @@ const LuxuryLayout: React.FC<{
                               }
                             `}
                       >
-                        <span className="material-symbols-outlined text-sm">
-                          {copiedKey === gift.value
-                            ? "check_circle"
-                            : "content_copy"}
-                        </span>
+                        {copiedKey === gift.value
+                          ? <CircleCheck size={14} />
+                          : <Copy size={14} />}
                         <span>
                           {copiedKey === gift.value
                             ? "IBAN Copiado"
@@ -5711,9 +5680,7 @@ const LuxuryLayout: React.FC<{
               ))}
               {(!event.gifts || event.gifts.length === 0) && (event as any).iban ? (
                 <div className="bg-[#1A1F26] p-6 rounded-xl border border-[#BF9B30]/20 text-center space-y-4">
-                  <span className="material-symbols-outlined text-3xl text-[#BF9B30]">
-                    featured_seasonal_and_gifts
-                  </span>
+                  <Gift size={30} className="text-3xl text-[#BF9B30]" />
                   <div>
                     <h4 className="text-white font-bold">Presentes</h4>
                     <p className="text-xs text-gray-400 mt-2 leading-relaxed">
@@ -5750,11 +5717,9 @@ const LuxuryLayout: React.FC<{
                               }
                             `}
                     >
-                      <span className="material-symbols-outlined text-sm">
-                        {copiedKey === (event as any).iban
-                          ? "check_circle"
-                          : "content_copy"}
-                      </span>
+                      {copiedKey === (event as any).iban
+                        ? <CircleCheck size={14} />
+                        : <Copy size={14} />}
                       <span>
                         {copiedKey === (event as any).iban
                           ? "IBAN Copiado"
@@ -5815,7 +5780,7 @@ const LuxuryLayout: React.FC<{
             className="w-full max-w-md bg-[#BF9B30] text-[#0F1419] font-bold uppercase tracking-widest text-xs hover:bg-white transition-colors py-4 shadow-[0_0_20px_rgba(191,155,48,0.3)] flex items-center justify-center gap-2"
           >
             <span>{getRSVPText(event.type, "RESPONDER")}</span>
-            <span className="material-symbols-outlined text-sm">mail</span>
+            <Mail size={14} className="text-sm" />
           </Button>
           {onCheckStatus && <button onClick={onCheckStatus} className="text-[11px] font-bold uppercase tracking-widest text-[#BF9B30]/80 hover:text-[#BF9B30] cursor-pointer" style={{ transition: 'color 200ms ease' }}>Meu convite</button>}
         </div>
@@ -5944,9 +5909,7 @@ const BridalShowerLayout: React.FC<{
         {/* WELCOME NOTE */}
         <div className="max-w-3xl mx-auto px-6 mt-16 md:mt-24 text-center">
           <FadeInSection>
-            <span className="material-symbols-outlined text-4xl mb-6 opacity-40">
-              favorite
-            </span>
+            <Heart size={36} className="text-4xl mb-6 opacity-40" />
             <p className="text-xl md:text-2xl font-serif italic leading-relaxed opacity-90 max-w-2xl mx-auto">
               {isEditing ? (
                 <EditableField
@@ -5986,9 +5949,7 @@ const BridalShowerLayout: React.FC<{
               className={`${accentCard} backdrop-blur-xl p-10 rounded-[2.5rem] border border-white/50 shadow-sm flex flex-col items-start min-h-[380px]`}
             >
               <div className="w-12 h-12 rounded-full bg-white flex items-center justify-center shadow-sm mb-6">
-                <span className="material-symbols-outlined opacity-60">
-                  location_on
-                </span>
+                <MapPin size={20} className="opacity-60" />
               </div>
               <h3 className="text-2xl font-serif mb-2">
                 <EditableField
@@ -6051,9 +6012,7 @@ const BridalShowerLayout: React.FC<{
                 className={`${accentCard} backdrop-blur-xl p-10 rounded-[2.5rem] border border-white/50 shadow-sm flex flex-col items-start min-h-[380px]`}
               >
                 <div className="w-12 h-12 rounded-full bg-white flex items-center justify-center shadow-sm mb-6">
-                  <span className="material-symbols-outlined opacity-60">
-                    card_giftcard
-                  </span>
+                  <Gift size={20} className="opacity-60" />
                 </div>
                 <h3 className="text-2xl font-serif mb-2">Lista de Presentes</h3>
                 <p
@@ -6325,9 +6284,7 @@ const BabyShowerLayout: React.FC<{
         {/* WELCOME NOTE */}
         <div className="max-w-3xl mx-auto px-6 mt-16 md:mt-24 text-center flex flex-col items-center">
           <FadeInSection>
-            <span className={`material-symbols-outlined text-4xl mb-6 ${iconColor}`}>
-              child_care
-            </span>
+            <Baby size={36} className={`text-4xl mb-6 ${iconColor}`} />
             <p className="text-xl md:text-2xl font-serif italic leading-relaxed opacity-90 max-w-2xl mx-auto text-center">
               {isEditing ? (
                 <EditableField
@@ -6367,9 +6324,7 @@ const BabyShowerLayout: React.FC<{
               className={`${accentCard} backdrop-blur-xl p-10 rounded-[2.5rem] border shadow-sm flex flex-col items-start min-h-[380px]`}
             >
               <div className="w-12 h-12 rounded-full bg-white flex items-center justify-center shadow-sm mb-6">
-                <span className={`material-symbols-outlined ${iconColor}`}>
-                  location_on
-                </span>
+                <MapPin size={20} className={`${iconColor}`} />
               </div>
               <h3 className="text-2xl font-serif mb-2">
                 <EditableField
@@ -6409,7 +6364,7 @@ const BabyShowerLayout: React.FC<{
                     onClick={() => window.open(event.mapLink, "_blank")}
                     className="h-12 px-6 rounded-2xl bg-black text-white hover:bg-black/80 transition-colors text-xs font-bold uppercase tracking-wider flex items-center gap-2 cursor-pointer shadow-md"
                   >
-                    <span className="material-symbols-outlined text-sm">map</span> Ver Mapa
+                    <Map size={14} className="text-sm" /> Ver Mapa
                   </button>
                 )}
               </div>
@@ -6421,9 +6376,7 @@ const BabyShowerLayout: React.FC<{
             className={`${accentCard} backdrop-blur-xl p-10 rounded-[2.5rem] border shadow-sm flex flex-col items-start min-h-[380px]`}
           >
             <div className="w-12 h-12 rounded-full bg-white flex items-center justify-center shadow-sm mb-6">
-              <span className={`material-symbols-outlined ${iconColor}`}>
-                featured_seasonal_and_gifts
-              </span>
+              <Gift size={20} className={`${iconColor}`} />
             </div>
             <h3 className="text-2xl font-serif mb-2 text-left">
               O Nosso Bebé
@@ -6462,9 +6415,7 @@ const BabyShowerLayout: React.FC<{
         >
           <div className="max-w-5xl mx-auto px-6 mt-24">
             <FadeInSection className="text-center mb-12 flex flex-col items-center">
-              <span className={`material-symbols-outlined text-3xl mb-4 ${iconColor}`}>
-                card_giftcard
-              </span>
+              <Gift size={30} className={`text-3xl mb-4 ${iconColor}`} />
               <h2 className="text-3xl font-serif mb-2 text-center">Lista de Mimos</h2>
               <p className={`text-xs ${secondaryText} uppercase tracking-widest text-center`}>
                 Sugestões de presentes para ajudar a preparar o enxoval
@@ -6526,7 +6477,7 @@ const BabyShowerLayout: React.FC<{
                         onClick={() => window.open(gift.url, "_blank")}
                         className="w-full h-10 rounded-xl bg-black/5 hover:bg-black/10 transition-colors text-xs font-bold flex items-center justify-center gap-2"
                       >
-                        Visitar Loja <span className="material-symbols-outlined text-xs">arrow_outward</span>
+                        Visitar Loja <ArrowUpRight size={12} className="text-xs" />
                       </button>
                     ) : (
                       <div className="w-full h-10 rounded-xl bg-black/5 text-xs font-bold flex items-center justify-center">
@@ -6553,9 +6504,7 @@ const BabyShowerLayout: React.FC<{
         >
           <div className="max-w-7xl mx-auto mt-32">
             <FadeInSection className="text-center mb-12 px-6 flex flex-col items-center">
-              <span className={`material-symbols-outlined text-3xl mb-4 ${iconColor}`}>
-                photo_library
-              </span>
+              <Images size={30} className={`text-3xl mb-4 ${iconColor}`} />
               <h2 className="text-3xl font-serif mb-2 text-center">Galeria de Amor</h2>
               <p className={`text-xs ${secondaryText} uppercase tracking-widest text-center`}>
                 Momentos doces da nossa espera
@@ -6844,14 +6793,14 @@ const LimintsoGoldLayout: React.FC<{
           transition={{ repeat: Infinity, duration: 1.8, ease: "easeInOut" }}
           className="z-10 text-center text-[#dcb349] flex flex-col items-center mt-auto"
         >
-          <span className="material-symbols-outlined text-3xl">keyboard_double_arrow_down</span>
+          <ChevronsDown size={30} className="text-3xl" />
         </motion.div>
       </div>
 
       {/* 3. LEI DIVINA (THE BEAUTIFUL SCRIPTURE QUOTE BOX) */}
       <div className="max-w-4xl mx-auto py-24 px-6 md:px-12 text-center">
         <FadeInSection>
-          <span className="material-symbols-outlined text-[#b49232] text-4xl mb-4">auto_awesome</span>
+          <Sparkles size={36} className="text-[#b49232] text-4xl mb-4" />
           <h2 className="text-xl md:text-2xl font-serif text-[#b49232] tracking-wider mb-8">
             <EditableField
               value={event.editableContent?.leiDivinaTitle || "Lei Divina..."}
@@ -7052,7 +7001,7 @@ const LimintsoGoldLayout: React.FC<{
       <div className="bg-[#FAF7F2] py-24 border-y border-[#dcb349]/10">
         <div className="max-w-4xl mx-auto px-6 md:px-12">
           <FadeInSection className="text-center mb-16">
-            <span className="material-symbols-outlined text-[#b49232] text-3xl mb-3">calendar_month</span>
+            <CalendarDays size={30} className="text-[#b49232] text-3xl mb-3" />
             <h2 className="text-3xl font-serif text-slate-800">
               Agenda do Grande Dia
             </h2>
@@ -7118,7 +7067,7 @@ const LimintsoGoldLayout: React.FC<{
                             onClick={() => deleteTimelineItem?.(idx)}
                             className="text-xs text-red-500 hover:underline flex items-center gap-1 font-sans font-bold"
                           >
-                            <span className="material-symbols-outlined text-[10px]">delete</span> Excluir
+                            <Trash2 size={10} className="text-[10px]" /> Excluir
                           </button>
                         )}
                       </div>
@@ -7156,7 +7105,7 @@ const LimintsoGoldLayout: React.FC<{
           >
           <FadeInSection className="mt-16 text-center max-w-md mx-auto">
             <div className="bg-white border border-[#dcb349]/20 rounded-3xl p-8 shadow-sm">
-              <span className="material-symbols-outlined text-[#b49232] text-2xl mb-2">location_on</span>
+              <MapPin size={32} className="text-[#b49232] text-2xl mb-2" />
               <h4 className="text-lg font-serif text-slate-800 font-semibold mb-1">
                 <EditableField
                   value={event.locationName}
@@ -7180,7 +7129,7 @@ const LimintsoGoldLayout: React.FC<{
                   onClick={() => window.open(event.mapLink, "_blank")}
                   className="px-6 py-3 bg-white border border-[#dcb349] text-[#b49232] rounded-full text-xs uppercase tracking-[0.15em] font-sans font-bold hover:bg-[#dcb349] hover:text-white transition-colors flex items-center justify-center gap-2 mx-auto shadow-sm"
                 >
-                  <span className="material-symbols-outlined text-sm">map</span> Ver Localização / Mapa
+                  <Map size={14} className="text-sm" /> Ver Localização / Mapa
                 </button>
               )}
             </div>
@@ -7189,7 +7138,7 @@ const LimintsoGoldLayout: React.FC<{
           {event.receptionName ? (
             <FadeInSection className="mt-8 text-center max-w-md mx-auto">
               <div className="bg-white border border-[#dcb349]/20 rounded-3xl p-8 shadow-sm">
-                <span className="material-symbols-outlined text-[#b49232] text-2xl mb-2">celebration</span>
+                <PartyPopper size={32} className="text-[#b49232] text-2xl mb-2" />
                 <p className="text-[10px] uppercase tracking-widest text-[#b49232] font-sans font-bold mb-1">
                   Receção
                 </p>
@@ -7224,7 +7173,7 @@ const LimintsoGoldLayout: React.FC<{
           {event.dressCode?.description ? (
             <FadeInSection className="mt-8 text-center max-w-md mx-auto">
               <div className="bg-white border border-[#dcb349]/20 rounded-3xl p-8 shadow-sm">
-                <span className="material-symbols-outlined text-[#b49232] text-2xl mb-2">checkroom</span>
+                <Shirt size={32} className="text-[#b49232] text-2xl mb-2" />
                 <p className="text-[10px] uppercase tracking-widest text-[#b49232] font-sans font-bold mb-1">
                   Dress Code
                 </p>
@@ -7249,7 +7198,7 @@ const LimintsoGoldLayout: React.FC<{
       <div className="py-24 max-w-4xl mx-auto px-6 md:px-12">
         <FadeInSection>
           <div className="text-center mb-12">
-            <span className="material-symbols-outlined text-[#b49232] text-3xl mb-2">forum</span>
+            <MessageSquare size={30} className="text-[#b49232] text-3xl mb-2" />
             <h2 className="text-3xl font-serif text-slate-800">
               Felicitações & Votos
             </h2>
@@ -7266,7 +7215,7 @@ const LimintsoGoldLayout: React.FC<{
         <div className="py-24 bg-white border-t border-[#dcb349]/10">
           <div className="max-w-4xl mx-auto px-6 md:px-12">
             <FadeInSection className="text-center mb-12">
-              <span className="material-symbols-outlined text-[#b49232] text-3xl mb-2">volunteer_activism</span>
+              <HeartHandshake size={30} className="text-[#b49232] text-3xl mb-2" />
               <h2 className="text-2xl md:text-3xl font-serif text-slate-800">Lista de Presentes</h2>
               <p className="text-xs text-slate-500 uppercase tracking-widest mt-2">Mimos em Dinheiro / Apoio</p>
               <div className="w-12 h-[1px] bg-[#dcb349]/30 mx-auto mt-4" />
@@ -7311,7 +7260,7 @@ const LimintsoGoldLayout: React.FC<{
         <div className="py-24 bg-white border-t border-[#dcb349]/10">
           <div className="max-w-4xl mx-auto px-6 md:px-12">
             <FadeInSection className="text-center mb-12">
-              <span className="material-symbols-outlined text-[#b49232] text-3xl mb-2">volunteer_activism</span>
+              <HeartHandshake size={30} className="text-[#b49232] text-3xl mb-2" />
               <h2 className="text-2xl md:text-3xl font-serif text-slate-800">Lista de Presentes</h2>
               <p className="text-xs text-slate-500 uppercase tracking-widest mt-2">Mimos em Dinheiro / Apoio</p>
               <div className="w-12 h-[1px] bg-[#dcb349]/30 mx-auto mt-4" />
@@ -7349,7 +7298,7 @@ const LimintsoGoldLayout: React.FC<{
         <div className="py-24 bg-white border-t border-[#dcb349]/10">
           <FadeInSection className="max-w-5xl mx-auto px-6 md:px-12 space-y-12">
             <div className="text-center space-y-4">
-              <span className="material-symbols-outlined text-3xl text-[#b49232]">photo_library</span>
+              <Images size={30} className="text-3xl text-[#b49232]" />
               <h2 className="text-2xl md:text-3xl font-serif text-slate-800">
                 Galeria
               </h2>
@@ -7398,7 +7347,7 @@ const LimintsoGoldLayout: React.FC<{
           <div className="absolute bottom-4 left-4 w-4 h-4 border-b border-l border-[#dcb349]/30" />
           <div className="absolute bottom-4 right-4 w-4 h-4 border-b border-r border-[#dcb349]/30" />
 
-          <span className="material-symbols-outlined text-[#b49232] text-3xl mb-2">rsvp</span>
+          <CalendarCheck size={30} className="text-[#b49232] text-3xl mb-2" />
           <h2 className="text-2xl font-serif text-slate-800 mb-3">Sua Presença</h2>
           <p className="text-xs text-slate-500 leading-relaxed mb-8 max-w-sm mx-auto">
             Se recebeu este convite significa que é nosso convidado de honra e a sua presença é importante para nós. Por favor confirme a sua presença para melhor nos organizarmos.
@@ -7562,16 +7511,11 @@ const LimintsoMeLayout: React.FC<{
       <style dangerouslySetInnerHTML={{ __html: `
         @import url('https://fonts.googleapis.com/css2?family=Cinzel:wght@400;600;700&family=Josefin+Sans:wght@300;400;600;700&family=Montserrat:wght@300;400;600&family=Quicksand:wght@400;700&display=swap');
         
-        @font-face {
-          font-family: 'Whispering Signature';
-          font-style: normal;
-          font-weight: normal;
-          font-display: swap;
-          src: url('https://in.limintso.com/wp-content/uploads/2025/07/WhisperingSignature.ttf') format('truetype');
-        }
-        
+        /* WhisperingSignature via in.limintso.com removida: host sem CORS
+           (ERR_FAILED em loop). Substituta: Pinyon Script/Great Vibes, já no
+           set de fontes do index.html — mesma caligrafia elegante, zero fetch. */
         .whispering-text {
-          font-family: 'Whispering Signature', cursive, sans-serif !important;
+          font-family: 'Pinyon Script', 'Great Vibes', cursive, sans-serif !important;
         }
         .josefin-font {
           font-family: 'Josefin Sans', sans-serif !important;
@@ -7736,7 +7680,7 @@ const LimintsoMeLayout: React.FC<{
             <FadeInSection className="z-10 flex flex-col items-center max-w-2xl mx-auto space-y-8">
               {/* Envelope Icon */}
               <div className="w-16 h-16 rounded-full border border-white/20 flex items-center justify-center text-white animate-pulse">
-                <span className="material-symbols-outlined text-4xl text-white">mail</span>
+                <Mail size={36} className="text-4xl text-white" />
               </div>
               
               <div className="space-y-4">
@@ -7754,9 +7698,7 @@ const LimintsoMeLayout: React.FC<{
               </div>
               
               {/* Scrolling Indicator */}
-              <span className="material-symbols-outlined text-white/50 text-4xl animate-bounce mt-16">
-                keyboard_double_arrow_down
-              </span>
+              <ChevronsDown size={36} className="text-white/50 text-4xl animate-bounce mt-16" />
             </FadeInSection>
           </div>
 
@@ -7765,7 +7707,7 @@ const LimintsoMeLayout: React.FC<{
             <FadeInSection className="max-w-2xl mx-auto space-y-8">
               {/* Rings Icon */}
               <div className="w-20 h-20 bg-amber-50 rounded-full border border-[#E9BE5D]/20 flex items-center justify-center text-[#E9BE5D] mx-auto">
-                <span className="material-symbols-outlined text-4xl text-[#E9BE5D]">favorite</span>
+                <Heart size={36} className="text-4xl text-[#E9BE5D]" />
               </div>
 
               <h2 className="josefin-font text-2xl md:text-3xl font-bold uppercase tracking-[0.2em] text-[#121212]">
@@ -7951,7 +7893,7 @@ const LimintsoMeLayout: React.FC<{
             <div className="absolute inset-0 bg-[#35100F]/70 pointer-events-none" />
 
             <FadeInSection className="z-10 max-w-4xl mx-auto space-y-12">
-              <span className="material-symbols-outlined text-4xl text-[#E9BE5D] animate-pulse">calendar_month</span>
+              <CalendarDays size={36} className="text-4xl text-[#E9BE5D] animate-pulse" />
               <h2 className="josefin-font text-3xl md:text-4xl font-bold uppercase tracking-[0.25em] text-white">
                 CONVITE
               </h2>
@@ -8027,7 +7969,7 @@ const LimintsoMeLayout: React.FC<{
                           onClick={() => window.open(event.mapLink, "_blank")}
                           className="josefin-font px-4 py-2 bg-transparent hover:bg-[#E9BE5D] text-[#E9BE5D] hover:text-white border border-[#E9BE5D] rounded-full text-[11px] uppercase tracking-wider font-bold transition-all duration-300 flex items-center justify-center gap-1.5 mx-auto"
                         >
-                          <span className="material-symbols-outlined text-sm">map</span> Ver Mapa
+                          <Map size={14} className="text-sm" /> Ver Mapa
                         </button>
                       )}
                     </div>
@@ -8081,7 +8023,7 @@ const LimintsoMeLayout: React.FC<{
                           onClick={() => window.open(event.mapLink, "_blank")}
                           className="josefin-font px-4 py-2 bg-transparent hover:bg-[#E9BE5D] text-[#E9BE5D] hover:text-white border border-[#E9BE5D] rounded-full text-[11px] uppercase tracking-wider font-bold transition-all duration-300 flex items-center justify-center gap-1.5 mx-auto"
                         >
-                          <span className="material-symbols-outlined text-sm">map</span> Ver Mapa
+                          <Map size={14} className="text-sm" /> Ver Mapa
                         </button>
                       )}
                     </div>
@@ -8134,7 +8076,7 @@ const LimintsoMeLayout: React.FC<{
                           }
                           className="josefin-font px-4 py-2 bg-transparent hover:bg-[#E9BE5D] text-[#E9BE5D] hover:text-white border border-[#E9BE5D] rounded-full text-[11px] uppercase tracking-wider font-bold transition-all duration-300 flex items-center justify-center gap-1.5 mx-auto"
                         >
-                          <span className="material-symbols-outlined text-sm">map</span> Ver Mapa
+                          <Map size={14} className="text-sm" /> Ver Mapa
                         </button>
                       )}
                     </div>
@@ -8201,7 +8143,7 @@ const LimintsoMeLayout: React.FC<{
           {/* 7. RSVP SECTION */}
           <div className="py-24 bg-white text-center px-6 border-b border-stone-200">
             <FadeInSection className="max-w-xl mx-auto space-y-8">
-              <span className="material-symbols-outlined text-4xl text-[#E9BE5D]">how_to_reg</span>
+              <UserCheck size={36} className="text-4xl text-[#E9BE5D]" />
               
               <div className="space-y-2">
                 <h2 className="josefin-font text-3xl md:text-4xl font-bold uppercase tracking-[0.2em] text-[#121212]">
@@ -8232,7 +8174,7 @@ const LimintsoMeLayout: React.FC<{
           <div className="py-24 bg-[#FCFAF6] px-6 md:px-12 border-b border-stone-200">
             <FadeInSection className="max-w-4xl mx-auto">
               <div className="text-center mb-12 space-y-4">
-                <span className="material-symbols-outlined text-3xl text-[#E9BE5D]">forum</span>
+                <MessageSquare size={30} className="text-3xl text-[#E9BE5D]" />
                 <h2 className="josefin-font text-3xl md:text-4xl font-semibold uppercase tracking-[0.2em] text-[#121212]">
                   Felicitações
                 </h2>
@@ -8249,7 +8191,7 @@ const LimintsoMeLayout: React.FC<{
             <div className="py-24 bg-white px-6 md:px-12 border-b border-stone-200">
               <FadeInSection className="max-w-5xl mx-auto space-y-12">
                 <div className="text-center space-y-4">
-                  <span className="material-symbols-outlined text-3xl text-[#E9BE5D]">photo_library</span>
+                  <Images size={30} className="text-3xl text-[#E9BE5D]" />
                   <h2 className="josefin-font text-3xl md:text-4xl font-semibold uppercase tracking-[0.2em] text-[#121212]">
                     Galeria
                   </h2>
@@ -8293,7 +8235,7 @@ const LimintsoMeLayout: React.FC<{
           {event.dressCode?.description ? (
             <div className="py-24 bg-white text-center px-6 border-b border-stone-200">
               <FadeInSection className="max-w-xl mx-auto space-y-6">
-                <span className="material-symbols-outlined text-3xl text-[#E9BE5D]">checkroom</span>
+                <Shirt size={30} className="text-3xl text-[#E9BE5D]" />
                 <h2 className="josefin-font text-3xl md:text-4xl font-semibold uppercase tracking-[0.2em] text-[#121212]">
                   Dress Code
                 </h2>
@@ -8318,7 +8260,7 @@ const LimintsoMeLayout: React.FC<{
             <div className="py-24 bg-[#FCFAF6] border-b border-stone-200">
               <div className="max-w-4xl mx-auto px-6 md:px-12">
                 <FadeInSection className="text-center mb-12 space-y-4">
-                  <span className="material-symbols-outlined text-3xl text-[#E9BE5D]">volunteer_activism</span>
+                  <HeartHandshake size={30} className="text-3xl text-[#E9BE5D]" />
                   <h2 className="josefin-font text-3xl md:text-4xl font-semibold uppercase tracking-[0.2em] text-[#121212]">Lista de Presentes</h2>
                   <p className="montserrat-font text-xs text-slate-500 uppercase tracking-widest mt-2">Mimos em Dinheiro / Apoio</p>
                   <div className="w-12 h-[1px] bg-[#E9BE5D]/30 mx-auto" />
@@ -8370,7 +8312,7 @@ const LimintsoMeLayout: React.FC<{
             <div className="py-24 bg-[#FCFAF6] border-b border-stone-200">
               <div className="max-w-4xl mx-auto px-6 md:px-12">
                 <FadeInSection className="text-center mb-12 space-y-4">
-                  <span className="material-symbols-outlined text-3xl text-[#E9BE5D]">volunteer_activism</span>
+                  <HeartHandshake size={30} className="text-3xl text-[#E9BE5D]" />
                   <h2 className="josefin-font text-3xl md:text-4xl font-semibold uppercase tracking-[0.2em] text-[#121212]">Lista de Presentes</h2>
                   <p className="montserrat-font text-xs text-slate-500 uppercase tracking-widest mt-2">Mimos em Dinheiro / Apoio</p>
                   <div className="w-12 h-[1px] bg-[#E9BE5D]/30 mx-auto" />
@@ -8645,7 +8587,7 @@ const RSVPForm: React.FC<{ event: EventDetails; onClose: () => void; simMode?: b
       // ativação do convite. A escrita direta abaixo é SÓ fallback (servidor
       // inalcançável/offline) — nunca para contornar uma recusa do servidor.
       // Com comprovante, o envio é multipart (o fallback local não o suporta).
-      let receiptWarn = false;
+      let receiptWarn: string | false = false;
       const useReceipt = !!receiptFile && status === "yes" && hasIbanGift && !simMode;
       try {
         const res = await (async () => {
@@ -8680,7 +8622,9 @@ const RSVPForm: React.FC<{ event: EventDetails; onClose: () => void; simMode?: b
 
         const data = await res.json();
         guestId = data.guestId;
-        if (useReceipt && data.receiptSaved === false) receiptWarn = true;
+        if (useReceipt && data.receiptSaved === false) {
+          receiptWarn = typeof data.receiptError === 'string' ? data.receiptError : 'STORAGE_SAVE_FAILED';
+        }
         console.log("RSVP gravado via backend API:", guestId);
       } catch (fetchErr) {
         if (useReceipt) {
@@ -8728,7 +8672,8 @@ const RSVPForm: React.FC<{ event: EventDetails; onClose: () => void; simMode?: b
         { id: toastId },
       );
       if (receiptWarn) {
-        toast.error("Presença gravada, mas o comprovante falhou. Fale com os anfitriões.");
+        console.warn("Comprovante não guardado:", receiptWarn);
+        toast.error("Presença gravada, mas o comprovante falhou no servidor. Fale com os anfitriões para reenviar.");
       }
 
       if (status === "yes") {
@@ -8762,7 +8707,7 @@ const RSVPForm: React.FC<{ event: EventDetails; onClose: () => void; simMode?: b
     const svgData = new XMLSerializer().serializeToString(svg);
     const canvas = document.createElement("canvas");
     const ctx = canvas.getContext("2d");
-    const img = new Image();
+    const img = new window.Image();
     img.onload = () => {
       canvas.width = img.width;
       canvas.height = img.height;
@@ -8974,7 +8919,7 @@ const RSVPForm: React.FC<{ event: EventDetails; onClose: () => void; simMode?: b
                   : "bg-white border border-slate-200 text-brand-blue hover:bg-slate-50 shadow-sm"
             }`}
           >
-            <span className="material-symbols-outlined text-sm">download</span>
+            <Download size={14} className="text-sm" />
             {isGoldPass ? (downloadingPass ? "A gerar…" : "Baixar passe") : "Baixar QR"}
           </button>
           <button

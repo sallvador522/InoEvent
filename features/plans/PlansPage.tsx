@@ -18,7 +18,7 @@ import {
 import { Navbar } from "../../components/Navbar";
 import { SEO } from "../../components/SEO";
 import toast from "react-hot-toast";
-import { PLANS, ADDONS } from "../../config/plans";
+import { PLANS, ADDONS, PREMIUM_PROMO_FREE, PREMIUM_PROMO_LABEL } from "../../config/plans";
 import { normalizeAccountType } from "../../types";
 import { normalizePlanId } from "../../lib/entitlements";
 import { trackPixelInitiateCheckout, trackPixelLead } from "../../lib/metaPixel";
@@ -270,15 +270,16 @@ export const PlansPage: React.FC = () => {
     const agencyLine = (userProfile as any)?.agencyName
       ? `\nAgência: ${(userProfile as any).agencyName}`
       : "";
-    const totalLine = modalTotal(whatsappModal);
+    const isPromoFreeOrder = PREMIUM_PROMO_FREE && whatsappModal.planId === "premium" && !whatsappModal.concierge;
+    const totalLine = isPromoFreeOrder ? PREMIUM_PROMO_LABEL : `${modalTotal(whatsappModal)} Kz`;
 
     const messageText = whatsappModal.name === "Business"
       ? `Olá InoEvents! Quero subscrever o Plano ${whatsappModal.name.toUpperCase()} para a minha agência.${conciergeLine}\n\nID da Plataforma: ${user.uid}\nE-mail: ${user.email || "Não informado"}${agencyLine}${eventTitleLine}${inviteLinkLine}\n\nAguardo o IBAN aqui e envio o comprovativo nesta conversa. Obrigado!`
-      : `Olá InoEvents! Quero ativar o Plano ${whatsappModal.name.toUpperCase()} — ${totalLine} Kz.${conciergeLine}\n\nID da Plataforma: ${user.uid}\nE-mail: ${user.email || "Não informado"}${agencyLine}${eventTitleLine}${inviteLinkLine}\n\nAguardo o IBAN aqui e envio o comprovativo nesta conversa. Obrigado!`;
+      : `Olá InoEvents! Quero ativar o Plano ${whatsappModal.name.toUpperCase()} — ${totalLine}${isPromoFreeOrder ? " (promoção)" : ""}.${conciergeLine}\n\nID da Plataforma: ${user.uid}\nE-mail: ${user.email || "Não informado"}${agencyLine}${eventTitleLine}${inviteLinkLine}\n\nAguardo o IBAN aqui e envio o comprovativo nesta conversa. Obrigado!`;
 
     const cleanNumber = whatsappNumber.replace(/\D/g, "");
     const url = `https://wa.me/${cleanNumber}?text=${encodeURIComponent(messageText)}`;
-    const planPrice = (PLANS[whatsappModal.planId as keyof typeof PLANS]?.price ?? 0) + (whatsappModal.concierge ? ADDONS.concierge.price : 0);
+    const planPrice = (PREMIUM_PROMO_FREE && whatsappModal.planId === "premium" && !whatsappModal.concierge ? 0 : (PLANS[whatsappModal.planId as keyof typeof PLANS]?.price ?? 0)) + (whatsappModal.concierge ? ADDONS.concierge.price : 0);
     const capiUser = user?.email ? { user_data: { email: user.email } } : {};
     trackPixelInitiateCheckout(
       {
@@ -405,6 +406,7 @@ export const PlansPage: React.FC = () => {
           {visiblePlans.map((plan) => {
             const isCurrentPlan = currentPlanId === normalizePlanId(plan.name) || ((plan as any).id && currentPlanId === normalizePlanId((plan as any).id));
             const isHighlighted = !!plan.popular;
+            const isPromoFree = PREMIUM_PROMO_FREE && plan.id === "premium";
             const ctaLabel = isCurrentPlan
               ? "Plano atual"
               : plan.id === "premium"
@@ -427,6 +429,12 @@ export const PlansPage: React.FC = () => {
                 {isHighlighted && !isCurrentPlan && (
                   <div className="absolute top-0 left-1/2 -translate-x-1/2 -translate-y-1/2 bg-[#C5A028] text-white text-[10px] font-bold uppercase tracking-[0.14em] py-1 px-4 rounded-full whitespace-nowrap">
                     O mais escolhido
+                  </div>
+                )}
+
+                {isPromoFree && (
+                  <div className="absolute top-0 left-1/2 -translate-x-1/2 -translate-y-1/2 bg-emerald-600 text-white text-[10px] font-bold uppercase tracking-[0.14em] py-1 px-4 rounded-full whitespace-nowrap shadow-lg shadow-emerald-600/30">
+                    Promoção · {PREMIUM_PROMO_LABEL}
                   </div>
                 )}
 
@@ -457,9 +465,20 @@ export const PlansPage: React.FC = () => {
                       className={`font-serif font-bold ${plan.id === "business" ? "text-3xl leading-[1.2]" : "text-4xl"}`}
                       style={{ fontVariantNumeric: 'tabular-nums' }}
                     >
-                      <span className={isHighlighted ? "text-white" : "text-slate-900"}>
-                        {plan.prices.price}
-                      </span>
+                      {isPromoFree ? (
+                        <span className="flex flex-col items-start gap-1">
+                          <span className="text-2xl text-slate-400 line-through decoration-red-500 decoration-2">
+                            {plan.prices.price}
+                          </span>
+                          <span className="text-4xl text-emerald-600">
+                            {PREMIUM_PROMO_LABEL}
+                          </span>
+                        </span>
+                      ) : (
+                        <span className={isHighlighted ? "text-white" : "text-slate-900"}>
+                          {plan.prices.price}
+                        </span>
+                      )}
                     </span>
                     {plan.id === "business" && (
                       <span className={`text-sm font-medium ${isHighlighted ? "text-blue-200/70" : "text-slate-500"}`}>
@@ -581,7 +600,11 @@ export const PlansPage: React.FC = () => {
                     Valor
                   </span>
                   <span className="text-xs font-bold text-slate-900">
-                    {modalTotal(whatsappModal)} Kz
+                    {PREMIUM_PROMO_FREE && whatsappModal.planId === "premium" && !whatsappModal.concierge ? (
+                      <span className="text-emerald-600">{PREMIUM_PROMO_LABEL} <span className="text-slate-400 font-medium">(promoção)</span></span>
+                    ) : (
+                      <>{modalTotal(whatsappModal)} Kz</>
+                    )}
                   </span>
                 </div>
                 <label className="flex items-center justify-between gap-3 pt-1 cursor-pointer">

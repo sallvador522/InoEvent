@@ -20,8 +20,9 @@ const router = Router();
 
 async function countAdmins(): Promise<number> {
   const db = getDb();
-  const snap = await db.collection('users').where('role', '==', 'admin').get();
-  return snap.size;
+  // Agregação: só o número interessa (era full-scan de docs de admin).
+  const agg = await db.collection('users').where('role', '==', 'admin').count().get();
+  return agg.data().count ?? 0;
 }
 
 async function resolveUid(input: { uid?: string; email?: string }): Promise<{ uid: string; email?: string } | null> {
@@ -54,24 +55,27 @@ router.get('/api/admin/admins', apiRateLimiter, async (req, res) => {
   try {
     const db = getDb();
     const snap = await db.collection('users').where('role', '==', 'admin').get();
-    const list = [];
-    for (const d of snap.docs) {
-      const data = d.data() as any;
-      let claim = false;
-      try {
-        const rec = await admin.auth().getUser(d.id);
-        claim = (rec.customClaims as any)?.admin === true;
-      } catch { /* conta apagada no Auth — sinaliza */ }
-      list.push({
-        uid: d.id,
-        email: data?.email || null,
-        name: data?.name || null,
-        roleGrantedAt: data?.roleGrantedAt || null,
-        roleGrantedBy: data?.roleGrantedBy || null,
-        claim,
-        inSync: claim === true,
-      });
-    }
+    // Lookups Auth independentes por admin: 1 onda (era 1 RTT sequencial cada).
+    // Mesma resposta, mesma sinalização de conta apagada.
+    const list = await Promise.all(
+      snap.docs.map(async (d) => {
+        const data = d.data() as any;
+        let claim = false;
+        try {
+          const rec = await admin.auth().getUser(d.id);
+          claim = (rec.customClaims as any)?.admin === true;
+        } catch { /* conta apagada no Auth — sinaliza */ }
+        return {
+          uid: d.id,
+          email: data?.email || null,
+          name: data?.name || null,
+          roleGrantedAt: data?.roleGrantedAt || null,
+          roleGrantedBy: data?.roleGrantedBy || null,
+          claim,
+          inSync: claim === true,
+        };
+      })
+    );
     return res.json({ admins: list, isSuper: isSuperAdmin(authUser) });
   } catch (err: any) {
     logger.error('Erro ao listar admins', { category: 'SYSTEM', data: err?.message || err });

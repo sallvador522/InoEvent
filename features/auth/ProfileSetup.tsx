@@ -1,6 +1,10 @@
 import React, { useState } from 'react';
 import { motion } from 'framer-motion';
-import { Heart, Briefcase } from 'lucide-react';
+import {
+  Briefcase,
+  Diamond,
+  Heart,
+} from 'lucide-react';
 import { useNavigate, useLocation } from 'react-router-dom';
 import { doc, setDoc } from 'firebase/firestore';
 import { db, useFirebase } from '../../components/FirebaseProvider';
@@ -82,7 +86,7 @@ export const ProfileSetup: React.FC = () => {
         className="w-full max-w-md bg-white px-8 py-10 rounded-3xl shadow-xl border border-slate-100"
       >
         <div className="text-center mb-8">
-          <span className="material-symbols-outlined text-primary text-4xl mb-2">diamond</span>
+          <Diamond size={36} className="text-primary text-4xl mb-2" />
           <h2 className="text-3xl font-serif font-bold text-brand-blue mb-2">Como vais usar?</h2>
           <p className="text-slate-500 text-sm">Escolhe o teu perfil para personalizarmos tudo.</p>
         </div>

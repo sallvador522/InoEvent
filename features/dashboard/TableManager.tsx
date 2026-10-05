@@ -4,6 +4,7 @@ import { EventDetails } from '../../types';
 import { collection, query, onSnapshot, doc, updateDoc, setDoc, deleteDoc } from 'firebase/firestore';
 import { db } from '../../components/FirebaseProvider';
 import { toast } from 'react-hot-toast';
+import { ArrowLeftRight, CheckCheck, Plus, Trash2, TriangleAlert, UtensilsCrossed, X } from 'lucide-react';
 
 interface Table {
     id: string;
@@ -188,7 +189,7 @@ export const TableManager: React.FC<{ event: EventDetails; guests: any[] }> = ({
                         >
                             {unassignedGuests.length === 0 ? (
                                 <div className="h-full flex flex-col items-center justify-center text-slate-400 text-sm text-center">
-                                    <span className="material-symbols-outlined text-4xl mb-2 opacity-50">done_all</span>
+                                    <CheckCheck size={36} className="text-4xl mb-2 opacity-50" />
                                     Todos os convidados têm mesa!
                                 </div>
                             ) : (
@@ -230,7 +231,7 @@ export const TableManager: React.FC<{ event: EventDetails; guests: any[] }> = ({
                                                 ))}
                                             </select>
                                             <button className="bg-white border border-slate-200 text-slate-600 px-3 py-1.5 rounded-lg text-xs font-medium flex items-center gap-1 shadow-sm hover:bg-slate-50 transition-colors">
-                                                <span className="material-symbols-outlined text-[14px]">swap_horiz</span> <span className="hidden sm:inline">Mover</span>
+                                                <ArrowLeftRight size={14} className="text-[14px]" /> <span className="hidden sm:inline">Mover</span>
                                             </button>
                                         </div>
                                     </div>
@@ -282,7 +283,7 @@ export const TableManager: React.FC<{ event: EventDetails; guests: any[] }> = ({
                                   </>
                                 ) : (
                                   <>
-                                    <span className="material-symbols-outlined text-[18px]">add</span> Adicionar
+                                    <Plus size={18} className="text-[18px]" /> Adicionar
                                   </>
                                 )}
                             </button>
@@ -316,7 +317,7 @@ export const TableManager: React.FC<{ event: EventDetails; guests: any[] }> = ({
                                 >
                                     <div className="flex items-center justify-between mb-4">
                                         <h5 className="font-bold text-slate-800 text-lg flex items-center gap-2">
-                                            <span className="material-symbols-outlined text-slate-400">table_restaurant</span>
+                                            <UtensilsCrossed size={20} className="text-slate-400" />
                                             {table.name}
                                         </h5>
                                         <div className="flex items-center gap-3">
@@ -327,7 +328,7 @@ export const TableManager: React.FC<{ event: EventDetails; guests: any[] }> = ({
                                                 onClick={() => setTableToDelete(table)}
                                                 className="text-slate-300 hover:text-red-500 transition-colors"
                                             >
-                                                <span className="material-symbols-outlined text-[18px]">delete</span>
+                                                <Trash2 size={18} className="text-[18px]" />
                                             </button>
                                         </div>
                                     </div>
@@ -362,7 +363,7 @@ export const TableManager: React.FC<{ event: EventDetails; guests: any[] }> = ({
                                                             ))}
                                                         </select>
                                                         <button className="text-slate-400 hover:text-brand-blue transition-colors p-1 flex items-center justify-center rounded-md hover:bg-slate-50">
-                                                            <span className="material-symbols-outlined text-[14px]">swap_horiz</span>
+                                                            <ArrowLeftRight size={14} className="text-[14px]" />
                                                         </button>
                                                     </div>
                                                     <button
@@ -370,7 +371,7 @@ export const TableManager: React.FC<{ event: EventDetails; guests: any[] }> = ({
                                                         disabled={movingGuestId !== null}
                                                         className="text-slate-300 hover:text-red-500 transition-colors p-1 flex items-center justify-center rounded-md hover:bg-red-50 disabled:opacity-40"
                                                     >
-                                                        <span className="material-symbols-outlined text-[14px]">close</span>
+                                                        <X size={14} className="text-[14px]" />
                                                     </button>
                                                 </div>
                                             ))
@@ -381,7 +382,7 @@ export const TableManager: React.FC<{ event: EventDetails; guests: any[] }> = ({
                         })}
                         {tables.length === 0 && !isFetching && (
                             <div className="col-span-full py-12 px-6 text-center border-2 border-dashed border-slate-200 rounded-3xl min-w-0 overflow-hidden">
-                                <span className="material-symbols-outlined text-4xl text-slate-300 mb-2">table_restaurant</span>
+                                <UtensilsCrossed size={36} className="text-4xl text-slate-300 mb-2" />
                                 <p className="text-slate-500 font-medium">Nenhuma mesa criada ainda.</p>
                                 <p className="text-slate-400 text-sm mt-1">Crie mesas para começar a organizar seus convidados.</p>
                             </div>
@@ -394,7 +395,7 @@ export const TableManager: React.FC<{ event: EventDetails; guests: any[] }> = ({
                 <div className="fixed inset-0 bg-slate-900/40 backdrop-blur-sm z-50 flex items-center justify-center p-4">
                     <div className="bg-white rounded-3xl p-6 w-full max-w-sm shadow-xl animate-in fade-in zoom-in-95 duration-200">
                         <div className="w-12 h-12 rounded-full bg-red-100 flex items-center justify-center text-red-600 mb-4 mx-auto">
-                            <span className="material-symbols-outlined text-2xl">warning</span>
+                            <TriangleAlert size={32} className="text-2xl" />
                         </div>
                         <h3 className="text-xl font-bold text-center text-slate-800 mb-2">Apagar Mesa?</h3>
                         <p className="text-center text-slate-500 mb-6 text-sm">

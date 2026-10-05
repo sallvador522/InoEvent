@@ -18,24 +18,41 @@ import { PLANS, ADDONS, formatPrice } from '../../config/plans.js';
 
 const router = Router();
 
+// --- In-memory index.html template (read once, revalidate by mtime) ---
+// /plans is 100% static and /invite/:id only string-replaces OG tags, so
+// re-reading dist/index.html from disk on every hit is pure latency.
+let cachedTemplate = '';
+let cachedTemplateMtime = 0;
+async function getCachedTemplate(): Promise<string | null> {
+  const possiblePaths = [
+    path.join(process.cwd(), 'dist/index.html'),
+    path.join(process.cwd(), 'index.html')
+  ];
+  const foundPath = possiblePaths.find(p => fs.existsSync(p));
+  if (!foundPath) return null;
+  try {
+    const stat = await fs.promises.stat(foundPath);
+    if (!cachedTemplate || stat.mtimeMs !== cachedTemplateMtime) {
+      cachedTemplate = await fs.promises.readFile(foundPath, 'utf8');
+      cachedTemplateMtime = stat.mtimeMs;
+    }
+    return cachedTemplate;
+  } catch {
+    return null;
+  }
+}
+
 // --- Plans Page SEO ---
 router.get('/plans', async (req, res, next) => {
   if (process.env.NODE_ENV !== 'production') {
     return next();
   }
   try {
-    let html = "";
-    const possiblePaths = [
-      path.join(process.cwd(), 'dist/index.html'),
-      path.join(process.cwd(), 'index.html')
-    ];
-    let foundPath = possiblePaths.find(p => fs.existsSync(p));
-    
-    if (foundPath) {
-      html = await fs.promises.readFile(foundPath, 'utf8');
-    } else {
+    const cached = await getCachedTemplate();
+    if (!cached) {
       return next();
     }
+    let html = cached;
     
     const plansTitle = "Planos e Preços de Convites Digitais Premium | InoEvents";
     const plansDesc = `Conheça os preços do InoEvents. Premium ${formatPrice(PLANS.premium.price)}, VIP ${formatPrice(PLANS.vip.price)} e Business ${formatPrice(PLANS.business.price)}/mês. Concierge +${formatPrice(ADDONS.concierge.price)}. RSVP, QR, check-in e gestão de convidados em Angola.`;
@@ -48,7 +65,7 @@ router.get('/plans', async (req, res, next) => {
       <div style="display:none;" id="ai-pricing-context">
         <h1>Preços e Planos do InoEvents Angola</h1>
         <h2>Plano Premium</h2>
-        <p>Preço: ${formatPrice(PLANS.premium.price)} (Pagamento único por evento). Validade ${PLANS.premium.validityDays} dias. Até ${PLANS.premium.guestLimit} convidados. Inclui: convidados individualizados, galeria premium, música, livro de assinaturas, mapa das mesas, analytics básicos. (Sem marca InoEvents só no Business.)</p>
+        <p>Preço: ${formatPrice(PLANS.premium.price)} (Pagamento único por evento). PROMOÇÃO: neste momento o Premium está GRÁTIS por tempo limitado. Validade ${PLANS.premium.validityDays} dias. Até ${PLANS.premium.guestLimit} convidados. Inclui: convidados individualizados, galeria premium, música, livro de assinaturas, mapa das mesas, analytics básicos. (Sem marca InoEvents só no Business.)</p>
         <h2>Plano VIP</h2>
         <p>Preço: ${formatPrice(PLANS.vip.price)} (Pagamento único por evento). Validade ${PLANS.vip.validityDays} dias. Até ${PLANS.vip.guestLimit} convidados. Inclui: tudo do Premium + QR individual, check-in, gestão +1, mesas avançadas, analytics avançados, suporte prioritário.</p>
         <h2>Concierge (Add-on)</h2>
@@ -59,8 +76,10 @@ router.get('/plans', async (req, res, next) => {
     `;
     
     html = html.replace('<div id="root"></div>', `${hiddenAIText}\n    <div id="root"></div>`);
-    
+
     res.setHeader('Content-Type', 'text/html');
+    // Fully static pricing page — CDN can hold it 1h, serve stale 10min.
+    res.setHeader('Cache-Control', 'public, s-maxage=3600, stale-while-revalidate=600');
     return res.send(html);
   } catch (err) {
     logger.error('Erro na rota SEO de planos (/plans):', { category: 'SEO', data: err });
@@ -83,20 +102,12 @@ router.get('/invite/:id', async (req, res, next) => {
   }
 
   try {
-    // Fetch event from Firestore
-    const eventData = await getEventDetails(id);
+    // Fetch only the ~7 hot fields the OG injection reads (projection).
+    const eventData = await getEventDetails(id, ['title', 'type', 'locationName', 'formattedAddress', 'brideName', 'groomName', 'heroImage']);
 
-    // Read index.html
-    let html = "";
-    const possiblePaths = [
-      path.join(process.cwd(), 'dist/index.html'),
-      path.join(process.cwd(), 'index.html')
-    ];
-    let foundPath = possiblePaths.find(p => fs.existsSync(p));
-    
-    if (foundPath) {
-      html = await fs.promises.readFile(foundPath, 'utf8');
-    } else {
+    // Read index.html (in-memory template, fallback to self-fetch)
+    let html = await getCachedTemplate() || "";
+    if (!html) {
       try {
         const isLocal = req.headers.host && req.headers.host.includes('localhost');
         const protocol = req.headers['x-forwarded-proto'] || (isLocal ? 'http' : 'https');
@@ -135,7 +146,7 @@ router.get('/invite/:id', async (req, res, next) => {
       
       // Determine the image to display — capa do evento (heroImage) com fallback para a marca.
       // Nota: data:/blob: (uploads em base64 no Firestore) não servem para scrapers → fallback.
-      const FALLBACK_OG_IMAGE = 'https://www.inoevent.online/inoOG.png';
+      const FALLBACK_OG_IMAGE = 'https://www.inoevent.online/inoOG.jpg';
       const toAbsoluteCoverUrl = (img: unknown): string | null => {
         let src = '';
         if (typeof img === 'string') src = img;
@@ -176,7 +187,7 @@ router.get('/invite/:id', async (req, res, next) => {
       html = html.replace(/<meta property="og:image" content="[^"]*"\s*\/?>/g, `<meta property="og:image" content="${eventImage}" />`);
       if (isFallbackCover) {
         if (!/<meta property="og:image:width"/.test(html)) {
-          html = html.replace(/(<meta property="og:image" content="[^"]*"\s*\/?>)/, `$1<meta property="og:image:width" content="1424" /><meta property="og:image:height" content="752" />`);
+          html = html.replace(/(<meta property="og:image" content="[^"]*"\s*\/?>)/, `$1<meta property="og:image:width" content="1200" /><meta property="og:image:height" content="630" />`);
         }
       } else {
         html = html.replace(/<meta property="og:image:(width|height)"[^>]*\/?>/g, '');
@@ -192,6 +203,8 @@ router.get('/invite/:id', async (req, res, next) => {
     }
     
     res.setHeader('Content-Type', 'text/html');
+    // Invite metadata changes rarely after publish — 5min CDN, 10min stale.
+    res.setHeader('Cache-Control', 'public, s-maxage=300, stale-while-revalidate=600');
     return res.send(html);
   } catch (err: any) {
     logger.error('Erro na rota serveInvitationWithSEO:', { category: 'SEO', data: err });

@@ -1,6 +1,17 @@
 import React, { useState, useEffect } from 'react';
 import { useParams, useSearchParams, Link } from 'react-router-dom';
-import { Users, CheckCircle2, Clock, Search, ExternalLink, ShieldCheck, Printer, Gift, MessageCircle } from 'lucide-react';
+import {
+  CheckCircle2,
+  Clock,
+  ExternalLink,
+  Gift,
+  Lock,
+  MessageCircle,
+  Printer,
+  Search,
+  ShieldCheck,
+  Users,
+} from 'lucide-react';
 import { Virtuoso } from 'react-virtuoso';
 import { doc, collection, onSnapshot, getDoc } from 'firebase/firestore';
 import { db } from '../../components/FirebaseProvider';
@@ -254,7 +265,7 @@ export const ClientDashboard = () => {
                         </button>
                         {event?.isBlocked || (event?.scheduledBlockDate && new Date(event.scheduledBlockDate) <= new Date()) ? (
                             <div className="flex bg-red-50 border border-red-200 px-6 py-3 rounded-full font-bold text-sm text-red-600 shadow-sm gap-2 items-center w-full md:w-auto justify-center cursor-not-allowed">
-                                <span className="material-symbols-outlined text-[16px]">lock</span> Convite Bloqueado
+                                <Lock size={16} className="text-[16px]" /> Convite Bloqueado
                             </div>
                         ) : (
                             <Link to={`/invite/${event.id}`} target="_blank" className="flex bg-white border border-slate-200 px-6 py-3 rounded-full font-bold text-sm text-brand-blue shadow-sm hover:shadow-md transition-all gap-2 items-center w-full md:w-auto justify-center">
@@ -397,7 +408,7 @@ export const ClientDashboard = () => {
                         montava N animações JS; agora são divs estáticas virtualizadas. */}
                     {guests.length === 0 ? (
                         <div className="p-12 text-center flex flex-col items-center justify-center text-slate-500">
-                            <span className="material-symbols-outlined text-4xl mb-4 opacity-50">group</span>
+                            <Users size={36} className="text-4xl mb-4 opacity-50" />
                             <p>Sua lista de convidados ainda está vazia.</p>
                         </div>
                     ) : filteredGuests.length === 0 ? (

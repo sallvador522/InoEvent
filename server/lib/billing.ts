@@ -64,8 +64,9 @@ export async function getOrder(orderId: string): Promise<Order | null> {
 
 export async function getOrderByEvent(eventId: string): Promise<Order | null> {
   const db = getDb();
-  // Sem orderBy (evita índice composto): ordena em código, devolve o mais recente
-  const q = await db.collection('orders').where('eventId', '==', eventId).get();
+  // Sem orderBy (evita índice composto): ordena em código, devolve o mais recente.
+  // Teto 20 — pedidos por evento são escassos; nunca varre histórico sem limite.
+  const q = await db.collection('orders').where('eventId', '==', eventId).limit(20).get();
   if (q.empty) return null;
   const sorted = q.docs
     .map((d) => d.data() as Order)
@@ -94,8 +95,25 @@ export async function repurposePendingOrder(orderId: string, plan: PlanId): Prom
 
 export async function listOrdersByUser(userId: string): Promise<Order[]> {
   const db = getDb();
-  const snap = await db.collection('orders').where('userId', '==', userId).get();
+  // Teto 500 — pedidos por utilizador são escassos; nunca sem limite.
+  const snap = await db.collection('orders').where('userId', '==', userId).limit(500).get();
   return snap.docs.map(d => d.data() as Order);
+}
+
+/** Carimba accountActive em todos os eventos do dono, em batches de 400
+ * (um batch único rebenta acima de 500 eventos — limite Firestore: 500/op). */
+async function stampOwnedEvents(
+  db: FirebaseFirestore.Firestore,
+  userId: string,
+  patch: Record<string, unknown>
+): Promise<number> {
+  const owned = await db.collection('events').where('ownerId', '==', userId).get();
+  for (let i = 0; i < owned.docs.length; i += 400) {
+    const batch = db.batch();
+    owned.docs.slice(i, i + 400).forEach((d) => batch.update(d.ref, patch as any));
+    await batch.commit();
+  }
+  return owned.size;
 }
 
 /** Confirma pagamento — só após validação (admin ou webhook) §12 */
@@ -131,8 +149,10 @@ export async function confirmPayment(orderId: string, providerTxId?: string): Pr
   // quota, mas se mesmo assim chegar aqui (fluxo antigo/manual), ativa na mesma
   // — dinheiro recebido não se devolve por isto — e regista aviso para o admin.
   try {
-    const gSnap = await db.collection('events').doc(order.eventId).collection('guests').get();
-    const occ = gSnap.docs.filter((d) => (d.data() as any)?.status !== 'DECLINED').length;
+    // Rede de segurança por agregação (era full-scan): conta sem descarregar docs.
+    const gref = db.collection('events').doc(order.eventId).collection('guests');
+    const [gTotal, gDeclined] = await Promise.all([gref.count().get(), gref.where('status', '==', 'DECLINED').count().get()]);
+    const occ = (gTotal.data().count ?? 0) - (gDeclined.data().count ?? 0);
     const lim = getGuestLimit(plan);
     if (occ > lim) {
       logger.warn(`Downgrade acima da quota: evento ${order.eventId} tem ${occ} convidados para o plano ${getPlanConfig(plan).name} (${lim}). Ativado na mesma — rever manualmente.`, { category: 'SYSTEM' });
@@ -172,17 +192,12 @@ export async function confirmPayment(orderId: string, providerTxId?: string): Pr
       updatedAt: now,
     } as any);
     // Carimba todos os eventos do dono para leitura event-local (sem fetch extra no convidado)
-    const owned = await db.collection('events').where('ownerId', '==', order.userId).get();
-    const batch = db.batch();
-    owned.docs.forEach((d) => {
-      batch.update(d.ref, {
-        accountActive: true,
-        accountExpiresAt: accountExpiresAt ? accountExpiresAt.toISOString() : null,
-        updatedAt: now,
-      } as any);
+    const stamped = await stampOwnedEvents(db, order.userId, {
+      accountActive: true,
+      accountExpiresAt,
+      updatedAt: now,
     });
-    await batch.commit();
-    logger.success(`Conta activada user=${order.userId} plan=${plan} eventos=${owned.size}`, { category: 'SYSTEM' });
+    logger.success(`Conta activada user=${order.userId} plan=${plan} eventos=${stamped}`, { category: 'SYSTEM' });
   } catch (e) {
     logger.error(`Falha ao activar conta após pagamento ${orderId}`, { category: 'DATABASE', data: e });
   }
@@ -198,43 +213,83 @@ export async function confirmPayment(orderId: string, providerTxId?: string): Pr
  * Business SÓ com subscrição viva — sem ela, não eterniza (antes carimbava
  * vitalício para qualquer users.plan='business').
  */
-export async function backfillAccountStamps(userId?: string): Promise<{ users: number; events: number }> {
+export async function backfillAccountStamps(userId?: string, opts?: { dryRun?: boolean }): Promise<{ users: number; events: number; scanned: number }> {
   const db = getDb();
-  const allUsers = await db.collection('users').get();
-  const targets: typeof allUsers.docs = [];
-  for (const d of allUsers.docs) {
-    if (userId && d.id !== userId) continue;
-    const data = d.data() as any;
-    const p = normalizePlanId(data?.plan ?? data?.planId);
-    if (p !== 'essential' && p !== 'premium' && p !== 'vip' && p !== 'business') continue;
-    if (p === 'business') {
-      const sub = await getActiveSubscription(d.id).catch(() => null);
-      if (!sub) {
-        logger.warn(`Backfill ignorado (business sem subscrição viva): user=${d.id}`, { category: 'SYSTEM' });
-        continue;
-      }
+  const dryRun = opts?.dryRun !== false;
+  // Cursor pagination over users (500/page) — never full-collection scan.
+  const candidates: { id: string; plan: string; accountExpiresAt: string | null }[] = [];
+  let scanned = 0;
+  if (userId) {
+    const one = await db.collection('users').doc(userId).get();
+    scanned = 1;
+    if (one.exists) {
+      const data = one.data() as any;
+      candidates.push({ id: one.id, plan: normalizePlanId(data?.plan ?? data?.planId), accountExpiresAt: data?.planExpiresAt || null });
     }
-    targets.push(d);
+  } else {
+    let lastId: string | null = null;
+    for (;;) {
+      let pageQ: FirebaseFirestore.Query = db.collection('users').orderBy('__name__').limit(500);
+      if (lastId) {
+        const lastSnap = await db.collection('users').doc(lastId).get();
+        if (lastSnap.exists) pageQ = pageQ.startAfter(lastSnap);
+      }
+      const snap = await pageQ.get();
+      if (snap.empty) break;
+      scanned += snap.size;
+      lastId = snap.docs[snap.docs.length - 1].id;
+      for (const d of snap.docs) {
+        const data = d.data() as any;
+        candidates.push({ id: d.id, plan: normalizePlanId(data?.plan ?? data?.planId), accountExpiresAt: data?.planExpiresAt || null });
+      }
+      if (snap.size < 500) break;
+    }
+  }
+  // Keep only paid plans; business requires a live subscription.
+  // Sub checks in waves of 10 (not N sequential round-trips).
+  const targets: typeof candidates = [];
+  const business = candidates.filter((c) => c.plan === 'business');
+  const businessOk = new Set<string>();
+  for (let i = 0; i < business.length; i += 10) {
+    const wave = await Promise.all(
+      business.slice(i, i + 10).map(async (c) => ({ id: c.id, ok: !!(await getActiveSubscription(c.id).catch(() => null)) }))
+    );
+    for (const w of wave) {
+      if (w.ok) businessOk.add(w.id);
+      else logger.warn(`Backfill ignorado (business sem subscrição viva): user=${w.id}`, { category: 'SYSTEM' });
+    }
+  }
+  for (const c of candidates) {
+    if (c.plan !== 'essential' && c.plan !== 'premium' && c.plan !== 'vip' && c.plan !== 'business') continue;
+    if (c.plan === 'business' && !businessOk.has(c.id)) continue;
+    targets.push(c);
   }
   let stamped = 0;
   for (const u of targets) {
-    const accountExpiresAt: string | null = (u.data() as any)?.planExpiresAt || null;
     const owned = await db.collection('events').where('ownerId', '==', u.id).get();
     if (owned.empty) continue;
-    const batch = db.batch();
+    if (dryRun) {
+      stamped += owned.size;
+      continue;
+    }
+    // Batch writes chunked at 400 (Firestore limit: 500/op — the old code
+    // put ALL owned docs in one batch and blew up past 500 events).
     const nowIso = new Date().toISOString();
-    owned.docs.forEach((d) => {
-      batch.update(d.ref, {
-        accountActive: true,
-        accountExpiresAt,
-        updatedAt: nowIso,
-      } as any);
-    });
-    await batch.commit();
+    for (let i = 0; i < owned.docs.length; i += 400) {
+      const batch = db.batch();
+      owned.docs.slice(i, i + 400).forEach((d) => {
+        batch.update(d.ref, {
+          accountActive: true,
+          accountExpiresAt: u.accountExpiresAt,
+          updatedAt: nowIso,
+        } as any);
+      });
+      await batch.commit();
+    }
     stamped += owned.size;
   }
-  logger.success(`Backfill contas: users=${targets.length} eventos=${stamped}`, { category: 'SYSTEM' });
-  return { users: targets.length, events: stamped };
+  logger.success(`Backfill contas${dryRun ? ' (dry-run)' : ''}: users=${targets.length} eventos=${stamped} scanned=${scanned}`, { category: 'SYSTEM' });
+  return { users: targets.length, events: stamped, scanned };
 }
 
 export async function failPayment(orderId: string, reason?: string): Promise<void> {
@@ -290,12 +345,7 @@ export async function createSubscription(userId: string, plan: Extract<PlanId, '
   // Nascimento completo: carimba eventos do dono como ativos (antes o doc nascia
   // e os eventos ficavam não-coletáveis até intervenção manual).
   try {
-    const owned = await db.collection('events').where('ownerId', '==', userId).get();
-    const batch = db.batch();
-    owned.docs.forEach((d) => {
-      batch.update(d.ref, { accountActive: true, accountExpiresAt: null, updatedAt: now.toISOString() } as any);
-    });
-    await batch.commit();
+    await stampOwnedEvents(db, userId, { accountActive: true, accountExpiresAt: null, updatedAt: now.toISOString() });
   } catch { void 0; }
   return sub;
 }
@@ -349,16 +399,11 @@ export async function cancelSubscription(subscriptionId: string): Promise<void> 
       } as any);
     } catch { void 0; }
     try {
-      const owned = await db.collection('events').where('ownerId', '==', userId).get();
-      const batch = db.batch();
-      owned.docs.forEach((d) => {
-        batch.update(d.ref, {
-          accountActive: false,
-          scheduledBlockDate: periodEnd.toISOString(),
-          updatedAt: now.toISOString(),
-        } as any);
+      await stampOwnedEvents(db, userId, {
+        accountActive: false,
+        scheduledBlockDate: periodEnd.toISOString(),
+        updatedAt: now.toISOString(),
       });
-      await batch.commit();
     } catch { void 0; }
   }
 }
@@ -394,17 +439,12 @@ export async function renewSubscription(subscriptionId: string): Promise<Subscri
       } as any);
     } catch { void 0; }
     try {
-      const owned = await db.collection('events').where('ownerId', '==', userId).get();
-      const batch = db.batch();
-      owned.docs.forEach((d) => {
-        batch.update(d.ref, {
-          accountActive: true,
-          accountExpiresAt: null,
-          scheduledBlockDate: null,
-          updatedAt: now.toISOString(),
-        } as any);
+      await stampOwnedEvents(db, userId, {
+        accountActive: true,
+        accountExpiresAt: null,
+        scheduledBlockDate: null,
+        updatedAt: now.toISOString(),
       });
-      await batch.commit();
     } catch { void 0; }
   }
   const updated = await ref.get();

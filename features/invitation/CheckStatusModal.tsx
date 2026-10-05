@@ -8,6 +8,7 @@ import { QRCodeSVG } from 'qrcode.react';
 import { exportPassPng } from '../../lib/passExport';
 import { firstGalleryPhoto } from '../../lib/passImage';
 import { EventPass, supportsElegantPass } from '../../components/passes/EventPass';
+import { Download, QrCode, RefreshCw, X } from 'lucide-react';
 
 interface CheckStatusModalProps {
   isOpen: boolean;
@@ -138,13 +139,13 @@ export const CheckStatusModal: React.FC<CheckStatusModalProps> = ({ isOpen, onCl
               onClick={onClose}
               className="absolute top-4 right-4 w-8 h-8 flex items-center justify-center rounded-full bg-slate-100 hover:bg-slate-200 text-slate-500 transition-colors"
             >
-              <span className="material-symbols-outlined text-lg">close</span>
+              <X size={20} className="text-lg" />
             </button>
 
             {!result ? (
               <form onSubmit={handleCheck} className="space-y-6">
                 <div className="text-center">
-                  <span className="material-symbols-outlined text-4xl text-[#BF9B30] mb-2">qr_code_scanner</span>
+                  <QrCode size={36} className="text-4xl text-[#BF9B30] mb-2" />
                   <h3 className="text-2xl font-serif text-slate-800 font-bold mb-2">Meu Convite</h3>
                   <p className="text-sm text-slate-500">
                     Insira o número de telemóvel usado na confirmação (RSVP) para ver o seu QR Code e Mesa assinalada.
@@ -170,7 +171,7 @@ export const CheckStatusModal: React.FC<CheckStatusModalProps> = ({ isOpen, onCl
                   className="w-full bg-[#BF9B30] hover:bg-[#a68629] text-white py-4 rounded-xl font-bold uppercase tracking-wider text-sm transition-all shadow-lg flex justify-center items-center gap-2 disabled:opacity-50"
                 >
                   {loading ? (
-                    <span className="material-symbols-outlined animate-spin">refresh</span>
+                    <RefreshCw size={20} className="animate-spin" />
                   ) : (
                     "Consultar Status"
                   )}
@@ -260,7 +261,7 @@ export const CheckStatusModal: React.FC<CheckStatusModalProps> = ({ isOpen, onCl
                     disabled={downloadingPass}
                     className="flex-1 py-3 bg-[#BF9B30] hover:bg-[#a68629] disabled:opacity-60 text-white rounded-xl font-bold text-sm transition-colors flex items-center justify-center gap-2"
                   >
-                    <span className="material-symbols-outlined text-sm">download</span> {isGoldPass ? (downloadingPass ? "A gerar…" : "Salvar passe") : "Salvar QR"}
+                    <Download size={14} className="text-sm" /> {isGoldPass ? (downloadingPass ? "A gerar…" : "Salvar passe") : "Salvar QR"}
                   </button>
                 </div>
               </div>

@@ -7,7 +7,15 @@ import { Navbar } from '../../components/Navbar';
 import { SEO } from '../../components/SEO';
 import { Skeleton } from '../../components/ui/Skeleton';
 import { getOptimizedImageUrl } from '../../lib/imageOptimizer';
-import { useFirebase } from '../../components/FirebaseProvider';
+import { useFirebase } from '../../components/firebase-context';
+import { Lock, Sparkles, Diamond, CookingPot } from 'lucide-react';
+
+const CATEGORY_ICONS: Record<string, React.ComponentType<{ size?: number | string; className?: string }>> = {
+  all: Sparkles,
+  wedding: Diamond,
+  bridal: CookingPot,
+};
+import { Hourglass } from 'lucide-react';
 
 const MotionLink = motion.create(Link as any) as any;
 
@@ -83,7 +91,7 @@ export const TemplateGalleryPage: React.FC = () => {
                      {/* Visitantes: ninguém avisava que é preciso conta para personalizar */}
                      {!user && (
                        <div className="mt-6 flex flex-col sm:flex-row items-stretch sm:items-center gap-3 bg-[#1B365D] rounded-2xl p-4 sm:p-5 shadow-lg shadow-brand-blue/10">
-                         <span className="material-symbols-outlined text-[#C5A028] text-2xl shrink-0 hidden sm:block">lock</span>
+                         <Lock size={32} className="text-[#C5A028] text-2xl shrink-0 hidden sm:block" />
                          <p className="flex-1 text-sm text-blue-50/90 leading-relaxed">
                            Encontrou o seu favorito? <strong className="text-white">Entre ou crie conta grátis</strong> para o personalizar com os seus dados.
                          </p>
@@ -113,7 +121,10 @@ export const TemplateGalleryPage: React.FC = () => {
                                 : 'bg-white text-slate-500 hover:bg-slate-100 hover:text-slate-900'
                             }`}
                         >
-                            <span className="material-symbols-outlined text-[20px]">{cat.icon}</span>
+                            {(() => {
+                                const CatIcon = CATEGORY_ICONS[cat.id] ?? Sparkles;
+                                return <CatIcon size={20} />;
+                            })()}
                             {cat.label}
                         </button>
                     ))}
@@ -158,7 +169,7 @@ export const TemplateGalleryPage: React.FC = () => {
                                         <div className="absolute top-2 right-2 md:top-4 md:right-4 z-20 flex flex-col md:flex-row gap-1 md:gap-2 items-end">
                                             {!user && (
                                                 <span className="inline-flex items-center gap-1 px-2 py-1 md:px-3 md:py-1.5 bg-black/50 backdrop-blur-md rounded-full text-[8px] md:text-xs font-bold text-white/90 shadow-sm">
-                                                    <span className="material-symbols-outlined text-[10px] md:text-sm">lock</span>
+                                                    <Lock size={10} className="text-[10px] md:text-sm" />
                                                     <span className="hidden md:inline">Requer conta</span>
                                                 </span>
                                             )}
@@ -177,7 +188,7 @@ export const TemplateGalleryPage: React.FC = () => {
                     </div>
                 ) : (
                     <div className="w-full text-center py-32 bg-white rounded-3xl border border-slate-100 flex flex-col items-center justify-center shadow-sm">
-                        <span className="material-symbols-outlined text-6xl text-slate-300 mb-6">hourglass_empty</span>
+                        <Hourglass size={20} className="text-6xl text-slate-300 mb-6" />
                         <h4 className="text-2xl font-serif font-bold text-slate-700 mb-3">Brevemente</h4>
                         <p className="text-slate-500 max-w-md text-lg">Os modelos para {CATEGORIES.find(c => c.id === selectedCategory)?.label.toLowerCase()} estão em desenvolvimento e estarão disponíveis muito em breve.</p>
                     </div>

@@ -321,6 +321,12 @@ export function calculateOrderTotal(planId: unknown, addons: Partial<Record<Addo
   return total;
 }
 
+// Promoção: Premium grátis por tempo limitado. Interruptor único — pôr a
+// false devolve o preço normal em todos os cartões, modais e mensagens.
+export const PREMIUM_PROMO_FREE = true;
+
+export const PREMIUM_PROMO_LABEL = 'Grátis';
+
 // Compat: preços centralizados para SEO/checkout — nunca duplicar
 export const PRICING = {
   ESSENTIAL: PLANS.essential.price,

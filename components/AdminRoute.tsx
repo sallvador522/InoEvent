@@ -1,5 +1,5 @@
 import React from 'react';
-import { useFirebase } from './FirebaseProvider';
+import { useFirebase } from './firebase-context';
 import { NotFound } from './NotFound';
 
 export const AdminRoute: React.FC<{ children: React.ReactNode }> = ({ children }) => {

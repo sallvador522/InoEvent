@@ -10,6 +10,7 @@ import { getValidityDays, normalizePlanId, getPlanConfig } from '../../config/pl
 import { normalizeAccountType } from '../../types';
 import { downloadCSV } from '../../lib/csv';
 import { UserMirror } from '../../components/admin/UserMirror';
+import { ArrowLeft, ArrowRight, Award, BellRing, Eye, Languages, Layers, MonitorSmartphone, Search, Send, Share2, Smartphone, SprayCan, TrendingUp } from 'lucide-react';
 
 export const AdminDashboard: React.FC = () => {
   const [users, setUsers] = useState<any[]>([]);
@@ -95,7 +96,8 @@ export const AdminDashboard: React.FC = () => {
         
         let visitsData: any[] = [];
         try {
-          const visitsSnapshot = await getDocs(collection(db, 'visits'));
+          // Teto 500 por data (era coleção inteira sem limite — cresce sem teto).
+          const visitsSnapshot = await getDocs(query(collection(db, 'visits'), orderBy('timestamp', 'desc'), limit(500)));
           visitsData = visitsSnapshot.docs.map(doc => ({ id: doc.id, ...doc.data() }));
         } catch (visErr) {
           console.warn('Falha ao buscar visitas (talvez a coleção esteja vazia):', visErr);
@@ -1169,7 +1171,7 @@ export const AdminDashboard: React.FC = () => {
                 onClick={() => setSelectedUser(null)}
                 className="flex items-center gap-2 text-slate-500 hover:text-brand-blue transition-colors mb-4 text-sm font-bold"
               >
-                <span className="material-symbols-outlined text-sm">arrow_back</span>
+                <ArrowLeft size={14} className="text-sm" />
                 Voltar para lista
               </button>
               <h2 className="text-2xl font-bold text-slate-900">{selectedUser.email || 'Usuário'}</h2>
@@ -1271,7 +1273,7 @@ export const AdminDashboard: React.FC = () => {
                     className="flex items-center gap-1.5 bg-white text-brand-blue text-xs font-bold px-4 py-2 rounded-xl border border-brand-blue/30 shadow-sm hover:bg-brand-blue/5 transition-all outline-none cursor-pointer"
                     title="Ver o painel exatamente como este usuário vê (somente leitura)"
                   >
-                    <span className="material-symbols-outlined text-sm">visibility</span>
+                    <Eye size={14} className="text-sm" />
                     Ver como usuário
                   </button>
                   {(selectedUser as any)?.suspendedAt ? (
@@ -1301,7 +1303,7 @@ export const AdminDashboard: React.FC = () => {
                     }}
                     className="flex items-center gap-1.5 bg-brand-blue text-white text-xs font-bold px-4 py-2 rounded-xl shadow-md shadow-brand-blue/10 hover:bg-brand-blue/90 hover:scale-[1.02] active:scale-95 transition-all outline-none cursor-pointer"
                   >
-                    <span className="material-symbols-outlined text-sm">notifications_active</span>
+                    <BellRing size={14} className="text-sm" />
                     Enviar Notificação
                   </button>
                 </li>
@@ -1401,7 +1403,7 @@ export const AdminDashboard: React.FC = () => {
         </div>
         <div className="p-4 border-b border-slate-100 flex flex-col sm:flex-row gap-4 justify-between items-center bg-slate-50/50">
            <div className="flex w-full sm:w-auto relative">
-              <span className="material-symbols-outlined absolute left-3 top-1/2 -translate-y-1/2 text-slate-400 text-sm">search</span>
+              <Search size={14} className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-400 text-sm" />
               <input 
                  type="text" 
                  placeholder="Buscar por e-mail, nome ou UID..." 
@@ -1526,7 +1528,7 @@ export const AdminDashboard: React.FC = () => {
       {/* Manutenção Storage: comprovantes órfãos (eventos apagados antes da limpeza automática) */}
       <div className="px-4 py-3 border-b border-slate-100 bg-amber-50/50 flex flex-col sm:flex-row sm:items-center gap-2 sm:gap-3">
         <div className="flex items-center gap-2 text-sm">
-          <span className="material-symbols-outlined text-amber-600 text-lg">cleaning_services</span>
+          <SprayCan size={20} className="text-amber-600 text-lg" />
           <span className="font-bold text-slate-700">Comprovantes órfãos</span>
           {cleanupResult && (
             <span className="text-xs text-slate-500">
@@ -1558,7 +1560,7 @@ export const AdminDashboard: React.FC = () => {
       </div>
       <div className="p-4 border-b border-slate-100 flex flex-col lg:flex-row gap-3 lg:items-center bg-slate-50/50">
         <div className="flex w-full lg:w-auto relative">
-          <span className="material-symbols-outlined absolute left-3 top-1/2 -translate-y-1/2 text-slate-400 text-sm">search</span>
+          <Search size={14} className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-400 text-sm" />
           <input
             type="text"
             placeholder="Buscar título, ID ou e-mail do dono…"
@@ -2193,9 +2195,9 @@ export const AdminDashboard: React.FC = () => {
               >
                 <div className="flex items-center gap-3 mb-4">
                   <div className="w-10 h-10 rounded-full bg-brand-blue/10 flex items-center justify-center text-brand-blue">
-                    <span className="material-symbols-outlined text-[20px]">
-                      {pendingPlanChange ? 'military_tech' : 'notifications_active'}
-                    </span>
+                    {pendingPlanChange
+                      ? <Award size={20} />
+                      : <BellRing size={20} />}
                   </div>
                   <div>
                     <h3 className="text-lg font-serif font-bold text-slate-900">
@@ -2221,7 +2223,7 @@ export const AdminDashboard: React.FC = () => {
                     <p className="text-slate-600 font-medium">Você está a alterar o plano deste utilizador:</p>
                     <div className="flex items-center gap-2 mt-1.5">
                       <span className="font-bold text-slate-500 line-through">{pendingPlanChange.currentPlan}</span>
-                      <span className="material-symbols-outlined text-slate-400 text-sm">arrow_forward</span>
+                      <ArrowRight size={14} className="text-slate-400 text-sm" />
                       <span className="font-bold text-brand-blue bg-blue-100/50 px-2.5 py-0.5 rounded-full">{pendingPlanChange.nextPlan}</span>
                     </div>
                   </div>
@@ -2279,7 +2281,7 @@ export const AdminDashboard: React.FC = () => {
                     {isSendingNotif ? (
                       <span className="w-4 h-4 border-2 border-white/40 border-t-white rounded-full animate-spin" aria-hidden="true" />
                     ) : (
-                      <span className="material-symbols-outlined text-[16px]">send</span>
+                      <Send size={16} className="text-[16px]" />
                     )}
                     {isSendingNotif ? 'A enviar…' : 'Confirmar e Enviar'}
                   </button>
@@ -2428,12 +2430,12 @@ const AnalyticsView: React.FC<AnalyticsViewProps> = ({ visits, events, users }) 
             <p className="text-xs font-bold text-slate-400 uppercase tracking-widest">Total de Visitas</p>
             <h3 className="text-3xl font-serif font-bold text-slate-900">{totalVisits}</h3>
             <p className="text-xs text-green-500 font-medium flex items-center gap-0.5">
-              <span className="material-symbols-outlined text-[14px]">trending_up</span>
+              <TrendingUp size={14} className="text-[14px]" />
               <span>Sessões registradas</span>
             </p>
           </div>
           <div className="w-12 h-12 rounded-full bg-violet-100 flex items-center justify-center text-violet-600">
-            <span className="material-symbols-outlined text-[24px]">visibility</span>
+            <Eye size={24} className="text-[24px]" />
           </div>
         </div>
 
@@ -2444,7 +2446,7 @@ const AnalyticsView: React.FC<AnalyticsViewProps> = ({ visits, events, users }) 
             <p className="text-xs text-slate-400">Total de URLs rastreadas</p>
           </div>
           <div className="w-12 h-12 rounded-full bg-emerald-100 flex items-center justify-center text-emerald-600">
-            <span className="material-symbols-outlined text-[24px]">layers</span>
+            <Layers size={24} className="text-[24px]" />
           </div>
         </div>
 
@@ -2455,7 +2457,7 @@ const AnalyticsView: React.FC<AnalyticsViewProps> = ({ visits, events, users }) 
             <p className="text-xs text-slate-400">{mobileVisits} de {totalVisits} visitas</p>
           </div>
           <div className="w-12 h-12 rounded-full bg-blue-100 flex items-center justify-center text-blue-600">
-            <span className="material-symbols-outlined text-[24px]">phone_iphone</span>
+            <Smartphone size={24} className="text-[24px]" />
           </div>
         </div>
 
@@ -2466,7 +2468,7 @@ const AnalyticsView: React.FC<AnalyticsViewProps> = ({ visits, events, users }) 
             <p className="text-xs text-slate-400">{topReferrerPercentage}% ({topReferrerCount} visitas)</p>
           </div>
           <div className="w-12 h-12 rounded-full bg-rose-100 flex items-center justify-center text-rose-600">
-            <span className="material-symbols-outlined text-[24px]">language</span>
+            <Languages size={24} className="text-[24px]" />
           </div>
         </div>
       </div>
@@ -2515,7 +2517,7 @@ const AnalyticsView: React.FC<AnalyticsViewProps> = ({ visits, events, users }) 
         <div className="space-y-6 flex flex-col justify-between">
           <div className="bg-white p-6 rounded-2xl shadow-sm border border-slate-100 flex-1">
             <h4 className="text-sm font-bold text-slate-800 uppercase tracking-wider mb-4 flex items-center gap-2">
-              <span className="material-symbols-outlined text-violet-500 text-[18px]">devices</span>
+              <MonitorSmartphone size={18} className="text-violet-500 text-[18px]" />
               <span>Dispositivos</span>
             </h4>
             <div className="space-y-4">
@@ -2540,7 +2542,7 @@ const AnalyticsView: React.FC<AnalyticsViewProps> = ({ visits, events, users }) 
 
           <div className="bg-white p-6 rounded-2xl shadow-sm border border-slate-100 flex-1 mt-4 lg:mt-0">
             <h4 className="text-sm font-bold text-slate-800 uppercase tracking-wider mb-4 flex items-center gap-2">
-              <span className="material-symbols-outlined text-emerald-500 text-[18px]">language</span>
+              <Languages size={18} className="text-emerald-500 text-[18px]" />
               <span>Navegadores</span>
             </h4>
             <div className="space-y-3 max-h-48 overflow-y-auto custom-scrollbar pr-1">
@@ -2610,7 +2612,7 @@ const AnalyticsView: React.FC<AnalyticsViewProps> = ({ visits, events, users }) 
 
         <div className="bg-white p-6 rounded-2xl shadow-sm border border-slate-100 flex flex-col">
           <h4 className="text-sm font-bold text-slate-800 uppercase tracking-wider mb-4 flex items-center gap-2">
-            <span className="material-symbols-outlined text-rose-500 text-[18px]">share</span>
+            <Share2 size={18} className="text-rose-500 text-[18px]" />
             <span>Fontes de Referência</span>
           </h4>
           <div className="space-y-4 flex-1">

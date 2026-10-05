@@ -99,18 +99,21 @@ router.post('/api/promo/first-event', apiRateLimiter, async (req, res) => {
       updatedAt: now,
     } as any);
     // Carimba eventos irmãos como conta ativa (mesma semântica do confirmPayment).
+    // Writes em chunks de 400 — um batch único rebenta acima de 500 eventos.
     try {
       const owned = await db.collection('events').where('ownerId', '==', ownerId).get();
-      const batch = db.batch();
-      owned.docs.forEach((d) => {
-        if (d.id === eventId) return;
-        batch.update(d.ref, {
-          accountActive: true,
-          accountExpiresAt: expiresAt ? expiresAt.toISOString() : null,
-          updatedAt: now,
-        } as any);
-      });
-      await batch.commit();
+      const siblings = owned.docs.filter((d) => d.id !== eventId);
+      for (let i = 0; i < siblings.length; i += 400) {
+        const batch = db.batch();
+        siblings.slice(i, i + 400).forEach((d) => {
+          batch.update(d.ref, {
+            accountActive: true,
+            accountExpiresAt: expiresAt ? expiresAt.toISOString() : null,
+            updatedAt: now,
+          } as any);
+        });
+        await batch.commit();
+      }
     } catch { /* best-effort */ }
 
     try {

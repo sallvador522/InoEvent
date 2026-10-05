@@ -1,6 +1,34 @@
 import React, { useState, useEffect, useRef } from 'react';
 import { useParams, Link, useNavigate, useSearchParams } from 'react-router-dom';
-import { Users, CheckCircle2, QrCode, Share2, Download, Clock, Search, MessageSquare, ArrowLeft, MoreHorizontal, Settings, Copy, Check, Edit2, Trash2, Plus, MessageCircle, UploadCloud, Gem, Gift, Camera, Bell, BellOff, Volume2, Printer, Eye } from 'lucide-react';
+import {
+  ArrowLeft,
+  Bell,
+  BellOff,
+  Camera,
+  Check,
+  CheckCircle2,
+  Clock,
+  Copy,
+  Download,
+  Edit2,
+  Eye,
+  Gem,
+  Gift,
+  MessageCircle,
+  MessageSquare,
+  MoreHorizontal,
+  Plus,
+  Printer,
+  QrCode,
+  Search,
+  Settings,
+  Share2,
+  Trash2,
+  UploadCloud,
+  Users,
+  UtensilsCrossed,
+  Volume2,
+} from 'lucide-react';
 import { motion, AnimatePresence } from 'framer-motion';
 import { Virtuoso } from 'react-virtuoso';
 import { doc, collection, onSnapshot, deleteDoc, updateDoc, setDoc } from 'firebase/firestore';
@@ -1343,7 +1371,7 @@ export const Dashboard = () => {
                             onClick={() => setActiveTab('tables')}
                             className={`flex-1 md:flex-none justify-center px-4 md:px-6 py-2.5 rounded-xl lg:rounded-full font-bold text-sm transition-all flex items-center gap-2 ${activeTab === 'tables' ? 'bg-white shadow-sm text-brand-blue' : 'text-slate-500 hover:text-slate-700'}`}
                         >
-                            <span className="material-symbols-outlined text-[18px]">table_restaurant</span> Mapa das Mesas
+                            <UtensilsCrossed size={18} className="text-[18px]" /> Mapa das Mesas
                         </button>
                     )}
 

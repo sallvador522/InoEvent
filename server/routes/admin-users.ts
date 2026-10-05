@@ -52,14 +52,24 @@ router.post('/api/admin/users/:id/plan', apiRateLimiter, async (req, res) => {
     if (toIdx >= 0 && fromIdx >= 0 && toIdx < fromIdx) {
       const newLimit = getGuestLimit(nextPlan);
       const owned = await db.collection('events').where('ownerId', '==', id).get();
-      for (const ev of owned.docs) {
-        const gsnap = await ev.ref.collection('guests').get();
-        const occ = gsnap.docs.filter((d) => (d.data() as any)?.status !== 'DECLINED').length;
-        if (occ > newLimit) {
-          return res.status(400).json({
-            error: `"${(ev.data() as any)?.title || ev.id}" tem ${occ} convidados e o plano ${getPlanConfig(nextPlan).name} permite ${newLimit}.`,
-            code: 'PLAN_DOWNGRADE_BLOCKED',
-          });
+      // Ocupação via count() em ondas de 10 (era full-scan por evento em
+      // sequência). Early-exit no primeiro evento que excede a quota.
+      const docs = owned.docs;
+      for (let i = 0; i < docs.length; i += 10) {
+        const wave = await Promise.all(
+          docs.slice(i, i + 10).map(async (ev) => {
+            const gref = ev.ref.collection('guests');
+            const [t, declined] = await Promise.all([gref.count().get(), gref.where('status', '==', 'DECLINED').count().get()]);
+            return { ev, occ: (t.data().count ?? 0) - (declined.data().count ?? 0) };
+          })
+        );
+        for (const { ev, occ } of wave) {
+          if (occ > newLimit) {
+            return res.status(400).json({
+              error: `"${(ev.data() as any)?.title || ev.id}" tem ${occ} convidados e o plano ${getPlanConfig(nextPlan).name} permite ${newLimit}.`,
+              code: 'PLAN_DOWNGRADE_BLOCKED',
+            });
+          }
         }
       }
     }

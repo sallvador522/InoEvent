@@ -103,7 +103,9 @@ router.get('/api/admin/tickets', apiRateLimiter, async (req, res) => {
   if (!checkIsAdmin(authUser)) return res.status(403).json({ error: 'Apenas admin' });
   try {
     const db = getDb();
-    const snap = await db.collection('tickets').get();
+    // Fila admin com teto: 200 mais recentes (era coleção inteira sem limite).
+    // A ordenação final (vencidos → abertos → recentes) continua em memória.
+    const snap = await db.collection('tickets').orderBy('updatedAt', 'desc').limit(200).get();
     const now = Date.now();
     const list = snap.docs.map((d) => {
       const data = d.data() as any;

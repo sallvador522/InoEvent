@@ -84,8 +84,14 @@ router.post('/api/events', apiRateLimiter, async (req, res) => {
     }
     if (!draft && !isShower && !isBusinessPlan(userPlan)) {
       const limit = getEventCreationLimit(userPlan);
-      const snap = await db.collection('events').where('ownerId', '==', ownerId).get();
-      const current = snap.docs.filter((d) => !SHOWER_TYPES.includes((d.data() as any)?.type)).length;
+      // Agregação server-side (era full-scan + filter em memória):
+      // não-shower = total − Σ(shower types). Mesma semântica, 3 agregações.
+      const ownerQ = db.collection('events').where('ownerId', '==', ownerId);
+      const [totalAgg, ...showerAggs] = await Promise.all([
+        ownerQ.count().get(),
+        ...SHOWER_TYPES.map((t) => ownerQ.where('type', '==', t).count().get()),
+      ]);
+      const current = (totalAgg.data().count ?? 0) - showerAggs.reduce((a, s) => a + (s.data().count ?? 0), 0);
       if (current >= limit) {
         return res.status(403).json({
           error: `Você atingiu o limite de ${limit} eventos do seu plano. Faça upgrade para criar mais!`,

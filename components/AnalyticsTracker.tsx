@@ -1,7 +1,5 @@
 import React, { useEffect } from 'react';
 import { useLocation } from 'react-router-dom';
-import { db } from './FirebaseProvider';
-import { collection, addDoc } from 'firebase/firestore';
 import { initPixel, trackPixelPageView, trackPixelViewContent, hasPixelConsent } from '../lib/metaPixel';
 
 declare global {
@@ -124,24 +122,32 @@ export const AnalyticsTracker: React.FC = () => {
 
     // Escrita no Firestore adiada para o idle — fire-and-forget, nunca await na rota.
     // Antes: `await addDoc(...)` segurava o effect e competia com o LCP da landing.
+    // O SDK carrega aqui por dynamic import: a visita regista-se sem o Firebase
+    // estar no caminho crítico do boot.
     runWhenIdle(() => {
-      try {
-        const device = getDeviceType();
-        const browser = getBrowserType();
-        const referrer = document.referrer ? new URL(document.referrer).hostname : 'Direto';
-        void addDoc(collection(db, 'visits'), {
-          path,
-          eventId: eventId || null,
-          device,
-          browser,
-          referrer,
-          timestamp: new Date().toISOString()
-        }).catch((err) => {
+      void (async () => {
+        try {
+          const [{ db }, { collection, addDoc }] = await Promise.all([
+            import('./FirebaseProvider'),
+            import('firebase/firestore'),
+          ]);
+          const device = getDeviceType();
+          const browser = getBrowserType();
+          const referrer = document.referrer ? new URL(document.referrer).hostname : 'Direto';
+          await addDoc(collection(db, 'visits'), {
+            path,
+            eventId: eventId || null,
+            device,
+            browser,
+            referrer,
+            timestamp: new Date().toISOString()
+          }).catch((err) => {
+            console.warn('[AnalyticsTracker Error] Falha ao registrar visita:', err);
+          });
+        } catch (err) {
           console.warn('[AnalyticsTracker Error] Falha ao registrar visita:', err);
-        });
-      } catch (err) {
-        console.warn('[AnalyticsTracker Error] Falha ao registrar visita:', err);
-      }
+        }
+      })();
     });
   }, [location.pathname, location.search]);
 

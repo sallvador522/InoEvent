@@ -22,19 +22,37 @@ import { logger } from './lib/logger.js';
 import './server/lib/firebase-admin.js';
 
 // --- Route Modules ---
+// Public/conversion path stays eager: landing-adjacent hits (/invite/:id,
+// /plans, RSVP, geo) must not pay for admin code on cold start.
 import rsvpRoutes from './server/routes/rsvp.js';
 import eventsRoutes from './server/routes/events.js';
 import geoRoutes from './server/routes/geo.js';
 import seoRoutes from './server/routes/seo.js';
 import ordersRoutes from './server/routes/orders.js';
 import metaRoutes from './server/routes/meta.js';
-import subscriptionsRoutes from './server/routes/subscriptions.js';
-import adminEventsRoutes from './server/routes/admin-events.js';
-import adminUsersRoutes from './server/routes/admin-users.js';
-import adminTeamRoutes from './server/routes/admin-team.js';
-import ticketsRoutes from './server/routes/tickets.js';
 import promoRoutes from './server/routes/promo.js';
-import privacyRoutes from './server/routes/privacy.js';
+
+// Heavy/admin-only routers load lazily on first hit under their prefix,
+// keeping the public cold start lean. Same handler semantics, deferred cost.
+import type { RequestHandler } from 'express';
+function lazyRoute(importer: () => Promise<{ default: any }>): RequestHandler {
+  let cached: any = null;
+  let loading: Promise<any> | null = null;
+  return (req, res, next) => {
+    if (cached) return cached(req, res, next);
+    if (!loading) loading = importer().then((m) => (cached = m.default));
+    loading.then(
+      (handler) => handler(req, res, next),
+      (err) => next(err)
+    );
+  };
+}
+const subscriptionsRoutes = lazyRoute(() => import('./server/routes/subscriptions.js'));
+const adminEventsRoutes = lazyRoute(() => import('./server/routes/admin-events.js'));
+const adminUsersRoutes = lazyRoute(() => import('./server/routes/admin-users.js'));
+const adminTeamRoutes = lazyRoute(() => import('./server/routes/admin-team.js'));
+const ticketsRoutes = lazyRoute(() => import('./server/routes/tickets.js'));
+const privacyRoutes = lazyRoute(() => import('./server/routes/privacy.js'));
 
 // --- Express App ---
 const app = express();

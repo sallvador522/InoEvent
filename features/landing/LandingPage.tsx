@@ -1,7 +1,7 @@
 import React, { useState, useEffect, useRef, lazy, Suspense } from 'react';
 import { Link, useNavigate, useLocation } from 'react-router-dom';
-import { motion, AnimatePresence } from 'framer-motion';
-import { useFirebase } from '../../components/FirebaseProvider';
+import { motion, AnimatePresence } from 'motion/react';
+import { useFirebase } from '../../components/firebase-context';
 import { normalizePlanId } from '../../lib/entitlements';
 import { Navbar } from '../../components/Navbar';
 import { SEO } from '../../components/SEO';
@@ -14,11 +14,10 @@ const MapEmbed = lazy(() =>
   import('../../components/MapEmbed').then((m) => ({ default: m.MapEmbed }))
 );
 import { buildEmbedSrc, buildDirectionsUrl, DEFAULT_CENTER } from '../../lib/maps';
-import { EVENTS } from '../../mockData';
 import { X, Copy, MessageSquare, ArrowRight, Award, CheckCircle2, Gem, Utensils, Briefcase, QrCode, Gift, Users, BookOpen, Globe, ChevronLeft, ChevronRight, MapPin, Navigation } from 'lucide-react';
 import toast from 'react-hot-toast';
 import { copyToClipboard } from '../../lib/clipboard';
-import { PLANS, ADDONS } from '../../config/plans';
+import { PLANS, ADDONS, PREMIUM_PROMO_FREE, PREMIUM_PROMO_LABEL } from '../../config/plans';
 
 // NOTA: depoimentos ilustrativos — trocar por clientes reais com nome, foto e autorização assim que existirem.
 const QUOTES = [
@@ -554,11 +553,25 @@ export const LandingPage: React.FC = () => {
             <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 items-stretch justify-center gap-6">
               {/* Plan 1: Premium */}
               <div className="w-full bg-[#FFFDF8] rounded-2xl p-8 border border-[#C5A028]/30 flex flex-col relative" style={{ transition: 'border-color 200ms ease, box-shadow 200ms ease' }}>
+                  {PREMIUM_PROMO_FREE && (
+                    <div className="absolute top-0 left-1/2 -translate-x-1/2 -translate-y-1/2 bg-emerald-600 text-white text-[10px] font-bold uppercase tracking-[0.14em] py-1 px-4 rounded-full whitespace-nowrap shadow-lg shadow-emerald-600/30">
+                      Promoção · {PREMIUM_PROMO_LABEL}
+                    </div>
+                  )}
                   <h4 className="font-serif text-2xl font-bold text-[#1B365D] mb-1">Premium</h4>
                   <p className="text-slate-500 text-[13px] font-light leading-relaxed mb-6">O grande dia, em grande e inesquecível.</p>
                   <div className="mb-2 flex items-baseline gap-1">
-                     <span className="text-4xl font-serif font-bold text-slate-900" style={{ fontVariantNumeric: 'tabular-nums' }}>{PLANS.premium.price.toLocaleString('pt-AO')}</span>
-                     <span className="text-slate-500 text-sm font-medium">Kz / evento</span>
+                     {PREMIUM_PROMO_FREE ? (
+                       <span className="flex flex-col items-start gap-1">
+                         <span className="text-2xl font-serif font-bold text-slate-400 line-through decoration-red-500 decoration-2" style={{ fontVariantNumeric: 'tabular-nums' }}>{PLANS.premium.price.toLocaleString('pt-AO')}</span>
+                         <span className="text-4xl font-serif font-bold text-emerald-600">{PREMIUM_PROMO_LABEL}</span>
+                       </span>
+                     ) : (
+                       <>
+                         <span className="text-4xl font-serif font-bold text-slate-900" style={{ fontVariantNumeric: 'tabular-nums' }}>{PLANS.premium.price.toLocaleString('pt-AO')}</span>
+                         <span className="text-slate-500 text-sm font-medium">Kz / evento</span>
+                       </>
+                     )}
                   </div>
                   <p className="text-xs text-slate-500 font-light mb-6">Válido por {PLANS.premium.validityDays} dias · Até {PLANS.premium.guestLimit} convidados</p>
                   <ul className="flex flex-col gap-3 mb-8 flex-1">
@@ -604,7 +617,7 @@ export const LandingPage: React.FC = () => {
                      </li>
                   </ul>
                  <button
-                     onClick={() => confirmPlanSelection("Premium", `${PLANS.premium.price.toLocaleString('pt-AO')} Kz`)}
+                     onClick={() => confirmPlanSelection("Premium", PREMIUM_PROMO_FREE ? `${PREMIUM_PROMO_LABEL} (promoção)` : `${PLANS.premium.price.toLocaleString('pt-AO')} Kz`)}
                      className="w-full py-3.5 rounded-full border border-[#1B365D]/30 text-[#1B365D] font-bold text-xs uppercase tracking-wider hover:bg-[#1B365D] hover:text-white active:scale-[0.97] cursor-pointer"
                      style={{ transition: 'transform 160ms ease-out, background-color 200ms ease, color 200ms ease' }}
                   >

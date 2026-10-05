@@ -81,8 +81,13 @@ router.post('/api/orders', apiRateLimiter, async (req, res) => {
     // Travão de downgrade (§10/§11): não admite pedido para plano menor que a
     // ocupação atual (recusados não contam — libertam o lugar, mesma semântica
     // da quota de RSVP). Evita ativar Essential-100 num evento com 500 pessoas.
-    const guestsSnap = await db.collection('events').doc(eventId).collection('guests').get();
-    const occupying = guestsSnap.docs.filter((d) => (d.data() as any)?.status !== 'DECLINED').length;
+    // Agregação server-side: conta sem descarregar nenhum documento (500 reads → 2).
+    const guestsRef = db.collection('events').doc(eventId).collection('guests');
+    const [totalAgg, declinedAgg] = await Promise.all([
+      guestsRef.count().get(),
+      guestsRef.where('status', '==', 'DECLINED').count().get(),
+    ]);
+    const occupying = (totalAgg.data().count ?? 0) - (declinedAgg.data().count ?? 0);
     const newLimit = getGuestLimit(planId);
     if (occupying > newLimit) {
       return res.status(400).json({
@@ -199,7 +204,8 @@ router.post('/api/orders/:id/fail', apiRateLimiter, async (req, res) => {
 
 // ---------------------------------------------------------------------------
 // POST /api/admin/backfill-accounts — carimba eventos de contas pagas (retroativos)
-// Body opcional: { userId } para um utilizador; sem body = todas as contas pagas.
+// Body: { userId? } para um utilizador; sem body = todas as contas pagas.
+// Dry-run por omissão — escrita real SÓ com { confirm: true }.
 // Admin estrito: exige Bearer de admin (sem modo dev permissivo — escrita em massa).
 // ---------------------------------------------------------------------------
 router.post('/api/admin/backfill-accounts', apiRateLimiter, async (req, res) => {
@@ -208,13 +214,16 @@ router.post('/api/admin/backfill-accounts', apiRateLimiter, async (req, res) => 
     return res.status(403).json({ error: 'Apenas admin' });
   }
   try {
-    const { userId } = (req.body || {}) as any;
+    const { userId, confirm } = (req.body || {}) as any;
     if (userId && typeof userId !== 'string') {
       return res.status(400).json({ error: 'userId inválido' });
     }
-    const result = await backfillAccountStamps(userId);
-    await logAudit({ actorEmail: authUser.email || 'admin', action: 'accounts.backfill', targetType: 'system', targetId: userId || 'all', metadata: result as any });
-    return res.json({ success: true, ...result });
+    const dryRun = confirm !== true;
+    const result = await backfillAccountStamps(userId, { dryRun });
+    if (!dryRun) {
+      await logAudit({ actorEmail: authUser.email || 'admin', action: 'accounts.backfill', targetType: 'system', targetId: userId || 'all', metadata: result as any });
+    }
+    return res.json({ success: true, dryRun, ...result });
   } catch (err: any) {
     logger.error('Backfill contas erro', { category: 'SYSTEM', data: err?.message || err });
     return res.status(500).json({ error: 'Erro no backfill' });
@@ -253,6 +262,8 @@ router.post('/api/webhooks/payment', async (req, res) => {
 // ---------------------------------------------------------------------------
 // POST /api/admin/backfill-order-titles — preenche eventTitle denormalizado
 // em pedidos antigos (criados antes da denormalização). Admin estrito.
+// Cursor pagination (500/página) + getAll em chunks de 100 + batch writes de
+// 400. Dry-run por omissão — escrita real SÓ com { confirm: true }.
 // ---------------------------------------------------------------------------
 router.post('/api/admin/backfill-order-titles', apiRateLimiter, async (req, res) => {
   const authUser = await getAuthUser(req);
@@ -261,27 +272,71 @@ router.post('/api/admin/backfill-order-titles', apiRateLimiter, async (req, res)
   }
   try {
     const db = getDb();
-    const snap = await db.collection('orders').get();
+    const { confirm } = (req.body || {}) as any;
+    const dryRun = confirm !== true;
     let updated = 0;
     let skipped = 0;
-    for (const d of snap.docs) {
-      const data = d.data() as any;
-      if (data?.eventTitle) { skipped++; continue; }
-      if (!data?.eventId) { skipped++; continue; }
-      try {
-        const evSnap = await db.collection('events').doc(data.eventId).get();
-        const title = evSnap.exists && typeof (evSnap.data() as any)?.title === 'string'
-          ? (evSnap.data() as any).title.slice(0, 100)
-          : null;
-        if (!title) { skipped++; continue; }
-        await d.ref.update({ eventTitle: title } as any);
-        updated++;
-      } catch {
-        skipped++;
+    let scanned = 0;
+    let lastId: string | null = null;
+    for (;;) {
+      let pageQ: FirebaseFirestore.Query = db.collection('orders').orderBy('__name__').limit(500);
+      if (lastId) {
+        const lastSnap = await db.collection('orders').doc(lastId).get();
+        if (lastSnap.exists) pageQ = pageQ.startAfter(lastSnap);
       }
+      const snap = await pageQ.get();
+      if (snap.empty) break;
+      scanned += snap.size;
+      lastId = snap.docs[snap.docs.length - 1].id;
+
+      // Candidatos: sem eventTitle + com eventId.
+      const pending = snap.docs.filter((d) => {
+        const data = d.data() as any;
+        return !data?.eventTitle && data?.eventId;
+      });
+      skipped += snap.size - pending.length;
+      if (pending.length === 0) {
+        if (snap.size < 500) break;
+        continue;
+      }
+
+      // Títulos via getAll batched (chunks de ~100), sem N round-trips.
+      const eventIds = [...new Set(pending.map((d) => (d.data() as any).eventId as string))];
+      const titles = new Map<string, string>();
+      for (let i = 0; i < eventIds.length; i += 100) {
+        const refs = eventIds.slice(i, i + 100).map((eid) => db.collection('events').doc(eid));
+        const snaps = await db.getAll(...refs);
+        for (const evSnap of snaps) {
+          const t = evSnap.exists && typeof (evSnap.data() as any)?.title === 'string'
+            ? (evSnap.data() as any).title.slice(0, 100)
+            : null;
+          if (t) titles.set(evSnap.id, t);
+        }
+      }
+
+      if (!dryRun) {
+        // Batch writes de 400 (limite Firestore: 500/op).
+        const writes = pending
+          .map((d) => ({ ref: d.ref, title: titles.get((d.data() as any).eventId) || null }))
+          .filter((w) => w.title);
+        skipped += pending.length - writes.length;
+        for (let i = 0; i < writes.length; i += 400) {
+          const batch = db.batch();
+          for (const w of writes.slice(i, i + 400)) {
+            batch.update(w.ref, { eventTitle: w.title } as any);
+          }
+          await batch.commit();
+        }
+        updated += writes.length;
+      } else {
+        updated += pending.filter((d) => titles.get((d.data() as any).eventId)).length;
+      }
+      if (snap.size < 500) break;
     }
-    await logAudit({ actorEmail: authUser.email || 'admin', action: 'order_titles.backfill', targetType: 'system', targetId: 'orders', metadata: { updated, skipped, total: snap.size } });
-    return res.json({ success: true, updated, skipped, total: snap.size });
+    if (!dryRun) {
+      await logAudit({ actorEmail: authUser.email || 'admin', action: 'order_titles.backfill', targetType: 'system', targetId: 'orders', metadata: { updated, skipped, scanned } });
+    }
+    return res.json({ success: true, dryRun, updated, skipped, scanned });
   } catch (err: any) {
     logger.error('Backfill order titles erro', { category: 'SYSTEM', data: err?.message || err });
     return res.status(500).json({ error: 'Erro no backfill' });

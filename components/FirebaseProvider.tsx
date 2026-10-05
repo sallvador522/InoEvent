@@ -1,10 +1,11 @@
-import React, { createContext, useContext, useEffect, useState } from 'react';
+import React, { useEffect, useState } from 'react';
 import { initializeApp } from 'firebase/app';
 import { getAuth, GoogleAuthProvider, onAuthStateChanged, User, signOut } from 'firebase/auth';
 import { getFirestore, doc, onSnapshot, getDocFromServer, initializeFirestore, setLogLevel, setDoc, updateDoc, persistentLocalCache, persistentMultipleTabManager } from 'firebase/firestore';
 import firebaseConfig from '../firebase-applet-config.json';
 import { logger } from '../lib/logger';
 import { normalizePlanId } from '../config/plans';
+import { FirebaseContext, OperationType } from './firebase-context';
 
 const app = initializeApp(firebaseConfig);
 export const auth = getAuth(app);
@@ -20,15 +21,9 @@ setLogLevel('error');
 
 
 export { signOut };
-
-export enum OperationType {
-  CREATE = 'create',
-  UPDATE = 'update',
-  DELETE = 'delete',
-  LIST = 'list',
-  GET = 'get',
-  WRITE = 'write',
-}
+// OperationType lives in ./firebase-context (SDK-free) so light consumers
+// don't pull the SDK. Re-exported here for backward compatibility.
+export { OperationType };
 
 interface FirestoreErrorInfo {
   error: string;
@@ -89,16 +84,6 @@ export function handleFirestoreError(error: unknown, operationType: OperationTyp
 
   throw new Error(JSON.stringify(errInfo));
 }
-
-interface FirebaseContextType {
-  user: User | null;
-  loading: boolean;
-  userProfile: any | null;
-  isOnline: boolean;
-}
-
-const FirebaseContext = createContext<FirebaseContextType>({ user: null, loading: true, userProfile: null, isOnline: true });
-
 
 const getCachedUser = () => {
   if (typeof window === 'undefined') return null;
@@ -237,4 +222,6 @@ export const FirebaseProvider: React.FC<{ children: React.ReactNode }> = ({ chil
   );
 };
 
-export const useFirebase = () => useContext(FirebaseContext);
+// Re-exported for backward compatibility — new light consumers should import
+// from './firebase-context' directly to avoid pulling the Firebase SDK.
+export { useFirebase } from './firebase-context';

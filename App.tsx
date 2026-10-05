@@ -54,10 +54,22 @@ const PageWrapper = ({ children }: { children: React.ReactNode }) => (
   </div>
 );
 
+// Toda a navegação volta ao topo: sem isto, ir da landing (scrollada) para
+// /templates, /plans ou /invite mantinha a posição de scroll anterior.
+const ScrollToTop: React.FC = () => {
+  const { pathname } = useLocation();
+  React.useEffect(() => {
+    window.scrollTo(0, 0);
+  }, [pathname]);
+  return null;
+};
+
 const AnimatedRoutes: React.FC = () => {
   const location = useLocation();
-  
+
   return (
+    <>
+    <ScrollToTop />
     <AnimatePresence>
       <Routes location={location} /* key={location.pathname} */>
         <Route path="/" element={<PageWrapper><LandingPage /></PageWrapper>} />
@@ -123,6 +135,7 @@ const AnimatedRoutes: React.FC = () => {
         <Route path="*" element={<PageWrapper><NotFound /></PageWrapper>} />
       </Routes>
     </AnimatePresence>
+    </>
   );
 };
 

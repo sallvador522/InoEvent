@@ -1,6 +1,16 @@
 import React, { useState } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
-import { ArrowLeft, Mail, Lock, User, Eye, EyeOff, Heart, Briefcase } from 'lucide-react';
+import {
+  ArrowLeft,
+  Briefcase,
+  Diamond,
+  Eye,
+  EyeOff,
+  Heart,
+  Lock,
+  Mail,
+  User,
+} from 'lucide-react';
 import { Link, useNavigate, useLocation, useSearchParams } from 'react-router-dom';
 import { GoogleAuthProvider, signInWithPopup, signInWithEmailAndPassword, createUserWithEmailAndPassword, updateProfile } from 'firebase/auth';
 import { auth, db } from '../../components/FirebaseProvider';
@@ -255,7 +265,7 @@ export const AuthPage: React.FC = () => {
         </button>
         
         <div className="text-center mb-8 mt-2">
-          <span className="material-symbols-outlined text-primary text-4xl mb-2">diamond</span>
+          <Diamond size={36} className="text-primary text-4xl mb-2" />
           <h2 className="text-3xl font-serif font-bold text-brand-blue mb-2">
             {isLogin ? 'Bem-vindo de volta' : 'Criar Sua Conta'}
           </h2>

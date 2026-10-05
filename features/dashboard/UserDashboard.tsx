@@ -85,7 +85,8 @@ export const UserDashboard: React.FC = () => {
         user.uid,
         "notifications",
       );
-      const q = query(notificationsRef, orderBy("createdAt", "desc"));
+      // Limitado a 30 como no Navbar — sem teto descarregava o histórico todo.
+      const q = query(notificationsRef, orderBy("createdAt", "desc"), limit(30));
       const unsubscribe = onSnapshot(
         q,
         (snapshot) => {

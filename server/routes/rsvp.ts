@@ -10,7 +10,7 @@
  */
 import { Router } from 'express';
 import multer from 'multer';
-import { getDb, getEventDetails, readLocalGuests, writeLocalGuest, fetchFirestoreGuestsWebSDK, admin } from '../lib/firebase-admin.js';
+import { getDb, getEventDetails, readLocalGuests, writeLocalGuest, fetchFirestoreGuestsWebSDK, getStorageBucket } from '../lib/firebase-admin.js';
 import { apiRateLimiter, rsvpRateLimiter } from '../middleware/index.js';
 import { logger } from '../../lib/logger.js';
 import { normalizePlanId, getGuestLimit, getPlanConfig } from '../../config/plans.js';
@@ -51,29 +51,52 @@ function parseReceipt(req: any, res: any, next: any) {
   });
 }
 
-/** Grava o comprovante no Storage e devolve URL assinada (longa duração). Null em falha. */
+/** Grava o comprovante no Storage e devolve URL pública ou assinada. Null em falha. */
 async function saveReceipt(
   eventId: string,
   guestId: string,
   file: { buffer: Buffer; mimetype: string; originalname?: string },
 ): Promise<{ url: string; name: string; kind: 'image' | 'pdf' } | null> {
   try {
-    const bucket = admin.storage().bucket();
+    const bucket = getStorageBucket();
     const ext = file.mimetype === 'application/pdf' ? 'pdf' : file.mimetype === 'image/png' ? 'png' : 'jpg';
     const dest = `receipts/${eventId}/${guestId}.${ext}`;
     await bucket.file(dest).save(file.buffer, {
       contentType: file.mimetype,
       metadata: { cacheControl: 'public, max-age=31536000' },
     });
-    const [url] = await bucket.file(dest).getSignedUrl({
-      action: 'read',
-      expires: '2036-01-01T00:00:00Z',
-    });
-    return {
-      url,
-      name: file.originalname || `comprovante.${ext}`,
-      kind: ext === 'pdf' ? 'pdf' : 'image',
-    };
+    // 1ª tentativa: URL assinada longa (compatível com o painel atual).
+    // Falha quando o Admin SDK não tem chave de assinatura (ex.: ADC local,
+    // Vercel sem FIREBASE_SERVICE_ACCOUNT_KEY) — nesse caso cai no fallback.
+    try {
+      const [url] = await bucket.file(dest).getSignedUrl({
+        action: 'read',
+        expires: '2036-01-01T00:00:00Z',
+      });
+      return {
+        url,
+        name: file.originalname || `comprovante.${ext}`,
+        kind: ext === 'pdf' ? 'pdf' : 'image',
+      };
+    } catch (signErr: any) {
+      logger.warn(`SignedURL falhou, a tornar público ${dest}: ${signErr?.message || signErr}`);
+    }
+    // 2ª tentativa: tornar público + URL pública (sem necessidade de assinatura).
+    try {
+      await bucket.file(dest).makePublic();
+      const bucketName = (bucket as any)?.name;
+      const url = `https://storage.googleapis.com/${bucketName}/${dest}`;
+      return {
+        url,
+        name: file.originalname || `comprovante.${ext}`,
+        kind: ext === 'pdf' ? 'pdf' : 'image',
+      };
+    } catch (pubErr: any) {
+      logger.warn(`Falha ao gravar comprovante do RSVP no evento ${eventId}: ${pubErr?.message || pubErr}`);
+      // Limpa o ficheiro parcial para não deixar órfão.
+      await bucket.file(dest).delete().catch(() => undefined);
+      return null;
+    }
   } catch (e: any) {
     logger.warn(`Falha ao gravar comprovante do RSVP no evento ${eventId}: ${e?.message || e}`);
     return null;
@@ -81,11 +104,15 @@ async function saveReceipt(
 }
 
 // --- List Guests ---
+// Pagination: ?limit (default 1000, max 1000) + ?cursor (last doc id).
+// Shape stays backward compatible ({ guests }) with additive nextCursor/hasMore.
 router.get('/api/events/:id/guests', apiRateLimiter, async (req, res) => {
     const id = req.params.id as string;
-    const { token } = req.query;
+    const { token, cursor } = req.query;
+    const pageSize = Math.min(Math.max(parseInt(String(req.query.limit ?? '1000'), 10) || 1000, 1), 1000);
     try {
-        const event = await getEventDetails(id);
+        // Auth path only needs 4 hot fields — not the full event doc.
+        const event = await getEventDetails(id, ['clientToken', 'ownerId', 'planId', 'plan']);
         if (!event) {
             return res.status(404).json({ error: 'Not found' });
         }
@@ -142,15 +169,26 @@ router.get('/api/events/:id/guests', apiRateLimiter, async (req, res) => {
         }
         
         let guests: any[] = [];
+        let nextCursor: string | null = null;
+        let hasMore = false;
         try {
             const db = getDb();
-            const guestsSnap = await db.collection('events').doc(id).collection('guests').get();
-            guests = guestsSnap.docs.map(doc => ({ id: doc.id, ...doc.data() }));
+            const guestsRef = db.collection('events').doc(id).collection('guests');
+            let q: FirebaseFirestore.Query = guestsRef.orderBy('createdAt').limit(pageSize + 1);
+            if (typeof cursor === 'string' && cursor) {
+                const cursorSnap = await guestsRef.doc(cursor).get();
+                if (cursorSnap.exists) q = q.startAfter(cursorSnap);
+            }
+            const guestsSnap = await q.get();
+            hasMore = guestsSnap.size > pageSize;
+            const pageDocs = hasMore ? guestsSnap.docs.slice(0, pageSize) : guestsSnap.docs;
+            guests = pageDocs.map(doc => ({ id: doc.id, ...doc.data() }));
+            if (hasMore) nextCursor = pageDocs[pageDocs.length - 1].id;
         } catch (dbErr: any) {
             // Fallback to Client Web SDK on Node.js if Firebase Admin SDK lacks service account credentials
             guests = await fetchFirestoreGuestsWebSDK(id);
         }
-        
+
         // Merge with local fallback guests if any exist (prevents data loss when guests RSVP via local fallback)
         const localGuests = readLocalGuests(id);
         if (localGuests.length > 0) {
@@ -163,8 +201,10 @@ router.get('/api/events/:id/guests', apiRateLimiter, async (req, res) => {
                 }
             }
         }
-        
-        return res.json({ guests });
+
+        // Owner-scoped list polled by check-in: short private cache, stale OK.
+        res.setHeader('Cache-Control', 'private, max-age=10, stale-while-revalidate=20');
+        return res.json({ guests, nextCursor, hasMore });
     } catch (err) {
         logger.error(`Erro ao buscar convidados para o evento ${id}:`, { category: 'DATABASE', data: err });
         res.status(500).json({ error: 'Server error' });
@@ -190,9 +230,10 @@ router.post('/api/events/:id/rsvp', rsvpRateLimiter, parseReceipt, async (req, r
     }
     logger.info(`RSVP route hit para evento ${id}`, { category: 'DATABASE', data: { phone, body: req.body } });
     try {
-        const event = await getEventDetails(id);
+        // Quota/activation checks only touch these fields — project them.
+        const event = await getEventDetails(id, ['planId', 'plan', 'expiresAt', 'isBlocked', 'blockedMessage', 'accountExpiresAt', 'accountActive', 'isPublished', 'ownerId']);
         if (!event) return res.status(404).json({ error: 'Not found' });
-        
+
         // §6, §7, §8 — validação centralizada (não hardcode).
         // Omissão = 'free' (identidade do registo): sem plano carimbado, sem quota.
         const planId = normalizePlanId((event as any).planId || (event as any).plan || 'free');
@@ -263,11 +304,14 @@ router.post('/api/events/:id/rsvp', rsvpRateLimiter, parseReceipt, async (req, r
                 });
             }
             
-            // Check duplicate
+            // Check duplicate — two normalized variants in ONE wave, existence
+            // only (limit 1 each): halves the waterfall RTT of the old sequential pair.
             if (phone) {
                 const normalizedPhone = phone.trim().replace(/[\s\-()]/g, "");
-                const phoneQuery = await guestsRef.where('phone', '==', normalizedPhone).get();
-                const phoneQueryRaw = await guestsRef.where('phone', '==', phone.trim()).get();
+                const [phoneQuery, phoneQueryRaw] = await Promise.all([
+                    guestsRef.where('phone', '==', normalizedPhone).limit(1).get(),
+                    guestsRef.where('phone', '==', phone.trim()).limit(1).get(),
+                ]);
                 if (!phoneQuery.empty || !phoneQueryRaw.empty) {
                     return res.status(400).json({ error: 'Este número de WhatsApp já confirmou presença neste evento.' });
                 }
@@ -280,8 +324,10 @@ router.post('/api/events/:id/rsvp', rsvpRateLimiter, parseReceipt, async (req, r
             });
 
             // Comprovante do presente (opcional): grava no Storage e anexa ao guest.
-            // O RSVP nunca é bloqueado por falha no comprovante.
+            // O RSVP nunca é bloqueado por falha no comprovante — mas devolve
+            // o motivo para o frontend mostrar a mensagem certa.
             let receiptSaved = false;
+            let receiptError: string | undefined;
             if (receiptFile) {
                 const saved = await saveReceipt(id, newGuestRef.id, receiptFile);
                 if (saved) {
@@ -291,10 +337,12 @@ router.post('/api/events/:id/rsvp', rsvpRateLimiter, parseReceipt, async (req, r
                         receiptKind: saved.kind,
                     });
                     receiptSaved = true;
+                } else {
+                    receiptError = 'STORAGE_SAVE_FAILED';
                 }
             }
 
-            return res.json({ success: true, guestId: newGuestRef.id, receiptSaved });
+            return res.json({ success: true, guestId: newGuestRef.id, receiptSaved, ...(receiptError ? { receiptError } : {}) });
         } catch (dbErr: any) {
             const isPermissionError = dbErr.message?.includes('PERMISSION_DENIED') || dbErr.message?.includes('Missing or insufficient permissions');
             if (isPermissionError || process.env.NODE_ENV !== 'production') {
@@ -355,8 +403,9 @@ router.get('/api/events/:id/rsvp-status', apiRateLimiter, async (req, res) => {
             const db = getDb();
             const guestsRef = db.collection('events').doc(id).collection('guests');
             const normalizedPhone = (phone as string).trim().replace(/[\s\-()]/g, "");
-            const snap = await guestsRef.where('phone', '==', normalizedPhone).get();
-            
+            // Existence lookup: only the first match is ever read (docs[0]).
+            const snap = await guestsRef.where('phone', '==', normalizedPhone).limit(1).get();
+
             if (snap.empty) {
                 return res.status(404).json({ error: 'Nenhuma confirmação encontrada para este número.' });
             }
@@ -425,7 +474,7 @@ router.delete('/api/events/:id/receipts', apiRateLimiter, async (req, res) => {
     try {
         const event = await requireEventOwner(req, res, id);
         if (!event) return;
-        const bucket = admin.storage().bucket();
+        const bucket = getStorageBucket();
         const [files] = await bucket.getFiles({ prefix: `receipts/${id}/` });
         await Promise.all(files.map((f) => f.delete().catch(() => undefined)));
         return res.json({ success: true, deleted: files.length });
@@ -442,7 +491,7 @@ router.delete('/api/events/:id/receipts/:guestId', apiRateLimiter, async (req, r
     try {
         const event = await requireEventOwner(req, res, id);
         if (!event) return;
-        const bucket = admin.storage().bucket();
+        const bucket = getStorageBucket();
         const [files] = await bucket.getFiles({ prefix: `receipts/${id}/${guestId}.` });
         await Promise.all(files.map((f) => f.delete().catch(() => undefined)));
         return res.json({ success: true, deleted: files.length });

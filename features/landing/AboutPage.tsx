@@ -2,7 +2,7 @@ import React, { useEffect } from 'react';
 import { motion } from 'framer-motion';
 import { ArrowLeft, Users, Zap, Target } from 'lucide-react';
 import { Link, useNavigate } from 'react-router-dom';
-import { useFirebase } from '../../components/FirebaseProvider';
+import { useFirebase } from '../../components/firebase-context';
 import { Navbar } from '../../components/Navbar';
 import { SEO } from '../../components/SEO';
 

@@ -1,10 +1,18 @@
 import React, { useState, useEffect } from 'react';
 import { Link, useNavigate, useLocation } from 'react-router-dom';
-import { motion, AnimatePresence } from 'framer-motion';
+import { motion, AnimatePresence } from 'motion/react';
 import toast from 'react-hot-toast';
-import { useFirebase, signOut, auth, db, handleFirestoreError, OperationType } from './FirebaseProvider';
-import { collection, query, where, onSnapshot, orderBy, limit, doc, updateDoc, deleteDoc } from 'firebase/firestore';
+import { useFirebase } from './firebase-context';
+import { OperationType } from './firebase-context';
 import { normalizePlanId, getPlanConfig } from '../lib/entitlements';
+
+// Firebase SDK loads on demand (first logged-in interaction), never in the
+// anonymous critical path: this keeps firebase-vendor out of the landing
+// bundle. All call sites below run after the `!user` guard or in handlers.
+async function loadFirebase() {
+  const [provider, fs] = await Promise.all([import('./FirebaseProvider'), import('firebase/firestore')]);
+  return { ...provider, ...fs };
+}
 import {
   BadgeCheck, Bell, BellRing, Briefcase, Check, ChevronDown, ChevronRight,
   Heart, Home, Info, LayoutDashboard, LogOut, MessageCircle, Phone,
@@ -54,6 +62,7 @@ export const Navbar: React.FC = () => {
   // Sair leva sempre ao início (sem piscar conteúdo protegido)
   const handleSignOut = async () => {
     try {
+      const { signOut, auth } = await loadFirebase();
       await signOut(auth);
     } catch {
       /* best-effort */
@@ -96,25 +105,34 @@ export const Navbar: React.FC = () => {
       setNotifications([]);
       return;
     }
-    try {
-      const notificationsRef = collection(db, 'users', user.uid, 'notifications');
-      // Limitado às 30 mais recentes — o dropdown pagina por scroll e o sino só
-      // precisa da contagem de não-lidas; sem limit descarregava o histórico todo.
-      const q = query(notificationsRef, orderBy('createdAt', 'desc'), limit(30));
-      
-      const unsubscribeNotifications = onSnapshot(q, (snapshot) => {
-        const notifsList = snapshot.docs.map(doc => ({
-          id: doc.id,
-          ...doc.data()
-        }));
-        setNotifications(notifsList);
-      }, (error) => {
-         console.warn("Could not listen to notifications", error);
-      });
-      return unsubscribeNotifications;
-    } catch(err) {
-      console.warn("Failed to listen notifications", err);
-    }
+    let cancelled = false;
+    let unsubscribe: (() => void) | undefined;
+    (async () => {
+      try {
+        const { db, collection, query, orderBy, limit, onSnapshot } = await loadFirebase();
+        if (cancelled) return;
+        const notificationsRef = collection(db, 'users', user.uid, 'notifications');
+        // Limitado às 30 mais recentes — o dropdown pagina por scroll e o sino só
+        // precisa da contagem de não-lidas; sem limit descarregava o histórico todo.
+        const q = query(notificationsRef, orderBy('createdAt', 'desc'), limit(30));
+
+        unsubscribe = onSnapshot(q, (snapshot) => {
+          const notifsList = snapshot.docs.map(doc => ({
+            id: doc.id,
+            ...doc.data()
+          }));
+          setNotifications(notifsList);
+        }, (error) => {
+           console.warn("Could not listen to notifications", error);
+        });
+      } catch(err) {
+        console.warn("Failed to listen notifications", err);
+      }
+    })();
+    return () => {
+      cancelled = true;
+      unsubscribe?.();
+    };
   }, [user]);
 
   const handleMarkAsRead = async (notifId: string, e: React.MouseEvent) => {
@@ -122,6 +140,7 @@ export const Navbar: React.FC = () => {
     if (!user || pendingNotifId) return;
     setPendingNotifId(notifId);
     try {
+      const { db, doc, updateDoc } = await loadFirebase();
       await updateDoc(doc(db, 'users', user.uid, 'notifications', notifId), { read: true });
     } catch(err) {
       console.error("Failed to mark notification as read", err);
@@ -138,7 +157,7 @@ export const Navbar: React.FC = () => {
     if (unread.length === 0) return;
     setIsMarkingAll(true);
     try {
-      const { writeBatch } = await import('firebase/firestore');
+      const { db, doc, writeBatch } = await loadFirebase();
       const batch = writeBatch(db);
       unread.forEach((n) => batch.update(doc(db, 'users', user.uid, 'notifications', n.id), { read: true }));
       await batch.commit();
@@ -156,6 +175,7 @@ export const Navbar: React.FC = () => {
     if (!user || pendingNotifId) return;
     setPendingNotifId(notifId);
     try {
+      const { db, doc, deleteDoc } = await loadFirebase();
       await deleteDoc(doc(db, 'users', user.uid, 'notifications', notifId));
       toast.success("Notificação eliminada!");
     } catch(err) {
@@ -174,32 +194,41 @@ export const Navbar: React.FC = () => {
     }
 
     setIsEventsLoading(true);
-    try {
-      const eventsRef = collection(db, 'events');
-      // Limitado a 20 — o menu só exibe os 3 mais recentes; sem limit cada
-      // login descarregava todos os eventos do utilizador em realtime.
-      const q = query(eventsRef, where("ownerId", "==", user.uid), limit(20));
-      
-      const unsubscribeEvents = onSnapshot(q, (snapshot: any) => {
-        const eventsList = snapshot.docs.map((doc: any) => ({
-          ...doc.data(),
-          id: doc.id
-        }));
-        setUserEvents(eventsList);
-        setIsEventsLoading(false);
-      }, (error: any) => {
-        setIsEventsLoading(false);
-        // Suppress missing permissions error during development if rule not exist
-        if(error.message.includes("Missing or insufficient permissions")) {
-            console.warn("Firestore rules test or missing index error, ignore if dev", error);
-        } else {
-            handleFirestoreError(error, OperationType.LIST, 'events');
-        }
-      });
-      return unsubscribeEvents;
-    } catch(err) {
-      console.warn("Failed to set up events listener", err);
-    }
+    let cancelled = false;
+    let unsubscribe: (() => void) | undefined;
+    (async () => {
+      try {
+        const { db, collection, query, where, limit, onSnapshot, handleFirestoreError } = await loadFirebase();
+        if (cancelled) return;
+        const eventsRef = collection(db, 'events');
+        // Limitado a 20 — o menu só exibe os 3 mais recentes; sem limit cada
+        // login descarregava todos os eventos do utilizador em realtime.
+        const q = query(eventsRef, where("ownerId", "==", user.uid), limit(20));
+
+        unsubscribe = onSnapshot(q, (snapshot: any) => {
+          const eventsList = snapshot.docs.map((doc: any) => ({
+            ...doc.data(),
+            id: doc.id
+          }));
+          setUserEvents(eventsList);
+          setIsEventsLoading(false);
+        }, (error: any) => {
+          setIsEventsLoading(false);
+          // Suppress missing permissions error during development if rule not exist
+          if(error.message.includes("Missing or insufficient permissions")) {
+              console.warn("Firestore rules test or missing index error, ignore if dev", error);
+          } else {
+              handleFirestoreError(error, OperationType.LIST, 'events');
+          }
+        });
+      } catch(err) {
+        console.warn("Failed to set up events listener", err);
+      }
+    })();
+    return () => {
+      cancelled = true;
+      unsubscribe?.();
+    };
   }, [user]);
 
   const handleCreateEvent = () => {

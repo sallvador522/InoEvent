@@ -15,13 +15,6 @@ img {
   max-width: 100%;
 }
 
-/* Ícones Material Symbols: esconde o texto-ligadura até a fonte carregar.
- * Em redes lentas a fonte atrasa e o nome do ícone ("expand_more"…)
- * aparecia como texto quebrando o layout. O navbar já usa lucide (sem fonte). */
-html:not(.ms-ready) .material-symbols-outlined {
-  color: transparent !important;
-}
-
 :focus-visible {
   outline: 2px solid #C5A028;
   outline-offset: 2px;

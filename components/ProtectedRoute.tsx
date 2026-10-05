@@ -1,6 +1,6 @@
 import React from 'react';
 import { Navigate, useLocation } from 'react-router-dom';
-import { useFirebase } from './FirebaseProvider';
+import { useFirebase } from './firebase-context';
 
 const AuthLoader: React.FC = () => (
   <div className="flex flex-col items-center justify-center min-h-screen w-full bg-[#FDFBF7]" role="status" aria-live="polite">

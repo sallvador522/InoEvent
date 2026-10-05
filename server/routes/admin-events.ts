@@ -12,7 +12,7 @@
  * no confirmPayment). Apenas libera visibilidade: desbloqueia + publica.
  */
 import { Router } from 'express';
-import { getDb, admin } from '../lib/firebase-admin.js';
+import { getDb, getStorageBucket } from '../lib/firebase-admin.js';
 import { apiRateLimiter } from '../middleware/index.js';
 import { logAudit } from '../lib/audit.js';
 import { getAdminAuthUser, isAdmin as requireAdmin } from '../lib/admin-auth.js';
@@ -105,7 +105,7 @@ const EVENT_SUBCOLLECTIONS = ['guests', 'contributions', 'photos', 'messages', '
 /** Apaga os comprovantes do evento no Storage (best-effort, via Admin SDK). */
 async function deleteEventReceipts(eventId: string): Promise<number> {
   try {
-    const bucket = admin.storage().bucket();
+    const bucket = getStorageBucket();
     const [files] = await bucket.getFiles({ prefix: `receipts/${eventId}/` });
     await Promise.all(files.map((f) => f.delete().catch(() => undefined)));
     return files.length;
@@ -130,17 +130,21 @@ router.post('/api/admin/events/:id/delete', apiRateLimiter, async (req, res) => 
     const snap = await ref.get();
     if (!snap.exists) return res.status(404).json({ error: 'Evento não encontrado' });
     const title = (snap.data() as any)?.title || id;
-    let deletedDocs = 0;
-    for (const sub of EVENT_SUBCOLLECTIONS) {
-      const qsnap = await ref.collection(sub).get();
-      // Batch em blocos de 400 (limite 500 por batch).
-      for (let i = 0; i < qsnap.docs.length; i += 400) {
-        const batch = db.batch();
-        qsnap.docs.slice(i, i + 400).forEach((d) => batch.delete(d.ref));
-        await batch.commit();
-      }
-      deletedDocs += qsnap.size;
-    }
+    // Subcoleções independentes: 6 deleções numa onda (era waterfall de 6 RTT).
+    // Mesmas eliminações, mesmos batches de 400 — só o paralelismo muda.
+    const deletedPerSub = await Promise.all(
+      EVENT_SUBCOLLECTIONS.map(async (sub) => {
+        const qsnap = await ref.collection(sub).get();
+        // Batch em blocos de 400 (limite 500 por batch).
+        for (let i = 0; i < qsnap.docs.length; i += 400) {
+          const batch = db.batch();
+          qsnap.docs.slice(i, i + 400).forEach((d) => batch.delete(d.ref));
+          await batch.commit();
+        }
+        return qsnap.size;
+      })
+    );
+    let deletedDocs = deletedPerSub.reduce((a, n) => a + n, 0);
     await ref.delete();
     const deletedReceipts = await deleteEventReceipts(id);
     logger.warn(`Evento apagado pelo admin ${id} (+${deletedDocs} docs, +${deletedReceipts} comprovantes)`, { category: 'SYSTEM' });
@@ -169,7 +173,7 @@ router.post('/api/admin/receipts/cleanup', apiRateLimiter, async (req, res) => {
   const dryRun = (req.body || {}).confirm !== true;
   try {
     const db = getDb();
-    const bucket = admin.storage().bucket();
+    const bucket = getStorageBucket();
     const [files, , apiResp] = await bucket.getFiles({ prefix: 'receipts/', maxResults: 5000 });
     const truncated = !!(apiResp as any)?.nextPageToken;
     // Agrupar por evento: receipts/{eventId}/{guestId}.{ext}

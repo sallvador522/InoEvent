@@ -3,7 +3,6 @@ import { motion, AnimatePresence } from 'framer-motion';
 import {
   ArrowLeft,
   Briefcase,
-  Diamond,
   Eye,
   EyeOff,
   Heart,
@@ -265,7 +264,9 @@ export const AuthPage: React.FC = () => {
         </button>
         
         <div className="text-center mb-8 mt-2">
-          <Diamond size={36} className="text-primary text-4xl mb-2" />
+          <div className="flex justify-center mb-3">
+            <img src="/logo-192.png" alt="InoEvents" width="56" height="56" decoding="async" className="w-14 h-14 rounded-2xl object-contain border border-slate-100 bg-white p-1 shadow-sm" />
+          </div>
           <h2 className="text-3xl font-serif font-bold text-brand-blue mb-2">
             {isLogin ? 'Bem-vindo de volta' : 'Criar Sua Conta'}
           </h2>

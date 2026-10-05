@@ -145,7 +145,7 @@ export const TocaPlayer: React.FC<TocaPlayerProps> = ({ trackName, isDark = fals
               ))}
             </span>
           ) : (
-            <Music size={24} className="text-xl" aria-hidden="true" />
+            <Music size={24} className="icon-glyph text-xl" aria-hidden="true" />
           )}
         </motion.button>
       </div>

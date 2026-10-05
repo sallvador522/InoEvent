@@ -1371,7 +1371,7 @@ export const Dashboard = () => {
                             onClick={() => setActiveTab('tables')}
                             className={`flex-1 md:flex-none justify-center px-4 md:px-6 py-2.5 rounded-xl lg:rounded-full font-bold text-sm transition-all flex items-center gap-2 ${activeTab === 'tables' ? 'bg-white shadow-sm text-brand-blue' : 'text-slate-500 hover:text-slate-700'}`}
                         >
-                            <UtensilsCrossed size={18} className="text-[18px]" /> Mapa das Mesas
+                            <UtensilsCrossed size={18} className="icon-glyph text-[18px]" /> Mapa das Mesas
                         </button>
                     )}
 

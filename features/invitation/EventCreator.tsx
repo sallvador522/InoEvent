@@ -1170,7 +1170,7 @@ export const EventCreator: React.FC = () => {
 
             {/* Warning Message Box indicating payment only on final Save */}
             <div className="p-4 rounded-2xl bg-[#F0F4FF] border border-blue-200/50 flex gap-3 text-blue-800 text-xs leading-relaxed font-medium">
-              <Info size={18} className="text-[18px] text-brand-blue flex-shrink-0" />
+              <Info size={18} className="icon-glyph text-[18px] text-brand-blue flex-shrink-0" />
               <div>
                 <p className="font-bold">Alta Costura sem riscos de cobrança</p>
                 <p className="text-blue-700 font-normal mt-0.5">

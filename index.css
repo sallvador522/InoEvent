@@ -15,6 +15,15 @@ img {
   max-width: 100%;
 }
 
+/* Ícones lucide que substituíram ligaduras Material Symbols: fluem como o
+ * glifo inline original (centram em `text-center`; em `flex` nada muda, o
+ * item é sempre blockificado). Só usar nos convertidos — nunca nos lucide
+ * pré-existentes, cujo layout já conta com block. */
+.icon-glyph {
+  display: inline-block;
+  vertical-align: middle;
+}
+
 :focus-visible {
   outline: 2px solid #C5A028;
   outline-offset: 2px;

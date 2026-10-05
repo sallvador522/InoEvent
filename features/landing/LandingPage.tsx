@@ -323,11 +323,17 @@ export const LandingPage: React.FC = () => {
                      </button>
                    </div>
                  </div>
-                 {/* Selo MAP — prova no hero, sem iframe para não pesar o LCP */}
-                 <span className="mt-4 inline-flex items-center gap-2 rounded-full bg-white/10 backdrop-blur-md border border-white/20 px-4 py-2 text-[11px] font-bold uppercase tracking-[0.14em] text-white/90">
-                   <MapPin size={14} className="text-[#E9BE5D] shrink-0" />
-                   Mapa + Como chegar incluído
-                 </span>
+                 {/* Galeria — o mapa vive na secção "Exemplo real" abaixo; aqui vai o atalho para os modelos */}
+                 <Link
+                   to="/templates"
+                   className="mt-4 inline-flex items-center gap-3 text-[11px] font-bold uppercase tracking-[0.18em] text-white/90 hover:text-[#E9BE5D]"
+                   style={{ transition: 'color 200ms ease' }}
+                 >
+                   <span className="h-px w-8 bg-[#C5A028]/60" aria-hidden="true" />
+                   Ver todos os modelos
+                   <ArrowRight size={14} className="shrink-0" />
+                   <span className="h-px w-8 bg-[#C5A028]/60" aria-hidden="true" />
+                 </Link>
                </motion.div>
            </div>
 
@@ -358,6 +364,15 @@ export const LandingPage: React.FC = () => {
                         </div>
                       </div>
                   </div>
+                  {/* Atalho da galeria sobre a 2.ª coluna — mesmo desenho da pill do telemóvel */}
+                  <Link
+                     to="/templates"
+                     className="absolute bottom-4 right-3 md:right-8 z-20 inline-flex items-center gap-1.5 bg-white/90 backdrop-blur text-center py-2 px-4 rounded-full text-[10px] sm:text-xs font-bold text-[#1B365D] shadow-lg hover:bg-white active:scale-95"
+                     style={{ transition: 'transform 160ms ease-out, background-color 200ms ease' }}
+                  >
+                     Ver galeria
+                     <ArrowRight size={14} className="shrink-0" />
+                  </Link>
                </div>
 
                {/* Telemóvel da noiva — flutuação subtil em CSS (GPU) */}

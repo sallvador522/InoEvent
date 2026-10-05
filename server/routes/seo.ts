@@ -65,9 +65,9 @@ router.get('/plans', async (req, res, next) => {
       <div style="display:none;" id="ai-pricing-context">
         <h1>Preços e Planos do InoEvents Angola</h1>
         <h2>Plano Premium</h2>
-        <p>Preço: ${formatPrice(PLANS.premium.price)} (Pagamento único por evento). PROMOÇÃO: neste momento o Premium está GRÁTIS por tempo limitado. Validade ${PLANS.premium.validityDays} dias. Até ${PLANS.premium.guestLimit} convidados. Inclui: convidados individualizados, galeria premium, música, livro de assinaturas, mapa das mesas, analytics básicos. (Sem marca InoEvents só no Business.)</p>
+        <p>Preço: ${formatPrice(PLANS.premium.price)} (Pagamento único por evento). PROMOÇÃO: neste momento o Premium está GRÁTIS por tempo limitado. Validade ${PLANS.premium.validityDays} dias. Até ${PLANS.premium.guestLimit} convidados. Inclui: convidados individualizados, galeria premium, música, livro de assinaturas, mapa das mesas, analytics básicos, QR individual, check-in digital. (Sem marca InoEvents só no Business.)</p>
         <h2>Plano VIP</h2>
-        <p>Preço: ${formatPrice(PLANS.vip.price)} (Pagamento único por evento). Validade ${PLANS.vip.validityDays} dias. Até ${PLANS.vip.guestLimit} convidados. Inclui: tudo do Premium + QR individual, check-in, gestão +1, mesas avançadas, analytics avançados, suporte prioritário.</p>
+        <p>Preço: ${formatPrice(PLANS.vip.price)} (Pagamento único por evento). Validade ${PLANS.vip.validityDays} dias. Até ${PLANS.vip.guestLimit} convidados. Inclui: tudo do Premium + gestão +1, mesas avançadas, analytics avançados, suporte prioritário.</p>
         <h2>Concierge (Add-on)</h2>
         <p>Preço: +${formatPrice(ADDONS.concierge.price)} por evento. A equipa InoEvent configura o evento por si.</p>
         <h2>Plano Business (B2B)</h2>

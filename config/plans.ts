@@ -142,6 +142,9 @@ export const PLANS: Record<PlanId, PlanConfig> = {
       'basic_analytics',
       'guest_management',
       'premium_themes',
+      // Check-in digital incluído no Premium (decisão produto): QR individual + validação portaria
+      'individual_qr',
+      'checkin',
     ],
   },
   vip: {

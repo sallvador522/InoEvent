@@ -74,13 +74,13 @@ app.use(helmet({
   contentSecurityPolicy: {
     directives: {
       defaultSrc: ["'self'"],
-      scriptSrc: ["'self'", "'unsafe-inline'", "'unsafe-eval'", "https://maps.googleapis.com", "https://cdn.tailwindcss.com", "https://www.googletagmanager.com", "https://connect.facebook.net"],
+      scriptSrc: ["'self'", "'unsafe-inline'", "'unsafe-eval'", "https://maps.googleapis.com", "https://cdn.tailwindcss.com", "https://www.googletagmanager.com", "https://connect.facebook.net", "https://apis.google.com", "https://*.googleapis.com", "https://*.gstatic.com", "https://*.firebaseapp.com"],
       styleSrc: ["'self'", "'unsafe-inline'", "https://fonts.googleapis.com"],
       fontSrc: ["'self'", "https://fonts.gstatic.com", "data:"],
       imgSrc: ["'self'", "data:", "blob:", "https:", "http:"],
       connectSrc: ["'self'", "https://firebasestorage.googleapis.com", "https://firestore.googleapis.com", "https://identitytoolkit.googleapis.com", "https://securetoken.googleapis.com", "https://*.googleapis.com", "wss://*.firebaseio.com", "https://*.google-analytics.com", "https://www.google-analytics.com", "https://connect.facebook.net", "https://www.facebook.com"],
       mediaSrc: ["'self'", "https:", "http:", "data:", "blob:"],
-      frameSrc: ["'self'", "https://maps.googleapis.com", "https://www.google.com", "https://www.youtube.com"],
+      frameSrc: ["'self'", "https://maps.googleapis.com", "https://www.google.com", "https://www.youtube.com", "https://accounts.google.com", "https://apis.google.com", "https://*.firebaseapp.com", "https://*.googleusercontent.com"],
       frameAncestors: ["'self'", "https://*.google.com", "https://*.googleusercontent.com", "https://*.run.app"],
     }
   },

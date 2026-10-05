@@ -6,6 +6,7 @@ import { db } from '../../components/FirebaseProvider';
 import { toast } from 'react-hot-toast';
 
 export const Guestbook: React.FC<{ eventId: string; layoutMode?: string }> = ({ eventId, layoutMode }) => {
+    const dark = layoutMode === 'LUXURY' || layoutMode === 'LIMINTSO_GOLD' || layoutMode === 'MODERN' || layoutMode === 'INDUSTRIAL';
     const [messages, setMessages] = useState<any[]>([]);
     const [newMessage, setNewMessage] = useState('');
     const [authorName, setAuthorName] = useState('');
@@ -91,18 +92,19 @@ export const Guestbook: React.FC<{ eventId: string; layoutMode?: string }> = ({ 
     return (
         <div className="w-full max-w-2xl mx-auto py-12 px-4">
             <div className="text-center mb-8">
-                <Heart className="mx-auto text-rose-400 mb-3" size={32} />
-                <h2 className="text-2xl md:text-3xl font-display font-bold text-slate-800 mb-2">Livro de Assinaturas</h2>
-                <p className="text-slate-500 text-sm">Deixe uma mensagem especial para nós apagarmos nunca!</p>
+                <Heart className={`mx-auto mb-3 ${dark ? 'text-[#BF9B30]' : 'text-rose-400'}`} size={32} />
+                <h2 className={`text-2xl md:text-3xl font-serif font-bold mb-2 ${dark ? 'text-white' : 'font-display text-slate-800'}`}>Livro de Assinaturas</h2>
+                <p className={`text-sm ${dark ? 'text-[#BF9B30]/80' : 'text-slate-500'}`}>Deixe uma mensagem especial para nós apagarmos nunca!</p>
             </div>
 
-            <form onSubmit={handleSubmit} className="bg-white rounded-3xl p-6 shadow-sm border border-slate-100 mb-10">
+            <form onSubmit={handleSubmit} className={`rounded-3xl p-6 shadow-sm border mb-10 ${dark ? 'bg-[#0F1419] border-[#BF9B30]/20' : 'bg-white border-slate-100'}`}>
                 <div className="space-y-4">
                     <div>
                         <input
                             type="text"
                             placeholder="Seu nome"
-                            className="w-full px-4 py-3 bg-slate-50 border border-slate-200 rounded-xl outline-none focus:border-rose-300 focus:bg-white transition-colors"
+                            aria-label="Seu nome"
+                            className={`w-full px-4 py-3 border rounded-xl outline-none transition-colors ${dark ? 'bg-black/60 border-[#BF9B30]/30 text-white placeholder:text-gray-500 focus:border-[#BF9B30]' : 'bg-slate-50 border-slate-200 focus:border-rose-300 focus:bg-white'}`}
                             value={authorName}
                             onChange={(e) => setAuthorName(e.target.value)}
                             disabled={loading}
@@ -111,7 +113,8 @@ export const Guestbook: React.FC<{ eventId: string; layoutMode?: string }> = ({ 
                     <div>
                         <textarea
                             placeholder="Escreva sua mensagem com carinho..."
-                            className="w-full px-4 py-3 bg-slate-50 border border-slate-200 rounded-xl outline-none focus:border-rose-300 focus:bg-white transition-colors min-h-[100px] resize-y"
+                            aria-label="Sua mensagem"
+                            className={`w-full px-4 py-3 border rounded-xl outline-none transition-colors min-h-[100px] resize-y ${dark ? 'bg-black/60 border-[#BF9B30]/30 text-white placeholder:text-gray-500 focus:border-[#BF9B30]' : 'bg-slate-50 border-slate-200 focus:border-rose-300 focus:bg-white'}`}
                             value={newMessage}
                             onChange={(e) => setNewMessage(e.target.value)}
                             disabled={loading}
@@ -121,7 +124,7 @@ export const Guestbook: React.FC<{ eventId: string; layoutMode?: string }> = ({ 
                     <button
                         type="submit"
                         disabled={loading}
-                        className="w-full bg-slate-900 text-white font-bold py-3.5 rounded-xl hover:bg-slate-800 transition-colors flex items-center justify-center gap-2 disabled:bg-slate-300"
+                        className={`w-full font-bold py-3.5 rounded-xl transition-colors flex items-center justify-center gap-2 disabled:opacity-60 ${dark ? 'bg-[#BF9B30] text-[#0F1419] hover:brightness-110' : 'bg-slate-900 text-white hover:bg-slate-800 disabled:bg-slate-300'}`}
                     >
                         {loading ? 'A enviar...' : (
                             <>
@@ -134,7 +137,7 @@ export const Guestbook: React.FC<{ eventId: string; layoutMode?: string }> = ({ 
 
             <div className="space-y-4">
                 {messages.length === 0 ? (
-                    <div className="text-center py-10 text-slate-400 bg-slate-50 rounded-3xl border border-dashed border-slate-200">
+                    <div className={`text-center py-10 rounded-3xl border border-dashed ${dark ? 'text-gray-400 bg-[#0F1419] border-[#BF9B30]/20' : 'text-slate-400 bg-slate-50 border-slate-200'}`}>
                         <MessageSquare className="mx-auto mb-2 opacity-50" size={24} />
                         <p>Seja o primeiro a deixar um recado!</p>
                     </div>
@@ -145,12 +148,12 @@ export const Guestbook: React.FC<{ eventId: string; layoutMode?: string }> = ({ 
                             initial={{ opacity: 0, y: 10 }}
                             animate={{ opacity: 1, y: 0 }}
                             transition={{ delay: idx * 0.05 }}
-                            className="bg-white p-5 rounded-2xl shadow-sm border border-slate-100 relative"
+                            className={`p-5 rounded-2xl shadow-sm border relative ${dark ? 'bg-[#0F1419] border-[#BF9B30]/20' : 'bg-white border-slate-100'}`}
                         >
-                            <p className="text-slate-700 leading-relaxed mb-3 whitespace-pre-wrap text-sm md:text-base">
+                            <p className={`leading-relaxed mb-3 whitespace-pre-wrap text-sm md:text-base ${dark ? 'text-gray-200' : 'text-slate-700'}`}>
                                 "{msg.text}"
                             </p>
-                            <div className="flex items-center justify-between text-xs font-bold text-slate-400">
+                            <div className={`flex items-center justify-between text-xs font-bold ${dark ? 'text-[#BF9B30]/70' : 'text-slate-400'}`}>
                                 <span>— {msg.author}</span>
                                 <span>{msg.createdAt?.toDate ? msg.createdAt.toDate().toLocaleDateString('pt-AO') : 'Agora mesmo'}</span>
                             </div>

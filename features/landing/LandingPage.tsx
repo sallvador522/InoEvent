@@ -453,7 +453,7 @@ export const LandingPage: React.FC = () => {
                 <QrCode size={20} className="text-[#8a6d1c] shrink-0 mt-1" />
                 <div>
                   <h3 className="font-bold text-slate-900 mb-1">Entrada com check-in</h3>
-                  <p className="text-sm text-slate-600 font-light leading-relaxed">QR individual por convidado e leitura à entrada, nos planos VIP e Business.</p>
+                  <p className="text-sm text-slate-600 font-light leading-relaxed">QR individual por convidado e leitura à entrada, nos planos Premium, VIP e Business.</p>
                 </div>
               </li>
               <li className="flex gap-4 py-6 border-t border-[#C5A028]/30">

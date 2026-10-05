@@ -419,6 +419,8 @@ Fernando Rafael Menezes`,
     locationName: "Fazenda Pôr do Sol",
     address: "Viana, Luanda, Angola",
     formattedAddress: "Fazenda Pôr do Sol, Viana, Luanda, Angola",
+    latitude: -8.9035,
+    longitude: 13.3744,
     mapsUrl: "https://www.google.com/maps/search/?api=1&query=Fazenda%20P%C3%B4r%20do%20Sol%20Viana%20Luanda%20Angola",
     mapLink: "https://www.google.com/maps/search/?api=1&query=Fazenda%20P%C3%B4r%20do%20Sol%20Viana%20Luanda%20Angola",
     heroImage:

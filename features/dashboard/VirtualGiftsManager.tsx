@@ -7,16 +7,27 @@ import { toast } from 'react-hot-toast';
 import { IBAN_PREFIX, IBAN_BODY_LENGTH, canonicalIban, isValidAngolaIban, ibanError, formatIbanBodyDots } from '../../lib/iban';
 
 interface GiftItem {
-  id: string;
+  id?: string;
   title: string;
-  price: number;
-  emoji: string;
+  price?: number;
+  emoji?: string;
   value?: string;
   bankName?: string;
   accountName?: string;
+  // Legado EventCreator: itens chegam como {type, title, value, description, ...}
+  type?: 'IBAN' | 'LINK' | 'BANK' | string;
+  description?: string;
 }
 
-export const VirtualGiftsManager: React.FC<{ event: any }> = ({ event }) => {
+interface ReceiptGuest {
+  id?: string;
+  name?: string;
+  phone?: string;
+  receiptUrl?: string;
+  receiptName?: string;
+}
+
+export const VirtualGiftsManager: React.FC<{ event: any; guests?: ReceiptGuest[] }> = ({ event, guests = [] }) => {
    const [gifts, setGifts] = useState<GiftItem[]>(event.gifts || []);
    const [isEditing, setIsEditing] = useState(false);
    const [newGift, setNewGift] = useState({ title: '', price: '', emoji: '🎁' });
@@ -94,8 +105,8 @@ export const VirtualGiftsManager: React.FC<{ event: any }> = ({ event }) => {
         }
     };
 
-    const handleDeleteGift = async (id: string) => {
-        if (deletingGiftId) return;
+    const handleDeleteGift = async (id?: string) => {
+        if (deletingGiftId || !id) return;
         const updatedGifts = gifts.filter(g => g.id !== id);
         setDeletingGiftId(id);
         try {
@@ -210,42 +221,124 @@ export const VirtualGiftsManager: React.FC<{ event: any }> = ({ event }) => {
                )}
            </AnimatePresence>
 
-           <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4 mt-4">
-               {gifts.length === 0 && !isEditing && (
-                   <div className="col-span-full py-12 text-center text-slate-400 bg-slate-50 border border-slate-100 rounded-3xl border-dashed">
-                      <Gift size={32} className="mx-auto mb-3 opacity-20" />
-                      <p>Nenhuma contribuição adicionada ainda.</p>
-                      <button onClick={() => setIsEditing(true)} className="text-brand-blue font-bold mt-2 hover:underline">Criar a primeira</button>
-                   </div>
-               )}
-                {gifts.map((gift, idx) => (
+            <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4 mt-4">
+                {(() => {
+                  const displayGifts = gifts.length > 0 ? gifts : ((event as any)?.iban ? [{
+                    id: undefined,
+                    title: 'Mimo do Casal',
+                    price: 0,
+                    emoji: '🎁',
+                    type: 'IBAN',
+                    value: String((event as any).iban || ''),
+                    bankName: String((event as any).bankName || '').trim(),
+                    accountName: String((event as any).accountName || '').trim(),
+                    description: '',
+                    _virtual: true,
+                  } as any] : []);
+                  return (<>
+                  {displayGifts.length === 0 && !isEditing && (
+                    <div className="col-span-full py-12 text-center text-slate-400 bg-slate-50 border border-slate-100 rounded-3xl border-dashed">
+                       <Gift size={32} className="mx-auto mb-3 opacity-20" />
+                       <p>Nenhuma contribuição adicionada ainda.</p>
+                       <button onClick={() => setIsEditing(true)} className="text-brand-blue font-bold mt-2 hover:underline">Criar a primeira</button>
+                    </div>
+                  )}
+                  {displayGifts.map((gift, idx) => (
                     <div key={gift.id || 'gift-' + idx} className="border border-slate-200 rounded-2xl p-5 flex flex-col justify-between bg-white shadow-sm hover:shadow-md transition-shadow relative group">
-                        <button onClick={() => handleDeleteGift(gift.id)} disabled={deletingGiftId === gift.id} className="absolute top-4 right-4 text-slate-300 hover:text-red-500 disabled:opacity-60 opacity-0 group-hover:opacity-100 transition-opacity">
+                        {(gift as any)._virtual ? (
+                          <span className="absolute top-4 left-4 text-[10px] font-bold uppercase tracking-wider text-emerald-700 bg-emerald-50 border border-emerald-200 px-2 py-0.5 rounded-full">Do convite • auto</span>
+                        ) : (
+                        <button onClick={() => handleDeleteGift(gift.id)} disabled={!gift.id || deletingGiftId === gift.id} className="absolute top-4 right-4 text-slate-300 hover:text-red-500 disabled:opacity-60 opacity-0 group-hover:opacity-100 transition-opacity">
                             {deletingGiftId === gift.id ? (
                               <span className="w-4 h-4 border-2 border-slate-300 border-t-red-400 rounded-full animate-spin block" aria-hidden="true" />
                             ) : (
                               <Trash2 size={16} />
                             )}
                         </button>
-                       <div className="text-4xl mb-4 text-center mt-2">{gift.emoji}</div>
+                        )}
+                       <div className="text-4xl mb-4 text-center mt-2">{gift.emoji || '🎁'}</div>
                        <div className="text-center">
                            <h4 className="font-bold text-slate-800 line-clamp-2">{gift.title}</h4>
-                           <div className="text-brand-blue font-black mt-2 bg-blue-50 py-1.5 px-3 rounded-lg inline-block">{Number(gift.price || 0).toLocaleString('pt-AO')} Kz</div>
-                       </div>
-                   </div>
-               ))}
-           </div>
+                           {typeof gift.price === 'number' && gift.price > 0 ? (
+                             <div className="text-brand-blue font-black mt-2 bg-blue-50 py-1.5 px-3 rounded-lg inline-block">{Number(gift.price || 0).toLocaleString('pt-AO')} Kz</div>
+                           ) : gift.value ? (
+                             <div className="mt-2 text-[11px] font-mono text-slate-600 bg-slate-50 py-1.5 px-3 rounded-lg inline-block break-all">
+                               {gift.type === 'IBAN' ? `IBAN: ${gift.value}` : gift.value}
+                             </div>
+                           ) : null}
+                           {(gift.bankName || gift.accountName) && (
+                             <p className="text-[11px] text-slate-500 mt-1">{[gift.bankName, gift.accountName].filter(Boolean).join(' • ')}</p>
+                           )}
+                            {gift.description && (
+                              <p className="text-[11px] text-slate-500 italic mt-1 line-clamp-2">“{gift.description}”</p>
+                            )}
+                            {(gift as any)._virtual && (
+                              <button
+                                onClick={async () => {
+                                  if (isSavingGift) return;
+                                  const rawIban = String(gift.value || '');
+                                  if (!isValidAngolaIban(rawIban)) {
+                                    toast.error(`IBAN do convite inválido: ${ibanError(rawIban) || 'verifique os dígitos.'}`);
+                                    return;
+                                  }
+                                  setIsSavingGift(true);
+                                  try {
+                                    const imported = [{
+                                      id: Math.random().toString(36).slice(2, 10),
+                                      title: gift.title || 'Mimo do Casal',
+                                      price: 0,
+                                      emoji: gift.emoji || '🎁',
+                                      type: 'IBAN',
+                                      value: canonicalIban(rawIban),
+                                      bankName: String(gift.bankName || '').trim(),
+                                      accountName: String(gift.accountName || '').trim(),
+                                      description: '',
+                                    }];
+                                    await updateDoc(doc(db, 'events', event.id), { gifts: imported });
+                                    setGifts(imported as any);
+                                    toast.success('IBAN fixado no catálogo!');
+                                  } catch {
+                                    toast.error('Erro ao fixar IBAN.');
+                                  } finally {
+                                    setIsSavingGift(false);
+                                  }
+                                }}
+                                disabled={isSavingGift}
+                                className="text-brand-blue text-xs font-bold mt-2 hover:underline disabled:opacity-60"
+                              >
+                                {isSavingGift ? 'A fixar…' : 'Fixar no catálogo'}
+                              </button>
+                            )}
+                        </div>
+                     </div>
+                 ))}
+                  </>);})()}
+            </div>
 
-            {isLoadingContribs ? (
-                <div className="mt-8 border-t border-slate-100 pt-8 space-y-3 animate-pulse" aria-hidden="true">
-                    <div className="h-5 w-48 bg-slate-200 rounded-lg" />
-                    <div className="h-16 bg-slate-100 rounded-2xl" />
-                </div>
-            ) : contributions.length > 0 && (
+            {(() => {
+              const receipts = (guests || []).filter(g => !!(g as any)?.receiptUrl).map((g: any) => ({
+                id: `receipt-${g.id}`,
+                guestName: g.name || 'Convidado',
+                guestPhone: g.phone || '',
+                giftTitle: g.receiptName || 'Comprovante IBAN',
+                amount: 0,
+                receiptUrl: g.receiptUrl,
+              }));
+              const merged = [...contributions, ...receipts.filter(r => !contributions.some((c: any) => c.receiptUrl && c.receiptUrl === (r as any).receiptUrl))];
+              if (isLoadingContribs && merged.length === 0) {
+                return (
+                  <div className="mt-8 border-t border-slate-100 pt-8 space-y-3 animate-pulse" aria-hidden="true">
+                      <div className="h-5 w-48 bg-slate-200 rounded-lg" />
+                      <div className="h-16 bg-slate-100 rounded-2xl" />
+                  </div>
+                );
+              }
+              if (merged.length === 0) return null;
+              return (
                <div className="mt-8 border-t border-slate-100 pt-8">
                    <h3 className="font-bold text-slate-800 mb-4 flex items-center gap-2">
                        <CheckCircle2 size={18} className="text-emerald-500" />
-                       Contribuições Recebidas ({contributions.length})
+                       Contribuições Recebidas ({merged.length})
                    </h3>
                    <div className="bg-slate-50 border border-slate-100 rounded-2xl overflow-hidden">
                        <table className="w-full text-left text-sm">
@@ -254,23 +347,28 @@ export const VirtualGiftsManager: React.FC<{ event: any }> = ({ event }) => {
                                    <th className="p-4 font-medium">Nome (Convidado)</th>
                                    <th className="p-4 font-medium">Telefone</th>
                                    <th className="p-4 font-medium">Presente Mimo</th>
-                                   <th className="p-4 font-medium text-right">Valor</th>
+                                   <th className="p-4 font-medium text-right">Comprovante</th>
                                </tr>
                            </thead>
                            <tbody className="divide-y divide-slate-100">
-                               {contributions.map((cont, idx) => (
+                               {merged.map((cont: any, idx: number) => (
                                    <tr key={cont.id || 'cont-' + idx} className="hover:bg-white transition-colors">
                                        <td className="p-4 font-bold text-slate-800">{cont.guestName}</td>
                                        <td className="p-4 text-slate-500 font-mono text-xs">{cont.guestPhone}</td>
                                        <td className="p-4 text-slate-600 truncate max-w-[200px]">{cont.giftTitle}</td>
-                                       <td className="p-4 text-right font-bold text-brand-blue">{Number(cont.amount || 0).toLocaleString('pt-AO')} Kz</td>
+                                       <td className="p-4 text-right font-bold text-brand-blue">
+                                         {cont.receiptUrl
+                                           ? <a href={cont.receiptUrl} target="_blank" rel="noreferrer" className="underline">Ver</a>
+                                           : `${Number(cont.amount || 0).toLocaleString('pt-AO')} Kz`}
+                                       </td>
                                    </tr>
                                ))}
                            </tbody>
                        </table>
                    </div>
                </div>
-           )}
+              );
+            })()}
        </div>
    );
 };

@@ -16,13 +16,18 @@ export interface TimelineItem {
 }
 
 export interface GiftItem {
-  type: 'IBAN' | 'LINK' | 'BANK'; 
+  id?: string;
+  type: 'IBAN' | 'LINK' | 'BANK';
   title: string;
-  value: string; 
+  value: string;
   description?: string;
   bankName?: string;
   accountName?: string;
   qrCode?: string;
+  // Campos do Gestor da aba Presentes (VirtualGiftsManager) — opcionais para
+  // compatibilidade com itens criados no EventCreator/Questionnaire
+  price?: number;
+  emoji?: string;
 }
 
 export interface TipItem {

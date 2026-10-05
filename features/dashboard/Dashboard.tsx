@@ -1909,7 +1909,7 @@ export const Dashboard = () => {
 
                     {activeTab === 'gifts' && (
                         <div className="lg:col-span-2 flex flex-col gap-6 min-w-0">
-                            <VirtualGiftsManager event={event} />
+                            <VirtualGiftsManager event={event} guests={guests} />
                         </div>
                     )}
 
@@ -1927,8 +1927,7 @@ export const Dashboard = () => {
 
                     {/* Sidebar Actions */}
                     <div className="flex flex-col gap-6 min-w-0">
-                        {/* Check-in: funcionalidade 'checkin' (VIP/Business). Antes: qualquer
-                            pago via isPaidPlan — o Premium validava QR sem o ter no pacote. */}
+                        {/* Check-in: funcionalidade 'checkin' (Premium/VIP/Business). */}
                         {event?.type !== 'BRIDAL_SHOWER' && canUseFeature(eventPlanId, 'checkin') ? (
                          <div className="bg-brand-blue text-white rounded-3xl p-8 relative overflow-hidden shadow-xl shadow-brand-blue/20">
                             <div className="absolute top-0 right-0 w-64 h-64 bg-white/5 rounded-full blur-3xl -mr-10 -mt-10 pointer-events-none"></div>

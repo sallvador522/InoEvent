@@ -44,7 +44,7 @@ const FAQ_ITEMS: FAQItem[] = [
   },
   {
     q: "Como funciona o rastreamento em tempo real e o check-in dos convidados?",
-    a: "Cada convidado recebe o link do convite por WhatsApp e confirma presença na página. Nos planos avançados (VIP e Business), cada convidado tem um código QR individual no bilhete virtual. No dia do evento, a sua equipa de receção usa a câmara de check-in para escanear os códigos e o status é marcado de imediato na lista de presença.",
+    a: "Cada convidado recebe o link do convite por WhatsApp e confirma presença na página. Nos planos Premium, VIP e Business, cada convidado tem um código QR individual no bilhete virtual. No dia do evento, a sua equipa de receção usa a câmara de check-in para escanear os códigos e o status é marcado de imediato na lista de presença.",
     category: "tracking",
     icon: QrCode
   },

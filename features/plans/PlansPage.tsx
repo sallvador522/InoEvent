@@ -44,6 +44,8 @@ const plans = [
       "Mapa das Mesas",
       "Countdown",
       "Analytics Básicos",
+      "QR Individual por Convidado",
+      "Check-in Digital na Portaria",
     ],
   },
   {

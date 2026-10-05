@@ -11,16 +11,21 @@ export const CountdownTimer: React.FC<{ targetDate: string; colorClass?: string 
     seconds: 0,
   });
 
+  const [expired, setExpired] = useState(false);
+
   useEffect(() => {
     const calculateTimeLeft = () => {
       const difference = +new Date(targetDate) - +new Date();
       if (difference > 0) {
+        setExpired(false);
         setTimeLeft({
           days: Math.floor(difference / (1000 * 60 * 60 * 24)),
           hours: Math.floor((difference / (1000 * 60 * 60)) % 24),
           minutes: Math.floor((difference / 1000 / 60) % 60),
           seconds: Math.floor((difference / 1000) % 60),
         });
+      } else {
+        setExpired(true);
       }
     };
     const timer = setInterval(calculateTimeLeft, 1000);
@@ -42,12 +47,19 @@ export const CountdownTimer: React.FC<{ targetDate: string; colorClass?: string 
   );
 
   return (
-    <div className="flex gap-4 md:gap-8 justify-center py-6">
-      <TimeBox val={timeLeft.days} label="Dias" />
-      <div className="text-xl opacity-30 self-start mt-2">:</div>
-      <TimeBox val={timeLeft.hours} label="Hrs" />
-      <div className="text-xl opacity-30 self-start mt-2">:</div>
-      <TimeBox val={timeLeft.minutes} label="Min" />
+    <div className="flex flex-col items-center gap-2 py-6" role="timer" aria-live="polite" aria-label={expired ? 'Evento já celebrado' : 'Contagem regressiva para o evento'}>
+      <div className="flex gap-4 md:gap-8 justify-center">
+        <TimeBox val={timeLeft.days} label="Dias" />
+        <div className="text-xl opacity-30 self-start mt-2" aria-hidden="true">:</div>
+        <TimeBox val={timeLeft.hours} label="Hrs" />
+        <div className="text-xl opacity-30 self-start mt-2" aria-hidden="true">:</div>
+        <TimeBox val={timeLeft.minutes} label="Min" />
+        <div className="text-xl opacity-30 self-start mt-2" aria-hidden="true">:</div>
+        <TimeBox val={timeLeft.seconds} label="Seg" />
+      </div>
+      {expired && (
+        <p className={`text-sm md:text-base font-serif italic ${colorClass}`}>Celebrado com amor — obrigado por teres vindo</p>
+      )}
     </div>
   );
 };

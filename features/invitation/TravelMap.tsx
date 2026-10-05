@@ -262,7 +262,7 @@ const MapFrame: React.FC<{ children: React.ReactNode; tone?: TravelTone; readOnl
                     ? 'border-[#E9BE5D]/25 shadow-sm'
                     : 'border-slate-200/60 shadow-lg';
   return (
-    <div className={`relative w-full overflow-hidden rounded-[1.5rem] border bg-slate-100 aspect-[16/10] min-h-[220px] ${frameBorder}`}>
+    <div className={`relative w-full overflow-hidden rounded-[1.5rem] border aspect-[16/10] min-h-[220px] ${frameBorder} ${isDark ? 'dark-map bg-[#1A1F26]' : 'bg-slate-100'}`}>
       {children}
       {readOnly ? <div className="absolute inset-0 z-10" aria-hidden tabIndex={-1} style={{ pointerEvents: 'auto' }} title="Mapa só leitura — use o botão Como chegar" /> : null}
       {readOnly ? (
@@ -378,7 +378,15 @@ export const TravelMap: React.FC<{
             title={dName || zone}
           />
         ) : embedSrc ? (
-          <MapEmbed src={embedSrc} title={mapTitle} />
+          <MapEmbed
+            src={embedSrc}
+            title={mapTitle}
+            skeletonClassName={
+              tone === 'rustic' ? 'bg-[#E8DCC8]/70'
+              : tone === 'gold' || tone === 'luxury' || tone === 'industrial' ? 'bg-white/5'
+              : undefined
+            }
+          />
         ) : (
           <div className="absolute inset-0 flex flex-col items-center justify-center gap-2 text-slate-400 p-6 text-center">
             <MapIcon size={32} />

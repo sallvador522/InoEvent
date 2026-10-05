@@ -42,12 +42,15 @@ interface TimelineItem {
 }
 
 interface GiftItem {
+  id?: string;
   type: 'IBAN' | 'LINK' | 'BANK';
   title: string;
   value: string;
   description?: string;
   bankName?: string;
   accountName?: string;
+  price?: number;
+  emoji?: string;
 }
 
 export const EventCreator: React.FC = () => {
@@ -325,12 +328,17 @@ export const EventCreator: React.FC = () => {
       return;
     }
     setGifts([...gifts, {
+      id: Math.random().toString(36).slice(2, 10),
       type: newGiftType,
       title: newGiftTitle,
       value: newGiftType === 'IBAN' ? canonicalIban(newGiftValue) : newGiftValue.trim(),
       description: newGiftDesc,
       bankName: newGiftBank.trim(),
-      accountName: newGiftAccount.trim()
+      accountName: newGiftAccount.trim(),
+      // Compatibilidade com a aba Presentes (VirtualGiftsManager): mesmo item
+      // precisa renderizar lá mesmo vindo do EventCreator
+      price: 0,
+      emoji: '🎁',
     }]);
     setNewGiftTitle('');
     setNewGiftValue('');

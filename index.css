@@ -116,3 +116,17 @@ img {
 .ino-float-soft-alt {
   animation: ino-float-soft-alt 5s ease-in-out 1s infinite;
 }
+
+/* Scroll horizontal sem barra (galerias) */
+.no-scrollbar {
+  -ms-overflow-style: none;
+  scrollbar-width: none;
+}
+.no-scrollbar::-webkit-scrollbar {
+  display: none;
+}
+
+/* Mapa dark (temas luxury/gold/industrial): tiles Google claros */
+.dark-map iframe {
+  filter: grayscale(1) invert(0.92) contrast(0.9);
+}

@@ -85,6 +85,7 @@ import {
   Shirt,
   Sparkles,
   Trash2,
+  Timer,
   TreePine,
   Upload,
   UserCheck,
@@ -2742,6 +2743,21 @@ const FloatingDesignDock: React.FC<{
               <Image size={14} className="icon-glyph text-sm text-[#C5A028]" />
               <span>Galeria de Fotos</span>
             </button>
+            <button
+              onClick={() => {
+                const hs = localEvent?.hiddenSections || [];
+                if (hs.includes("countdown")) {
+                  updateField("hiddenSections", hs.filter(s => s !== "countdown"));
+                } else {
+                  updateField("hiddenSections", [...hs, "countdown"]);
+                }
+              }}
+              className="p-3 bg-slate-950 border border-slate-800 hover:border-[#C5A028]/50 hover:bg-slate-800 rounded-xl flex items-center gap-2 justify-center font-bold text-slate-200 transition-all cursor-pointer col-span-2"
+              aria-pressed={(localEvent?.hiddenSections || []).includes("countdown")}
+            >
+              <Timer size={14} className="icon-glyph text-sm text-[#C5A028]" />
+              <span>Contador: {(localEvent?.hiddenSections || []).includes("countdown") ? "Oculto" : "Visível"}</span>
+            </button>
           </div>
           <p className="text-xs text-slate-500 text-center">
             Secções escondidas voltam aqui para editar.
@@ -2766,7 +2782,7 @@ const FloatingDesignDock: React.FC<{
 // ============================================================================
 const EditableSectionWrapper: React.FC<{
   isEditing?: boolean;
-  section: "locations" | "timeline" | "gifts" | "gallery" | "style";
+  section: "locations" | "timeline" | "gifts" | "gallery" | "style" | "reception" | "countdown" | "map" | "dressCode" | "guestbook";
   label: string;
   onEditSection?: (section: any) => void;
   children: React.ReactNode;
@@ -4556,12 +4572,12 @@ const RusticLayout: React.FC<{
             </p>
             ) : null}
             <button
-              onClick={() => window.open(event.mapLink || "#", "_blank")}
+              onClick={() => window.open(event.mapLink || `https://www.google.com/maps/search/?api=1&query=${encodeURIComponent([event.locationName, event.address].filter(Boolean).join(', ') || 'Local do Evento')}`, "_blank")}
+              aria-label={`Ver ${event.locationName || 'local da cerimônia'} no mapa`}
               className="text-xs font-bold border-b border-[#5D4037] pb-1 uppercase tracking-widest"
             >
               Ver Mapa
             </button>
-          {onCheckStatus && <button onClick={onCheckStatus} className="mt-4 sm:mt-0 sm:ml-4 bg-white text-slate-900 border border-slate-200 shadow-lg hover:bg-slate-50 py-4 px-12 rounded-full font-bold uppercase tracking-widest text-sm transition-all w-full sm:w-auto">Meu Convite</button>}
           </div>
           <div className="w-full md:w-1/3 aspect-square rounded-2xl overflow-hidden">
             {/* Foto do local real (Google) → hero → stock decorativo em último caso */}
@@ -4604,12 +4620,21 @@ const RusticLayout: React.FC<{
       ) : null}
 
       {event.isoDate && !isNaN(new Date(event.isoDate).getTime()) ? (
+      <EditableSectionWrapper
+        isEditing={isEditing}
+        section="countdown"
+        isHidden={(event.hiddenSections || []).includes("countdown")}
+        label="Contagem regressiva"
+        onEditSection={onEditSection}
+        className="w-full block"
+      >
         <FadeInSection className="max-w-2xl mx-auto text-center px-6 pb-12">
           <p className="uppercase tracking-widest text-xs text-[#8D6E63] mb-2">
             Contagem regressiva
           </p>
           <CountdownTimer targetDate={event.isoDate} colorClass="text-[#5D4037]" />
         </FadeInSection>
+      </EditableSectionWrapper>
       ) : null}
 
       {/* TIMELINE - Rustic Path */}
@@ -4731,7 +4756,7 @@ const RusticLayout: React.FC<{
           isHidden={(event.hiddenSections || []).includes("gifts")}
         label="Lista de Presentes & Trajes"
         onEditSection={onEditSection}
-        className="grid md:grid-cols-2 gap-4 px-4 mt-16 mb-24 block"
+        className={`grid gap-4 px-4 mt-16 mb-24 w-full max-w-5xl mx-auto ${(event.dressCode?.description || isEditing) ? 'md:grid-cols-2' : 'md:grid-cols-1 max-w-xl'}`}
       >
         {(event.dressCode?.description || isEditing) ? (
         <FadeInSection className="bg-[#5D4037] text-[#FDF5E6] p-10 rounded-3xl text-center flex flex-col items-center justify-center">
@@ -4809,21 +4834,21 @@ const RusticLayout: React.FC<{
           label="Localização"
           onEditSection={onEditSection}
         >
-        <FadeInSection delay={0.1} className="max-w-3xl mx-auto px-6 mt-16">
+        <FadeInSection delay={0.1} className="max-w-3xl mx-auto px-6 mt-16 mb-32">
           <p className="text-center text-[11px] font-bold uppercase tracking-[0.2em] text-[#8D6E63] mb-4">Como chegar</p>
           <TravelMap chrome="guest" tone="rustic" event={event} isEditing={isEditing} onFieldChange={updateField} />
         </FadeInSection>
         </EditableSectionWrapper>
 
       {/* FIXED ACTION */}
-      <div className="fixed bottom-6 left-1/2 -translate-x-1/2 z-50 w-full max-w-sm px-4">
+      <div className="fixed bottom-6 left-1/2 -translate-x-1/2 z-50 w-full max-w-sm px-4 flex flex-col items-center gap-2">
         <button
           onClick={onRSVP}
-          className="w-full bg-[#5D4037] text-[#FDF5E6] py-4 rounded-full font-bold shadow-2xl shadow-[#5D4037]/40 text-sm uppercase tracking-widest hover:scale-105 transition-transform"
+          className="w-full bg-[#5D4037] text-[#FDF5E6] py-4 rounded-full font-bold shadow-2xl shadow-[#5D4037]/40 text-sm uppercase tracking-widest hover:scale-105 active:scale-95 transition-transform min-h-[52px] cursor-pointer"
         >
           {getRSVPText(event.type)}
         </button>
-          {onCheckStatus && <button onClick={onCheckStatus} className="mt-4 sm:mt-0 sm:ml-4 bg-white text-slate-900 border border-slate-200 shadow-lg hover:bg-slate-50 py-4 px-12 rounded-full font-bold uppercase tracking-widest text-sm transition-all w-full sm:w-auto">Meu Convite</button>}
+        {onCheckStatus && <button onClick={onCheckStatus} className="text-[11px] font-bold uppercase tracking-widest text-[#8D6E63] hover:text-[#5D4037] cursor-pointer min-h-[44px] px-4" style={{ transition: 'color 200ms ease' }}>Meu convite</button>}
       </div>
     </div>
   );
@@ -5380,7 +5405,7 @@ const LuxuryLayout: React.FC<{
   };
 
   return (
-    <div className="min-h-screen bg-black text-gray-200 font-serif pb-28 border-[12px] border-[#111] overflow-x-hidden relative">
+    <div className="min-h-screen bg-black text-gray-200 font-serif pb-28 border-[8px] md:border-[12px] border-[#111] overflow-x-hidden relative">
       {/* BACKGROUND: Deep Elegant Radial Gradient (Spotlight Effect) */}
       <div className="fixed inset-0 bg-[radial-gradient(100%_100%_at_50%_0%,_#2C3038_0%,_#0F1419_50%,_#000000_100%)] z-0" />
 
@@ -5417,7 +5442,7 @@ const LuxuryLayout: React.FC<{
                 className="text-4xl text-white text-center font-serif"
               />
             </motion.h1>
-            <p className="text-xs text-gray-500 uppercase tracking-widest">
+            <p className="text-xs text-gray-300 uppercase tracking-widest">
               {event.hosts}
             </p>
           </div>
@@ -5425,7 +5450,7 @@ const LuxuryLayout: React.FC<{
           {/* 2. GUEST PERSONALIZATION */}
           <FadeInSection delay={0.2} className="my-6 text-center w-full px-6">
             <div className="bg-[#BF9B30]/10 border-y border-[#BF9B30]/20 py-3">
-              <p className="text-[10px] uppercase tracking-widest text-gray-400 mb-1">
+              <p className="text-[10px] uppercase tracking-widest text-gray-300 mb-1">
                 Convidado de Honra
               </p>
               <p className="text-xl text-[#BF9B30] font-script">{guestName}</p>
@@ -5434,7 +5459,7 @@ const LuxuryLayout: React.FC<{
 
           {/* 3. HERO IMAGE & DATE */}
           <FadeInSection delay={0.3} className="w-full px-6 mb-4">
-            <div className="w-full aspect-[4/5] rounded-t-[10rem] rounded-b-xl overflow-hidden relative border border-[#BF9B30]/20 mx-auto max-w-sm">
+            <div className="w-full aspect-[4/5] max-h-[520px] rounded-t-[10rem] rounded-b-xl overflow-hidden relative border border-[#BF9B30]/20 mx-auto max-w-sm">
               <EditableImageWrapper
                 src={event.heroImage}
                 onChange={(newVal) => updateField?.("heroImage", newVal)}
@@ -5476,21 +5501,30 @@ const LuxuryLayout: React.FC<{
           </FadeInSection>
 
           {/* 4. COUNTDOWN */}
+          <EditableSectionWrapper
+            isEditing={isEditing}
+            section="countdown"
+            isHidden={(event.hiddenSections || []).includes("countdown")}
+            label="Contagem regressiva"
+            onEditSection={onEditSection}
+            className="w-full block"
+          >
           <FadeInSection className="w-full mb-8">
-            <p className="text-center text-[10px] uppercase tracking-widest text-gray-500 mb-0">
+            <p className="text-center text-[10px] uppercase tracking-widest text-gray-300 mb-0">
               Contagem Regressiva
             </p>
             <CountdownTimer targetDate={event.isoDate} />
           </FadeInSection>
+          </EditableSectionWrapper>
 
           {/* 5. COUPLE MESSAGE */}
           <FadeInSection className="px-8 text-center max-w-md mx-auto pb-4">
-            <p className="text-lg leading-relaxed font-light text-gray-400 border-t border-b border-[#BF9B30]/20 py-8">
+            <p className="text-lg leading-relaxed font-light text-gray-300 border-t border-b border-[#BF9B30]/20 py-8">
               <EditableField
                 value={event.description}
                 onChange={(newVal) => updateField?.("description", newVal)}
                 isEditing={isEditing}
-                className="text-lg leading-relaxed font-light text-gray-400 text-center"
+                className="text-lg leading-relaxed font-light text-gray-300 text-center"
                 multiline
               />
             </p>
@@ -5502,8 +5536,8 @@ const LuxuryLayout: React.FC<{
         {/* 6. CEREMONY & RECEPTION (Split Locations) */}
         <EditableSectionWrapper
           isEditing={isEditing}
-          section="locations"
-          isHidden={(event.hiddenSections || []).includes("locations")}
+          section="reception"
+          isHidden={(event.hiddenSections || []).includes("reception") || (event.hiddenSections || []).includes("locations")}
           label="Locais"
           onEditSection={onEditSection}
           className="w-full block"
@@ -5511,43 +5545,36 @@ const LuxuryLayout: React.FC<{
           <div className="w-full px-6 mb-8 space-y-8">
             <FadeInSection>
               <SectionTitle title="Cerimônia Religiosa" />
-              <div className="border border-[#BF9B30]/30 rounded-xl overflow-hidden bg-[#0F1419] max-w-md mx-auto">
-                <div className="h-32 relative">
-                  <div
-                    className="absolute inset-0 bg-cover bg-center opacity-60"
-                    style={{
-                      backgroundImage: `url('${getImageUrl(event.heroImage, { width: 800 })}')`,
-                    }}
-                  ></div>
-                  <div className="absolute inset-0 bg-gradient-to-t from-[#0F1419] to-transparent"></div>
-                  <div className="absolute bottom-3 left-4">
-                    <p className="text-white text-lg font-serif">
-                      <EditableField
-                        value={event.locationName}
-                        onChange={(newVal) =>
-                          updateField?.("locationName", newVal)
-                        }
-                        isEditing={isEditing}
-                        className="text-white text-lg font-serif text-left"
-                      />
-                    </p>
-                    <p className="text-gray-400 text-xs">{event.time}</p>
-                  </div>
+              <div className="border border-[#BF9B30]/30 rounded-xl bg-[#0F1419] max-w-md mx-auto p-6 text-center space-y-3">
+                <div className="w-12 h-12 mx-auto border border-[#BF9B30]/40 rounded-full flex items-center justify-center" aria-hidden="true">
+                  <MapPin size={20} className="text-[#BF9B30]" />
                 </div>
-                <div className="p-4 flex flex-col gap-3">
+                <p className="text-white text-lg font-serif">
+                  <EditableField
+                    value={event.locationName}
+                    onChange={(newVal) =>
+                      updateField?.("locationName", newVal)
+                    }
+                    isEditing={isEditing}
+                    className="text-white text-lg font-serif text-center"
+                  />
+                </p>
+                <p className="text-[#BF9B30] text-sm">{event.time}</p>
+                <div className="flex flex-col gap-3 pt-1">
                   {event.address ? (
-                  <p className="text-xs text-gray-500 text-center leading-relaxed">
+                  <p className="text-xs text-gray-300 text-center leading-relaxed">
                     <EditableField
                       value={event.address}
                       onChange={(newVal) => updateField?.("address", newVal)}
                       isEditing={false}
-                      className="text-xs text-gray-500 text-center leading-relaxed"
+                      className="text-xs text-gray-300 text-center leading-relaxed"
                       multiline
                     />
                   </p>
                   ) : null}
                   <Button
-                    className="w-full bg-[#BF9B30] text-[#0F1419] hover:bg-white hover:text-black text-xs font-bold uppercase tracking-widest h-10 border-none shadow-lg"
+                    aria-label={`Ver ${event.locationName || 'local da cerimônia'} no mapa`}
+                    className="w-full bg-transparent border border-[#BF9B30] text-[#BF9B30] hover:bg-[#BF9B30]/10 text-xs font-bold uppercase tracking-widest h-10 shadow-none"
                     onClick={() =>
                       window.open(
                         event.mapLink ||
@@ -5565,46 +5592,42 @@ const LuxuryLayout: React.FC<{
             {event.receptionName && (
               <FadeInSection>
                 <SectionTitle title="Recepção & Festa" />
-                <div className="border border-[#BF9B30]/30 rounded-xl overflow-hidden bg-[#0F1419] max-w-md mx-auto">
-                  <div className="h-32 relative">
-                    <div
-                      className="absolute inset-0 bg-cover bg-center opacity-60"
-                      style={{ backgroundImage: `url('${event.mapImage}')` }}
-                    ></div>
-                    <div className="absolute inset-0 bg-gradient-to-t from-[#0F1419] to-transparent"></div>
-                    <div className="absolute bottom-3 left-4">
-                      <p className="text-white text-lg font-serif">
-                        <EditableField
-                          value={event.receptionName}
-                          onChange={(newVal) =>
-                            updateField?.("receptionName", newVal)
-                          }
-                          isEditing={isEditing}
-                          className="text-white text-lg font-serif text-left"
-                        />
-                      </p>
-                      <p className="text-gray-400 text-xs">
-                        Logo após a cerimônia
-                      </p>
-                    </div>
+                <div className="border border-[#BF9B30]/30 rounded-xl bg-[#0F1419] max-w-md mx-auto p-6 text-center space-y-3">
+                  <div className="w-12 h-12 mx-auto border border-[#BF9B30]/40 rounded-full flex items-center justify-center" aria-hidden="true">
+                    <PartyPopper size={20} className="text-[#BF9B30]" />
                   </div>
-                  <div className="p-4 flex flex-col gap-3">
-                    <p className="text-xs text-gray-500 text-center leading-relaxed">
+                  <p className="text-white text-lg font-serif">
+                    <EditableField
+                      value={event.receptionName}
+                      onChange={(newVal) =>
+                        updateField?.("receptionName", newVal)
+                      }
+                      isEditing={isEditing}
+                      className="text-white text-lg font-serif text-center"
+                    />
+                  </p>
+                  <p className="text-gray-300 text-xs">
+                    Logo após a cerimônia
+                  </p>
+                  <div className="flex flex-col gap-3 pt-1">
+                    <p className="text-xs text-gray-300 text-center leading-relaxed">
                       <EditableField
                         value={event.receptionAddress}
                         onChange={(newVal) =>
                           updateField?.("receptionAddress", newVal)
                         }
                         isEditing={isEditing}
-                        className="text-xs text-gray-500 text-center leading-relaxed"
+                        className="text-xs text-gray-300 text-center leading-relaxed"
                         multiline
                       />
                     </p>
                     <Button
-                      className="w-full bg-[#BF9B30] text-[#0F1419] hover:bg-white hover:text-black text-xs font-bold uppercase tracking-widest h-10 border-none shadow-lg"
+                      aria-label={`Ver ${event.receptionName || 'recepção'} no mapa`}
+                      className="w-full bg-transparent border border-[#BF9B30] text-[#BF9B30] hover:bg-[#BF9B30]/10 text-xs font-bold uppercase tracking-widest h-10 shadow-none"
                       onClick={() =>
                         window.open(
-                          `https://maps.google.com/?q=${event.receptionAddress}`,
+                          event.mapLink ||
+                            `https://www.google.com/maps/search/?api=1&query=${encodeURIComponent(event.receptionAddress || event.receptionName || 'Local da Recepção')}`,
                           "_blank",
                         )
                       }
@@ -5620,7 +5643,15 @@ const LuxuryLayout: React.FC<{
 <GoldDivider />
 
         {event.dressCode?.description ? (
-          <FadeInSection className="w-full px-6 mb-24 max-w-md mx-auto text-center">
+          <EditableSectionWrapper
+            isEditing={isEditing}
+            section="dressCode"
+            isHidden={(event.hiddenSections || []).includes("dressCode")}
+            label="Dress Code"
+            onEditSection={onEditSection}
+            className="w-full block"
+          >
+          <FadeInSection className="w-full px-6 mb-16 max-w-md mx-auto text-center">
             <SectionTitle title="Dress Code" />
             <p className="text-sm text-gray-300 leading-relaxed">
               <EditableField
@@ -5634,11 +5665,12 @@ const LuxuryLayout: React.FC<{
               />
             </p>
           </FadeInSection>
+          </EditableSectionWrapper>
         ) : null}
 
       {/* GUESTBOOK / MURAL DE RECADOS — só em planos com guestbook */}
       {isPremium && (
-        <div className="py-16">
+        <div className="py-16 w-full px-6">
           <Guestbook eventId={event.id} layoutMode={event.layoutMode} />
         </div>
       )}
@@ -5653,7 +5685,7 @@ const LuxuryLayout: React.FC<{
             onEditSection={onEditSection}
             className="w-full block"
           >
-            <FadeInSection className="w-full px-6 mb-24 max-w-md mx-auto">
+            <FadeInSection className="w-full px-6 mb-16 max-w-md mx-auto">
               <SectionTitle title="Lista de Presentes" />
               {(event.gifts || []).map((gift, i) => (
                 <div
@@ -5787,16 +5819,21 @@ const LuxuryLayout: React.FC<{
             onEditSection={onEditSection}
             className="w-full block"
           >
-            <FadeInSection className="w-full mb-24 pl-6">
+            <FadeInSection className="w-full mb-16 px-6 max-w-md mx-auto">
               <h3 className="text-[#BF9B30] font-bold uppercase tracking-widest text-xs mb-4 text-left">
                 Nossa Galeria
               </h3>
-              <div className="flex overflow-x-auto gap-4 pb-4 no-scrollbar">
+              <div className="flex overflow-x-auto gap-4 pb-4 no-scrollbar snap-x -mx-6 px-6">
                 {(event.gallery || []).map((img, i) => (
                   <img
                     key={i}
-                    src={getImageUrl(img)}
-                    className="h-48 w-36 object-cover rounded-lg border border-[#BF9B30]/20 grayscale hover:grayscale-0 transition-all duration-500"
+                    src={getImageUrl(img, { width: 400, quality: 70 })}
+                    alt={`Foto ${i + 1} do casal`}
+                    loading="lazy"
+                    decoding="async"
+                    referrerPolicy="no-referrer"
+                    onError={(e) => { (e.currentTarget as HTMLImageElement).src = '/casalModel.webp'; }}
+                    className="h-48 min-w-[144px] w-36 object-cover rounded-lg border border-[#BF9B30]/20 grayscale hover:grayscale-0 focus-visible:grayscale-0 focus-visible:ring-2 focus-visible:ring-[#BF9B30] transition-all duration-500 snap-start"
                   />
                 ))}
               </div>
@@ -5807,18 +5844,19 @@ const LuxuryLayout: React.FC<{
         {/* LOCAL + MAPA — por último, 100% só-leitura, card adaptativo bonito (clica para editar no Estúdio) */}
         <EditableSectionWrapper
           isEditing={isEditing}
-          section="locations"
+          section="map"
+          isHidden={(event.hiddenSections || []).includes("map")}
           label="Localização"
           onEditSection={onEditSection}
         >
-        <FadeInSection delay={0.1} className="max-w-md mx-auto px-6 mt-16 mb-24">
+        <FadeInSection delay={0.1} className="max-w-md mx-auto px-6 mt-16 mb-32">
           <p className="text-center text-[11px] font-bold uppercase tracking-[0.2em] text-[#BF9B30] mb-4">Como chegar</p>
           <TravelMap chrome="guest" tone="luxury" event={event} isEditing={isEditing} onFieldChange={updateField} />
         </FadeInSection>
         </EditableSectionWrapper>
 
         {/* Gold Action Button (Fixed Bottom Bar) */}
-        <div className="fixed bottom-0 left-0 w-full bg-[#0F1419]/95 backdrop-blur-md border-t border-[#BF9B30]/20 px-4 pt-4 z-50 flex flex-col items-center gap-2" style={{ paddingBottom: 'max(1rem, env(safe-area-inset-bottom))' }}>
+        <div className="fixed bottom-0 left-1/2 -translate-x-1/2 w-full max-w-md bg-[#0F1419]/95 backdrop-blur-md border-t border-[#BF9B30]/20 px-4 pt-4 z-50 flex flex-col items-center gap-2" style={{ paddingBottom: 'max(1rem, env(safe-area-inset-bottom))' }}>
           <Button
             onClick={onRSVP}
             className="w-full max-w-md bg-[#BF9B30] text-[#0F1419] font-bold uppercase tracking-widest text-xs hover:bg-white transition-colors py-4 shadow-[0_0_20px_rgba(191,155,48,0.3)] flex items-center justify-center gap-2"
@@ -8263,10 +8301,15 @@ const LimintsoMeLayout: React.FC<{
                           isEditing={isEditing}
                           className="absolute inset-0"
                         >
-                          <div
-                            className="absolute inset-0 bg-cover bg-center transition-transform duration-500 group-hover:scale-105"
-                            style={{ backgroundImage: `url('${getImageUrl(url, { width: 400, quality: 80 })}')` }}
-                          />
+                      <img
+                        src={getImageUrl(url, { width: 400, quality: 80 })}
+                        alt={`Foto ${i + 1} do casal`}
+                        loading="lazy"
+                        decoding="async"
+                        referrerPolicy="no-referrer"
+                        onError={(e) => { (e.currentTarget as HTMLImageElement).src = '/casalModel.webp'; }}
+                        className="absolute inset-0 w-full h-full object-cover transition-transform duration-500 group-hover:scale-105"
+                      />
                         </EditableImageWrapper>
                       </div>
                     );

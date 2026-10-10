@@ -16,6 +16,10 @@ const TemplateGalleryPage = lazy(() => import('./features/landing/TemplateGaller
 const TermsPage = lazy(() => import('./features/landing/TermsPage').then(m => ({ default: m.TermsPage })));
 const PrivacyPage = lazy(() => import('./features/landing/PrivacyPage').then(m => ({ default: m.PrivacyPage })));
 const AboutPage = lazy(() => import('./features/landing/AboutPage').then(m => ({ default: m.AboutPage })));
+const WeddingGuidePage = lazy(() => import('./features/landing/guides/WeddingGuidePage').then(m => ({ default: m.WeddingGuidePage })));
+const GiftsGuidePage = lazy(() => import('./features/landing/guides/GiftsGuidePage').then(m => ({ default: m.GiftsGuidePage })));
+const PricingGuidePage = lazy(() => import('./features/landing/guides/PricingGuidePage').then(m => ({ default: m.PricingGuidePage })));
+const BridalGuidePage = lazy(() => import('./features/landing/guides/BridalGuidePage').then(m => ({ default: m.BridalGuidePage })));
 const InvitationView = lazy(() => import('./features/invitation/InvitationView'));
 const CheckinScanner = lazy(() => import('./features/checkin/CheckinScanner').then(m => ({ default: m.CheckinScanner })));
 const CreateBusiness = lazy(() => import('./features/business/CreateBusiness').then(m => ({ default: m.CreateBusiness })));
@@ -74,6 +78,10 @@ const AnimatedRoutes: React.FC = () => {
       <Routes location={location} /* key={location.pathname} */>
         <Route path="/" element={<PageWrapper><LandingPage /></PageWrapper>} />
         <Route path="/templates" element={<PageWrapper><TemplateGalleryPage /></PageWrapper>} />
+        <Route path="/guia/convite-digital-casamento-angola" element={<PageWrapper><WeddingGuidePage /></PageWrapper>} />
+        <Route path="/guia/lista-presentes-iban" element={<PageWrapper><GiftsGuidePage /></PageWrapper>} />
+        <Route path="/guia/precos-convite-digital" element={<PageWrapper><PricingGuidePage /></PageWrapper>} />
+        <Route path="/guia/cha-de-panela" element={<PageWrapper><BridalGuidePage /></PageWrapper>} />
         <Route path="/terms" element={<PageWrapper><TermsPage /></PageWrapper>} />
         <Route path="/privacy" element={<PageWrapper><PrivacyPage /></PageWrapper>} />
         <Route path="/about" element={<PageWrapper><AboutPage /></PageWrapper>} />

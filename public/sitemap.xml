@@ -11,6 +11,26 @@
     <priority>0.8</priority>
   </url>
   <url>
+    <loc>https://www.inoevent.online/guia/convite-digital-casamento-angola</loc>
+    <changefreq>monthly</changefreq>
+    <priority>0.9</priority>
+  </url>
+  <url>
+    <loc>https://www.inoevent.online/guia/lista-presentes-iban</loc>
+    <changefreq>monthly</changefreq>
+    <priority>0.9</priority>
+  </url>
+  <url>
+    <loc>https://www.inoevent.online/guia/precos-convite-digital</loc>
+    <changefreq>monthly</changefreq>
+    <priority>0.9</priority>
+  </url>
+  <url>
+    <loc>https://www.inoevent.online/guia/cha-de-panela</loc>
+    <changefreq>monthly</changefreq>
+    <priority>0.7</priority>
+  </url>
+  <url>
     <loc>https://www.inoevent.online/plans</loc>
     <changefreq>weekly</changefreq>
     <priority>0.8</priority>

@@ -63,6 +63,13 @@ export function getUpgradeSuggestion(planId: unknown): { from: PlanId; to: PlanI
   return null; // business já é topo
 }
 
+/** KYC pendente: sem kycCompletedAt, o utilizador ainda não declarou perfil.
+ *  Usado pelo KYC progressivo — o cadastro nasce sem KYC e a pergunta aparece
+ *  1x ao criar evento / usar modelo (via /bem-vindo com retorno). */
+export function isKycPending(profile: unknown): boolean {
+  return !(profile as any)?.kycCompletedAt;
+}
+
 // ---------------------------------------------------------------------------
 // Expiração (§8)
 // ---------------------------------------------------------------------------

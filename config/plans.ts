@@ -330,6 +330,12 @@ export const PREMIUM_PROMO_FREE = true;
 
 export const PREMIUM_PROMO_LABEL = 'Grátis';
 
+// Self-serve do 1º evento grátis (piloto silencioso): a true, o utilizador
+// ativa sozinho via POST /api/promo/claim-first-event (elegibilidade 1/conta
+// no servidor + auditoria). A false, o endpoint dá 403 e o frontend repõe o
+// caminho via assistente no WhatsApp. Kill-switch anti-abuso sem deploy.
+export const SELF_SERVE_PROMO_ENABLED = true;
+
 // Compat: preços centralizados para SEO/checkout — nunca duplicar
 export const PRICING = {
   ESSENTIAL: PLANS.essential.price,

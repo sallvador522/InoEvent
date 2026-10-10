@@ -14,7 +14,7 @@ import path from 'path';
 import fs from 'fs';
 import { getEventDetails } from '../lib/firebase-admin.js';
 import { logger } from '../../lib/logger.js';
-import { PLANS, ADDONS, formatPrice } from '../../config/plans.js';
+import { PLANS, ADDONS, PREMIUM_PROMO_FREE, formatPrice } from '../../config/plans.js';
 
 const router = Router();
 
@@ -55,7 +55,9 @@ router.get('/plans', async (req, res, next) => {
     let html = cached;
     
     const plansTitle = "Planos e Preços de Convites Digitais Premium | InoEvents";
-    const plansDesc = `Conheça os preços do InoEvents. Premium ${formatPrice(PLANS.premium.price)}, VIP ${formatPrice(PLANS.vip.price)} e Business ${formatPrice(PLANS.business.price)}/mês. Concierge +${formatPrice(ADDONS.concierge.price)}. RSVP, QR, check-in e gestão de convidados em Angola.`;
+    const plansDesc = PREMIUM_PROMO_FREE
+      ? `Conheça os preços do InoEvents. Premium (${formatPrice(PLANS.premium.price)}) GRÁTIS em promoção de lançamento, VIP ${formatPrice(PLANS.vip.price)} e Business ${formatPrice(PLANS.business.price)}/mês. Concierge +${formatPrice(ADDONS.concierge.price)}. RSVP, QR, check-in e gestão de convidados em Angola.`
+      : `Conheça os preços do InoEvents. Premium ${formatPrice(PLANS.premium.price)}, VIP ${formatPrice(PLANS.vip.price)} e Business ${formatPrice(PLANS.business.price)}/mês. Concierge +${formatPrice(ADDONS.concierge.price)}. RSVP, QR, check-in e gestão de convidados em Angola.`;
     
     html = html.replace(/<title>[^<]*<\/title>/g, `<title>${plansTitle}</title>`);
     html = html.replace(/<meta name="description" content="[^"]*"\s*\/?>/g, `<meta name="description" content="${plansDesc}" />`);

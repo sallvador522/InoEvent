@@ -51,6 +51,7 @@ import { GuestDetailsModal } from './GuestDetailsModal';
 
 import { copyToClipboard } from '../../lib/clipboard';
 import { openInviteShareWhatsApp } from '../../lib/inviteShare';
+import { claimFirstEventFree, CLAIM_FALLBACK_CODES } from '../../lib/promoClaim';
 import { getGuestLimit, normalizePlanId, canUseFeature, getPlanConfig, isAccountActive } from '../../lib/entitlements';
 
 export const Dashboard = () => {
@@ -91,6 +92,7 @@ export const Dashboard = () => {
     const [updatingStatusId, setUpdatingStatusId] = useState<string | null>(null);
     const [deletingGuestId, setDeletingGuestId] = useState<string | null>(null);
     const [isGenLink, setIsGenLink] = useState(false);
+    const [promoClaiming, setPromoClaiming] = useState(false);
     const [isImporting, setIsImporting] = useState(false);
     const [pendingInline, setPendingInline] = useState<string | null>(null);
 
@@ -380,8 +382,45 @@ export const Dashboard = () => {
         window.open(`https://wa.me/244952815430?text=${encodeURIComponent(msg)}`, '_blank', 'noopener,noreferrer');
     };
 
+    // Self-serve: tenta ativar sozinho; se o servidor mandar para o caminho
+    // manual, cai no WhatsApp — nunca prende o utilizador.
+    const handlePromoClaimSelfServe = async () => {
+        if (promoClaiming || !id) return;
+        setPromoClaiming(true);
+        try {
+            const token = await auth.currentUser?.getIdToken();
+            const result = await claimFirstEventFree(id, token || undefined);
+            if (result.ok) {
+                toast.success('Evento ativado GRÁTIS em Premium! A recarregar…');
+                setTimeout(() => window.location.reload(), 1200);
+                return;
+            }
+            if (result.code && CLAIM_FALLBACK_CODES.has(result.code)) {
+                toast(result.message, { icon: '💬' });
+                openPromoWhatsApp();
+                return;
+            }
+            toast.error(result.message);
+        } finally {
+            setPromoClaiming(false);
+        }
+    };
+
+    // Auto-publicação do 1º evento (alavanca B): conta free elegível ativa
+    // sozinha ao tentar partilhar/gerir — sem WhatsApp, sem espera. O reload
+    // devolve a página já partilhável; em falha, segue o caminho pago normal.
+    const triggerAutoPublishFree = () => {
+        if (!promoEligible || promoClaiming) return;
+        void handlePromoClaimSelfServe();
+    };
+
     const requirePaidForShare = () => {
         if (isShareLocked) {
+            if (promoEligible) {
+                toast('A ativar o teu primeiro evento GRÁTIS…');
+                triggerAutoPublishFree();
+                return false;
+            }
             toast.error(
                 isFreeAccount
                     ? 'Na conta Free crias e provas à vontade. Para partilhar, ativa um plano.'
@@ -397,6 +436,11 @@ export const Dashboard = () => {
 
     const requireGuestsAllowed = () => {
         if (isFreeAccount || eventNeedsOwnPlan) {
+            if (promoEligible) {
+                toast('A ativar o teu primeiro evento GRÁTIS…');
+                triggerAutoPublishFree();
+                return false;
+            }
             toast.error(
                 isFreeAccount
                     ? 'A lista de convidados abre após ativares um plano.'
@@ -1184,10 +1228,11 @@ export const Dashboard = () => {
                             <p className="text-sm text-slate-600">Ativamos este evento em Premium (50 convidados, 180 dias) sem pagares nada. Fala com um assistente no WhatsApp.</p>
                         </div>
                         <button
-                            onClick={openPromoWhatsApp}
-                            className="shrink-0 px-6 h-12 rounded-full bg-emerald-600 text-white font-bold text-xs uppercase tracking-wider hover:bg-emerald-700 cursor-pointer whitespace-nowrap"
+                            onClick={handlePromoClaimSelfServe}
+                            disabled={promoClaiming}
+                            className="shrink-0 px-6 h-12 rounded-full bg-emerald-600 text-white font-bold text-xs uppercase tracking-wider hover:bg-emerald-700 disabled:opacity-70 cursor-pointer whitespace-nowrap"
                         >
-                            Ativar grátis
+                            {promoClaiming ? 'A ativar…' : 'Ativar grátis'}
                         </button>
                     </div>
                 )}

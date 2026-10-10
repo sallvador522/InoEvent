@@ -1,6 +1,10 @@
-import React from 'react';
+import React, { useState } from 'react';
 import { motion } from 'framer-motion';
 import { Gift, MessageSquare, X } from 'lucide-react';
+import { useNavigate } from 'react-router-dom';
+import toast from 'react-hot-toast';
+import { auth } from '../../components/FirebaseProvider';
+import { claimFirstEventFree, CLAIM_FALLBACK_CODES } from '../../lib/promoClaim';
 
 /**
  * Boas-vindas + promo 1º evento GRÁTIS (Premium completo, via assistente).
@@ -17,6 +21,35 @@ interface Props {
 }
 
 export const FirstEventFreeModal: React.FC<Props> = ({ eventTitle, eventId, userUid, userEmail, onClose, onDismiss }) => {
+  const navigate = useNavigate();
+  const [claiming, setClaiming] = useState(false);
+  const [claimError, setClaimError] = useState('');
+
+  // Self-serve: ativa sozinho; se o servidor mandar para o caminho manual
+  // (ou falhar), cai nos botões WhatsApp abaixo — nunca prende o utilizador.
+  const handleClaimSelfServe = async () => {
+    if (claiming) return;
+    setClaiming(true);
+    setClaimError('');
+    try {
+      const token = await auth.currentUser?.getIdToken();
+      const result = await claimFirstEventFree(eventId, token || undefined);
+      if (result.ok) {
+        toast.success('Evento ativado GRÁTIS em Premium! Já pode partilhar.');
+        onDismiss();
+        navigate(`/dashboard/${eventId}`);
+        return;
+      }
+      if (result.code && CLAIM_FALLBACK_CODES.has(result.code)) {
+        setClaimError(result.message);
+        return;
+      }
+      setClaimError(result.message);
+    } finally {
+      setClaiming(false);
+    }
+  };
+
   const openAssistantWhatsApp = (number: string) => {
     const origin = typeof window !== 'undefined' ? window.location.origin : 'https://www.inoevent.online';
     const msg =
@@ -71,14 +104,31 @@ export const FirstEventFreeModal: React.FC<Props> = ({ eventTitle, eventId, user
           <li>✓ Válido por 180 dias</li>
         </ul>
         <p className="text-xs text-slate-500 mb-5">
-          Fala com um assistente no WhatsApp com a referência pronta — ele ativa em minutos.
+          Ative já aqui sem espera — ou, se preferir, fale no WhatsApp abaixo.
         </p>
 
         <button
-          onClick={() => openAssistantWhatsApp('244952815430')}
-          className="w-full bg-emerald-600 hover:bg-emerald-700 text-white rounded-full py-3.5 px-5 font-bold text-xs uppercase tracking-wider transition-all flex items-center justify-center gap-2 cursor-pointer active:scale-[0.98] mb-2"
+          onClick={handleClaimSelfServe}
+          disabled={claiming}
+          className="w-full bg-emerald-600 hover:bg-emerald-700 disabled:opacity-70 text-white rounded-full py-3.5 px-5 font-bold text-xs uppercase tracking-wider transition-all flex items-center justify-center gap-2 cursor-pointer active:scale-[0.98] mb-2"
         >
-          <MessageSquare size={16} /> Ativar grátis no WhatsApp
+          {claiming ? (
+            <span className="w-4 h-4 border-2 border-white/30 border-t-white rounded-full animate-spin" aria-hidden="true" />
+          ) : (
+            <Gift size={16} />
+          )}
+          {claiming ? 'A ativar…' : 'Ativar grátis agora'}
+        </button>
+        {claimError && (
+          <p className="text-xs text-amber-700 bg-amber-50 border border-amber-200 rounded-xl px-3 py-2 mb-2">
+            {claimError} Pode ativar pelo WhatsApp:
+          </p>
+        )}
+        <button
+          onClick={() => openAssistantWhatsApp('244952815430')}
+          className="w-full border border-slate-200 text-slate-600 hover:bg-slate-50 rounded-full py-3 px-5 font-bold text-xs uppercase tracking-wider transition-all cursor-pointer flex items-center justify-center gap-2"
+        >
+          <MessageSquare size={16} /> WhatsApp (952 815 430)
         </button>
         <button
           onClick={() => openAssistantWhatsApp('244939384315')}

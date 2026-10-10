@@ -19,7 +19,7 @@ import { TocaPlayer } from "../../components/music/TocaPlayer";
 import { BottomSheet } from "../../components/ui/BottomSheet";
 import { Button } from "../../components/ui/Button";
 import { db, useFirebase } from "../../components/FirebaseProvider";
-import { getGuestLimit, normalizePlanId, getPlanConfig, canUseFeature, getEventCreationLimit, isBusinessPlan, isEventExpired, isAccountActive } from "../../lib/entitlements";
+import { getGuestLimit, normalizePlanId, getPlanConfig, canUseFeature, getEventCreationLimit, isBusinessPlan, isEventExpired, isAccountActive, isKycPending } from "../../lib/entitlements";
 import {
   doc,
   getDoc,
@@ -694,16 +694,21 @@ const InvitationView: React.FC = () => {
       setIsAuthOpen(true);
       return;
     }
-    // Casamento: preview → questionário (todos os campos do template) → publicar → editor
-    if (activeEvent.type === "WEDDING") {
-      navigate(`/create-wedding?template=${activeEvent.layoutMode}`);
+    // Destino conforme o tipo — calculado antes da porteira KYC para o
+    // /bem-vindo saber para onde voltar.
+    const dest =
+      activeEvent.type === "WEDDING"
+        ? `/create-wedding?template=${activeEvent.layoutMode}`
+        : (() => {
+            const newId = `evt_${Math.random().toString(36).substr(2, 9)}`;
+            return `/invite/${newId}?edit=true&new=true&baseId=${activeEvent.id}&template=${activeEvent.layoutMode}&theme=${activeEvent.type}`;
+          })();
+    // KYC progressivo: sem perfil declarado, pergunta 1x e volta ao destino.
+    if (isKycPending(userProfile)) {
+      navigate('/bem-vindo', { state: { from: dest } });
       return;
     }
-    // Demais tipos: caminho direto ao editor interativo
-    const newId = `evt_${Math.random().toString(36).substr(2, 9)}`;
-    navigate(
-      `/invite/${newId}?edit=true&new=true&baseId=${activeEvent.id}&template=${activeEvent.layoutMode}&theme=${activeEvent.type}`,
-    );
+    navigate(dest);
   };
 
   // Helper values updates

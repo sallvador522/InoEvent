@@ -240,7 +240,7 @@ export const LandingPage: React.FC = () => {
     <div className="flex-1 min-h-screen flex flex-col justify-between relative font-display overflow-x-hidden bg-[#FDFBF7] text-slate-900">
       <SEO 
         title="InoEvents Angola | Convites Digitais de Casamento, Chá de Panela e Gestão de Eventos" 
-        description={`A plataforma mais elegante de Angola para criar convites digitais de casamento e chás de panela a partir de ${PLANS.premium.price.toLocaleString('pt-AO')} Kz, com RSVP online, QR Code de acesso, mapa da zona com botão Como chegar, check-in presencial no evento, lista de convidados e presentes por IBAN.`}
+        description={PREMIUM_PROMO_FREE ? `A plataforma mais elegante de Angola para criar convites digitais de casamento e chás de panela — Premium (${PLANS.premium.price.toLocaleString('pt-AO')} Kz) grátis em promoção de lançamento, com RSVP online, QR Code de acesso, mapa da zona com botão Como chegar, check-in presencial no evento, lista de convidados e presentes por IBAN.` : `A plataforma mais elegante de Angola para criar convites digitais de casamento e chás de panela a partir de ${PLANS.premium.price.toLocaleString('pt-AO')} Kz, com RSVP online, QR Code de acesso, mapa da zona com botão Como chegar, check-in presencial no evento, lista de convidados e presentes por IBAN.`}
       />
 
       <Navbar />
@@ -269,10 +269,17 @@ export const LandingPage: React.FC = () => {
             >
                <div className="flex items-center gap-3 px-1 py-2">
                   <span className="h-px w-8 bg-[var(--color-gold-soft)]/80" />
-                  <span className="text-[11px] font-bold uppercase tracking-[0.22em] text-white/85">Convites digitais · Angola</span>
-                  <span className="h-px w-8 bg-[var(--color-gold-soft)]/80" />
+                   <span className="text-[11px] font-bold uppercase tracking-[0.22em] text-white/85">Convites digitais · Angola</span>
+                   <span className="h-px w-8 bg-[var(--color-gold-soft)]/80" />
+                </div>
+             </motion.div>
+             {PREMIUM_PROMO_FREE && (
+               <div className="relative z-20 flex justify-center w-full -mt-4 mb-8">
+                 <span className="inline-flex items-center gap-2 rounded-full bg-emerald-500/95 px-4 py-1.5 text-[11px] font-bold uppercase tracking-[0.16em] text-white shadow-lg shadow-emerald-900/30">
+                   Premium Grátis — promoção de lançamento
+                 </span>
                </div>
-            </motion.div>
+             )}
 
             <div className="relative z-20 max-w-5xl mx-auto px-6 pb-12 md:pb-16 text-center flex flex-col items-center">
               
@@ -322,8 +329,13 @@ export const LandingPage: React.FC = () => {
                         Concierge: criamos por si
                      </button>
                    </div>
-                 </div>
-                 {/* Galeria — o mapa vive na secção "Exemplo real" abaixo; aqui vai o atalho para os modelos */}
+                  </div>
+                  {PREMIUM_PROMO_FREE && (
+                    <p className="-mt-3 text-xs font-medium tracking-wide text-white/80">
+                      Preço normal {PLANS.premium.price.toLocaleString('pt-AO')} Kz · hoje grátis, sem cartão
+                    </p>
+                  )}
+                  {/* Galeria — o mapa vive na secção "Exemplo real" abaixo; aqui vai o atalho para os modelos */}
                  <Link
                    to="/templates"
                    className="mt-4 inline-flex items-center gap-3 text-[11px] font-bold uppercase tracking-[0.18em] text-white/90 hover:text-[#E9BE5D]"
@@ -558,7 +570,7 @@ export const LandingPage: React.FC = () => {
               <div className="w-full bg-[#FFFDF8] rounded-2xl p-8 border border-[#C5A028]/30 flex flex-col relative" style={{ transition: 'border-color 200ms ease, box-shadow 200ms ease' }}>
                   {PREMIUM_PROMO_FREE && (
                     <div className="absolute top-0 left-1/2 -translate-x-1/2 -translate-y-1/2 bg-emerald-600 text-white text-[10px] font-bold uppercase tracking-[0.14em] py-1 px-4 rounded-full whitespace-nowrap shadow-lg shadow-emerald-600/30">
-                      Promoção · {PREMIUM_PROMO_LABEL}
+                      Promoção de lançamento
                     </div>
                   )}
                   <h4 className="font-serif text-2xl font-bold text-[#1B365D] mb-1">Premium</h4>
@@ -576,7 +588,10 @@ export const LandingPage: React.FC = () => {
                        </>
                      )}
                   </div>
-                  <p className="text-xs text-slate-500 font-light mb-6">Válido por {PLANS.premium.validityDays} dias · Até {PLANS.premium.guestLimit} convidados</p>
+                   <p className="text-xs text-slate-500 font-light mb-6">Válido por {PLANS.premium.validityDays} dias · Até {PLANS.premium.guestLimit} convidados</p>
+                   {PREMIUM_PROMO_FREE && (
+                     <p className="-mt-4 mb-6 text-xs font-bold text-emerald-700">Preço normal {PLANS.premium.price.toLocaleString('pt-AO')} Kz · hoje grátis, sem cartão</p>
+                   )}
                   <ul className="flex flex-col gap-3 mb-8 flex-1">
                      <li className="flex items-center gap-3 text-[13px] text-slate-600">
                         <CheckCircle2 size={18} className="text-[#C5A028] shrink-0" />
@@ -620,7 +635,7 @@ export const LandingPage: React.FC = () => {
                      </li>
                   </ul>
                  <button
-                     onClick={() => confirmPlanSelection("Premium", PREMIUM_PROMO_FREE ? `${PREMIUM_PROMO_LABEL} (promoção)` : `${PLANS.premium.price.toLocaleString('pt-AO')} Kz`)}
+                      onClick={() => confirmPlanSelection("Premium", PREMIUM_PROMO_FREE ? `Grátis em promoção de lançamento (preço normal ${PLANS.premium.price.toLocaleString('pt-AO')} Kz)` : `${PLANS.premium.price.toLocaleString('pt-AO')} Kz`)}
                      className="w-full py-3.5 rounded-full border border-[#1B365D]/30 text-[#1B365D] font-bold text-xs uppercase tracking-wider hover:bg-[#1B365D] hover:text-white active:scale-[0.97] cursor-pointer"
                      style={{ transition: 'transform 160ms ease-out, background-color 200ms ease, color 200ms ease' }}
                   >
@@ -776,15 +791,20 @@ export const LandingPage: React.FC = () => {
                  className="h-12 px-8 bg-[#1B365D] text-white text-xs font-bold uppercase tracking-wider rounded-full cursor-pointer hover:bg-[#224373] active:scale-[0.97]"
                  style={{ transition: 'transform 160ms ease-out, background-color 200ms ease' }}
               >
-                 Criar Convite
+                 {PREMIUM_PROMO_FREE ? "Criar Convite Grátis" : "Criar Convite"}
               </button>
+              {PREMIUM_PROMO_FREE && (
+                <p className="-mt-3 text-xs font-medium text-slate-500">Premium {PLANS.premium.price.toLocaleString('pt-AO')} Kz, hoje grátis</p>
+              )}
               <nav className="flex flex-wrap items-center justify-center gap-x-4 gap-y-1 text-[13px] text-slate-500 [&>a]:min-h-[44px] [&>a]:inline-flex [&>a]:items-center [&>a]:px-1" aria-label="Rodapé">
-                 <Link to="/templates" className="hover:text-slate-900" style={{ transition: 'color 200ms ease' }}>Templates</Link>
-                 <Link to="/plans" className="hover:text-slate-900" style={{ transition: 'color 200ms ease' }}>Planos</Link>
+                  <Link to="/templates" className="hover:text-slate-900" style={{ transition: 'color 200ms ease' }}>Templates</Link>
+                  <Link to="/plans" className="hover:text-slate-900" style={{ transition: 'color 200ms ease' }}>Planos</Link>
+                  <Link to="/guia/convite-digital-casamento-angola" className="hover:text-slate-900" style={{ transition: 'color 200ms ease' }}>Guias</Link>
                  <Link to="/about" className="hover:text-slate-900" style={{ transition: 'color 200ms ease' }}>Sobre Nós</Link>
                  <Link to="/terms" className="hover:text-slate-900" style={{ transition: 'color 200ms ease' }}>Termos</Link>
                  <Link to="/privacy" className="hover:text-slate-900" style={{ transition: 'color 200ms ease' }}>Privacidade</Link>
-                 <a href="https://wa.me/244952815430" target="_blank" rel="noopener noreferrer" className="hover:text-slate-900" style={{ transition: 'color 200ms ease' }}>WhatsApp</a>
+                  <a href="https://wa.me/244952815430" target="_blank" rel="noopener noreferrer" className="hover:text-slate-900" style={{ transition: 'color 200ms ease' }}>WhatsApp</a>
+                  <a href="https://www.instagram.com/inoevent2026/" target="_blank" rel="noopener noreferrer" className="hover:text-slate-900" style={{ transition: 'color 200ms ease' }}>Instagram</a>
               </nav>
               <p className="text-xs text-slate-500 font-light">© {new Date().getFullYear()} InoEvents · Feito em Luanda, Angola</p>
           </div>

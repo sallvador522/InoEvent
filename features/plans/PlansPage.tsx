@@ -277,7 +277,7 @@ export const PlansPage: React.FC = () => {
 
     const messageText = whatsappModal.name === "Business"
       ? `Olá InoEvents! Quero subscrever o Plano ${whatsappModal.name.toUpperCase()} para a minha agência.${conciergeLine}\n\nID da Plataforma: ${user.uid}\nE-mail: ${user.email || "Não informado"}${agencyLine}${eventTitleLine}${inviteLinkLine}\n\nAguardo o IBAN aqui e envio o comprovativo nesta conversa. Obrigado!`
-      : `Olá InoEvents! Quero ativar o Plano ${whatsappModal.name.toUpperCase()} — ${totalLine}${isPromoFreeOrder ? " (promoção)" : ""}.${conciergeLine}\n\nID da Plataforma: ${user.uid}\nE-mail: ${user.email || "Não informado"}${agencyLine}${eventTitleLine}${inviteLinkLine}\n\nAguardo o IBAN aqui e envio o comprovativo nesta conversa. Obrigado!`;
+      : `Olá InoEvents! Quero ativar o Plano ${whatsappModal.name.toUpperCase()} — ${totalLine}${isPromoFreeOrder ? ` (grátis em promoção de lançamento — preço normal ${PLANS.premium.price.toLocaleString('pt-AO')} Kz)` : ""}.${conciergeLine}\n\nID da Plataforma: ${user.uid}\nE-mail: ${user.email || "Não informado"}${agencyLine}${eventTitleLine}${inviteLinkLine}\n\nAguardo o IBAN aqui e envio o comprovativo nesta conversa. Obrigado!`;
 
     const cleanNumber = whatsappNumber.replace(/\D/g, "");
     const url = `https://wa.me/${cleanNumber}?text=${encodeURIComponent(messageText)}`;
@@ -436,7 +436,7 @@ export const PlansPage: React.FC = () => {
 
                 {isPromoFree && (
                   <div className="absolute top-0 left-1/2 -translate-x-1/2 -translate-y-1/2 bg-emerald-600 text-white text-[10px] font-bold uppercase tracking-[0.14em] py-1 px-4 rounded-full whitespace-nowrap shadow-lg shadow-emerald-600/30">
-                    Promoção · {PREMIUM_PROMO_LABEL}
+                    Promoção de lançamento
                   </div>
                 )}
 
@@ -500,6 +500,12 @@ export const PlansPage: React.FC = () => {
                     </p>
                   ) : (
                     <div className="mb-6 h-4" aria-hidden="true" />
+                  )}
+
+                  {isPromoFree && (
+                    <p className="-mt-4 mb-6 text-xs font-bold text-emerald-700">
+                      Preço normal {PLANS.premium.price.toLocaleString('pt-AO')} Kz · hoje grátis, sem cartão
+                    </p>
                   )}
 
                   <ul className="flex flex-col gap-3 mb-8 flex-1">

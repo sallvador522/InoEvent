@@ -13,7 +13,15 @@ import { admin } from './firebase-admin.js';
 
 export const ADMIN_BOOTSTRAP_EMAIL = 'antoniosalvador522@gmail.com';
 
-export type AdminAuthUser = { uid: string; email?: string; isAdminClaim: boolean };
+export type AdminAuthUser = {
+  uid: string;
+  email?: string;
+  isAdminClaim: boolean;
+  /** Provider de login (ex.: 'google.com', 'password', 'anonymous') — base da
+   *  regra anti-farming da promo self-serve. Ausente = desconhecido. */
+  signInProvider?: string;
+  emailVerified?: boolean;
+};
 
 export async function getAdminAuthUser(req: any): Promise<AdminAuthUser | null> {
   const hdr = req.headers.authorization as string | undefined;
@@ -24,6 +32,8 @@ export async function getAdminAuthUser(req: any): Promise<AdminAuthUser | null> 
       uid: decoded.uid,
       email: (decoded as any).email,
       isAdminClaim: (decoded as any).admin === true,
+      signInProvider: (decoded as any)?.firebase?.sign_in_provider,
+      emailVerified: !!(decoded as any)?.email_verified,
     };
   } catch {
     return null;

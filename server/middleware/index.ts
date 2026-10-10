@@ -42,6 +42,17 @@ export const rsvpRateLimiter = rateLimit({
   legacyHeaders: false,
 });
 
+/** Promo self-serve: 10 ativações por hora por utilizador (a regra real de
+ *  1-promo-por-conta vive no Firestore; isto trava rajadas e scripts). */
+export const promoClaimLimiter = rateLimit({
+  windowMs: 60 * 60 * 1000,
+  max: 10,
+  message: { error: 'Muitas tentativas de ativação. Tente novamente mais tarde.' },
+  keyGenerator,
+  standardHeaders: true,
+  legacyHeaders: false,
+});
+
 // --- Auth Helper ---
 
 /** Extracts and verifies a Firebase ID token from the Authorization header. */

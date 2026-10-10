@@ -6,6 +6,7 @@ import { useFirebase, db } from '../../components/FirebaseProvider';
 import { Navbar } from '../../components/Navbar';
 import { SEO } from '../../components/SEO';
 import { normalizePlanId, getEventCreationLimit, isBusinessPlan } from '../../config/plans';
+import { isKycPending } from '../../lib/entitlements';
 import { uploadEventAudioWithProgress, deleteEventAudio, isOwnStorageAudio, formatAudioSize, MAX_AUDIO_BYTES } from '../../lib/audioUpload';
 import { ArrowLeft, ArrowRight, Check, Plus, Trash2, Gift } from 'lucide-react';
 import toast from 'react-hot-toast';
@@ -92,7 +93,7 @@ const compressImage = (file: File): Promise<string> =>
   });
 
 export const WeddingQuestionnaire: React.FC = () => {
-  const { user, userProfile } = useFirebase();
+  const { user, userProfile, loading: authLoading } = useFirebase();
   const navigate = useNavigate();
   const [step, setStep] = useState(0);
   const [eventId, setEventId] = useState<string | null>(null);
@@ -177,6 +178,15 @@ export const WeddingQuestionnaire: React.FC = () => {
       setTitle(`${brideName} & ${groomName}`);
     }
   }, [brideName, groomName, titleTouched]);
+
+  // KYC progressivo: sem perfil declarado, desvia 1x para /bem-vindo e volta
+  // para aqui (só após carregar o perfil — evita salto com ficha ainda a ler).
+  useEffect(() => {
+    if (!authLoading && user && isKycPending(userProfile)) {
+      const back = `/create-wedding${searchParams.toString() ? `?${searchParams.toString()}` : ''}`;
+      navigate('/bem-vindo', { state: { from: back }, replace: true });
+    }
+  }, [authLoading, user, userProfile, navigate, searchParams]);
 
   // Guarda rascunho ou publica. Criação nova vai via servidor (impõe limite §7);
   // `draft:false` (publicação) conta no limite, rascunho não. Edição segue direta.

@@ -2,7 +2,7 @@ import React, { useState, useEffect, useRef } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
 import { useNavigate, useLocation } from 'react-router-dom';
 import { useFirebase, db } from '../../components/FirebaseProvider';
-import { getGuestLimit, normalizePlanId, getPlanConfig, getEventCreationLimit, isBusinessPlan } from '../../lib/entitlements';
+import { getGuestLimit, normalizePlanId, getPlanConfig, getEventCreationLimit, isBusinessPlan, isKycPending } from '../../lib/entitlements';
 import { doc, getDoc, setDoc, updateDoc, collection, query, where, getDocs } from 'firebase/firestore';
 import toast from 'react-hot-toast';
 import {
@@ -60,8 +60,16 @@ export const EventCreator: React.FC = () => {
   const initialTemplate = queryObj.get('template');
   const eventIdParam = queryObj.get('eventId');
   
-  const { user, userProfile } = useFirebase();
+  const { user, userProfile, loading: authLoading } = useFirebase();
   const isEditingExisting = !!eventIdParam;
+
+  // KYC progressivo: sem perfil declarado, desvia 1x para /bem-vindo e volta
+  // para aqui (só após carregar o perfil — evita salto com ficha ainda a ler).
+  useEffect(() => {
+    if (!authLoading && user && isKycPending(userProfile)) {
+      navigate('/bem-vindo', { state: { from: location.pathname + location.search }, replace: true });
+    }
+  }, [authLoading, user, userProfile, navigate, location]);
 
   // Determine if it is a bridal shower
   const isBridalShower = location.pathname.includes('bridal') || 
